@@ -1,0 +1,18 @@
+@import "tailwindcss";
+
+:root {
+  --primary: #8A5A6A;
+  --gold: #C9A96E;
+  --background: #FFFDF9;
+  --text: #2F2A28;
+}
+
+body {
+  background: var(--background);
+  color: var(--text);
+  font-family: var(--font-inter);
+}
+
+h1,h2,h3,h4,h5,h6{
+  font-family: var(--font-playfair);
+}
