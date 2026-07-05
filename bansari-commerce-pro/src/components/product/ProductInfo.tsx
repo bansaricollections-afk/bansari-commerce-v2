@@ -1,8 +1,10 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 
 import { Product } from "@/types";
+import { useCart } from "@/store/cart";
 
 type Props = {
   product: Product;
@@ -11,26 +13,48 @@ type Props = {
 const sizes = ["S", "M", "L", "XL", "XXL"];
 
 export default function ProductInfo({ product }: Props) {
+  const router = useRouter();
+
+  const addItem = useCart((state) => state.addItem);
+
   const [selectedSize, setSelectedSize] = useState("M");
   const [quantity, setQuantity] = useState(1);
 
+  function handleAddToCart() {
+    addItem({
+      id: product.id,
+      name: product.name,
+      image: product.images?.[0]?.url || "/placeholder.png",
+      price: product.price,
+      quantity,
+    });
+
+    alert("Product added to cart.");
+  }
+
+  function handleBuyNow() {
+    addItem({
+      id: product.id,
+      name: product.name,
+      image: product.images?.[0]?.url || "/placeholder.png",
+      price: product.price,
+      quantity,
+    });
+
+    router.push("/checkout");
+  }
+
   return (
     <div className="space-y-6">
-      {/* Badge */}
-
       {product.badge && (
         <span className="inline-flex rounded-full bg-[#8A5A6A] px-4 py-2 text-sm font-medium text-white">
           {product.badge}
         </span>
       )}
 
-      {/* Title */}
-
       <h1 className="font-[family:var(--font-playfair)] text-4xl font-bold leading-tight lg:text-5xl">
         {product.name}
       </h1>
-
-      {/* Rating */}
 
       <div className="flex items-center gap-3">
         <span className="text-lg text-yellow-500">★★★★★</span>
@@ -43,8 +67,6 @@ export default function ProductInfo({ product }: Props) {
           ({product.reviewCount} Reviews)
         </span>
       </div>
-
-      {/* Price */}
 
       <div className="flex flex-wrap items-center gap-4">
         <span className="text-4xl font-bold text-[#8A5A6A]">
@@ -66,8 +88,6 @@ export default function ProductInfo({ product }: Props) {
         )}
       </div>
 
-      {/* Availability */}
-
       <div>
         {product.stock > 5 ? (
           <p className="font-medium text-green-600">
@@ -84,13 +104,9 @@ export default function ProductInfo({ product }: Props) {
         )}
       </div>
 
-      {/* Description */}
-
       <p className="leading-8 text-gray-600">
         {product.description}
       </p>
-
-      {/* Size */}
 
       <div className="space-y-3">
         <h3 className="font-semibold">
@@ -114,8 +130,6 @@ export default function ProductInfo({ product }: Props) {
           ))}
         </div>
       </div>
-
-      {/* Quantity */}
 
       <div className="space-y-3">
         <h3 className="font-semibold">
@@ -149,11 +163,10 @@ export default function ProductInfo({ product }: Props) {
         </div>
       </div>
 
-      {/* CTA Buttons */}
-
       <div className="grid gap-4 pt-4 sm:grid-cols-2">
         <button
           type="button"
+          onClick={handleAddToCart}
           disabled={product.stock === 0}
           className="rounded-full border-2 border-[#8A5A6A] py-4 font-semibold text-[#8A5A6A] transition hover:bg-[#8A5A6A] hover:text-white disabled:cursor-not-allowed disabled:opacity-50"
         >
@@ -162,14 +175,13 @@ export default function ProductInfo({ product }: Props) {
 
         <button
           type="button"
+          onClick={handleBuyNow}
           disabled={product.stock === 0}
           className="rounded-full bg-[#8A5A6A] py-4 font-semibold text-white transition hover:bg-[#734757] disabled:cursor-not-allowed disabled:opacity-50"
         >
           Buy Now
         </button>
       </div>
-
-      {/* Quick Details */}
 
       <div className="grid grid-cols-2 gap-5 rounded-2xl border border-[#ECE7E2] bg-[#FFFDF9] p-5">
         <div>
