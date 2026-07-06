@@ -1,5 +1,5 @@
 import ProductCard from "@/components/product/ProductCard";
-import { products } from "@/data/products";
+import { getProducts } from "@/services/product.service";
 
 type Props = {
   product: {
@@ -8,11 +8,15 @@ type Props = {
   };
 };
 
-export default function CompleteLook({ product }: Props) {
+export default async function CompleteLook({ product }: Props) {
+  const allProducts = await getProducts();
+
   const related =
     product.completeLook && product.completeLook.length > 0
-      ? products.filter((p) => product.completeLook?.includes(p.id))
-      : products.filter((p) => p.id !== product.id).slice(0, 4);
+      ? allProducts
+          .filter((p) => product.completeLook?.includes(p.id))
+          .slice(0, 4)
+      : allProducts.filter((p) => p.id !== product.id).slice(0, 4);
 
   if (related.length === 0) return null;
 
