@@ -1,8 +1,8 @@
 import ProductCard from "@/components/product/ProductCard";
-import { products } from "@/data/products";
+import { getProducts } from "@/services/product.service";
 
-export default function ProductGrid() {
-  const productList = products;
+export default async function ProductGrid() {
+  const productList = await getProducts();
 
   if (productList.length === 0) {
     return (

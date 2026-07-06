@@ -1,12 +1,10 @@
 import Link from "next/link";
 
 import ProductCard from "@/components/product/ProductCard";
-import { products } from "@/data/products";
+import { getFeaturedProducts } from "@/services/product.service";
 
-export default function FeaturedProducts() {
-  const featuredProducts = products
-    .filter((product) => product.featured)
-    .slice(0, 8);
+export default async function FeaturedProducts() {
+  const featuredProducts = (await getFeaturedProducts()).slice(0, 8);
 
   return (
     <section className="bg-[#FAF8F5] py-24">
