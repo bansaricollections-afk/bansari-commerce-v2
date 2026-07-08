@@ -13,7 +13,11 @@ declare global {
   }
 }
 
-export default function RazorpayButton() {
+type Props = {
+  disabled?: boolean;
+};
+
+export default function RazorpayButton({ disabled = false }: Props) {
   const router = useRouter();
 
   const {
@@ -25,6 +29,12 @@ export default function RazorpayButton() {
   const [loading, setLoading] = useState(false);
 
   async function handlePayment() {
+    // Defense-in-depth: never allow payment to start if the button
+    // should not be actionable, even if invoked programmatically.
+    if (disabled || loading || items.length === 0) {
+      return;
+    }
+
     try {
       setLoading(true);
 
@@ -165,7 +175,7 @@ export default function RazorpayButton() {
     <button
       type="button"
       onClick={handlePayment}
-      disabled={loading || items.length === 0}
+      disabled={loading || items.length === 0 || disabled}
       className="mt-10 flex w-full items-center justify-center rounded-full bg-[#8A5A6A] py-4 font-semibold text-white transition hover:bg-[#734757] disabled:cursor-not-allowed disabled:opacity-50"
     >
       {loading ? "Processing..." : "Pay Securely"}
