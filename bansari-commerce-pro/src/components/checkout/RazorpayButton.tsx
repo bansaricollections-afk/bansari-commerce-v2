@@ -13,11 +13,31 @@ declare global {
   }
 }
 
+type CustomerDetails = {
+  name: string;
+  email: string;
+  phone: string;
+};
+
+type ShippingDetails = {
+  addressLine1: string;
+  addressLine2?: string;
+  city: string;
+  state: string;
+  postalCode: string;
+};
+
 type Props = {
+  customer: CustomerDetails;
+  shipping: ShippingDetails;
   disabled?: boolean;
 };
 
-export default function RazorpayButton({ disabled = false }: Props) {
+export default function RazorpayButton({
+  customer,
+  shipping,
+  disabled = false,
+}: Props) {
   const router = useRouter();
 
   const {
@@ -29,12 +49,6 @@ export default function RazorpayButton({ disabled = false }: Props) {
   const [loading, setLoading] = useState(false);
 
   async function handlePayment() {
-    // Defense-in-depth: never allow payment to start if the button
-    // should not be actionable, even if invoked programmatically.
-    if (disabled || loading || items.length === 0) {
-      return;
-    }
-
     try {
       setLoading(true);
 
@@ -116,27 +130,17 @@ export default function RazorpayButton({ disabled = false }: Props) {
                   "Content-Type": "application/json",
                 },
                 body: JSON.stringify({
-                  customerId: "guest",
+                  items: items.map((item) => ({
+                    productId: item.id,
+                    quantity: item.quantity,
+                  })),
 
-                  orderNumber: `BC-${Date.now()}`,
+                  customer,
+                  shipping,
 
-                  items,
-
-                  subtotal: amount,
-
-                  shipping: amount >= 2999 ? 0 : 99,
-
-                  tax: 0,
-
-                  discount: 0,
-
-                  total:
-                    amount +
-                    (amount >= 2999 ? 0 : 99),
-
-                  paymentStatus: "Paid",
-
-                  orderStatus: "Placed",
+                  razorpay_order_id: response.razorpay_order_id,
+                  razorpay_payment_id: response.razorpay_payment_id,
+                  razorpay_signature: response.razorpay_signature,
                 }),
               }
             );
@@ -144,7 +148,7 @@ export default function RazorpayButton({ disabled = false }: Props) {
             const saveOrder = await saveResponse.json();
 
             if (!saveOrder.success) {
-              alert("Order saved failed.");
+              alert(saveOrder.error ?? "Order saved failed.");
               return;
             }
 
@@ -175,7 +179,7 @@ export default function RazorpayButton({ disabled = false }: Props) {
     <button
       type="button"
       onClick={handlePayment}
-      disabled={loading || items.length === 0 || disabled}
+      disabled={disabled || loading || items.length === 0}
       className="mt-10 flex w-full items-center justify-center rounded-full bg-[#8A5A6A] py-4 font-semibold text-white transition hover:bg-[#734757] disabled:cursor-not-allowed disabled:opacity-50"
     >
       {loading ? "Processing..." : "Pay Securely"}

@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
 import Script from "next/script";
 import { ArrowLeft, ShieldCheck } from "lucide-react";
@@ -13,6 +14,24 @@ export default function CheckoutPage() {
   const subtotal = totalPrice();
   const shipping = subtotal >= 2999 ? 0 : 99;
   const total = subtotal + shipping;
+
+  const [fullName, setFullName] = useState("");
+  const [phone, setPhone] = useState("");
+  const [email, setEmail] = useState("");
+  const [addressLine1, setAddressLine1] = useState("");
+  const [addressLine2, setAddressLine2] = useState("");
+  const [city, setCity] = useState("");
+  const [state, setState] = useState("");
+  const [postalCode, setPostalCode] = useState("");
+
+  const isValid =
+    fullName.trim().length > 0 &&
+    phone.trim().length > 0 &&
+    email.trim().length > 0 &&
+    addressLine1.trim().length > 0 &&
+    city.trim().length > 0 &&
+    state.trim().length > 0 &&
+    postalCode.trim().length > 0;
 
   return (
     <>
@@ -47,18 +66,24 @@ export default function CheckoutPage() {
                   <input
                     type="text"
                     placeholder="Full Name"
+                    value={fullName}
+                    onChange={(e) => setFullName(e.target.value)}
                     className="rounded-xl border p-4 outline-none focus:border-[#8A5A6A]"
                   />
 
                   <input
                     type="tel"
                     placeholder="Mobile Number"
+                    value={phone}
+                    onChange={(e) => setPhone(e.target.value)}
                     className="rounded-xl border p-4 outline-none focus:border-[#8A5A6A]"
                   />
 
                   <input
                     type="email"
                     placeholder="Email Address"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
                     className="rounded-xl border p-4 outline-none focus:border-[#8A5A6A]"
                   />
                 </div>
@@ -73,12 +98,16 @@ export default function CheckoutPage() {
                   <input
                     type="text"
                     placeholder="House / Flat No."
+                    value={addressLine1}
+                    onChange={(e) => setAddressLine1(e.target.value)}
                     className="rounded-xl border p-4 outline-none focus:border-[#8A5A6A]"
                   />
 
                   <input
                     type="text"
                     placeholder="Street / Area"
+                    value={addressLine2}
+                    onChange={(e) => setAddressLine2(e.target.value)}
                     className="rounded-xl border p-4 outline-none focus:border-[#8A5A6A]"
                   />
 
@@ -86,12 +115,16 @@ export default function CheckoutPage() {
                     <input
                       type="text"
                       placeholder="City"
+                      value={city}
+                      onChange={(e) => setCity(e.target.value)}
                       className="rounded-xl border p-4 outline-none focus:border-[#8A5A6A]"
                     />
 
                     <input
                       type="text"
                       placeholder="State"
+                      value={state}
+                      onChange={(e) => setState(e.target.value)}
                       className="rounded-xl border p-4 outline-none focus:border-[#8A5A6A]"
                     />
                   </div>
@@ -99,6 +132,8 @@ export default function CheckoutPage() {
                   <input
                     type="text"
                     placeholder="PIN Code"
+                    value={postalCode}
+                    onChange={(e) => setPostalCode(e.target.value)}
                     className="rounded-xl border p-4 outline-none focus:border-[#8A5A6A]"
                   />
                 </div>
@@ -168,7 +203,21 @@ export default function CheckoutPage() {
                 </div>
               </div>
 
-              <RazorpayButton />
+              <RazorpayButton
+                customer={{
+                  name: fullName,
+                  email,
+                  phone,
+                }}
+                shipping={{
+                  addressLine1,
+                  addressLine2,
+                  city,
+                  state,
+                  postalCode,
+                }}
+                disabled={!isValid}
+              />
 
               <div className="mt-6 flex items-center justify-center gap-2 text-sm text-gray-500">
                 <ShieldCheck size={16} />
