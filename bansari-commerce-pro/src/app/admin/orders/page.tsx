@@ -5,7 +5,7 @@ import { createClient } from "@/lib/supabase/server";
 type Order = {
   id: number;
   order_number: string;
-  total: number;
+  grand_total: number;
   payment_status: string;
   order_status: string;
   created_at: string;
@@ -20,7 +20,7 @@ export default async function OrdersPage() {
       `
       id,
       order_number,
-      total,
+      grand_total,
       payment_status,
       order_status,
       created_at
@@ -57,7 +57,7 @@ export default async function OrdersPage() {
             <thead className="bg-[#FAF8F5]">
               <tr>
                 <th className="px-6 py-4 text-left">Order</th>
-                <th className="px-6 py-4 text-left">Total</th>
+                <th className="px-6 py-4 text-left">grand_total</th>
                 <th className="px-6 py-4 text-left">Payment</th>
                 <th className="px-6 py-4 text-left">Status</th>
                 <th className="px-6 py-4 text-left">Date</th>
@@ -77,7 +77,7 @@ export default async function OrdersPage() {
 
                     <td className="px-6 py-5">
                       ₹
-                      {Number(order.total).toLocaleString("en-IN")}
+                      {Number(order.grand_total).toLocaleString("en-IN")}
                     </td>
 
                     <td className="px-6 py-5">
