@@ -1,19 +1,47 @@
 import { createServiceRoleClient } from "@/lib/supabase/service";
 
 /**
- * Order read operations for admin use.
+ * Order read/write operations for admin use.
  *
  * Uses the service-role client, not the regular server/browser client.
  * RLS on `orders`/`order_items` only allows a customer to SELECT their own
  * rows (`user_id = auth.uid()`), and orders are currently created with
  * `user_id: null` (no customer-account system exists yet) — so no
- * authenticated session, including an admin's, can read any order rows
- * under that policy alone. The service-role client bypasses RLS entirely,
- * which is the only way admin order reads can return data today.
+ * authenticated session, including an admin's, can read or write any order
+ * row under that policy alone. There is also no authenticated write policy
+ * of any kind, so status updates from the admin UI can only happen through
+ * a trusted server-side path using this service-role client.
  *
- * SERVER-SIDE USE ONLY. Never import this into a Client Component — the
- * service-role key must never reach the browser.
+ * SERVER-SIDE USE ONLY — never import this into a Client Component, the
+ * service-role key must never reach the browser. `updateOrderStatus` is
+ * called only from `src/app/api/admin/orders/status/route.ts`, which the
+ * new OrderStatusSelect Client Component calls over `fetch()`, following
+ * the same API route → service layer → service-role client pattern
+ * already used by `/api/orders/create`.
  */
+
+// The DB's order_status CHECK constraint only permits these exact lowercase
+// values — this is the single source of truth both this service and
+// OrderStatusSelect's display labels are built from.
+export const ORDER_STATUSES = [
+  "placed",
+  "processing",
+  "packed",
+  "shipped",
+  "delivered",
+  "cancelled",
+] as const;
+
+export type OrderStatus = (typeof ORDER_STATUSES)[number];
+
+export const ORDER_STATUS_LABELS: Record<OrderStatus, string> = {
+  placed: "Placed",
+  processing: "Processing",
+  packed: "Packed",
+  shipped: "Shipped",
+  delivered: "Delivered",
+  cancelled: "Cancelled",
+};
 
 export type Order = {
   id: string;
@@ -94,4 +122,24 @@ export async function getOrderById(id: string): Promise<OrderWithItems | null> {
   }
 
   return data as OrderWithItems | null;
+}
+
+export async function updateOrderStatus(
+  id: string,
+  status: OrderStatus
+): Promise<void> {
+  if (!ORDER_STATUSES.includes(status)) {
+    throw new Error(`Invalid order status: ${status}`);
+  }
+
+  const supabase = createServiceRoleClient();
+
+  const { error } = await supabase
+    .from("orders")
+    .update({ order_status: status })
+    .eq("id", id);
+
+  if (error) {
+    throw new Error(error.message);
+  }
 }
