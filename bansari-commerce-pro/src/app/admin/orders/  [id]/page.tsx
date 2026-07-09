@@ -1,7 +1,8 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
-import { getOrderById } from "@/services/order.service";
+import { getOrderById, type OrderStatus } from "@/services/order.service";
+import OrderStatusSelect from "@/components/admin/OrderStatusSelect";
 
 export const dynamic = "force-dynamic";
 
@@ -47,10 +48,11 @@ export default async function OrderDetailPage({ params }: Props) {
           </Link>
         </div>
 
-        <div className="mb-8 flex gap-4">
-          <span className="rounded-full bg-[#FAF8F5] px-5 py-2 text-sm font-medium">
-            Order Status: {order.order_status}
-          </span>
+        <div className="mb-8 flex items-center gap-4">
+          <OrderStatusSelect
+            orderId={order.id}
+            currentStatus={order.order_status as OrderStatus}
+          />
 
           <span className="rounded-full bg-[#FAF8F5] px-5 py-2 text-sm font-medium">
             Payment Status: {order.payment_status}
