@@ -21,6 +21,15 @@ export type Order = {
   customer_name: string;
   customer_email: string;
   customer_phone: string | null;
+  shipping_name: string;
+  shipping_phone: string;
+  shipping_email: string | null;
+  shipping_address_line1: string;
+  shipping_address_line2: string | null;
+  shipping_city: string;
+  shipping_state: string;
+  shipping_postal_code: string;
+  shipping_country: string;
   subtotal: number;
   discount: number;
   shipping_fee: number;
@@ -29,10 +38,31 @@ export type Order = {
   currency: string;
   payment_provider: string | null;
   payment_method: string | null;
+  payment_reference: string | null;
+  razorpay_order_id: string | null;
+  razorpay_payment_id: string | null;
   payment_status: string;
   order_status: string;
   created_at: string;
   updated_at: string;
+};
+
+export type OrderItem = {
+  id: string;
+  product_id: number | null;
+  product_name: string;
+  product_slug: string | null;
+  product_sku: string | null;
+  product_image: string | null;
+  variant_color: string | null;
+  variant_size: string | null;
+  unit_price: number;
+  quantity: number;
+  line_total: number;
+};
+
+export type OrderWithItems = Order & {
+  order_items: OrderItem[];
 };
 
 export async function getOrders(): Promise<Order[]> {
@@ -50,12 +80,12 @@ export async function getOrders(): Promise<Order[]> {
   return (data ?? []) as Order[];
 }
 
-export async function getOrderById(id: string): Promise<Order | null> {
+export async function getOrderById(id: string): Promise<OrderWithItems | null> {
   const supabase = createServiceRoleClient();
 
   const { data, error } = await supabase
     .from("orders")
-    .select("*")
+    .select("*, order_items(*)")
     .eq("id", id)
     .maybeSingle();
 
@@ -63,5 +93,5 @@ export async function getOrderById(id: string): Promise<Order | null> {
     throw new Error(error.message);
   }
 
-  return data as Order | null;
+  return data as OrderWithItems | null;
 }
