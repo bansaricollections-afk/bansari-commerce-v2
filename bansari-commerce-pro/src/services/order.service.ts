@@ -143,3 +143,38 @@ export async function updateOrderStatus(
     throw new Error(error.message);
   }
 }
+export async function updatePaymentStatusFromWebhook(
+  razorpayPaymentId: string,
+  status: "paid" | "failed"
+): Promise<{ updated: boolean }> {
+  const supabase = createServiceRoleClient();
+
+  const updatePayload: Record<string, unknown> = {
+    payment_status: status,
+  };
+
+  if (status === "paid") {
+    updatePayload.paid_at = new Date().toISOString();
+  }
+
+  let query = supabase
+    .from("orders")
+    .update(updatePayload)
+    .eq("razorpay_payment_id", razorpayPaymentId);
+
+  if (status === "failed") {
+    query = query.neq("payment_status", "paid");
+  }
+
+  const { data, error } = await query
+    .select("id")
+    .maybeSingle();
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  return {
+    updated: !!data,
+  };
+}
