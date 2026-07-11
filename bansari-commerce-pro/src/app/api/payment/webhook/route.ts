@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 
 import { verifyWebhookSignature } from "@/lib/razorpay";
 import { updatePaymentStatusFromWebhook } from "@/services/order.service";
+import { sendOrderEvent } from "@/services/email.service";
 
 const HANDLED_EVENTS = new Set(["payment.captured", "payment.failed"]);
 
@@ -63,8 +64,19 @@ export async function POST(request: NextRequest) {
   }
 
   try {
+    // status is the normalized internal value: 'paid' | 'failed'
+    // (eventType 'payment.captured' → 'paid', 'payment.failed' → 'failed')
     const status = eventType === "payment.captured" ? "paid" : "failed";
     const result = await updatePaymentStatusFromWebhook(paymentId, status);
+
+    if (result.updated && result.orderId && status === "paid") {
+      // Email failure must never affect the webhook HTTP response.
+      try {
+        await sendOrderEvent({ orderId: result.orderId, event: "payment_successful" });
+      } catch (err) {
+        console.error("[webhook] sendOrderEvent failed:", err);
+      }
+    }
 
     if (!result.updated) {
       console.warn(

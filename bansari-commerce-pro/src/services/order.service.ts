@@ -146,10 +146,11 @@ export async function updateOrderStatus(
     throw new Error(error.message);
   }
 }
+
 export async function updatePaymentStatusFromWebhook(
   razorpayPaymentId: string,
   status: "paid" | "failed"
-): Promise<{ updated: boolean }> {
+): Promise<{ updated: boolean; orderId: string | null }> {
   const supabase = createServiceRoleClient();
 
   const updatePayload: Record<string, unknown> = {
@@ -179,5 +180,6 @@ export async function updatePaymentStatusFromWebhook(
 
   return {
     updated: !!data,
+    orderId: data?.id ?? null,
   };
 }
