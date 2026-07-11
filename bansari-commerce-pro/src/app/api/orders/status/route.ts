@@ -6,6 +6,7 @@ import {
   updateOrderStatus,
   type OrderStatus,
 } from "@/services/order.service";
+import { sendStatusEmailsIfAny } from "@/services/email.service";
 import { createClient } from "@/lib/supabase/server";
 
 function isValidOrderStatus(value: unknown): value is OrderStatus {
@@ -83,6 +84,13 @@ export async function POST(request: NextRequest) {
       },
       { status: 500 }
     );
+  }
+
+  // Email failure must never affect the successful HTTP response.
+  try {
+    await sendStatusEmailsIfAny(id, status);
+  } catch (err) {
+    console.error("[orders/status] sendStatusEmailsIfAny failed:", err);
   }
 
   revalidatePath(`/admin/orders/${id}`);
