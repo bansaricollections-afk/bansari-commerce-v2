@@ -23,11 +23,13 @@ import { createServiceRoleClient } from "@/lib/supabase/service";
 // The DB's order_status CHECK constraint only permits these exact lowercase
 // values — this is the single source of truth both this service and
 // OrderStatusSelect's display labels are built from.
+// 'out_for_delivery' added in migration 20260712000000_add_order_email_events.sql
 export const ORDER_STATUSES = [
   "placed",
   "processing",
   "packed",
   "shipped",
+  "out_for_delivery",
   "delivered",
   "cancelled",
 ] as const;
@@ -39,6 +41,7 @@ export const ORDER_STATUS_LABELS: Record<OrderStatus, string> = {
   processing: "Processing",
   packed: "Packed",
   shipped: "Shipped",
+  out_for_delivery: "Out For Delivery",
   delivered: "Delivered",
   cancelled: "Cancelled",
 };
