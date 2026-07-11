@@ -4,6 +4,7 @@ import { NextRequest, NextResponse } from "next/server";
 
 import { getProductById } from "@/services/product.service";
 import { createServiceRoleClient } from "@/lib/supabase/service";
+import { createClient } from "@/lib/supabase/server";
 
 const FREE_SHIPPING_THRESHOLD = 2999;
 const STANDARD_SHIPPING_FEE = 99;
@@ -218,6 +219,16 @@ function formatOrderResponse(order: OrderRow) {
 }
 
 export async function POST(request: NextRequest) {
+  // Resolve the authenticated session server-side. The JWT is read from the
+  // HTTP-only cookie set by Supabase SSR — the client cannot supply or
+  // forge a different user_id. Guests produce user === null, which is
+  // intentional: guest checkout must continue to work unchanged.
+  const serverClient = await createClient();
+  const {
+    data: { user },
+  } = await serverClient.auth.getUser();
+  const userId = user?.id ?? null;
+
   let rawBody: unknown;
 
   try {
@@ -364,7 +375,7 @@ export async function POST(request: NextRequest) {
     .rpc("create_order_with_items", {
       p_order: {
         order_number: generateOrderNumber(),
-        user_id: null,
+        user_id: userId,
 
         customer_name: customer.name,
         customer_email: customer.email,

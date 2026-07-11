@@ -6,6 +6,7 @@ import {
   updateOrderStatus,
   type OrderStatus,
 } from "@/services/order.service";
+import { createClient } from "@/lib/supabase/server";
 
 function isValidOrderStatus(value: unknown): value is OrderStatus {
   return (
@@ -15,6 +16,23 @@ function isValidOrderStatus(value: unknown): value is OrderStatus {
 }
 
 export async function POST(request: NextRequest) {
+  // TODO: Replace this session check with a proper admin role check once
+  // a role system (e.g. profiles.role = 'admin') is implemented. For now,
+  // requiring an authenticated session is the safest protection available
+  // without a role system — it matches the protection the middleware
+  // already applies to /admin/* UI routes.
+  const serverClient = await createClient();
+  const {
+    data: { user },
+  } = await serverClient.auth.getUser();
+
+  if (!user) {
+    return NextResponse.json(
+      { success: false, error: "Unauthorized." },
+      { status: 401 }
+    );
+  }
+
   let rawBody: unknown;
 
   try {
