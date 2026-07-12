@@ -7,11 +7,11 @@ export default async function FeaturedProducts() {
   const featuredProducts = (await getFeaturedProducts()).slice(0, 4);
 
   return (
-    <section className="bg-[#FAF8F5] py-32">
+    <section className="bg-[#FAF8F5] py-40">
       <div className="mx-auto max-w-7xl px-6">
 
         {/* Editorial header — left-aligned, no centring */}
-        <div className="mb-16">
+        <div className="mb-20">
           <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#8A5A6A]">
             The Bansari Edit
           </p>
@@ -54,7 +54,7 @@ export default async function FeaturedProducts() {
         )}
 
         {/* Footer link */}
-        <div className="mt-16 text-center">
+        <div className="mt-20 text-center">
           <Link
             href="/shop"
             className="text-xs font-normal tracking-wide text-[#78716C] underline-offset-4 transition-colors duration-200 hover:text-[#1C1917] hover:underline"
