@@ -132,3 +132,156 @@ button {
 ::-webkit-scrollbar-thumb:hover {
   background: var(--primary-dark);
 }
+
+/* ==========================================
+   SPRINT 6 — LUXURY TOKENS v1.0
+   Additive only. Do not modify tokens above.
+   All new tokens are prefixed --bc- to avoid
+   collisions with existing design system.
+   ========================================== */
+
+:root {
+  /* --------------------------------------------------
+     BRAND PALETTE — SPRINT 6
+     Primary mauve, deep plum, champagne gold tones
+  -------------------------------------------------- */
+  --bc-brand-mauve:        #8A5A6A;   /* mirrors --primary for sprint 6 components */
+  --bc-brand-mauve-dark:   #714857;   /* mirrors --primary-dark */
+  --bc-brand-mauve-light:  #B88A97;   /* lighter tint for hover states */
+  --bc-brand-mauve-faint:  #F3ECEe;   /* near-white tint for soft backgrounds */
+  --bc-brand-plum:         #3D2535;   /* deep plum — headers, overlays */
+  --bc-brand-plum-light:   #5C3A4F;   /* hover state for plum elements */
+
+  /* --------------------------------------------------
+     GOLD / CHAMPAGNE SCALE
+  -------------------------------------------------- */
+  --bc-gold-warm:          #C9A96E;   /* mirrors --gold */
+  --bc-gold-light:         #E2C98E;   /* lighter champagne */
+  --bc-gold-faint:         #F7F0E2;   /* near-white gold tint for section backgrounds */
+  --bc-gold-dark:          #9E7B47;   /* deep gold for borders, accents */
+
+  /* --------------------------------------------------
+     SURFACE SCALE — SPRINT 6 HOMEPAGE
+  -------------------------------------------------- */
+  --bc-surface-cream:      #FFFDF9;   /* mirrors --background */
+  --bc-surface-warm:       #F6F0EB;   /* mirrors --surface */
+  --bc-surface-blush:      #F8F1F0;   /* blush-tinted section background */
+  --bc-surface-sand:       #F5EFE6;   /* warm sand section background */
+  --bc-surface-dark:       #1A1018;   /* dark mode section background */
+  --bc-surface-overlay:    rgba(29, 16, 24, 0.48); /* hero/image overlay */
+
+  /* --------------------------------------------------
+     TEXT SCALE — SPRINT 6
+  -------------------------------------------------- */
+  --bc-text-primary:       #1D1D1D;   /* mirrors --text */
+  --bc-text-secondary:     #4B3F45;   /* rich dark brown for subheadings */
+  --bc-text-muted:         #6B7280;   /* mirrors --text-light */
+  --bc-text-faint:         #A89CA0;   /* disabled / placeholder */
+  --bc-text-inverse:       #FFFDF9;   /* text on dark backgrounds */
+  --bc-text-gold:          #C9A96E;   /* gold text for accent labels */
+
+  /* --------------------------------------------------
+     BORDER SCALE — SPRINT 6
+  -------------------------------------------------- */
+  --bc-border-default:     #ECE7E2;   /* mirrors --border */
+  --bc-border-soft:        #F0ECEA;   /* very soft, minimal dividers */
+  --bc-border-gold:        #D9BC8A;   /* gold separator for luxury sections */
+  --bc-border-dark:        rgba(255, 253, 249, 0.12); /* border on dark backgrounds */
+
+  /* --------------------------------------------------
+     SPACING SCALE — SPRINT 6
+     4px base grid, matches existing Tailwind scale
+  -------------------------------------------------- */
+  --bc-space-1:   0.25rem;  /*  4px */
+  --bc-space-2:   0.5rem;   /*  8px */
+  --bc-space-3:   0.75rem;  /* 12px */
+  --bc-space-4:   1rem;     /* 16px */
+  --bc-space-5:   1.25rem;  /* 20px */
+  --bc-space-6:   1.5rem;   /* 24px */
+  --bc-space-8:   2rem;     /* 32px */
+  --bc-space-10:  2.5rem;   /* 40px */
+  --bc-space-12:  3rem;     /* 48px */
+  --bc-space-16:  4rem;     /* 64px */
+  --bc-space-20:  5rem;     /* 80px */
+  --bc-space-24:  6rem;     /* 96px */
+  --bc-space-32:  8rem;     /* 128px */
+
+  /* --------------------------------------------------
+     RADIUS SCALE — SPRINT 6
+  -------------------------------------------------- */
+  --bc-radius-xs:   0.25rem;  /*  4px — tight badges */
+  --bc-radius-sm:   0.375rem; /*  6px — inputs, small elements */
+  --bc-radius-md:   0.5rem;   /*  8px — buttons, chips */
+  --bc-radius-lg:   0.75rem;  /* 12px — cards */
+  --bc-radius-xl:   1rem;     /* 16px — large cards */
+  --bc-radius-2xl:  1.5rem;   /* 24px — mirrors --radius-card */
+  --bc-radius-full: 9999px;   /* mirrors --radius-button */
+
+  /* --------------------------------------------------
+     ELEVATION / SHADOWS — SPRINT 6
+     Tone-matched to warm cream surfaces
+  -------------------------------------------------- */
+  --bc-shadow-xs:   0 1px 2px rgba(90, 45, 60, 0.06);
+  --bc-shadow-sm:   0 2px 8px rgba(90, 45, 60, 0.08);
+  --bc-shadow-md:   0 4px 16px rgba(90, 45, 60, 0.10);
+  --bc-shadow-lg:   0 8px 32px rgba(90, 45, 60, 0.12);
+  --bc-shadow-xl:   0 16px 48px rgba(90, 45, 60, 0.16);
+  --bc-shadow-card: 0 2px 8px rgba(90, 45, 60, 0.08),
+                    0 8px 24px rgba(90, 45, 60, 0.06);
+
+  /* --------------------------------------------------
+     TRANSITIONS — SPRINT 6
+  -------------------------------------------------- */
+  --bc-transition-fast:    150ms cubic-bezier(0.16, 1, 0.3, 1);
+  --bc-transition-base:    250ms cubic-bezier(0.16, 1, 0.3, 1);
+  --bc-transition-slow:    400ms cubic-bezier(0.16, 1, 0.3, 1);
+  --bc-transition-reveal:  600ms cubic-bezier(0.16, 1, 0.3, 1);
+
+  /* --------------------------------------------------
+     TYPE SCALE — SPRINT 6
+     Fluid clamp() scale. No existing typography rules changed.
+     These tokens are used only by new Sprint 6 components.
+  -------------------------------------------------- */
+  --bc-text-xs:    clamp(0.75rem,  0.7rem  + 0.25vw, 0.875rem); /* 12–14px */
+  --bc-text-sm:    clamp(0.875rem, 0.8rem  + 0.35vw, 1rem);     /* 14–16px */
+  --bc-text-base:  clamp(1rem,     0.95rem + 0.25vw, 1.125rem); /* 16–18px */
+  --bc-text-lg:    clamp(1.125rem, 1rem    + 0.75vw, 1.5rem);   /* 18–24px */
+  --bc-text-xl:    clamp(1.5rem,   1.2rem  + 1.25vw, 2.25rem);  /* 24–36px */
+  --bc-text-2xl:   clamp(2rem,     1.2rem  + 2.5vw,  3.5rem);   /* 32–56px */
+  --bc-text-3xl:   clamp(2.5rem,   1rem    + 4vw,    5rem);      /* 40–80px */
+  --bc-text-hero:  clamp(3rem,     0.5rem  + 7vw,    8rem);      /* 48–128px */
+
+  /* --------------------------------------------------
+     SECTION LAYOUT — SPRINT 6
+  -------------------------------------------------- */
+  --bc-content-narrow:  640px;
+  --bc-content-default: 960px;
+  --bc-content-wide:    1200px;
+  --bc-section-padding: clamp(var(--bc-space-12), 6vw, var(--bc-space-24));
+  --bc-gutter:          clamp(var(--bc-space-4), 4vw, var(--bc-space-8));
+
+  /* --------------------------------------------------
+     Z-INDEX SCALE — SPRINT 6
+  -------------------------------------------------- */
+  --bc-z-base:        0;
+  --bc-z-raised:     10;
+  --bc-z-dropdown:   100;
+  --bc-z-sticky:     200;
+  --bc-z-overlay:    300;
+  --bc-z-modal:      400;
+  --bc-z-toast:      500;
+}
+
+/* --------------------------------------------------
+   SPRINT 6 — REDUCED MOTION SAFETY NET
+   Ensure no Sprint 6 animation token causes motion
+   issues for users who prefer reduced motion.
+-------------------------------------------------- */
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --bc-transition-fast:   0ms;
+    --bc-transition-base:   0ms;
+    --bc-transition-slow:   0ms;
+    --bc-transition-reveal: 0ms;
+  }
+}
