@@ -1,5 +1,6 @@
 // WhyChooseUs — Editorial Trust Band
 // Batch 8 · Option B v2 · CTO-approved
+// Batch 10A · Eyebrow added · CTO-approved
 //
 // Layout
 //   Desktop  : 4-column typography band, full-width within max-w-7xl
@@ -11,12 +12,13 @@
 //   --bc-text-primary    heading colour
 //   --bc-text-secondary  label colour
 //   --bc-text-muted      supporting line colour
-//   --bc-text-xs         label size
+//   --bc-text-gold       eyebrow colour
+//   --bc-text-xs         eyebrow + label size
 //   --bc-text-sm         supporting line size
 //   --bc-text-lg         section heading size
 //   --bc-space-*         padding / gap
 //   --font-playfair      section heading
-//   --font-inter         labels + body
+//   --font-inter         eyebrow + labels + body
 
 const promises = [
   {
@@ -55,7 +57,22 @@ export default function WhyChooseUs() {
           paddingInline: "var(--bc-gutter)",
         }}
       >
-        {/* ── Editorial heading ── */}
+        {/* ── Eyebrow ── */}
+        <p
+          style={{
+            fontFamily:    "var(--font-inter), sans-serif",
+            fontSize:      "var(--bc-text-xs)",
+            fontWeight:    600,
+            letterSpacing: "0.16em",
+            textTransform: "uppercase",
+            color:         "var(--bc-text-gold)",
+            marginBottom:  "var(--bc-space-2)",
+          }}
+        >
+          The Bansari Edit
+        </p>
+
+        {/* ── Editorial heading — unchanged ── */}
         <p
           style={{
             fontFamily:    "var(--font-playfair), serif",
@@ -74,7 +91,7 @@ export default function WhyChooseUs() {
           aria-label="Brand commitments"
           style={{
             display:             "grid",
-            gridTemplateColumns: "repeat(2, 1fr)",  /* mobile: 2-col */
+            gridTemplateColumns: "repeat(2, 1fr)",
             gap:                 "var(--bc-space-10) var(--bc-space-8)",
           }}
           className="bc-promise-grid"
