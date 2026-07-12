@@ -4,64 +4,65 @@ import ProductCard from "@/components/product/ProductCard";
 import { getFeaturedProducts } from "@/services/product.service";
 
 export default async function FeaturedProducts() {
-  const featuredProducts = (await getFeaturedProducts()).slice(0, 8);
+  const featuredProducts = (await getFeaturedProducts()).slice(0, 4);
 
   return (
     <section className="bg-[#FAF8F5] py-24">
       <div className="mx-auto max-w-7xl px-6">
-        {/* Header */}
-        <div className="mb-14 flex flex-col items-center justify-between gap-6 md:flex-row">
-          <div>
-            <p className="uppercase tracking-[5px] text-[#8A5A6A]">
-              Featured Collection
-            </p>
 
-            <h2 className="mt-3 font-[family:var(--font-playfair)] text-5xl font-bold">
-              Handpicked For You
-            </h2>
+        {/* Editorial header — left-aligned, no centring */}
+        <div className="mb-16">
+          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#8A5A6A]">
+            The Bansari Edit
+          </p>
 
-            <p className="mt-4 max-w-2xl text-gray-600">
-              Discover our most loved styles selected for weddings,
-              celebrations, office wear and timeless elegance.
-            </p>
-          </div>
+          <h2 className="mt-3 font-[family:var(--font-playfair)] text-3xl font-normal text-[#1C1917] md:text-4xl">
+            The House Edit
+          </h2>
 
-          <Link
-            href="/shop"
-            className="rounded-full border border-[#8A5A6A] px-8 py-4 font-semibold text-[#8A5A6A] transition-all duration-300 hover:bg-[#8A5A6A] hover:text-white"
-          >
-            View All Products
-          </Link>
+          <p className="mt-3 text-sm font-normal text-[#78716C]">
+            The finest of the season, considered and placed here.
+          </p>
         </div>
 
-        {/* Products */}
+        {/* Product rail */}
         {featuredProducts.length > 0 ? (
           <div className="grid gap-8 sm:grid-cols-2 lg:grid-cols-4">
-            {featuredProducts.map((product) => (
+            {featuredProducts.map((product, index) => (
               <ProductCard
                 key={product.id}
                 product={product}
+                priority={index === 0}
               />
             ))}
           </div>
         ) : (
-          <div className="rounded-3xl border border-dashed border-gray-300 bg-white py-20 text-center">
-            <h3 className="text-2xl font-semibold text-gray-900">
-              Featured products coming soon
-            </h3>
-
-            <p className="mt-3 text-gray-500">
-              New arrivals will appear here shortly.
+          <div className="py-20 text-center">
+            <p className="font-[family:var(--font-playfair)] text-2xl font-normal text-[#1C1917]">
+              The edit is being prepared.
             </p>
-
+            <p className="mt-3 text-sm text-[#78716C]">
+              New pieces will appear here shortly.
+            </p>
             <Link
               href="/shop"
-              className="mt-8 inline-flex rounded-full bg-[#8A5A6A] px-6 py-3 font-medium text-white transition hover:opacity-90"
+              className="mt-8 inline-block text-xs font-medium tracking-wide text-[#8A5A6A] underline-offset-4 hover:underline"
             >
-              Browse Collection
+              Browse the full collection
             </Link>
           </div>
         )}
+
+        {/* Footer link */}
+        <div className="mt-16 text-center">
+          <Link
+            href="/shop"
+            className="text-xs font-normal tracking-wide text-[#78716C] underline-offset-4 transition-colors duration-200 hover:text-[#1C1917] hover:underline"
+          >
+            View the full edit &rarr;
+          </Link>
+        </div>
+
       </div>
     </section>
   );

@@ -1,176 +1,155 @@
 "use client";
 
+import { useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
-import {
-  Heart,
-  Eye,
-  ShoppingBag,
-  Star,
-  Truck,
-} from "lucide-react";
+import { Heart } from "lucide-react";
 
 import { Product } from "@/types";
 
 type Props = {
   product: Product;
+  /** Pass true for the first card in the rail (LCP image) */
+  priority?: boolean;
 };
 
-export default function ProductCard({ product }: Props) {
+export default function ProductCard({ product, priority = false }: Props) {
+  const [wishlisted, setWishlisted] = useState(false);
+  const [hovered, setHovered] = useState(false);
+
   const primaryImage = product.images?.[0]?.url || "/placeholder.png";
   const hoverImage = product.images?.[1]?.url || primaryImage;
 
+  /**
+   * shortName fallback chain:
+   *   product.shortName  (editorial name, e.g. "Amara")
+   *   → product.collection (e.g. "Bridal Sarees")
+   *   → product.name     (full catalogue name — last resort only)
+   */
+  const displayName =
+    (product as any).shortName ||
+    product.collection ||
+    product.name;
+
+  /**
+   * Craft detail: work technique + fabric, sourced from specifications.
+   * Renders nothing if both are absent — no empty line.
+   */
+  const craftDetail = [
+    (product as any).specifications?.work,
+    (product as any).specifications?.fabric,
+  ]
+    .filter(Boolean)
+    .join(" · ");
+
   return (
-    <article className="group overflow-hidden rounded-3xl border border-[#ECE7E2] bg-white transition-all duration-300 hover:-translate-y-2 hover:shadow-2xl">
-      {/* Image Section */}
-
-      <div className="relative overflow-hidden">
+    <article
+      className="group"
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+    >
+      {/* Image — 3:4, no border, no radius, no shadow */}
+      <div className="relative aspect-[3/4] w-full overflow-hidden">
         <Link
           href={`/product/${product.id}`}
-          aria-label={`View ${product.name}`}
+          aria-label={`View ${displayName}`}
+          className="block h-full w-full"
+          tabIndex={0}
         >
-          <div className="relative h-[420px] w-full overflow-hidden">
-            <Image
-              src={primaryImage}
-              alt={product.name}
-              fill
-              priority={false}
-              loading="lazy"
-              sizes="(max-width:768px) 100vw, (max-width:1280px) 50vw, 25vw"
-              className="object-cover transition-all duration-500 group-hover:scale-105 group-hover:opacity-0"
-            />
-
-            <Image
-              src={hoverImage}
-              alt={`${product.name} alternate view`}
-              fill
-              loading="lazy"
-              sizes="(max-width:768px) 100vw, (max-width:1280px) 50vw, 25vw"
-              className="absolute inset-0 object-cover opacity-0 transition-all duration-500 group-hover:scale-105 group-hover:opacity-100"
-            />
-          </div>
-        </Link>
-
-        {/* Badge */}
-
-        {product.badge && (
-          <div className="absolute left-4 top-4 rounded-full bg-[#8A5A6A] px-4 py-2 text-xs font-semibold text-white shadow-lg">
-            {product.badge}
-          </div>
-        )}
-
-        {/* Floating Actions */}
-
-        <div className="absolute right-4 top-4 flex flex-col gap-3 opacity-0 transition-all duration-300 group-hover:opacity-100">
-          <button
-            type="button"
-            aria-label="Add to wishlist"
-            className="rounded-full bg-white p-3 shadow-lg transition hover:scale-110"
-          >
-            <Heart size={18} />
-          </button>
-
-          <button
-            type="button"
-            aria-label="Quick view"
-            className="rounded-full bg-white p-3 shadow-lg transition hover:scale-110"
-          >
-            <Eye size={18} />
-          </button>
-
-          <button
-            type="button"
-            aria-label="Add to cart"
-            className="rounded-full bg-white p-3 shadow-lg transition hover:scale-110"
-          >
-            <ShoppingBag size={18} />
-          </button>
-        </div>
-      </div>
-
-      {/* Product Content */}
-
-      <div className="space-y-4 p-6">
-        <p className="text-xs uppercase tracking-[4px] text-[#8A5A6A]">
-          {product.collection}
-        </p>
-
-        <Link
-          href={`/product/${product.id}`}
-          className="block text-xl font-semibold leading-8 transition hover:text-[#8A5A6A]"
-        >
-          {product.name}
-        </Link>
-
-        {/* Rating */}
-
-        <div className="flex items-center gap-2">
-          <Star
-            size={16}
-            className="fill-yellow-400 text-yellow-400"
+          {/* Primary image */}
+          <Image
+            src={primaryImage}
+            alt={product.name}
+            fill
+            priority={priority}
+            loading={priority ? "eager" : "lazy"}
+            sizes="(max-width:640px) 50vw, (max-width:1024px) 50vw, 25vw"
+            className={[
+              "object-cover object-top",
+              "transition-[transform,opacity] duration-[750ms] ease-out",
+              hovered
+                ? "scale-[1.02] opacity-0"
+                : "scale-100 opacity-100",
+            ].join(" ")}
           />
 
-          <span className="font-medium">
-            {product.rating.toFixed(1)}
-          </span>
+          {/* Hover image — crossfade only, no additional scale */}
+          <Image
+            src={hoverImage}
+            alt={`${product.name} alternate view`}
+            fill
+            loading="lazy"
+            sizes="(max-width:640px) 50vw, (max-width:1024px) 50vw, 25vw"
+            className={[
+              "absolute inset-0 object-cover object-top",
+              "transition-[transform,opacity] duration-[750ms] ease-out",
+              hovered
+                ? "scale-[1.02] opacity-100"
+                : "scale-100 opacity-0",
+            ].join(" ")}
+          />
+        </Link>
 
-          <span className="text-gray-500">
-            ({product.reviewCount})
-          </span>
-        </div>
-
-        {/* Price */}
-
-        <div className="flex flex-wrap items-center gap-3">
-          <span className="text-2xl font-bold text-[#8A5A6A]">
-            ₹{product.price.toLocaleString("en-IN")}
-          </span>
-
-          {product.oldPrice && (
-            <>
-              <span className="text-gray-400 line-through">
-                ₹{product.oldPrice.toLocaleString("en-IN")}
-              </span>
-
-              {product.discount > 0 && (
-                <span className="rounded-full bg-green-100 px-2 py-1 text-xs font-semibold text-green-700">
-                  {product.discount}% OFF
-                </span>
-              )}
-            </>
-          )}
-        </div>
-
-        {/* Delivery */}
-
-        <div className="flex items-center gap-2 text-sm text-green-700">
-          <Truck size={16} />
-          <span>Delivery in 2–5 Days</span>
-        </div>
-
-        {/* Stock */}
-
-        {product.stock <= 5 && product.stock > 0 && (
-          <p className="text-sm font-semibold text-red-600">
-            Only {product.stock} left in stock
-          </p>
-        )}
-
-        {product.stock === 0 && (
-          <p className="text-sm font-semibold text-red-600">
-            Out of Stock
-          </p>
-        )}
-
-        {/* Quick Add */}
-
+        {/* Wishlist — always visible, top-right, no background, no shadow */}
         <button
           type="button"
-          disabled={product.stock === 0}
-          className="mt-3 w-full rounded-full bg-[#8A5A6A] py-3 font-semibold text-white transition hover:bg-[#734757] disabled:cursor-not-allowed disabled:opacity-50"
+          aria-label={wishlisted ? "Remove from wishlist" : "Add to wishlist"}
+          aria-pressed={wishlisted}
+          onClick={() => setWishlisted((v) => !v)}
+          className="absolute right-0 top-0 flex items-start justify-end p-3"
+          style={{ width: 44, height: 44 }}
         >
-          {product.stock === 0 ? "Out of Stock" : "Quick Add"}
+          <Heart
+            size={16}
+            strokeWidth={1.5}
+            className="transition-colors duration-200"
+            style={{
+              color: wishlisted ? "#8A5A6A" : "#C4A882",
+              fill: wishlisted ? "#8A5A6A" : "none",
+            }}
+          />
         </button>
+      </div>
+
+      {/* Metadata — below image, left-aligned, no card container */}
+      <div className="mt-4 space-y-1">
+
+        {/* Collection eyebrow */}
+        {product.collection && (
+          <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[#8A5A6A]">
+            {product.collection}
+          </p>
+        )}
+
+        {/* Product name — Playfair, editorial weight */}
+        <Link
+          href={`/product/${product.id}`}
+          className="block font-[family:var(--font-playfair)] text-base font-normal leading-snug text-[#1C1917] transition-colors duration-200 hover:text-[#8A5A6A] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#8A5A6A] focus-visible:ring-offset-2"
+          tabIndex={0}
+        >
+          {displayName}
+        </Link>
+
+        {/* Craft detail — only renders if data present */}
+        {craftDetail && (
+          <p className="text-xs font-normal text-[#A8A29E]">{craftDetail}</p>
+        )}
+
+        {/* Price — quiet, no emphasis colour */}
+        <p className="text-sm font-normal text-[#78716C]">
+          &#x20B9;{product.price.toLocaleString("en-IN")}
+        </p>
+
+        {/* CTA — always visible, no button/pill */}
+        <Link
+          href={`/product/${product.id}`}
+          className="inline-block text-xs font-medium tracking-[0.08em] text-[#78716C] underline-offset-4 transition-colors duration-200 hover:text-[#1C1917] hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#8A5A6A] focus-visible:ring-offset-2"
+          tabIndex={0}
+          aria-label={`Discover ${displayName}`}
+        >
+          Discover &rarr;
+        </Link>
+
       </div>
     </article>
   );
