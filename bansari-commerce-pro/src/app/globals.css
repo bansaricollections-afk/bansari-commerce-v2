@@ -259,6 +259,7 @@ button {
   --bc-content-wide:    1200px;
   --bc-section-padding: clamp(var(--bc-space-12), 6vw, var(--bc-space-24));
   --bc-gutter:          clamp(var(--bc-space-4), 4vw, var(--bc-space-8));
+  --bc-announcement-h:  2.25rem;  /* 36px — static height token for AnnouncementBar */
 
   /* --------------------------------------------------
      Z-INDEX SCALE — SPRINT 6
