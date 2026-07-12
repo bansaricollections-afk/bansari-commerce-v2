@@ -14,12 +14,48 @@ import { DashboardCard } from "@/components/admin/DashboardCard";
 import { LowStockProducts } from "@/components/admin/LowStockProducts";
 import { QuickActionCard } from "@/components/admin/QuickActionCard";
 import { RecentOrders } from "@/components/admin/RecentOrders";
+import { getOrders } from "@/services/order.service";
+import {
+  getProductCount,
+  getLowStockProducts,
+} from "@/services/product.service";
 
-export default function AdminDashboardPage() {
+const PENDING_STATUSES = new Set(["placed", "processing", "packed"]);
+
+export default async function AdminDashboardPage() {
+  const [orders, productCount, lowStock] = await Promise.all([
+    getOrders(),
+    getProductCount(),
+    getLowStockProducts(),
+  ]);
+
+  // KPI derivations — single pass over the orders array
+  const totalOrders = orders.length;
+  const totalRevenue = orders.reduce((sum, o) => sum + o.grand_total, 0);
+  const pendingOrders = orders.filter((o) =>
+    PENDING_STATUSES.has(o.order_status)
+  ).length;
+
+  // Latest 5 orders sorted by created_at descending
+  const recentOrders = orders
+    .slice()
+    .sort(
+      (a, b) =>
+        new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+    )
+    .slice(0, 5)
+    .map((o) => ({
+      id: o.id,
+      orderNumber: o.order_number,
+      customer: o.customer_name,
+      total: `₹${o.grand_total.toLocaleString("en-IN")}`,
+      status: o.order_status,
+    }));
+
   const dashboardCards = [
     {
       title: "Products",
-      value: "0",
+      value: String(productCount),
       description: "Total products",
       href: "/admin/products",
       icon: Package,
@@ -27,23 +63,23 @@ export default function AdminDashboardPage() {
     },
     {
       title: "Orders",
-      value: "0",
+      value: String(totalOrders),
       description: "Total orders",
       href: "/admin/orders",
       icon: ShoppingBag,
       tone: "bg-green-50 text-green-700",
     },
     {
-      title: "Customers",
-      value: "0",
-      description: "Registered customers",
-      href: "/admin/customers",
+      title: "Pending",
+      value: String(pendingOrders),
+      description: "Placed, processing or packed",
+      href: "/admin/orders",
       icon: Users,
       tone: "bg-purple-50 text-purple-700",
     },
     {
       title: "Revenue",
-      value: "₹0",
+      value: `₹${totalRevenue.toLocaleString("en-IN")}`,
       description: "Total revenue",
       href: "/admin/analytics",
       icon: BarChart3,
@@ -126,7 +162,7 @@ export default function AdminDashboardPage() {
       </section>
 
       <section className="mt-8 grid gap-6 xl:grid-cols-[1fr_360px]">
-        <RecentOrders />
+        <RecentOrders orders={recentOrders} />
 
         <div>
           <h2 className="mb-4 text-lg font-semibold text-slate-950">
@@ -142,7 +178,7 @@ export default function AdminDashboardPage() {
       </section>
 
       <section className="mt-8">
-        <LowStockProducts />
+        <LowStockProducts products={lowStock} />
       </section>
     </div>
   );

@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
+import { createServiceRoleClient } from "@/lib/supabase/service";
 import type {
   Product,
   ProductImage,
@@ -283,4 +284,63 @@ export async function getProductById(
   }
 
   return mapDbProductToProduct(data as DbProduct);
+}
+
+// ---------------------------------------------------------------------------
+// Admin-only helpers — use service-role client (bypasses RLS)
+// ---------------------------------------------------------------------------
+
+/**
+ * Lightweight COUNT of all active products.
+ * Used by the admin dashboard KPI card; avoids loading full product rows.
+ */
+export async function getProductCount(): Promise<number> {
+  const supabase = createServiceRoleClient();
+
+  const { count, error } = await supabase
+    .from("products")
+    .select("*", { count: "exact", head: true })
+    .eq("active", true);
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  return count ?? 0;
+}
+
+export type LowStockProduct = {
+  id: string;
+  name: string;
+  sku: string;
+  stock: number;
+};
+
+/**
+ * Returns active products whose stock is at or below `threshold` (default 5),
+ * ordered by stock ascending so the most critical items appear first.
+ * Used by the admin dashboard Low Stock section.
+ */
+export async function getLowStockProducts(
+  threshold = 5
+): Promise<LowStockProduct[]> {
+  const supabase = createServiceRoleClient();
+
+  const { data, error } = await supabase
+    .from("products")
+    .select("id, name, sku, stock")
+    .eq("active", true)
+    .lte("stock", threshold)
+    .order("stock", { ascending: true });
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  return (data ?? []).map((row) => ({
+    id: String(row.id),
+    name: row.name as string,
+    sku: row.sku as string,
+    stock: row.stock as number,
+  }));
 }
