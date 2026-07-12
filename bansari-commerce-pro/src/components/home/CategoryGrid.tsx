@@ -85,7 +85,7 @@ function TileLabel({
       className="absolute inset-x-0 bottom-0 flex flex-col gap-0.5 px-5 pb-5 pt-10"
       style={{
         background:
-          "linear-gradient(to top, rgba(29,16,24,0.72) 0%, rgba(29,16,24,0.28) 60%, transparent 100%)",
+          `linear-gradient(to top, var(--bc-surface-overlay-deep) 0%, rgba(29,16,24,0.28) 60%, transparent 100%)`,
       }}
     >
       <span
@@ -219,7 +219,7 @@ export default function CategoryGrid() {
               letterSpacing: "0.16em",
             }}
           >
-            The Collection
+            The Edit
           </p>
           <h2
             className="font-playfair"

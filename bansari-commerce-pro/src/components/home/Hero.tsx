@@ -5,7 +5,13 @@ export default function Hero() {
   return (
     <section aria-label="Hero" className="bg-[var(--bc-surface-cream)]">
 
-      <div className="mx-auto grid min-h-[90vh] max-w-7xl items-center gap-16 px-6 py-24 lg:grid-cols-2">
+      <div
+        className="mx-auto grid min-h-[90vh] items-center gap-16 px-6 lg:grid-cols-2"
+        style={{
+          maxWidth: "var(--bc-content-wide)",
+          paddingBlock: "var(--bc-section-padding)",
+        }}
+      >
 
         {/* ── LEFT ── */}
 
@@ -54,7 +60,7 @@ export default function Hero() {
                   "var(--bc-brand-mauve)")
               }
             >
-              Shop Collection
+              Shop The Edit
             </Link>
 
             <Link
@@ -153,6 +159,7 @@ export default function Hero() {
           Image: rounded-2xl (--bc-radius-2xl 24px token), warm layered shadow.
           2:3 editorial aspect ratio (600×900).
           justify-end: image breathes toward the right edge.
+          radius and shadow deferred to Batch 10A visual evaluation.
         */}
         <div className="flex justify-end">
 
