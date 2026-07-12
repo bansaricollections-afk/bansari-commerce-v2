@@ -52,7 +52,7 @@ export default function ProductInfo({ product }: Props) {
         </span>
       )}
 
-      <h1 className="font-[family:var(--font-playfair)] text-4xl font-bold leading-tight lg:text-5xl">
+      <h1 className="font-[family:var(--font-playfair)] text-4xl font-normal leading-tight tracking-wide lg:text-5xl">
         {product.name}
       </h1>
 
