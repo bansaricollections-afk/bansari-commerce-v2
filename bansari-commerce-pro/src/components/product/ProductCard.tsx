@@ -56,7 +56,7 @@ export default function ProductCard({ product, priority = false }: Props) {
           className="block h-full w-full"
           tabIndex={0}
         >
-          {/* Primary image */}
+          {/* Primary image — fades out on hover, no scale on outgoing */}
           <Image
             src={primaryImage}
             alt={product.name}
@@ -65,15 +65,13 @@ export default function ProductCard({ product, priority = false }: Props) {
             loading={priority ? "eager" : "lazy"}
             sizes="(max-width:640px) 50vw, (max-width:1024px) 50vw, 25vw"
             className={[
-              "object-cover object-top",
-              "transition-[transform,opacity] duration-[750ms] ease-out",
-              hovered
-                ? "scale-[1.02] opacity-0"
-                : "scale-100 opacity-100",
+              "object-cover object-[center_12%]",
+              "transition-[opacity] duration-[750ms] ease-out",
+              hovered ? "opacity-0" : "opacity-100",
             ].join(" ")}
           />
 
-          {/* Hover image — crossfade only, no additional scale */}
+          {/* Hover image — arrives with gentle scale, no dual-motion */}
           <Image
             src={hoverImage}
             alt={`${product.name} alternate view`}
@@ -81,7 +79,7 @@ export default function ProductCard({ product, priority = false }: Props) {
             loading="lazy"
             sizes="(max-width:640px) 50vw, (max-width:1024px) 50vw, 25vw"
             className={[
-              "absolute inset-0 object-cover object-top",
+              "absolute inset-0 object-cover object-[center_12%]",
               "transition-[transform,opacity] duration-[750ms] ease-out",
               hovered
                 ? "scale-[1.02] opacity-100"
@@ -112,11 +110,11 @@ export default function ProductCard({ product, priority = false }: Props) {
       </div>
 
       {/* Metadata — below image, left-aligned, no card container */}
-      <div className="mt-4 space-y-1">
+      <div className="mt-3 space-y-[3px]">
 
         {/* Collection eyebrow */}
         {product.collection && (
-          <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[#8A5A6A]">
+          <p className="text-xs font-normal uppercase tracking-[0.14em] text-[#8A5A6A]">
             {product.collection}
           </p>
         )}
@@ -135,8 +133,8 @@ export default function ProductCard({ product, priority = false }: Props) {
           <p className="text-xs font-normal text-[#A8A29E]">{craftDetail}</p>
         )}
 
-        {/* Price — quiet, no emphasis colour */}
-        <p className="text-sm font-normal text-[#78716C]">
+        {/* Price — tertiary, caption weight */}
+        <p className="text-xs font-normal text-[#A8A29E]">
           &#x20B9;{product.price.toLocaleString("en-IN")}
         </p>
 

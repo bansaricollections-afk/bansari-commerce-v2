@@ -7,7 +7,7 @@ export default async function FeaturedProducts() {
   const featuredProducts = (await getFeaturedProducts()).slice(0, 4);
 
   return (
-    <section className="bg-[#FAF8F5] py-24">
+    <section className="bg-[#FAF8F5] py-32">
       <div className="mx-auto max-w-7xl px-6">
 
         {/* Editorial header — left-aligned, no centring */}
@@ -27,7 +27,7 @@ export default async function FeaturedProducts() {
 
         {/* Product rail */}
         {featuredProducts.length > 0 ? (
-          <div className="grid gap-8 sm:grid-cols-2 lg:grid-cols-4">
+          <div className="grid gap-x-5 gap-y-16 sm:grid-cols-2 lg:grid-cols-4">
             {featuredProducts.map((product, index) => (
               <ProductCard
                 key={product.id}
