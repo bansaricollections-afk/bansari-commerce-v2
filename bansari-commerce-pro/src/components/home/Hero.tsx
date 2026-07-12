@@ -155,11 +155,11 @@ export default function Hero() {
         {/* ── RIGHT ── */}
 
         {/*
-          Blur orb removed entirely — no replacement.
-          Image: rounded-2xl (--bc-radius-2xl 24px token), warm layered shadow.
-          2:3 editorial aspect ratio (600×900).
-          justify-end: image breathes toward the right edge.
-          radius and shadow deferred to Batch 10A visual evaluation.
+          Batch 10A — Option C approved.
+          rounded-2xl removed. boxShadow removed.
+          Image is completely flush: no radius, no shadow.
+          Every image on the homepage now shares zero-radius, zero-shadow language.
+          Dimensions (600×900), priority, alt text, layout, crop: unchanged.
         */}
         <div className="flex justify-end">
 
@@ -169,8 +169,6 @@ export default function Hero() {
             width={600}
             height={900}
             priority
-            className="rounded-2xl"
-            style={{ boxShadow: "var(--bc-shadow-card)" }}
           />
 
         </div>
