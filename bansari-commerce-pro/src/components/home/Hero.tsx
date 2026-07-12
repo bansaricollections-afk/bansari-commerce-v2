@@ -1,91 +1,169 @@
 import Image from "next/image";
 import Link from "next/link";
-import { ArrowRight } from "lucide-react";
 
 export default function Hero() {
   return (
-    <section aria-label="Hero" className="bg-[#FFFDF9]">
+    <section aria-label="Hero" className="bg-[var(--bc-surface-cream)]">
 
-      <div className="mx-auto grid min-h-[85vh] max-w-7xl items-center gap-16 px-6 py-16 lg:grid-cols-2">
+      <div className="mx-auto grid min-h-[90vh] max-w-7xl items-center gap-16 px-6 py-24 lg:grid-cols-2">
 
-        {/* LEFT */}
+        {/* ── LEFT ── */}
 
         <div>
 
-          <span className="inline-block rounded-full bg-[#F6F0EB] px-5 py-2 text-sm font-medium uppercase tracking-[0.2em] text-[#8A5A6A]">
-            <span aria-hidden="true">✨</span> New Collection 2026
-          </span>
+          {/* Eyebrow — plain tracked uppercase, no pill, no emoji */}
+          <p
+            className="text-[var(--bc-text-xs)] font-medium uppercase tracking-[0.25em]"
+            style={{ color: "var(--bc-gold-warm)" }}
+          >
+            The 2026 Edit
+          </p>
 
-          <h1 className="mt-8 font-[family:var(--font-playfair)] text-[var(--bc-text-3xl)] font-bold leading-[1.1]">
-            Where
-            <br />
-            Tradition
-            <br />
-            Meets
+          {/* Headline — 2 editorial lines, Playfair Display weight 550 */}
+          <h1
+            className="mt-6 font-[family:var(--font-playfair)] text-[var(--bc-text-3xl)] leading-[1.08]"
+            style={{ fontWeight: 550 }}
+          >
+            Where Tradition Meets
             <br />
             Timeless Style
           </h1>
 
-          <p className="mt-8 max-w-xl text-lg leading-relaxed text-gray-600">
+          {/* Body copy — narrowed for editorial intimacy */}
+          <p
+            className="mt-6 max-w-md text-[var(--bc-text-base)] leading-relaxed"
+            style={{ color: "var(--bc-text-muted)" }}
+          >
             Discover thoughtfully crafted ethnic wear designed for weddings,
             celebrations, festive occasions and everyday elegance.
           </p>
 
+          {/* CTAs */}
           <div className="mt-10 flex flex-wrap gap-4">
 
             <Link
               href="/shop"
-              className="inline-flex items-center gap-2 rounded-full bg-[#8A5A6A] px-8 py-4 font-semibold tracking-wide text-white transition hover:bg-[#734757]"
+              className="inline-flex items-center rounded-full px-10 py-3.5 font-medium tracking-wide text-white transition"
+              style={{ backgroundColor: "var(--bc-brand-mauve)" }}
+              onMouseEnter={e =>
+                ((e.currentTarget as HTMLAnchorElement).style.backgroundColor =
+                  "var(--bc-brand-mauve-dark)")
+              }
+              onMouseLeave={e =>
+                ((e.currentTarget as HTMLAnchorElement).style.backgroundColor =
+                  "var(--bc-brand-mauve)")
+              }
             >
               Shop Collection
-              <ArrowRight size={18} />
             </Link>
 
             <Link
               href="/collections"
-              className="rounded-full border border-[#8A5A6A] px-8 py-4 font-semibold tracking-wide text-[#8A5A6A] transition hover:bg-[#F6F0EB]"
+              className="inline-flex items-center rounded-full border px-10 py-3.5 font-medium tracking-wide transition"
+              style={{
+                borderColor: "var(--bc-brand-mauve)",
+                color: "var(--bc-brand-mauve)",
+              }}
+              onMouseEnter={e => {
+                (e.currentTarget as HTMLAnchorElement).style.backgroundColor =
+                  "var(--bc-surface-warm)";
+              }}
+              onMouseLeave={e => {
+                (e.currentTarget as HTMLAnchorElement).style.backgroundColor =
+                  "transparent";
+              }}
             >
               Explore Collections
             </Link>
 
           </div>
 
-          {/* Brand Stats */}
+          {/*
+            Editorial divider + trust metadata row.
+            Semantic structure preserved: dl > div > (dt + dd).
+            Restyled as a single inline metadata line beneath a thin rule.
+          */}
+          <div
+            className="mt-10 border-t pt-6"
+            style={{ borderColor: "var(--bc-border-soft)" }}
+          >
+            <dl
+              className="flex flex-wrap items-baseline gap-x-5 gap-y-1"
+              aria-label="Brand credentials"
+            >
 
-          <dl className="mt-16 grid grid-cols-3 gap-8">
+              <div className="flex items-baseline gap-1.5">
+                <dd
+                  className="text-[var(--bc-text-sm)] font-medium"
+                  style={{ color: "var(--bc-text-secondary)" }}
+                >
+                  500+
+                </dd>
+                <dt
+                  className="text-[var(--bc-text-xs)] uppercase tracking-[0.15em]"
+                  style={{ color: "var(--bc-text-faint)" }}
+                >
+                  Curated Styles
+                </dt>
+              </div>
 
-            <div>
-              <dd className="text-3xl font-bold text-[#8A5A6A]">500+</dd>
-              <dt className="mt-2 text-sm text-gray-500">Curated Styles</dt>
-            </div>
+              <span aria-hidden="true" style={{ color: "var(--bc-border-gold)" }}>·</span>
 
-            <div>
-              <dd className="text-3xl font-bold text-[#8A5A6A]">100%</dd>
-              <dt className="mt-2 text-sm text-gray-500">Quality Checked</dt>
-            </div>
+              <div className="flex items-baseline gap-1.5">
+                <dd
+                  className="text-[var(--bc-text-sm)] font-medium"
+                  style={{ color: "var(--bc-text-secondary)" }}
+                >
+                  Quality Assured
+                </dd>
+                <dt
+                  className="text-[var(--bc-text-xs)] uppercase tracking-[0.15em]"
+                  style={{ color: "var(--bc-text-faint)" }}
+                >
+                  Every Piece
+                </dt>
+              </div>
 
-            <div>
-              <dd className="text-3xl font-bold text-[#8A5A6A]">PAN India</dd>
-              <dt className="mt-2 text-sm text-gray-500">Delivery</dt>
-            </div>
+              <span aria-hidden="true" style={{ color: "var(--bc-border-gold)" }}>·</span>
 
-          </dl>
+              <div className="flex items-baseline gap-1.5">
+                <dd
+                  className="text-[var(--bc-text-sm)] font-medium"
+                  style={{ color: "var(--bc-text-secondary)" }}
+                >
+                  Pan-India
+                </dd>
+                <dt
+                  className="text-[var(--bc-text-xs)] uppercase tracking-[0.15em]"
+                  style={{ color: "var(--bc-text-faint)" }}
+                >
+                  Delivery
+                </dt>
+              </div>
+
+            </dl>
+          </div>
 
         </div>
 
-        {/* RIGHT */}
+        {/* ── RIGHT ── */}
 
-        <div className="relative flex justify-center">
-
-          <div className="absolute h-[550px] w-[550px] rounded-full bg-[#F7EDE6] blur-3xl" />
+        {/*
+          Blur orb removed entirely — no replacement.
+          Image: rounded-2xl (--bc-radius-2xl 24px token), warm layered shadow.
+          2:3 editorial aspect ratio (600×900).
+          justify-end: image breathes toward the right edge.
+        */}
+        <div className="flex justify-end">
 
           <Image
             src="/hero/hero.png"
-            alt="Bansari Collections"
-            width={650}
-            height={850}
+            alt="Bansari Collections — curated ethnic wear"
+            width={600}
+            height={900}
             priority
-            className="relative rounded-[40px] shadow-2xl"
+            className="rounded-2xl"
+            style={{ boxShadow: "var(--bc-shadow-card)" }}
           />
 
         </div>
