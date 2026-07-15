@@ -14,7 +14,7 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   metadataBase: new URL(
-    process.env.NEXT_PUBLIC_SITE_URL ?? 'https://bansaricollections.com'
+    process.env.NEXT_PUBLIC_SITE_URL ?? 'https://www.bansaricollection.in'
   ),
   title: {
     default: 'Bansari Collections — Indian Ethnic Wear',
@@ -38,7 +38,7 @@ export const metadata: Metadata = {
   openGraph: {
     type: 'website',
     locale: 'en_IN',
-    url: 'https://bansaricollections.com',
+    url: 'https://www.bansaricollection.in',
     siteName: 'Bansari Collections',
     title: 'Bansari Collections — Indian Ethnic Wear',
     description:
@@ -78,7 +78,7 @@ export const metadata: Metadata = {
   },
   manifest: '/site.webmanifest',
   alternates: {
-    canonical: 'https://bansaricollections.com',
+    canonical: 'https://www.bansaricollection.in',
   },
 };
 
@@ -98,8 +98,8 @@ export default function RootLayout({
               '@context': 'https://schema.org',
               '@type': 'Organization',
               name: 'Bansari Collections',
-              url: 'https://bansaricollections.com',
-              logo: 'https://bansaricollections.com/logo.png',
+              url: 'https://www.bansaricollection.in',
+              logo: 'https://www.bansaricollection.in/logo.png',
               description:
                 'Premium Indian ethnic wear — sarees, lehengas, salwar suits.',
               contactPoint: {

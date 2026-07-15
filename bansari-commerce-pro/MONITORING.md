@@ -1,162 +1,118 @@
-# Bansari Commerce — Post-Launch Monitoring Checklist
+# Bansari Commerce — Post-Launch Monitoring
 
-Check this dashboard daily for the first week, then weekly thereafter.
+> **Domain:** `https://www.bansaricollection.in`
 
 ---
 
-## DAILY CHECKS (First 7 Days)
+## DAILY CHECKLIST (Every business day, 9 AM)
 
 ### Orders
-
-```
-[ ] Log in to /admin/orders
-[ ] Count today's orders
-[ ] Verify each order has payment_status = 'paid' or 'pending'
-[ ] Check for any orders stuck in 'pending' > 1 hour
-    Action if stuck: Check Razorpay webhook delivery for that order's razorpay_order_id
-[ ] Cross-check Razorpay Dashboard captured payments = Supabase paid orders total
-    SQL check:
-      SELECT COUNT(*), SUM(total_amount)
-      FROM orders
-      WHERE payment_status = 'paid'
-      AND created_at > NOW() - INTERVAL '24 hours';
-```
+- [ ] Supabase → Table Editor → `orders` → filter `status = pending` and `created_at < now() - interval '30 minutes'`
+  - Expected: 0 rows. Any row = potential webhook failure — investigate immediately.
+- [ ] Confirm all orders from previous day have `status = paid` or `status = cancelled`
 
 ### Payments
+- [ ] Razorpay Dashboard → Payments → filter yesterday's date
+- [ ] Count `Captured` payments
+- [ ] Run: `SELECT COUNT(*), SUM(total) FROM orders WHERE status = 'paid' AND created_at::date = CURRENT_DATE - 1`
+- [ ] Razorpay count must equal Supabase count. Any mismatch = payment reconciliation issue.
 
-```
-[ ] Razorpay Dashboard → Payments → filter Last 24 hours
-[ ] All captured payments have matching order in Supabase
-[ ] No payments in 'authorized' state > 30 minutes (should auto-capture)
-[ ] No chargebacks or disputes
-[ ] Refund status: any pending refunds issued?
-```
-
-### Webhook Health
-
-```
-[ ] Razorpay Dashboard → Webhooks → Recent Deliveries
-[ ] All deliveries show HTTP 200
-[ ] If any show 400:
-    - Check RAZORPAY_WEBHOOK_SECRET in Vercel matches Razorpay Dashboard
-    - Redeploy if secret was changed
-[ ] If any show 5xx:
-    - Check Vercel Functions log for /api/payment/webhook
-    - Check Supabase logs for database errors
-```
+### Webhooks
+- [ ] Razorpay → Settings → Webhooks → `www.bansaricollection.in` webhook → Recent Deliveries
+- [ ] Expected: all deliveries HTTP 200
+- [ ] Any non-200 → check `/api/payment/webhook` in Vercel Functions logs
 
 ### Inventory
-
-```
-[ ] Check products with stock < 5:
-    SQL:
-      SELECT id, name, stock
-      FROM products
-      WHERE stock < 5
-      ORDER BY stock ASC;
-[ ] Restock or mark out-of-stock in admin panel
-[ ] Verify no product has stock = negative (data integrity check):
-    SQL:
-      SELECT id, name, stock FROM products WHERE stock < 0;
-    Expected: 0 rows
-```
+- [ ] Run: `SELECT id, name, stock FROM products WHERE stock <= 5 ORDER BY stock ASC`
+- [ ] Products with `stock = 0` must have `is_active = false`
+- [ ] Restock or deactivate as needed
 
 ### Emails
+- [ ] Resend → Logs → filter last 24h
+- [ ] Expected: 0 bounced, 0 failed deliveries
+- [ ] Any bounce → check recipient address validity
 
-```
-[ ] Resend Dashboard → Logs → Last 24 hours
-[ ] All order confirmation emails show 'Delivered' status
-[ ] Check for any 'Bounced' or 'Failed' deliveries
-    Action: If bounce rate > 5%, check EMAIL_FROM domain DNS records
-[ ] Check spam rate: Resend Dashboard → Domains → Reputation
-```
+### Errors
+- [ ] Vercel Dashboard → Project → Functions tab
+- [ ] Expected: 0 functions with error rate > 0% in last 24h
+- [ ] Any 500s → check function logs → fix or rollback
 
-### Errors (4xx / 5xx)
+### 404s
+- [ ] Vercel Analytics → filter status 404 (if Analytics enabled)
+- [ ] Any 404 on product/category URLs = deleted content still linked — fix redirects
 
-```
-[ ] Vercel Dashboard → Project → Functions → Last 24 hours
-[ ] Filter by status >= 500 → should be 0
-[ ] Supabase Dashboard → Logs → API → filter status >= 500
-[ ] Any 404 patterns? (May indicate broken links from external sites)
-    Check: Vercel Analytics → Top 404 pages
-[ ] Any 401/403 spikes? (May indicate attempted unauthorised admin access)
-```
+---
+
+## WEEKLY CHECKLIST (Every Monday)
 
 ### Performance
-
-```
-[ ] Vercel Dashboard → Project → Speed Insights (if enabled)
-[ ] LCP (Largest Contentful Paint): target < 2.5 seconds
-[ ] INP (Interaction to Next Paint): target < 200ms
-[ ] CLS (Cumulative Layout Shift): target < 0.1
-[ ] If any metric degrades: check if new images were added without width/height attributes
-```
+- [ ] Vercel Speed Insights → check Core Web Vitals
+  - LCP < 2.5s ✅
+  - INP < 200ms ✅
+  - CLS < 0.1 ✅
+- [ ] Any metric failing → investigate and fix before next week
 
 ### Analytics
+- [ ] Vercel Analytics → Sessions, Bounce rate, Top pages
+- [ ] Funnel: homepage → product → cart → checkout → paid
+- [ ] Note conversion rate. Benchmark week-over-week.
 
-```
-[ ] Vercel Analytics → Today's visitors
-[ ] Top pages by traffic
-[ ] Top referrers (which platform is sending traffic?)
-[ ] If GA4 installed: check conversion funnel
-    (Product viewed → Add to cart → Checkout started → Purchase)
-[ ] Cart abandonment rate: (Checkout started - Purchases) / Checkout started
-    Target: < 70% abandonment
-```
+### Payment Reconciliation
+- [ ] Export Razorpay settlements CSV for the week
+- [ ] Export Supabase orders: `SELECT * FROM orders WHERE status = 'paid' AND created_at >= CURRENT_DATE - 7`
+- [ ] Confirm settlement amount matches bank deposit
 
----
-
-## WEEKLY CHECKS (Ongoing)
-
-```
-[ ] Reconcile: total Razorpay settled amount = total in bank account
-[ ] Review all 1-star or negative customer feedback
-[ ] Check Supabase database size (Dashboard → Settings → Database → Size)
-[ ] Review Vercel usage vs. plan limits
-[ ] Rotate API keys if any team member has left
-[ ] Check for dependency security updates: npm audit
-[ ] Review top search queries in admin search logs
-[ ] Restock all products with stock < 10
-[ ] Archive or mark old orders as fulfiled
-```
+### Security
+- [ ] Check Supabase → Authentication → Users for any suspicious sign-up spikes
+- [ ] Confirm `SUPABASE_SERVICE_ROLE_KEY` is not exposed in any client-side log
 
 ---
 
-## ALERTS TO SET UP
+## ALERT THRESHOLDS
 
-Set up these manual checks as recurring calendar reminders:
-
-| Alert | Frequency | Check |
-|---|---|---|
-| Webhook failures | Daily | Razorpay → Recent Deliveries → any non-200 |
-| Low stock | Daily | Supabase: stock < 5 |
-| Pending orders | Twice daily | Orders with payment_status = 'pending' > 1hr |
-| Failed emails | Daily | Resend logs → Failed/Bounced |
-| Vercel errors | Daily | Functions log → 5xx |
-| Revenue reconciliation | Weekly | Razorpay settled = bank deposit |
-
----
-
-## ESCALATION CONTACTS
-
-Fill in before launch:
-
-| Service | Support URL | Your Account Email |
-|---|---|---|
-| Vercel | https://vercel.com/help | |
-| Supabase | https://supabase.com/support | |
-| Razorpay | https://razorpay.com/support | |
-| Resend | https://resend.com/help | |
+| Metric | Warning | Critical | Action |
+|---|---|---|---|
+| Pending orders > 30 min | 1 | 3 | Check webhook, manual status fix |
+| Payment mismatch | Any | Any | Stop new orders, investigate |
+| Webhook failure rate | > 0% | > 5% | Check endpoint, redeploy |
+| Email bounce rate | > 2% | > 5% | Check DNS/SPF/DKIM, contact Resend |
+| Function error rate | > 1% | > 5% | Check logs, rollback if needed |
+| LCP | > 2.5s | > 4s | Image optimisation, CDN check |
+| Stock at 0 but active | Any | Any | Deactivate product immediately |
 
 ---
 
-## MONTHLY BACKUP
+## USEFUL SQL QUERIES
 
-```
-[ ] Supabase Dashboard → Settings → Backups → Download backup
-[ ] Export orders CSV: /admin/orders → Export (or via SQL)
-    SQL:
-      COPY (SELECT * FROM orders WHERE created_at > NOW() - INTERVAL '30 days')
-      TO '/tmp/orders_backup.csv' CSV HEADER;
-[ ] Save to Google Drive or external storage
+```sql
+-- Orders stuck in pending
+SELECT id, created_at, total, razorpay_order_id
+FROM orders
+WHERE status = 'pending'
+  AND created_at < NOW() - INTERVAL '30 minutes'
+ORDER BY created_at ASC;
+
+-- Daily revenue
+SELECT DATE(created_at) AS date, COUNT(*) AS orders, SUM(total) AS revenue
+FROM orders
+WHERE status = 'paid'
+GROUP BY DATE(created_at)
+ORDER BY date DESC
+LIMIT 30;
+
+-- Low stock products
+SELECT id, name, stock
+FROM products
+WHERE stock <= 5
+ORDER BY stock ASC;
+
+-- Top products by revenue
+SELECT p.name, SUM(oi.quantity * oi.price) AS revenue
+FROM order_items oi
+JOIN products p ON p.id = oi.product_id
+JOIN orders o ON o.id = oi.order_id
+WHERE o.status = 'paid'
+GROUP BY p.name
+ORDER BY revenue DESC
+LIMIT 10;
 ```
