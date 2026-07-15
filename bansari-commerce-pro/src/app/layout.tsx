@@ -82,41 +82,63 @@ export const metadata: Metadata = {
   },
 };
 
+const organizationSchema = {
+  '@context': 'https://schema.org',
+  '@type': 'Organization',
+  name: 'Bansari Collections',
+  url: 'https://www.bansaricollection.in',
+  logo: 'https://www.bansaricollection.in/logo.png',
+  description: 'Premium Indian ethnic wear — sarees, lehengas, salwar suits.',
+  contactPoint: {
+    '@type': 'ContactPoint',
+    telephone: '+91-84601-92745',
+    contactType: 'customer service',
+    availableLanguage: ['English', 'Hindi'],
+  },
+  sameAs: [
+    'https://www.instagram.com/bansaricollections',
+    'https://www.facebook.com/bansaricollections',
+  ],
+};
+
+const websiteSchema = {
+  '@context': 'https://schema.org',
+  '@type': 'WebSite',
+  name: 'Bansari Collections',
+  url: 'https://www.bansaricollection.in',
+  potentialAction: {
+    '@type': 'SearchAction',
+    target: {
+      '@type': 'EntryPoint',
+      urlTemplate:
+        'https://www.bansaricollection.in/shop?q={search_term_string}',
+    },
+    'query-input': 'required name=search_term_string',
+  },
+};
+
 export default function RootLayout({
   children,
-}: Readonly<{
-  children: React.ReactNode;
-}>) {
+}: Readonly<{ children: React.ReactNode }>) {
   return (
     <html lang="en">
       <head>
-        {/* JSON-LD: Organization */}
         <script
           type="application/ld+json"
           dangerouslySetInnerHTML={{
-            __html: JSON.stringify({
-              '@context': 'https://schema.org',
-              '@type': 'Organization',
-              name: 'Bansari Collections',
-              url: 'https://www.bansaricollection.in',
-              logo: 'https://www.bansaricollection.in/logo.png',
-              description:
-                'Premium Indian ethnic wear — sarees, lehengas, salwar suits.',
-              contactPoint: {
-                '@type': 'ContactPoint',
-                contactType: 'customer service',
-                availableLanguage: ['English', 'Hindi'],
-              },
-              sameAs: [
-                'https://www.instagram.com/bansaricollections',
-                'https://www.facebook.com/bansaricollections',
-              ],
-            }),
+            __html: JSON.stringify(organizationSchema),
+          }}
+        />
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{
+            __html: JSON.stringify(websiteSchema),
           }}
         />
       </head>
-      <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
-        {/* Skip to content — accessibility */}
+      <body
+        className={`${geistSans.variable} ${geistMono.variable} antialiased`}
+      >
         <a
           href="#main-content"
           className="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-50 focus:rounded focus:bg-white focus:px-4 focus:py-2 focus:text-slate-900 focus:shadow-lg focus:outline-none"

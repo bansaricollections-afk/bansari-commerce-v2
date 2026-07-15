@@ -14,10 +14,15 @@ export type LogLevel = 'debug' | 'info' | 'warn' | 'error';
 
 export type LogContext = {
   requestId?: string;
+  userId?: string;
   orderId?: string;
   razorpayOrderId?: string;
   paymentId?: string;
   customerId?: string;
+  route?: string;
+  latencyMs?: number;
+  environment?: string;
+  gitSha?: string;
   [key: string]: unknown;
 };
 
@@ -33,13 +38,9 @@ export type LogEntry = LogContext & {
 };
 
 function writeEntry(entry: LogEntry): void {
-  // Vercel captures stdout as structured logs when the output is valid JSON.
-  // Use process.stdout.write so we never interleave with console internals.
   try {
     process.stdout.write(JSON.stringify(entry) + '\n');
   } catch {
-    // Last-resort fallback: if stdout write fails (e.g. test environment),
-    // use console.error which is always safe.
     // eslint-disable-next-line no-console
     console.error('[logger] Failed to write structured log entry', entry);
   }
@@ -61,6 +62,12 @@ function extractErrorFields(
   }
   return {};
 }
+
+/** Shared runtime context injected into every log entry automatically. */
+const RUNTIME_CTX: Partial<LogContext> = {
+  environment: process.env.NODE_ENV ?? 'development',
+  gitSha: process.env.VERCEL_GIT_COMMIT_SHA?.slice(0, 8) ?? 'local',
+};
 
 export type Logger = {
   debug(event: string, ctx?: LogContext): void;
@@ -85,6 +92,7 @@ export function createLogger(
     error?: unknown
   ): void {
     const entry: LogEntry = {
+      ...RUNTIME_CTX,
       ...baseCtx,
       ...ctx,
       ...extractErrorFields(error),
