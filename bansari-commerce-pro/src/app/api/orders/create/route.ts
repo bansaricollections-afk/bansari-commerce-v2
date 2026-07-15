@@ -33,9 +33,6 @@ export async function POST(request: NextRequest) {
     } = body ?? {};
 
     // --- Step 1: Field presence validation ---
-    // All three Razorpay fields must be present as non-empty strings before
-    // any other processing. Rejection here is safe — nothing has been read
-    // from the DB yet.
     if (!razorpay_payment_id || typeof razorpay_payment_id !== 'string') {
       return NextResponse.json(
         { success: false, error: 'razorpay_payment_id is required.' },
@@ -56,14 +53,9 @@ export async function POST(request: NextRequest) {
     }
 
     // --- Step 2: Cryptographic HMAC verification ---
-    // MUST run before ANY database read or write, including the idempotency
-    // check. A valid signature proves the client received these IDs from
-    // Razorpay after a real payment; without it, a caller with a known
-    // payment_id could forge an order.
-    //
-    // verifyPaymentSignature uses RAZORPAY_KEY_SECRET (not the webhook
-    // secret) over `${razorpay_order_id}|${razorpay_payment_id}` via
-    // crypto.timingSafeEqual — never string equality.
+    // MUST run before ANY database read or write.
+    // verifyPaymentSignature uses RAZORPAY_KEY_SECRET (not the webhook secret)
+    // over `${razorpay_order_id}|${razorpay_payment_id}` via timingSafeEqual.
     const signatureValid = verifyPaymentSignature(
       razorpay_order_id,
       razorpay_payment_id,
@@ -75,7 +67,6 @@ export async function POST(request: NextRequest) {
         razorpayOrderId: razorpay_order_id,
         paymentId: razorpay_payment_id,
       });
-      // Exit immediately. Nothing written to DB.
       return NextResponse.json(
         { success: false, error: 'Invalid payment signature.' },
         { status: 400 }
@@ -95,9 +86,8 @@ export async function POST(request: NextRequest) {
     const supabase = createServiceRoleClient();
 
     // --- Step 3: Idempotency check ---
-    // Runs only after signature is verified. The UNIQUE index on
-    // razorpay_payment_id is the DB-level guard; this check provides a clean
-    // 200 instead of a Postgres 23505 error.
+    // Runs only after signature is verified. The UNIQUE partial index on
+    // razorpay_payment_id is the DB-level race guard.
     const { data: existing } = await supabase
       .from('orders')
       .select('id, order_number')
@@ -150,7 +140,6 @@ export async function POST(request: NextRequest) {
     };
 
     if (pending) {
-      // Use server-computed data — never trust client-sent prices.
       lineItems = (pending.items_json ?? []) as typeof lineItems;
       subtotal = Number(pending.subtotal);
       shippingFee = Number(pending.shipping_fee);
@@ -171,8 +160,6 @@ export async function POST(request: NextRequest) {
         country: pending.shipping_country,
       };
     } else {
-      // pending_orders row missing (race or retry after expiry).
-      // Fall back to client-sent body: re-validate every item from DB.
       rLog.warn('orders.create.pending_orders_miss', { razorpayOrderId: razorpay_order_id });
 
       if (!Array.isArray(rawItems) || rawItems.length === 0) {
@@ -202,7 +189,6 @@ export async function POST(request: NextRequest) {
       discount = 0;
       grandTotal = Math.round((subtotal + shippingFee - discount) * 100) / 100;
 
-      // Use client-sent customer/shipping as fallback only.
       customerName = customer?.name ?? 'Customer';
       customerEmail = customer?.email ?? '';
       customerPhone = customer?.phone ?? null;
@@ -220,52 +206,68 @@ export async function POST(request: NextRequest) {
     }
 
     const orderNumber = generateOrderNumber();
-    // payment_verified_at is set here — AFTER cryptographic verification
-    // in Step 2 above. It is never written without a valid HMAC check.
+    // payment_verified_at written only after HMAC passed in Step 2.
     const now = new Date().toISOString();
 
-    // --- Step 5: Insert order ---
-    const { data: order, error: orderErr } = await supabase
-      .from('orders')
-      .insert({
-        order_number: orderNumber,
-        user_id: null,
-        customer_name: customerName,
-        customer_email: customerEmail,
-        customer_phone: customerPhone,
-        shipping_name: shippingData.name,
-        shipping_phone: shippingData.phone,
-        shipping_email: shippingData.email,
-        shipping_address_line1: shippingData.addressLine1,
-        shipping_address_line2: shippingData.addressLine2,
-        shipping_city: shippingData.city,
-        shipping_state: shippingData.state,
-        shipping_postal_code: shippingData.postalCode,
-        shipping_country: shippingData.country,
-        billing_same_as_shipping: true,
-        currency: 'INR',
-        subtotal,
-        discount,
-        shipping_fee: shippingFee,
-        tax: 0,
-        grand_total: grandTotal,
-        payment_provider: 'razorpay',
-        payment_method: 'razorpay',
-        payment_reference: razorpay_payment_id,
-        razorpay_order_id,
-        razorpay_payment_id,
-        payment_status: 'paid',
-        order_status: 'placed',
-        // Written only after HMAC verification passed (Step 2).
-        payment_verified_at: now,
-        paid_at: now,
+    // --- Step 5: Atomic order + order_items via create_order_with_items RPC ---
+    // This replaces the previous two-step INSERT approach.
+    // create_order_with_items() wraps both inserts in an implicit PL/pgSQL
+    // transaction: if the order_items insert fails (e.g. FK violation) the
+    // entire transaction rolls back — no orphaned order rows.
+    //
+    // The UNIQUE constraint on razorpay_payment_id is enforced inside the RPC;
+    // a concurrent call that races here will get a 23505 from Postgres which
+    // is surfaced as a Supabase RPC error and caught below.
+    const orderPayload = {
+      order_number:              orderNumber,
+      user_id:                   '',  // null serialized as empty string; RPC uses nullif()
+      customer_name:             customerName,
+      customer_email:            customerEmail,
+      customer_phone:            customerPhone ?? '',
+      shipping_name:             shippingData.name,
+      shipping_phone:            shippingData.phone,
+      shipping_email:            shippingData.email ?? '',
+      shipping_address_line1:    shippingData.addressLine1,
+      shipping_address_line2:    shippingData.addressLine2 ?? '',
+      shipping_city:             shippingData.city,
+      shipping_state:            shippingData.state,
+      shipping_postal_code:      shippingData.postalCode,
+      billing_same_as_shipping:  'true',
+      currency:                  'INR',
+      subtotal:                  String(subtotal),
+      discount:                  String(discount),
+      shipping_fee:              String(shippingFee),
+      tax:                       '0',
+      grand_total:               String(grandTotal),
+      payment_provider:          'razorpay',
+      payment_method:            'razorpay',
+      payment_reference:         razorpay_payment_id,
+      razorpay_order_id:         razorpay_order_id,
+      razorpay_payment_id:       razorpay_payment_id,
+      payment_status:            'paid',
+      order_status:              'placed',
+      payment_verified_at:       now,
+      paid_at:                   now,
+    };
+
+    const itemsPayload = lineItems.map((li) => ({
+      product_id:   li.productId,
+      product_name: li.productName,
+      unit_price:   li.unitPrice,
+      quantity:     li.quantity,
+      line_total:   li.lineTotal,
+    }));
+
+    const { data: order, error: rpcErr } = await supabase
+      .rpc('create_order_with_items', {
+        p_order: orderPayload,
+        p_items: itemsPayload,
       })
-      .select('id, order_number, customer_name, customer_email, grand_total, subtotal, shipping_fee, discount')
       .single();
 
-    if (orderErr) {
-      // 23505 = concurrent insert already succeeded (webhook beat the browser).
-      if (orderErr.code === '23505') {
+    if (rpcErr) {
+      // 23505 = concurrent insert won the race (webhook beat the browser).
+      if (rpcErr.code === '23505') {
         const { data: winner } = await supabase
           .from('orders')
           .select('id, order_number')
@@ -277,9 +279,9 @@ export async function POST(request: NextRequest) {
           { status: 200 }
         );
       }
-      rLog.error('orders.create.insert_failed', orderErr);
+      rLog.error('orders.create.rpc_failed', rpcErr);
       return NextResponse.json(
-        { success: false, error: orderErr.message },
+        { success: false, error: rpcErr.message },
         { status: 500 }
       );
     }
@@ -291,38 +293,23 @@ export async function POST(request: NextRequest) {
       paymentId: razorpay_payment_id,
     });
 
-    // --- Step 6: Insert order_items ---
-    if (lineItems.length > 0) {
-      const itemRows = lineItems.map((li) => ({
-        order_id: order.id,
-        product_id: li.productId,
-        product_name: li.productName,
-        unit_price: li.unitPrice,
-        quantity: li.quantity,
-        line_total: li.lineTotal,
-      }));
-
-      const { error: itemsErr } = await supabase.from('order_items').insert(itemRows);
-      if (itemsErr) {
-        rLog.warn('orders.create.items_failed', itemsErr, { orderId: order.id });
-      }
-
-      // --- Step 7: Decrement stock via RPC ---
-      for (const li of lineItems) {
-        const { error: stockErr } = await supabase.rpc('decrement_product_stock', {
-          p_product_id: li.productId,
-          p_quantity: li.quantity,
+    // --- Step 6: Decrement stock via RPC (intentionally outside the order transaction) ---
+    // Payment was already captured by Razorpay — a stock shortfall must not
+    // roll back a confirmed paid order.  Best-effort; logged on failure.
+    for (const li of lineItems) {
+      const { error: stockErr } = await supabase.rpc('decrement_product_stock', {
+        p_product_id: li.productId,
+        p_quantity: li.quantity,
+      });
+      if (stockErr) {
+        rLog.warn('orders.create.stock_failed', stockErr, {
+          orderId: order.id,
+          productId: li.productId,
         });
-        if (stockErr) {
-          rLog.warn('orders.create.stock_failed', stockErr, {
-            orderId: order.id,
-            productId: li.productId,
-          });
-        }
       }
     }
 
-    // --- Step 8: Mark pending_orders as consumed (idempotency lock) ---
+    // --- Step 7: Mark pending_orders as consumed ---
     if (pending) {
       await supabase
         .from('pending_orders')
@@ -330,7 +317,7 @@ export async function POST(request: NextRequest) {
         .eq('id', pending.id);
     }
 
-    // --- Step 9: Confirmation email (non-fatal) ---
+    // --- Step 8: Confirmation email (non-fatal) ---
     try {
       await sendOrderConfirmationEmail({
         orderNumber: order.order_number,
