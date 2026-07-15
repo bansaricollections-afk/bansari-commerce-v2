@@ -1,0 +1,30 @@
+OG IMAGE SPECIFICATION — Bansari Collections
+============================================
+
+FILE REQUIRED: /public/og-image.jpg
+
+DIMENSIONS:    1200 × 630 pixels (exact)
+FORMAT:        JPEG
+MAX FILE SIZE: 300 KB
+COLOUR SPACE: sRGB
+
+CONTENT BRIEF:
+- Background: lifestyle photograph of Indian ethnic wear (sarees / lehengas)
+  on a clean, warm-toned background
+- Overlay text (bottom left or centre):
+    Line 1: "Bansari Collections"  (bold, large)
+    Line 2: "Indian Ethnic Wear"   (lighter weight, smaller)
+- Brand colour: #7c3f2e (deep terracotta)
+
+PLATFORM PREVIEWS:
+- Facebook / WhatsApp share: uses full 1200×630
+- Twitter / X:               crops to 2:1 centre
+- LinkedIn:                  uses full 1200×630
+
+DELIVERY:
+- Save as: bansari-commerce-pro/public/og-image.jpg
+- Commit to main branch
+- Vercel will serve it automatically at /og-image.jpg
+
+NOTE: Until this file is added, social media shares will show no preview image.
+The metadata is correctly configured — only the image asset is missing.
