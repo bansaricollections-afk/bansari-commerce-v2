@@ -1,7 +1,7 @@
 "use client";
 
 import Image from "next/image";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Edit,
   Eye,
@@ -53,10 +53,14 @@ import {
 import { createClient } from "@/lib/supabase/client";
 import { cn } from "@/lib/utils";
 
+// ─── Constants ───────────────────────────────────────────────────────────────
+
 const PRODUCTS_TABLE = "products";
 const PRODUCT_IMAGES_BUCKET = "product-images";
 const PAGE_SIZE = 8;
 const LOW_STOCK_THRESHOLD = 5;
+
+// ─── Schemas ─────────────────────────────────────────────────────────────────
 
 const imageSchema = z.object({
   url: z.string().min(1),
@@ -92,6 +96,8 @@ const productFormSchema = z.object({
   active: z.boolean(),
   images: z.array(imageSchema),
 });
+
+// ─── Types ────────────────────────────────────────────────────────────────────
 
 type ProductImage = z.infer<typeof imageSchema>;
 type ValidProductForm = z.infer<typeof productFormSchema>;
@@ -152,6 +158,8 @@ type ProductFormState = {
   images: ProductImage[];
 };
 
+// ─── Defaults ─────────────────────────────────────────────────────────────────
+
 const emptyForm: ProductFormState = {
   name: "",
   sku: "",
@@ -178,6 +186,8 @@ const emptyForm: ProductFormState = {
   images: [],
 };
 
+// ─── Pure helpers ─────────────────────────────────────────────────────────────
+
 function slugify(value: string) {
   return value
     .toLowerCase()
@@ -197,65 +207,38 @@ function generateSku(category: string, name: string) {
       .replace(/[^a-zA-Z]/g, "")
       .slice(0, 3)
       .toUpperCase() || "BAN";
-
   return `BC-${categoryCode}-${nameCode}-${Date.now().toString().slice(-6)}`;
 }
 
 function getString(row: DbProductRecord, key: string, fallback = "") {
   const value = row[key];
-
-  if (typeof value === "string") {
-    return value;
-  }
-
-  if (typeof value === "number" || typeof value === "boolean") {
+  if (typeof value === "string") return value;
+  if (typeof value === "number" || typeof value === "boolean")
     return String(value);
-  }
-
   return fallback;
 }
 
-function getNumber(
-  row: DbProductRecord,
-  key: string,
-  fallback = 0
-) {
+function getNumber(row: DbProductRecord, key: string, fallback = 0) {
   const value = row[key];
-
-  if (typeof value === "number" && Number.isFinite(value)) {
-    return value;
-  }
-
+  if (typeof value === "number" && Number.isFinite(value)) return value;
   if (typeof value === "string") {
     const parsed = Number(value);
     return Number.isFinite(parsed) ? parsed : fallback;
   }
-
   return fallback;
 }
 
 function getOptionalNumber(row: DbProductRecord, key: string) {
   const value = row[key];
-
-  if (value === null || value === undefined || value === "") {
-    return undefined;
-  }
-
+  if (value === null || value === undefined || value === "") return undefined;
   const parsed = Number(value);
   return Number.isFinite(parsed) ? parsed : undefined;
 }
 
 function getBoolean(row: DbProductRecord, key: string, fallback = false) {
   const value = row[key];
-
-  if (typeof value === "boolean") {
-    return value;
-  }
-
-  if (typeof value === "string") {
-    return value === "true";
-  }
-
+  if (typeof value === "boolean") return value;
+  if (typeof value === "string") return value === "true";
   return fallback;
 }
 
@@ -265,41 +248,24 @@ function parseSizes(value: unknown) {
       .filter((item): item is string => typeof item === "string")
       .filter(Boolean);
   }
-
   if (typeof value === "string") {
     return value
       .split(",")
       .map((item) => item.trim())
       .filter(Boolean);
   }
-
   return [];
 }
 
 function parseImages(value: unknown) {
-  if (!Array.isArray(value)) {
-    return [];
-  }
-
+  if (!Array.isArray(value)) return [];
   return value.flatMap((item) => {
-    if (!item || typeof item !== "object") {
-      return [];
-    }
-
+    if (!item || typeof item !== "object") return [];
     const record = item as Record<string, unknown>;
     const url = record.url;
     const alt = record.alt;
-
-    if (typeof url !== "string" || !url) {
-      return [];
-    }
-
-    return [
-      {
-        url,
-        alt: typeof alt === "string" && alt ? alt : "Product image",
-      },
-    ];
+    if (typeof url !== "string" || !url) return [];
+    return [{ url, alt: typeof alt === "string" && alt ? alt : "Product image" }];
   });
 }
 
@@ -412,28 +378,18 @@ function formatCurrency(value: number) {
 }
 
 function stockLabel(product: Product) {
-  if (product.stock === 0) {
-    return "Out of stock";
-  }
-
-  if (product.stock <= LOW_STOCK_THRESHOLD) {
-    return "Low stock";
-  }
-
+  if (product.stock === 0) return "Out of stock";
+  if (product.stock <= LOW_STOCK_THRESHOLD) return "Low stock";
   return "In stock";
 }
 
 function stockVariant(product: Product) {
-  if (product.stock === 0) {
-    return "destructive" as const;
-  }
-
-  if (product.stock <= LOW_STOCK_THRESHOLD) {
-    return "secondary" as const;
-  }
-
+  if (product.stock === 0) return "destructive" as const;
+  if (product.stock <= LOW_STOCK_THRESHOLD) return "secondary" as const;
   return "outline" as const;
 }
+
+// ─── Form field sub-components ────────────────────────────────────────────────
 
 type FieldProps = {
   id: keyof ProductFormState;
@@ -442,6 +398,7 @@ type FieldProps = {
   onChange: (id: keyof ProductFormState, value: string) => void;
   type?: string;
   required?: boolean;
+  placeholder?: string;
 };
 
 function Field({
@@ -451,20 +408,26 @@ function Field({
   onChange,
   type = "text",
   required = false,
+  placeholder,
 }: FieldProps) {
   return (
-    <label className="grid gap-1.5">
-      <span className="text-xs font-medium text-slate-700">
+    <div className="flex flex-col gap-1.5">
+      <label
+        htmlFor={id}
+        className="text-[13px] font-medium text-slate-700"
+      >
         {label}
-        {required ? <span className="text-red-600"> *</span> : null}
-      </span>
+        {required ? <span className="ml-0.5 text-red-500"> *</span> : null}
+      </label>
       <Input
+        id={id}
         type={type}
         value={value}
-        onChange={(event) => onChange(id, event.target.value)}
-        className="h-9 bg-white"
+        onChange={(e) => onChange(id, e.target.value)}
+        placeholder={placeholder}
+        className="h-10 bg-white text-sm"
       />
-    </label>
+    </div>
   );
 }
 
@@ -478,24 +441,49 @@ type ToggleFieldProps = {
   onChange: (id: ToggleFieldProps["id"], checked: boolean) => void;
 };
 
-function ToggleField({
-  id,
-  label,
-  checked,
-  onChange,
-}: ToggleFieldProps) {
+function ToggleField({ id, label, checked, onChange }: ToggleFieldProps) {
   return (
-    <label className="flex items-center justify-between gap-3 rounded-md border border-slate-200 bg-white px-3 py-2">
-      <span className="text-xs font-medium text-slate-700">{label}</span>
+    <label
+      className={cn(
+        "flex cursor-pointer items-center justify-between gap-3 rounded-lg border px-4 py-3 transition-colors",
+        checked
+          ? "border-[#8A5A6A]/30 bg-[#8A5A6A]/5"
+          : "border-slate-200 bg-white hover:bg-slate-50"
+      )}
+    >
+      <span className="text-[13px] font-medium text-slate-700">{label}</span>
       <input
         type="checkbox"
         checked={checked}
-        onChange={(event) => onChange(id, event.target.checked)}
+        onChange={(e) => onChange(id, e.target.checked)}
         className="size-4 accent-[#8A5A6A]"
       />
     </label>
   );
 }
+
+/** Layout-only section wrapper — no logic */
+function FormSection({
+  title,
+  children,
+}: {
+  title: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <section className="space-y-4">
+      <div className="flex items-center gap-3">
+        <h3 className="whitespace-nowrap text-[11px] font-semibold uppercase tracking-widest text-slate-400">
+          {title}
+        </h3>
+        <div className="h-px flex-1 bg-slate-100" />
+      </div>
+      {children}
+    </section>
+  );
+}
+
+// ─── Main component ───────────────────────────────────────────────────────────
 
 export function ProductManagement() {
   const supabase = useMemo(() => createClient(), []);
@@ -514,6 +502,10 @@ export function ProductManagement() {
   const [detailsProduct, setDetailsProduct] = useState<Product | null>(null);
   const [deleteProduct, setDeleteProduct] = useState<Product | null>(null);
   const [form, setForm] = useState<ProductFormState>(emptyForm);
+  const [dragOver, setDragOver] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // ── Data loading ──────────────────────────────────────────────────────────
 
   const loadProducts = useCallback(async () => {
     setLoading(true);
@@ -522,9 +514,7 @@ export function ProductManagement() {
     const { data, error: productsError } = await supabase
       .from(PRODUCTS_TABLE)
       .select("*")
-      .order("created_at", {
-        ascending: false,
-      });
+      .order("created_at", { ascending: false });
 
     if (productsError) {
       setError(productsError.message);
@@ -543,262 +533,197 @@ export function ProductManagement() {
     void Promise.resolve().then(loadProducts);
   }, [loadProducts]);
 
+  // ── Derived state ──────────────────────────────────────────────────────────
+
   const categories = useMemo(() => {
     return Array.from(
-      new Set(products.map((product) => product.category).filter(Boolean))
+      new Set(products.map((p) => p.category).filter(Boolean))
     ).sort();
   }, [products]);
 
   const filteredProducts = useMemo(() => {
-    const normalizedQuery = query.trim().toLowerCase();
-
-    return products.filter((product) => {
+    const q = query.trim().toLowerCase();
+    return products.filter((p) => {
       const matchesQuery =
-        !normalizedQuery ||
-        [
-          product.name,
-          product.sku,
-          product.slug,
-          product.category,
-          product.collection,
-          product.brand,
-          product.color,
-        ]
+        !q ||
+        [p.name, p.sku, p.slug, p.category, p.collection, p.brand, p.color]
           .join(" ")
           .toLowerCase()
-          .includes(normalizedQuery);
-
+          .includes(q);
       const matchesCategory =
-        categoryFilter === "all" || product.category === categoryFilter;
-
+        categoryFilter === "all" || p.category === categoryFilter;
       const matchesStatus =
         statusFilter === "all" ||
-        (statusFilter === "active" && product.active) ||
-        (statusFilter === "inactive" && !product.active) ||
-        (statusFilter === "featured" && product.featured) ||
-        (statusFilter === "new-arrival" && product.newArrival) ||
-        (statusFilter === "best-seller" && product.bestSeller);
-
+        (statusFilter === "active" && p.active) ||
+        (statusFilter === "inactive" && !p.active) ||
+        (statusFilter === "featured" && p.featured) ||
+        (statusFilter === "new-arrival" && p.newArrival) ||
+        (statusFilter === "best-seller" && p.bestSeller);
       const matchesStock =
         stockFilter === "all" ||
-        (stockFilter === "in-stock" &&
-          product.stock > LOW_STOCK_THRESHOLD) ||
+        (stockFilter === "in-stock" && p.stock > LOW_STOCK_THRESHOLD) ||
         (stockFilter === "low-stock" &&
-          product.stock > 0 &&
-          product.stock <= LOW_STOCK_THRESHOLD) ||
-        (stockFilter === "out-of-stock" && product.stock === 0);
-
-      return (
-        matchesQuery &&
-        matchesCategory &&
-        matchesStatus &&
-        matchesStock
-      );
+          p.stock > 0 &&
+          p.stock <= LOW_STOCK_THRESHOLD) ||
+        (stockFilter === "out-of-stock" && p.stock === 0);
+      return matchesQuery && matchesCategory && matchesStatus && matchesStock;
     });
   }, [categoryFilter, products, query, statusFilter, stockFilter]);
 
-  const totalPages = Math.max(1, Math.ceil(filteredProducts.length / PAGE_SIZE));
+  const totalPages = Math.max(
+    1,
+    Math.ceil(filteredProducts.length / PAGE_SIZE)
+  );
   const visibleProducts = filteredProducts.slice(
     (page - 1) * PAGE_SIZE,
     page * PAGE_SIZE
   );
 
+  // ── Event handlers (business logic — unchanged) ───────────────────────────
+
   function resetFilters() {
     setPage(1);
   }
-
   function updateQuery(value: string) {
     setQuery(value);
     resetFilters();
   }
-
   function updateCategoryFilter(value: string) {
     setCategoryFilter(value);
     resetFilters();
   }
-
   function updateStatusFilter(value: string) {
     setStatusFilter(value);
     resetFilters();
   }
-
   function updateStockFilter(value: string) {
     setStockFilter(value);
     resetFilters();
   }
-
   function updateForm(id: keyof ProductFormState, value: string) {
-    setForm((current) => ({
-      ...current,
-      [id]: value,
-    }));
+    setForm((c) => ({ ...c, [id]: value }));
   }
-
-  function updateToggle(
-    id: ToggleFieldProps["id"],
-    checked: boolean
-  ) {
-    setForm((current) => ({
-      ...current,
-      [id]: checked,
-    }));
+  function updateToggle(id: ToggleFieldProps["id"], checked: boolean) {
+    setForm((c) => ({ ...c, [id]: checked }));
   }
-
   function openCreateForm() {
     setDrawerMode("create");
     setForm(emptyForm);
     setFormOpen(true);
   }
-
   function openEditForm(product: Product) {
     setDrawerMode("edit");
     setForm(productToForm(product));
     setFormOpen(true);
   }
-
   function applySlug() {
-    setForm((current) => ({
-      ...current,
-      slug: slugify(current.name),
-      seoTitle: current.seoTitle || current.name,
+    setForm((c) => ({
+      ...c,
+      slug: slugify(c.name),
+      seoTitle: c.seoTitle || c.name,
     }));
   }
-
   function applySku() {
-    setForm((current) => ({
-      ...current,
-      sku: generateSku(current.category, current.name),
+    setForm((c) => ({
+      ...c,
+      sku: generateSku(c.category, c.name),
     }));
   }
 
   async function handleImageUpload(files: FileList | null) {
-    if (!files?.length) {
-      return;
-    }
-
+    if (!files?.length) return;
     setUploading(true);
-
     const uploadedImages: ProductImage[] = [];
-
     for (const file of Array.from(files)) {
       const extension = file.name.split(".").pop() ?? "jpg";
       const path = `${Date.now()}-${slugify(file.name)}.${extension}`;
-
       const { error: uploadError } = await supabase.storage
         .from(PRODUCT_IMAGES_BUCKET)
         .upload(path, file);
-
       if (uploadError) {
         toast.error(uploadError.message);
         setUploading(false);
         return;
       }
-
       const { data } = supabase.storage
         .from(PRODUCT_IMAGES_BUCKET)
         .getPublicUrl(path);
-
-      uploadedImages.push({
-        url: data.publicUrl,
-        alt: form.name || file.name,
-      });
+      uploadedImages.push({ url: data.publicUrl, alt: form.name || file.name });
     }
-
-    setForm((current) => ({
-      ...current,
-      images: [...current.images, ...uploadedImages],
-    }));
+    setForm((c) => ({ ...c, images: [...c.images, ...uploadedImages] }));
     setUploading(false);
     toast.success("Images uploaded.");
   }
 
   function removeImage(url: string) {
-    setForm((current) => ({
-      ...current,
-      images: current.images.filter((image) => image.url !== url),
-    }));
+    setForm((c) => ({ ...c, images: c.images.filter((img) => img.url !== url) }));
   }
 
   async function handleSubmit() {
     const result = prepareForm(form);
-
     if (!result.success) {
       toast.error(result.error.issues[0]?.message ?? "Invalid product data.");
       return;
     }
-
     setSaving(true);
-
     const payload = toPayload(result.data);
-
     if (drawerMode === "create") {
       payload.created_at = new Date().toISOString();
-
       const { error: createError } = await supabase
         .from(PRODUCTS_TABLE)
         .insert(payload);
-
       if (createError) {
         toast.error(createError.message);
         setSaving(false);
         return;
       }
-
       toast.success("Product created.");
     } else {
-      const product = products.find((item) => item.sku === form.sku);
-
+      const product = products.find((p) => p.sku === form.sku);
       if (!product) {
         toast.error("Unable to find product for update.");
         setSaving(false);
         return;
       }
-
       const { error: updateError } = await supabase
         .from(PRODUCTS_TABLE)
         .update(payload)
         .eq("id", product.id);
-
       if (updateError) {
         toast.error(updateError.message);
         setSaving(false);
         return;
       }
-
       toast.success("Product updated.");
     }
-
     setSaving(false);
     setFormOpen(false);
     await loadProducts();
   }
 
   async function handleDelete() {
-    if (!deleteProduct) {
-      return;
-    }
-
+    if (!deleteProduct) return;
     setSaving(true);
-
     const { error: deleteError } = await supabase
       .from(PRODUCTS_TABLE)
       .delete()
       .eq("id", deleteProduct.id);
-
     if (deleteError) {
       toast.error(deleteError.message);
       setSaving(false);
       return;
     }
-
     toast.success("Product deleted.");
     setDeleteProduct(null);
     setSaving(false);
     await loadProducts();
   }
 
+  // ── Render ────────────────────────────────────────────────────────────────
+
   return (
     <div className="space-y-6">
+      {/* Page header */}
       <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
         <div>
           <h1 className="text-2xl font-bold text-slate-950">Products</h1>
@@ -806,13 +731,13 @@ export function ProductManagement() {
             Manage catalog, pricing, stock, media, and SEO for Bansari products.
           </p>
         </div>
-
         <Button type="button" size="lg" onClick={openCreateForm}>
           <Plus className="size-4" />
           New Product
         </Button>
       </div>
 
+      {/* Product table card */}
       <Card className="bg-white shadow-sm">
         <CardHeader>
           <CardTitle className="text-base font-semibold text-slate-950">
@@ -821,13 +746,14 @@ export function ProductManagement() {
         </CardHeader>
 
         <CardContent className="space-y-4">
+          {/* Filters */}
           <div className="grid gap-3 lg:grid-cols-[1fr_180px_180px_180px_auto]">
             <label className="relative">
               <span className="sr-only">Search products</span>
               <Search className="absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-slate-400" />
               <Input
                 value={query}
-                onChange={(event) => updateQuery(event.target.value)}
+                onChange={(e) => updateQuery(e.target.value)}
                 placeholder="Search by name, SKU, slug, category..."
                 className="h-9 bg-white pl-8"
               />
@@ -835,20 +761,20 @@ export function ProductManagement() {
 
             <select
               value={categoryFilter}
-              onChange={(event) => updateCategoryFilter(event.target.value)}
+              onChange={(e) => updateCategoryFilter(e.target.value)}
               className="h-9 rounded-md border border-input bg-white px-2 text-xs outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/30"
             >
               <option value="all">All categories</option>
-              {categories.map((category) => (
-                <option key={category} value={category}>
-                  {category}
+              {categories.map((cat) => (
+                <option key={cat} value={cat}>
+                  {cat}
                 </option>
               ))}
             </select>
 
             <select
               value={statusFilter}
-              onChange={(event) => updateStatusFilter(event.target.value)}
+              onChange={(e) => updateStatusFilter(e.target.value)}
               className="h-9 rounded-md border border-input bg-white px-2 text-xs outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/30"
             >
               <option value="all">All statuses</option>
@@ -861,7 +787,7 @@ export function ProductManagement() {
 
             <select
               value={stockFilter}
-              onChange={(event) => updateStockFilter(event.target.value)}
+              onChange={(e) => updateStockFilter(e.target.value)}
               className="h-9 rounded-md border border-input bg-white px-2 text-xs outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/30"
             >
               <option value="all">All stock</option>
@@ -888,6 +814,7 @@ export function ProductManagement() {
             </div>
           ) : null}
 
+          {/* Table */}
           <div className="overflow-hidden rounded-md border border-slate-200">
             <Table>
               <TableHeader>
@@ -929,7 +856,6 @@ export function ProductManagement() {
                               <ImagePlus className="absolute left-1/2 top-1/2 size-5 -translate-x-1/2 -translate-y-1/2 text-slate-400" />
                             )}
                           </div>
-
                           <div className="min-w-0">
                             <p className="truncate font-semibold text-slate-950">
                               {product.name}
@@ -940,7 +866,6 @@ export function ProductManagement() {
                           </div>
                         </div>
                       </TableCell>
-
                       <TableCell>{product.category}</TableCell>
                       <TableCell>{formatCurrency(product.price)}</TableCell>
                       <TableCell>
@@ -1006,18 +931,18 @@ export function ProductManagement() {
             </Table>
           </div>
 
+          {/* Pagination */}
           <div className="flex flex-col gap-3 text-sm text-slate-500 md:flex-row md:items-center md:justify-between">
             <p>
               Showing {visibleProducts.length} of {filteredProducts.length}{" "}
               products
             </p>
-
             <div className="flex items-center gap-2">
               <Button
                 type="button"
                 variant="outline"
                 disabled={page === 1}
-                onClick={() => setPage((current) => Math.max(1, current - 1))}
+                onClick={() => setPage((p) => Math.max(1, p - 1))}
               >
                 Previous
               </Button>
@@ -1028,9 +953,7 @@ export function ProductManagement() {
                 type="button"
                 variant="outline"
                 disabled={page === totalPages}
-                onClick={() =>
-                  setPage((current) => Math.min(totalPages, current + 1))
-                }
+                onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
               >
                 Next
               </Button>
@@ -1039,289 +962,420 @@ export function ProductManagement() {
         </CardContent>
       </Card>
 
+      {/* ─────────────────────────────────────────────────────────────────────
+          CREATE / EDIT PRODUCT DRAWER
+          Responsive widths: xl:900px  lg:800px  md:700px  mobile:100%
+          Layout: sticky header + scrollable body + sticky footer
+      ───────────────────────────────────────────────────────────────────── */}
       <Sheet open={formOpen} onOpenChange={setFormOpen}>
-        <SheetContent className="w-full overflow-y-auto sm:max-w-3xl">
-          <SheetHeader>
-            <SheetTitle>
-              {drawerMode === "create" ? "Create Product" : "Edit Product"}
-            </SheetTitle>
-            <SheetDescription>
-              Maintain product data, media, inventory, and SEO metadata.
-            </SheetDescription>
+        <SheetContent
+          className={cn(
+            // Responsive drawer widths
+            "w-full",
+            "md:max-w-[700px]",
+            "lg:max-w-[800px]",
+            "xl:max-w-[900px]",
+            // Full viewport height, no outer scroll
+            "flex h-screen flex-col overflow-hidden p-0"
+          )}
+        >
+          {/* ── Sticky header ── */}
+          <SheetHeader className="shrink-0 border-b border-slate-100 bg-white px-8 py-5">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <SheetTitle className="text-xl font-semibold text-slate-950">
+                  {drawerMode === "create" ? "Create Product" : "Edit Product"}
+                </SheetTitle>
+                <SheetDescription className="mt-0.5 text-sm text-slate-500">
+                  {drawerMode === "create"
+                    ? "Fill in the details below to add a new product to the catalog."
+                    : "Update product data, media, inventory, and SEO metadata."}
+                </SheetDescription>
+              </div>
+            </div>
           </SheetHeader>
 
-          <div className="grid gap-6 px-6 pb-6">
-            <div className="grid gap-4 md:grid-cols-2">
-              <Field
-                id="name"
-                label="Name"
-                value={form.name}
-                onChange={updateForm}
-                required
-              />
-              <Field
-                id="sku"
-                label="SKU"
-                value={form.sku}
-                onChange={updateForm}
-                required
-              />
-              <Field
-                id="slug"
-                label="Slug"
-                value={form.slug}
-                onChange={updateForm}
-                required
-              />
-              <Field
-                id="category"
-                label="Category"
-                value={form.category}
-                onChange={updateForm}
-                required
-              />
-              <Field
-                id="collection"
-                label="Collection"
-                value={form.collection}
-                onChange={updateForm}
-                required
-              />
-              <Field
-                id="brand"
-                label="Brand"
-                value={form.brand}
-                onChange={updateForm}
-                required
-              />
-              <Field
-                id="fabric"
-                label="Fabric"
-                value={form.fabric}
-                onChange={updateForm}
-                required
-              />
-              <Field
-                id="color"
-                label="Color"
-                value={form.color}
-                onChange={updateForm}
-                required
-              />
-              <Field
-                id="sizes"
-                label="Sizes"
-                value={form.sizes}
-                onChange={updateForm}
-                required
-              />
-              <Field
-                id="hsn"
-                label="HSN"
-                value={form.hsn}
-                onChange={updateForm}
-                required
-              />
-            </div>
+          {/* ── Scrollable form body ── */}
+          <div className="flex-1 overflow-y-auto">
+            <div className="space-y-8 px-8 py-7">
 
-            <div className="flex flex-wrap gap-2">
-              <Button type="button" variant="outline" onClick={applySlug}>
-                <Wand2 className="size-4" />
-                Generate Slug
-              </Button>
-              <Button type="button" variant="outline" onClick={applySku}>
-                <Wand2 className="size-4" />
-                Generate SKU
-              </Button>
-            </div>
-
-            <div className="grid gap-4 md:grid-cols-5">
-              <Field
-                id="price"
-                label="Price"
-                value={form.price}
-                onChange={updateForm}
-                type="number"
-                required
-              />
-              <Field
-                id="comparePrice"
-                label="Compare Price"
-                value={form.comparePrice}
-                onChange={updateForm}
-                type="number"
-              />
-              <Field
-                id="cost"
-                label="Cost"
-                value={form.cost}
-                onChange={updateForm}
-                type="number"
-              />
-              <Field
-                id="stock"
-                label="Stock"
-                value={form.stock}
-                onChange={updateForm}
-                type="number"
-                required
-              />
-              <Field
-                id="gst"
-                label="GST %"
-                value={form.gst}
-                onChange={updateForm}
-                type="number"
-                required
-              />
-            </div>
-
-            <label className="grid gap-1.5">
-              <span className="text-xs font-medium text-slate-700">
-                Description *
-              </span>
-              <textarea
-                value={form.description}
-                onChange={(event) =>
-                  updateForm("description", event.target.value)
-                }
-                className="min-h-28 rounded-md border border-input bg-white px-3 py-2 text-sm outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/30"
-              />
-            </label>
-
-            <div className="grid gap-4 md:grid-cols-2">
-              <Field
-                id="seoTitle"
-                label="SEO Title"
-                value={form.seoTitle}
-                onChange={updateForm}
-                required
-              />
-              <label className="grid gap-1.5">
-                <span className="text-xs font-medium text-slate-700">
-                  SEO Description *
-                </span>
-                <textarea
-                  value={form.seoDescription}
-                  onChange={(event) =>
-                    updateForm("seoDescription", event.target.value)
-                  }
-                  className="min-h-20 rounded-md border border-input bg-white px-3 py-2 text-sm outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/30"
+              {/* ── Section 1: Basic Information ── */}
+              <FormSection title="Basic Information">
+                {/* Name — full width */}
+                <Field
+                  id="name"
+                  label="Product Name"
+                  value={form.name}
+                  onChange={updateForm}
+                  placeholder="e.g. Kanjivaram Pure Silk Saree"
+                  required
                 />
-              </label>
-            </div>
 
-            <div className="grid gap-3 md:grid-cols-4">
-              <ToggleField
-                id="featured"
-                label="Featured"
-                checked={form.featured}
-                onChange={updateToggle}
-              />
-              <ToggleField
-                id="newArrival"
-                label="New Arrival"
-                checked={form.newArrival}
-                onChange={updateToggle}
-              />
-              <ToggleField
-                id="bestSeller"
-                label="Best Seller"
-                checked={form.bestSeller}
-                onChange={updateToggle}
-              />
-              <ToggleField
-                id="active"
-                label="Active"
-                checked={form.active}
-                onChange={updateToggle}
-              />
-            </div>
-
-            <div className="grid gap-3">
-              <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
-                <div>
-                  <h3 className="text-sm font-semibold text-slate-950">
-                    Product Images
-                  </h3>
-                  <p className="text-xs text-slate-500">
-                    Upload multiple product images to Supabase Storage.
-                  </p>
+                {/* Slug row with generate button */}
+                <div className="flex items-end gap-2">
+                  <div className="flex-1">
+                    <Field
+                      id="slug"
+                      label="URL Slug"
+                      value={form.slug}
+                      onChange={updateForm}
+                      placeholder="kanjivaram-pure-silk-saree"
+                      required
+                    />
+                  </div>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="h-10 shrink-0 gap-1.5 text-xs"
+                    onClick={applySlug}
+                  >
+                    <Wand2 className="size-3.5" />
+                    Generate
+                  </Button>
                 </div>
 
-                <label className="inline-flex h-8 cursor-pointer items-center justify-center gap-2 rounded-md border border-slate-200 px-3 text-xs font-medium transition hover:bg-slate-50">
-                  {uploading ? (
-                    <Loader2 className="size-4 animate-spin" />
-                  ) : (
-                    <ImagePlus className="size-4" />
+                {/* SKU row with generate button */}
+                <div className="flex items-end gap-2">
+                  <div className="flex-1">
+                    <Field
+                      id="sku"
+                      label="SKU"
+                      value={form.sku}
+                      onChange={updateForm}
+                      placeholder="BC-SAR-KAN-123456"
+                      required
+                    />
+                  </div>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="h-10 shrink-0 gap-1.5 text-xs"
+                    onClick={applySku}
+                  >
+                    <Wand2 className="size-3.5" />
+                    Generate
+                  </Button>
+                </div>
+              </FormSection>
+
+              {/* ── Section 2: Classification ── */}
+              <FormSection title="Classification">
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+                  <Field
+                    id="category"
+                    label="Category"
+                    value={form.category}
+                    onChange={updateForm}
+                    placeholder="Sarees"
+                    required
+                  />
+                  <Field
+                    id="collection"
+                    label="Collection"
+                    value={form.collection}
+                    onChange={updateForm}
+                    placeholder="Summer 2025"
+                    required
+                  />
+                  <Field
+                    id="brand"
+                    label="Brand"
+                    value={form.brand}
+                    onChange={updateForm}
+                    required
+                  />
+                </div>
+              </FormSection>
+
+              {/* ── Section 3: Product Details ── */}
+              <FormSection title="Product Details">
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                  <Field
+                    id="fabric"
+                    label="Fabric"
+                    value={form.fabric}
+                    onChange={updateForm}
+                    placeholder="Pure Silk"
+                    required
+                  />
+                  <Field
+                    id="color"
+                    label="Color"
+                    value={form.color}
+                    onChange={updateForm}
+                    placeholder="Deep Crimson"
+                    required
+                  />
+                  <Field
+                    id="sizes"
+                    label="Sizes (comma-separated)"
+                    value={form.sizes}
+                    onChange={updateForm}
+                    placeholder="XS, S, M, L, XL"
+                    required
+                  />
+                  <Field
+                    id="hsn"
+                    label="HSN Code"
+                    value={form.hsn}
+                    onChange={updateForm}
+                    placeholder="5208"
+                    required
+                  />
+                </div>
+              </FormSection>
+
+              {/* ── Section 4: Pricing ── */}
+              <FormSection title="Pricing & Inventory">
+                <div className="grid grid-cols-2 gap-4 sm:grid-cols-5">
+                  <Field
+                    id="price"
+                    label="Price (₹)"
+                    value={form.price}
+                    onChange={updateForm}
+                    type="number"
+                    placeholder="0"
+                    required
+                  />
+                  <Field
+                    id="comparePrice"
+                    label="Compare Price"
+                    value={form.comparePrice}
+                    onChange={updateForm}
+                    type="number"
+                    placeholder="0"
+                  />
+                  <Field
+                    id="cost"
+                    label="Cost"
+                    value={form.cost}
+                    onChange={updateForm}
+                    type="number"
+                    placeholder="0"
+                  />
+                  <Field
+                    id="stock"
+                    label="Stock"
+                    value={form.stock}
+                    onChange={updateForm}
+                    type="number"
+                    placeholder="0"
+                    required
+                  />
+                  <Field
+                    id="gst"
+                    label="GST %"
+                    value={form.gst}
+                    onChange={updateForm}
+                    type="number"
+                    placeholder="5"
+                    required
+                  />
+                </div>
+              </FormSection>
+
+              {/* ── Section 5: Description ── */}
+              <FormSection title="Description">
+                <div className="flex flex-col gap-1.5">
+                  <label
+                    htmlFor="description"
+                    className="text-[13px] font-medium text-slate-700"
+                  >
+                    Description{" "}
+                    <span className="ml-0.5 text-red-500">*</span>
+                  </label>
+                  <textarea
+                    id="description"
+                    value={form.description}
+                    onChange={(e) => updateForm("description", e.target.value)}
+                    placeholder="Describe the product — fabric, craftsmanship, occasions, care instructions..."
+                    className="w-full resize-y rounded-lg border border-input bg-white px-3.5 py-3 text-sm text-slate-900 outline-none transition focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/30"
+                    style={{ minHeight: "220px" }}
+                  />
+                </div>
+              </FormSection>
+
+              {/* ── Section 6: Media ── */}
+              <FormSection title="Media">
+                {/* Drag-and-drop upload zone */}
+                <div
+                  role="button"
+                  tabIndex={0}
+                  aria-label="Upload product images"
+                  onDragOver={(e) => {
+                    e.preventDefault();
+                    setDragOver(true);
+                  }}
+                  onDragLeave={() => setDragOver(false)}
+                  onDrop={(e) => {
+                    e.preventDefault();
+                    setDragOver(false);
+                    void handleImageUpload(e.dataTransfer.files);
+                  }}
+                  onClick={() => fileInputRef.current?.click()}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" || e.key === " ") {
+                      fileInputRef.current?.click();
+                    }
+                  }}
+                  className={cn(
+                    "flex cursor-pointer flex-col items-center justify-center gap-3 rounded-xl border-2 border-dashed px-6 py-10 text-center transition-colors",
+                    dragOver
+                      ? "border-[#8A5A6A] bg-[#8A5A6A]/5"
+                      : "border-slate-200 bg-slate-50 hover:border-slate-300 hover:bg-slate-100"
                   )}
-                  Upload Images
+                >
+                  {uploading ? (
+                    <Loader2 className="size-7 animate-spin text-slate-400" />
+                  ) : (
+                    <ImagePlus className="size-7 text-slate-400" />
+                  )}
+                  <div>
+                    <p className="text-sm font-medium text-slate-700">
+                      {uploading ? "Uploading..." : "Drop images here or click to upload"}
+                    </p>
+                    <p className="mt-0.5 text-xs text-slate-400">
+                      PNG, JPG, WEBP up to 10MB each
+                    </p>
+                  </div>
                   <input
+                    ref={fileInputRef}
                     type="file"
                     multiple
                     accept="image/*"
                     className="sr-only"
                     disabled={uploading}
-                    onChange={(event) => handleImageUpload(event.target.files)}
+                    onChange={(e) => void handleImageUpload(e.target.files)}
                   />
-                </label>
-              </div>
+                </div>
 
-              {form.images.length > 0 ? (
-                <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
-                  {form.images.map((image) => (
-                    <div
-                      key={image.url}
-                      className="group relative aspect-square overflow-hidden rounded-md border border-slate-200 bg-slate-100"
-                    >
-                      <Image
-                        src={image.url}
-                        alt={image.alt}
-                        fill
-                        sizes="160px"
-                        className="object-cover"
-                      />
-                      <Button
-                        type="button"
-                        variant="destructive"
-                        size="icon-sm"
-                        className="absolute right-2 top-2 opacity-0 transition group-hover:opacity-100"
-                        aria-label="Remove image"
-                        onClick={() => removeImage(image.url)}
+                {/* Thumbnail grid */}
+                {form.images.length > 0 ? (
+                  <div className="mt-4 grid grid-cols-3 gap-3 sm:grid-cols-4 md:grid-cols-5">
+                    {form.images.map((image) => (
+                      <div
+                        key={image.url}
+                        className="group relative aspect-square overflow-hidden rounded-lg border border-slate-200 bg-slate-100"
                       >
-                        <X className="size-3" />
-                      </Button>
-                    </div>
-                  ))}
+                        <Image
+                          src={image.url}
+                          alt={image.alt}
+                          fill
+                          sizes="160px"
+                          className="object-cover"
+                        />
+                        <button
+                          type="button"
+                          aria-label="Remove image"
+                          onClick={() => removeImage(image.url)}
+                          className="absolute right-1.5 top-1.5 flex size-6 items-center justify-center rounded-full bg-red-500 text-white opacity-0 shadow transition group-hover:opacity-100"
+                        >
+                          <X className="size-3.5" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                ) : null}
+              </FormSection>
+
+              {/* ── Section 7: SEO ── */}
+              <FormSection title="SEO">
+                <Field
+                  id="seoTitle"
+                  label="SEO Title"
+                  value={form.seoTitle}
+                  onChange={updateForm}
+                  placeholder="Kanjivaram Pure Silk Saree | Bansari Collections"
+                  required
+                />
+                <div className="flex flex-col gap-1.5">
+                  <label
+                    htmlFor="seoDescription"
+                    className="text-[13px] font-medium text-slate-700"
+                  >
+                    SEO Description{" "}
+                    <span className="ml-0.5 text-red-500">*</span>
+                  </label>
+                  <textarea
+                    id="seoDescription"
+                    value={form.seoDescription}
+                    onChange={(e) =>
+                      updateForm("seoDescription", e.target.value)
+                    }
+                    placeholder="Shop authentic Kanjivaram Pure Silk Sarees at Bansari Collections. Premium ethnic wear for weddings and festivals."
+                    rows={3}
+                    className="w-full resize-y rounded-lg border border-input bg-white px-3.5 py-3 text-sm text-slate-900 outline-none transition focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/30"
+                  />
                 </div>
-              ) : (
-                <div className="rounded-md border border-dashed border-slate-300 p-8 text-center text-sm text-slate-500">
-                  No images uploaded.
+              </FormSection>
+
+              {/* ── Section 8: Product Flags ── */}
+              <FormSection title="Product Flags">
+                <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                  <ToggleField
+                    id="featured"
+                    label="Featured"
+                    checked={form.featured}
+                    onChange={updateToggle}
+                  />
+                  <ToggleField
+                    id="newArrival"
+                    label="New Arrival"
+                    checked={form.newArrival}
+                    onChange={updateToggle}
+                  />
+                  <ToggleField
+                    id="bestSeller"
+                    label="Best Seller"
+                    checked={form.bestSeller}
+                    onChange={updateToggle}
+                  />
+                  <ToggleField
+                    id="active"
+                    label="Active"
+                    checked={form.active}
+                    onChange={updateToggle}
+                  />
                 </div>
-              )}
+              </FormSection>
+
             </div>
           </div>
 
-          <SheetFooter>
-            <Button
-              type="button"
-              size="lg"
-              onClick={handleSubmit}
-              disabled={saving || uploading}
-            >
-              {saving ? <Loader2 className="size-4 animate-spin" /> : null}
-              {drawerMode === "create" ? "Create Product" : "Save Product"}
-            </Button>
+          {/* ── Sticky footer ── */}
+          <SheetFooter className="shrink-0 border-t border-slate-100 bg-white px-8 py-4">
+            <div className="flex w-full items-center justify-between gap-3">
+              <Button
+                type="button"
+                variant="outline"
+                size="lg"
+                onClick={() => setFormOpen(false)}
+                disabled={saving}
+              >
+                Cancel
+              </Button>
+              <Button
+                type="button"
+                size="lg"
+                onClick={handleSubmit}
+                disabled={saving || uploading}
+                className="min-w-[160px]"
+              >
+                {saving ? (
+                  <Loader2 className="size-4 animate-spin" />
+                ) : null}
+                {drawerMode === "create" ? "Create Product" : "Save Changes"}
+              </Button>
+            </div>
           </SheetFooter>
         </SheetContent>
       </Sheet>
 
+      {/* ── Product details side sheet ── */}
       <Sheet
         open={Boolean(detailsProduct)}
         onOpenChange={(open) => {
-          if (!open) {
-            setDetailsProduct(null);
-          }
+          if (!open) setDetailsProduct(null);
         }}
       >
         <SheetContent className="w-full overflow-y-auto sm:max-w-xl">
@@ -1331,7 +1385,6 @@ export function ProductManagement() {
                 <SheetTitle>{detailsProduct.name}</SheetTitle>
                 <SheetDescription>{detailsProduct.sku}</SheetDescription>
               </SheetHeader>
-
               <div className="space-y-5 px-6 pb-6">
                 {detailsProduct.images[0]?.url ? (
                   <div className="relative aspect-[4/5] overflow-hidden rounded-md bg-slate-100">
@@ -1344,31 +1397,18 @@ export function ProductManagement() {
                     />
                   </div>
                 ) : null}
-
                 <div className="grid gap-3 text-sm">
                   <Detail label="Slug" value={detailsProduct.slug} />
                   <Detail label="Category" value={detailsProduct.category} />
-                  <Detail
-                    label="Collection"
-                    value={detailsProduct.collection}
-                  />
+                  <Detail label="Collection" value={detailsProduct.collection} />
                   <Detail label="Brand" value={detailsProduct.brand} />
                   <Detail label="Fabric" value={detailsProduct.fabric} />
                   <Detail label="Color" value={detailsProduct.color} />
-                  <Detail
-                    label="Sizes"
-                    value={detailsProduct.sizes.join(", ")}
-                  />
-                  <Detail
-                    label="Price"
-                    value={formatCurrency(detailsProduct.price)}
-                  />
+                  <Detail label="Sizes" value={detailsProduct.sizes.join(", ")} />
+                  <Detail label="Price" value={formatCurrency(detailsProduct.price)} />
                   <Detail label="Stock" value={String(detailsProduct.stock)} />
                   <Detail label="GST" value={`${detailsProduct.gst}%`} />
-                  <Detail
-                    label="Description"
-                    value={detailsProduct.description}
-                  />
+                  <Detail label="Description" value={detailsProduct.description} />
                 </div>
               </div>
             </>
@@ -1376,12 +1416,11 @@ export function ProductManagement() {
         </SheetContent>
       </Sheet>
 
+      {/* ── Delete confirmation dialog ── */}
       <Dialog
         open={Boolean(deleteProduct)}
         onOpenChange={(open) => {
-          if (!open) {
-            setDeleteProduct(null);
-          }
+          if (!open) setDeleteProduct(null);
         }}
       >
         <DialogContent>
@@ -1392,7 +1431,6 @@ export function ProductManagement() {
               cannot be undone.
             </DialogDescription>
           </DialogHeader>
-
           <DialogFooter>
             <Button
               type="button"
