@@ -143,6 +143,7 @@ export async function updateOrderStatus(
     throw new Error(error.message);
   }
 }
+
 export async function updatePaymentStatusFromWebhook(
   razorpayPaymentId: string,
   status: "paid" | "failed"
@@ -177,4 +178,154 @@ export async function updatePaymentStatusFromWebhook(
   return {
     updated: !!data,
   };
+}
+
+/**
+ * RazorpayPaymentEntity — the shape of `payment.entity` inside a
+ * Razorpay webhook payload, as well as the Razorpay Fetch Payment API
+ * response.  Only the fields we actually use are declared.
+ */
+export type RazorpayPaymentEntity = {
+  id: string;
+  order_id: string;
+  amount: number;          // in paise
+  currency: string;
+  status: string;
+  contact?: string;        // phone, may include country code prefix
+  email?: string;
+  description?: string;
+  notes?: Record<string, string>;
+};
+
+/**
+ * recoverOrderFromWebhook
+ *
+ * Called by the webhook handler when `payment.captured` arrives but no
+ * order row exists for that payment id.  This happens when the customer's
+ * browser closed (or crashed) between Razorpay capturing the payment and
+ * the client calling /api/orders/create.
+ *
+ * Creates a minimal-but-complete order row from the Razorpay payment
+ * entity.  Shipping address will be empty because the browser never
+ * submitted it — this is logged and the order is marked with
+ * payment_method = 'razorpay-webhook-recovery' so admin can identify and
+ * follow up to confirm the delivery address.
+ *
+ * Does NOT decrement stock — that is logged as a manual-review item,
+ * consistent with the existing stock-error handling in orders/create.
+ *
+ * Returns { recovered: true, orderId } on success.
+ * Returns { recovered: false, error } on failure — never throws.
+ */
+export async function recoverOrderFromWebhook(
+  payment: RazorpayPaymentEntity
+): Promise<{ recovered: boolean; orderId?: string; error?: string }> {
+  try {
+    const supabase = createServiceRoleClient();
+
+    // Idempotency: bail out early if an order already exists for this
+    // payment id.  The unique index prevents a duplicate insert, but
+    // checking first lets us return a clean result without relying on
+    // catching Postgres error code 23505.
+    const { data: existing } = await supabase
+      .from("orders")
+      .select("id")
+      .eq("razorpay_payment_id", payment.id)
+      .maybeSingle();
+
+    if (existing) {
+      return { recovered: true, orderId: existing.id };
+    }
+
+    // Derive what we can from the payment entity.
+    const grandTotal = Math.round((payment.amount / 100) * 100) / 100;
+    const customerEmail = payment.email ?? "unknown@bansaricollections.com";
+    const customerPhone = payment.contact ?? "";
+    // Razorpay contact may include a +91 prefix — strip it for the name
+    // fallback; we cannot infer a real name from payment alone.
+    const customerName = payment.notes?.customer_name ?? "Customer";
+    const now = new Date().toISOString();
+
+    const crypto = await import("crypto");
+    const timestamp = Date.now().toString(36).toUpperCase();
+    const random = crypto.default.randomBytes(3).toString("hex").toUpperCase();
+    const orderNumber = `BC-${timestamp}-${random}`;
+
+    const { data: order, error: insertError } = await supabase
+      .from("orders")
+      .insert({
+        order_number: orderNumber,
+        user_id: null,
+
+        customer_name: customerName,
+        customer_email: customerEmail,
+        customer_phone: customerPhone || null,
+
+        // Shipping address is unavailable — filled with empty strings so
+        // NOT NULL constraints are satisfied; admin must follow up.
+        shipping_name: customerName,
+        shipping_phone: customerPhone || "",
+        shipping_email: customerEmail,
+        shipping_address_line1: "[Pending — webhook recovery]",
+        shipping_address_line2: null,
+        shipping_city: "",
+        shipping_state: "",
+        shipping_postal_code: "",
+        shipping_country: "IN",
+
+        billing_same_as_shipping: true,
+
+        currency: payment.currency ?? "INR",
+        subtotal: grandTotal,
+        discount: 0,
+        shipping_fee: 0,
+        tax: 0,
+        grand_total: grandTotal,
+
+        payment_provider: "razorpay",
+        // Distinguishes webhook-recovered orders from browser-submitted ones.
+        payment_method: "razorpay-webhook-recovery",
+        payment_reference: payment.id,
+        razorpay_order_id: payment.order_id ?? null,
+        razorpay_payment_id: payment.id,
+        payment_status: "paid",
+
+        order_status: "placed",
+
+        payment_verified_at: now,
+        paid_at: now,
+      })
+      .select("id, order_number, customer_name, customer_email, grand_total, shipping_fee, subtotal, discount")
+      .single();
+
+    if (insertError) {
+      // 23505 = unique_violation: a concurrent webhook delivery already
+      // inserted this order.  Treat as success.
+      if (insertError.code === "23505") {
+        const { data: raceWinner } = await supabase
+          .from("orders")
+          .select("id")
+          .eq("razorpay_payment_id", payment.id)
+          .maybeSingle();
+        return { recovered: true, orderId: raceWinner?.id };
+      }
+
+      return { recovered: false, error: insertError.message };
+    }
+
+    if (!order) {
+      return { recovered: false, error: "Insert returned no data." };
+    }
+
+    console.warn(
+      `[webhook-recovery] Created order ${order.id} (${orderNumber}) for payment ${
+        payment.id
+      }. Shipping address is MISSING — admin must contact ${customerEmail} to confirm delivery details. Stock was NOT decremented — manual review required.`
+    );
+
+    return { recovered: true, orderId: order.id };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    return { recovered: false, error: message };
+  }
 }
