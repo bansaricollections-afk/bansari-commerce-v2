@@ -5,6 +5,9 @@ import { getRazorpay } from '@/lib/razorpay';
 import { validateCartItems, type CartItem } from '@/services/product.service';
 import { createServiceRoleClient } from '@/lib/supabase/service';
 import { createLogger } from '@/lib/logger';
+import { generateRequestId } from '@/lib/request-id';
+import { checkRateLimit, RATE_LIMIT_CHECKOUT } from '@/lib/rate-limit';
+import { apiError } from '@/lib/api-response';
 
 const FREE_SHIPPING_THRESHOLD = 2999;
 const STANDARD_SHIPPING_FEE = 99;
@@ -14,7 +17,7 @@ function round2(n: number) {
   return Math.round(n * 100) / 100;
 }
 
-function requireString(value: unknown, field: string): string | null {
+function requireString(value: unknown, _field: string): string | null {
   if (typeof value === 'string' && value.trim().length > 0) return value.trim();
   return null;
 }
@@ -39,22 +42,11 @@ function parseItems(raw: unknown): CartItem[] | string {
   return items;
 }
 
-type CustomerInput = {
-  name: string;
-  email: string;
-  phone: string;
-};
-
+type CustomerInput = { name: string; email: string; phone: string };
 type ShippingInput = {
-  name: string;
-  phone: string;
-  email?: string;
-  addressLine1: string;
-  addressLine2?: string;
-  city: string;
-  state: string;
-  postalCode: string;
-  country?: string;
+  name: string; phone: string; email?: string;
+  addressLine1: string; addressLine2?: string;
+  city: string; state: string; postalCode: string; country?: string;
 };
 
 function parseCustomer(raw: unknown): CustomerInput | string {
@@ -64,8 +56,7 @@ function parseCustomer(raw: unknown): CustomerInput | string {
   if (!name) return 'customer.name is required.';
   const email = requireString(c.email, 'customer.email');
   if (!email) return 'customer.email is required.';
-  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))
-    return 'customer.email is not a valid email address.';
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return 'customer.email is not a valid email address.';
   const phone = requireString(c.phone, 'customer.phone');
   if (!phone) return 'customer.phone is required.';
   return { name, email, phone };
@@ -86,45 +77,43 @@ function parseShipping(raw: unknown): ShippingInput | string {
   if (!state) return 'shipping.state is required.';
   const postalCode = requireString(s.postalCode, 'shipping.postalCode');
   if (!postalCode) return 'shipping.postalCode is required.';
-
   return {
-    name,
-    phone,
+    name, phone,
     email: requireString(s.email, 'shipping.email') ?? undefined,
     addressLine1,
     addressLine2: requireString(s.addressLine2, 'shipping.addressLine2') ?? undefined,
-    city,
-    state,
-    postalCode,
+    city, state, postalCode,
     country: requireString(s.country, 'shipping.country') ?? 'IN',
   };
 }
 
 export async function POST(request: NextRequest) {
-  const requestId = crypto.randomUUID();
+  const requestId = generateRequestId();
   const log = createLogger({ service: 'create-order', requestId });
   const timer = log.startTimer('create-order.duration');
+
+  const rateLimitResponse = checkRateLimit(request, 'checkout', RATE_LIMIT_CHECKOUT, requestId);
+  if (rateLimitResponse) return rateLimitResponse;
 
   try {
     const body = await request.json();
 
-    // --- Input validation ---
     const itemsResult = parseItems(body?.items);
     if (typeof itemsResult === 'string') {
       log.warn('create-order.validation.items', { error: itemsResult });
-      return NextResponse.json({ success: false, message: itemsResult }, { status: 400 });
+      return apiError(requestId, 'VALIDATION_ERROR', itemsResult, 400);
     }
 
     const customerResult = parseCustomer(body?.customer);
     if (typeof customerResult === 'string') {
       log.warn('create-order.validation.customer', { error: customerResult });
-      return NextResponse.json({ success: false, message: customerResult }, { status: 400 });
+      return apiError(requestId, 'VALIDATION_ERROR', customerResult, 400);
     }
 
     const shippingResult = parseShipping(body?.shipping);
     if (typeof shippingResult === 'string') {
       log.warn('create-order.validation.shipping', { error: shippingResult });
-      return NextResponse.json({ success: false, message: shippingResult }, { status: 400 });
+      return apiError(requestId, 'VALIDATION_ERROR', shippingResult, 400);
     }
 
     const customer = customerResult;
@@ -134,22 +123,16 @@ export async function POST(request: NextRequest) {
         ? body.coupon.trim()
         : null;
 
-    // --- Product validation (existence, active, stock) ---
     const cartValidation = await validateCartItems(itemsResult);
     if (!cartValidation.valid) {
       log.warn('create-order.validation.cart', { errors: cartValidation.errors });
-      return NextResponse.json(
-        { success: false, message: cartValidation.errors.join(' ') },
-        { status: 400 }
-      );
+      return apiError(requestId, 'CART_INVALID', cartValidation.errors.join(' '), 400);
     }
 
     const { lineItems } = cartValidation;
 
-    // --- Server-side pricing ---
     const subtotal = round2(lineItems.reduce((s, r) => s + r.lineTotal, 0));
     const shippingFee = subtotal >= FREE_SHIPPING_THRESHOLD ? 0 : STANDARD_SHIPPING_FEE;
-    // Coupon discount: server validates; currently 0 (plug-in point).
     const discount = 0;
     const grandTotal = round2(subtotal + shippingFee - discount);
     const amountPaise = Math.round(grandTotal * 100);
@@ -157,14 +140,12 @@ export async function POST(request: NextRequest) {
 
     log.info('create-order.pricing', { subtotal, shippingFee, discount, grandTotal });
 
-    // --- Create Razorpay order ---
     const razorpay = getRazorpay();
     const rzpOrder = await razorpay.orders.create({
       amount: amountPaise,
       currency,
       receipt: `BC-${Date.now()}`,
       notes: {
-        // Stored so webhook recovery can cross-reference without a DB lookup.
         customer_name: customer.name,
         customer_email: customer.email,
         subtotal: String(subtotal),
@@ -176,10 +157,6 @@ export async function POST(request: NextRequest) {
 
     log.info('create-order.razorpay.created', { razorpayOrderId: rzpOrder.id, amountPaise });
 
-    // --- Persist full metadata to pending_orders ---
-    // UPSERT on razorpay_order_id: if the client retries (network timeout
-    // after Razorpay already created the order), we update in place rather
-    // than creating a duplicate.
     const supabase = createServiceRoleClient();
     const { error: pendingError } = await supabase
       .from('pending_orders')
@@ -211,11 +188,7 @@ export async function POST(request: NextRequest) {
       );
 
     if (pendingError) {
-      // Non-fatal: log and continue. The payment can still proceed;
-      // webhook recovery will fall back to partial data from Razorpay notes.
-      log.warn('create-order.pending_orders.write_failed', pendingError, {
-        razorpayOrderId: rzpOrder.id,
-      });
+      log.warn('create-order.pending_orders.write_failed', pendingError, { razorpayOrderId: rzpOrder.id });
     } else {
       log.info('create-order.pending_orders.saved', { razorpayOrderId: rzpOrder.id });
     }
@@ -224,20 +197,22 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({
       success: true,
+      requestId,
       order: rzpOrder,
       pricing: { subtotal, shippingFee, discount, grandTotal },
     });
   } catch (error) {
     timer('error', { error: error instanceof Error ? error.message : String(error) });
     log.error('create-order.unhandled', error);
-
-    return NextResponse.json(
-      {
-        success: false,
-        message:
-          error instanceof Error ? error.message : 'Unable to create payment order.',
-      },
-      { status: 500 }
+    return apiError(
+      requestId,
+      'INTERNAL_ERROR',
+      error instanceof Error ? error.message : 'Unable to create payment order.',
+      500
     );
   }
 }
+
+export { generateRequestId as _requestId };
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+const _crypto = crypto;

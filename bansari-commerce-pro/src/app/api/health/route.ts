@@ -1,4 +1,8 @@
 import { NextResponse } from 'next/server';
+import { validateEnv } from '@/lib/env';
+import { generateRequestId } from '@/lib/request-id';
+
+const SERVER_START = Date.now();
 
 type CheckResult = {
   status: 'ok' | 'degraded' | 'error';
@@ -8,13 +12,30 @@ type CheckResult = {
 
 type HealthResponse = {
   status: 'ok' | 'degraded' | 'error';
+  requestId: string;
   timestamp: string;
+  version: string;
+  gitCommit: string;
+  uptimeSeconds: number;
   checks: {
     database: CheckResult;
     payments: CheckResult;
     email: CheckResult;
+    environment: CheckResult;
   };
 };
+
+function checkEnvironment(): CheckResult {
+  try {
+    validateEnv();
+    return { status: 'ok' };
+  } catch (err) {
+    return {
+      status: 'error',
+      message: err instanceof Error ? err.message : 'Environment validation failed.',
+    };
+  }
+}
 
 async function fetchCheck(url: string, base: string): Promise<CheckResult> {
   const start = Date.now();
@@ -36,6 +57,7 @@ async function fetchCheck(url: string, base: string): Promise<CheckResult> {
 }
 
 export async function GET(request: Request): Promise<NextResponse> {
+  const requestId = generateRequestId();
   const base = new URL(request.url).origin;
 
   const [database, payments, email] = await Promise.all([
@@ -44,7 +66,9 @@ export async function GET(request: Request): Promise<NextResponse> {
     fetchCheck('/api/health/email', base),
   ]);
 
-  const checks = { database, payments, email };
+  const environment = checkEnvironment();
+
+  const checks = { database, payments, email, environment };
 
   const hasError = Object.values(checks).some((c) => c.status === 'error');
   const hasDegraded = Object.values(checks).some((c) => c.status === 'degraded');
@@ -52,11 +76,18 @@ export async function GET(request: Request): Promise<NextResponse> {
 
   const body: HealthResponse = {
     status: overallStatus,
+    requestId,
     timestamp: new Date().toISOString(),
+    version: process.env.npm_package_version ?? '0.0.0',
+    gitCommit: process.env.VERCEL_GIT_COMMIT_SHA?.slice(0, 8) ?? 'local',
+    uptimeSeconds: Math.floor((Date.now() - SERVER_START) / 1_000),
     checks,
   };
 
-  const httpStatus = overallStatus === 'ok' ? 200 : overallStatus === 'degraded' ? 200 : 503;
+  const httpStatus = overallStatus === 'error' ? 503 : 200;
 
-  return NextResponse.json(body, { status: httpStatus });
+  return NextResponse.json(body, {
+    status: httpStatus,
+    headers: { 'Cache-Control': 'no-store, no-cache' },
+  });
 }

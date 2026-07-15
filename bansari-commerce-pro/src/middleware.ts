@@ -1,7 +1,6 @@
 import { createServerClient } from '@supabase/ssr';
 import { NextResponse, type NextRequest } from 'next/server';
 
-// Routes that require an authenticated admin session at the edge
 const ADMIN_ROUTES = /^\/admin(?!\/login)/;
 const ADMIN_API_ROUTES = /^\/api\/admin/;
 
@@ -15,10 +14,14 @@ export async function middleware(request: NextRequest) {
     return NextResponse.next();
   }
 
-  // Build a response we can mutate cookies on
   const response = NextResponse.next({
     request: { headers: request.headers },
   });
+
+  // Admin API responses must never be cached.
+  if (isAdminApi) {
+    response.headers.set('Cache-Control', 'no-store');
+  }
 
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -37,12 +40,13 @@ export async function middleware(request: NextRequest) {
     }
   );
 
+  // getUser() validates the JWT against the Supabase Auth server.
+  // Unlike getSession() it never trusts client-supplied cookie data alone.
   const {
-    data: { session },
-  } = await supabase.auth.getSession();
+    data: { user },
+  } = await supabase.auth.getUser();
 
-  // No session → redirect admin pages to login, reject admin API calls
-  if (!session) {
+  if (!user) {
     if (isAdminApi) {
       return new NextResponse(
         JSON.stringify({ error: 'Unauthorized' }),
@@ -55,8 +59,7 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(loginUrl);
   }
 
-  // Session present — verify admin role via app_metadata
-  const isAdmin = session.user.app_metadata?.role === 'admin';
+  const isAdmin = user.app_metadata?.role === 'admin';
   if (!isAdmin) {
     if (isAdminApi) {
       return new NextResponse(
@@ -64,7 +67,6 @@ export async function middleware(request: NextRequest) {
         { status: 403, headers: { 'Content-Type': 'application/json' } }
       );
     }
-    // Authenticated but not admin → send to storefront with forbidden notice
     const homeUrl = request.nextUrl.clone();
     homeUrl.pathname = '/';
     homeUrl.searchParams.set('error', 'forbidden');
@@ -76,12 +78,6 @@ export async function middleware(request: NextRequest) {
 
 export const config = {
   matcher: [
-    /*
-     * Match all request paths except:
-     * - _next/static (static files)
-     * - _next/image (image optimisation)
-     * - favicon.ico, public assets
-     */
     '/((?!_next/static|_next/image|favicon.ico|.*\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
   ],
 };

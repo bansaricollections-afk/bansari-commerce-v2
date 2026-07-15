@@ -1,12 +1,8 @@
 /**
  * Server-side utility — call inside RSC pages or API route handlers.
- * Returns the authenticated admin session or throws a Response.
  *
- * Usage in API routes:
- *   const session = await requireAdminSession(request);
- *
- * Usage in RSC pages:
- *   await requireAdminPage();
+ * Both functions use getUser() which validates the JWT against the Supabase
+ * Auth server — never trusting client-supplied cookie data alone.
  */
 import { createServerClient } from '@supabase/ssr';
 import { cookies } from 'next/headers';
@@ -33,17 +29,17 @@ export async function requireAdminPage(): Promise<void> {
   );
 
   const {
-    data: { session },
-  } = await supabase.auth.getSession();
+    data: { user },
+  } = await supabase.auth.getUser();
 
-  if (!session || session.user.app_metadata?.role !== 'admin') {
+  if (!user || user.app_metadata?.role !== 'admin') {
     redirect('/admin/login');
   }
 }
 
-/** For API route handlers — returns 401/403 NextResponse or the session */
+/** For API route handlers — returns 401/403 NextResponse or the authenticated user info */
 export async function requireAdminSession(
-  request: NextRequest
+  _request: NextRequest
 ): Promise<{ userId: string; email: string } | NextResponse> {
   const cookieStore = await cookies();
 
@@ -61,18 +57,18 @@ export async function requireAdminSession(
   );
 
   const {
-    data: { session },
-  } = await supabase.auth.getSession();
+    data: { user },
+  } = await supabase.auth.getUser();
 
-  if (!session) {
+  if (!user) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
-  if (session.user.app_metadata?.role !== 'admin') {
+  if (user.app_metadata?.role !== 'admin') {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   }
 
   return {
-    userId: session.user.id,
-    email: session.user.email ?? '',
+    userId: user.id,
+    email: user.email ?? '',
   };
 }

@@ -1,72 +1,55 @@
-import crypto from "crypto";
+import crypto from 'crypto';
 
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest, NextResponse } from 'next/server';
+import { generateRequestId } from '@/lib/request-id';
+import { createLogger } from '@/lib/logger';
+import { apiError } from '@/lib/api-response';
+
+const log = createLogger({ service: 'payment.verify' });
 
 export async function POST(request: NextRequest) {
-  try {
-    const {
-      razorpay_order_id,
-      razorpay_payment_id,
-      razorpay_signature,
-    } = await request.json();
+  const requestId = generateRequestId();
+  const rLog = log.child({ requestId });
 
-    if (
-      !razorpay_order_id ||
-      !razorpay_payment_id ||
-      !razorpay_signature
-    ) {
-      return NextResponse.json(
-        {
-          success: false,
-          message: "Missing payment details.",
-        },
-        {
-          status: 400,
-        }
-      );
+  try {
+    const body = await request.json();
+    const { razorpay_order_id, razorpay_payment_id, razorpay_signature } = body ?? {};
+
+    if (!razorpay_order_id || !razorpay_payment_id || !razorpay_signature) {
+      return apiError(requestId, 'MISSING_FIELDS', 'Missing payment details.', 400);
+    }
+
+    const secret = process.env.RAZORPAY_KEY_SECRET;
+    if (!secret) {
+      rLog.error('payment.verify.secret_missing');
+      return apiError(requestId, 'CONFIG_ERROR', 'Payment configuration error.', 500);
     }
 
     const expectedSignature = crypto
-      .createHmac(
-        "sha256",
-        process.env.RAZORPAY_KEY_SECRET!
-      )
-      .update(
-        `${razorpay_order_id}|${razorpay_payment_id}`
-      )
-      .digest("hex");
+      .createHmac('sha256', secret)
+      .update(`${razorpay_order_id}|${razorpay_payment_id}`)
+      .digest('hex');
 
-    const verified =
-      expectedSignature === razorpay_signature;
+    const verified = crypto.timingSafeEqual(
+      Buffer.from(expectedSignature, 'hex'),
+      Buffer.from(razorpay_signature, 'hex')
+    );
 
     if (!verified) {
-      return NextResponse.json(
-        {
-          success: false,
-          message: "Payment verification failed.",
-        },
-        {
-          status: 400,
-        }
-      );
+      rLog.warn('payment.verify.signature_invalid', { razorpay_order_id, razorpay_payment_id });
+      return apiError(requestId, 'INVALID_SIGNATURE', 'Payment verification failed.', 400);
     }
+
+    rLog.info('payment.verify.ok', { razorpay_order_id, razorpay_payment_id });
 
     return NextResponse.json({
       success: true,
+      requestId,
       paymentId: razorpay_payment_id,
       orderId: razorpay_order_id,
     });
-  } catch (error) {
-    console.error("Payment verification error:", error);
-
-    return NextResponse.json(
-      {
-        success: false,
-        message: "Internal server error.",
-      },
-      {
-        status: 500,
-      }
-    );
+  } catch (err) {
+    rLog.error('payment.verify.unhandled', err);
+    return apiError(requestId, 'INTERNAL_ERROR', 'Internal server error.', 500);
   }
 }

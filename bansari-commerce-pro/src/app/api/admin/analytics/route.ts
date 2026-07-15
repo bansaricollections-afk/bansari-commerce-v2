@@ -1,8 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAdminSession } from '@/lib/auth/requireAdmin';
-import { createServiceRoleClient } from '@/lib/supabase/server';
+import { createServiceRoleClient } from '@/lib/supabase/service';
+import { createLogger } from '@/lib/logger';
+import { generateRequestId } from '@/lib/request-id';
+import { apiError } from '@/lib/api-response';
+
+const log = createLogger({ service: 'admin.analytics' });
 
 export async function GET(request: NextRequest) {
+  const requestId = generateRequestId();
   const auth = await requireAdminSession(request);
   if (auth instanceof NextResponse) return auth;
 
@@ -15,28 +21,30 @@ export async function GET(request: NextRequest) {
   const [ordersResult, productsResult] = await Promise.all([
     supabase
       .from('orders')
-      .select('total_amount, status, created_at')
+      .select('grand_total, order_status, created_at')
       .gte('created_at', isoDate),
     supabase.from('products').select('id', { count: 'exact', head: true }),
   ]);
 
   if (ordersResult.error) {
-    console.error('[GET /api/admin/analytics]', ordersResult.error);
-    return NextResponse.json({ error: ordersResult.error.message }, { status: 500 });
+    log.error('admin.analytics.orders.failed', ordersResult.error, { requestId });
+    return apiError(requestId, 'DB_ERROR', ordersResult.error.message, 500);
   }
 
   const orders = ordersResult.data ?? [];
   const totalRevenue = orders
-    .filter((o) => o.status !== 'cancelled' && o.status !== 'failed')
-    .reduce((sum, o) => sum + Number(o.total_amount ?? 0), 0);
+    .filter((o) => o.order_status !== 'cancelled')
+    .reduce((sum, o) => sum + Number(o.grand_total ?? 0), 0);
 
   const completedOrders = orders.filter(
-    (o) => o.status === 'delivered' || o.status === 'completed'
+    (o) => o.order_status === 'delivered'
   ).length;
 
   const aov = completedOrders > 0 ? totalRevenue / completedOrders : 0;
 
   return NextResponse.json({
+    success: true,
+    requestId,
     totalRevenue,
     totalOrders: orders.length,
     completedOrders,

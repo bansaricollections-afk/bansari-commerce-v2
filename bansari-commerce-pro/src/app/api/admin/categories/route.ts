@@ -1,8 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAdminSession } from '@/lib/auth/requireAdmin';
-import { createServiceRoleClient } from '@/lib/supabase/server';
+import { createServiceRoleClient } from '@/lib/supabase/service';
+import { createLogger } from '@/lib/logger';
+import { generateRequestId } from '@/lib/request-id';
+import { apiError } from '@/lib/api-response';
+
+const log = createLogger({ service: 'admin.categories' });
 
 export async function GET(request: NextRequest) {
+  const requestId = generateRequestId();
   const auth = await requireAdminSession(request);
   if (auth instanceof NextResponse) return auth;
 
@@ -14,26 +20,23 @@ export async function GET(request: NextRequest) {
     .not('category', 'is', null);
 
   if (error) {
-    console.error('[GET /api/admin/categories]', error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    log.error('admin.categories.get.failed', error, { requestId });
+    return apiError(requestId, 'DB_ERROR', error.message, 500);
   }
 
-  // Count products per category
   const counts = new Map<string, number>();
   for (const row of data ?? []) {
     const cat = (row.category as string) ?? 'Uncategorised';
     counts.set(cat, (counts.get(cat) ?? 0) + 1);
   }
 
-  const categories = Array.from(counts.entries()).map(([name, count]) => ({
-    name,
-    count,
-  }));
+  const categories = Array.from(counts.entries()).map(([name, count]) => ({ name, count }));
 
-  return NextResponse.json(categories);
+  return NextResponse.json({ success: true, requestId, data: categories });
 }
 
 export async function PATCH(request: NextRequest) {
+  const requestId = generateRequestId();
   const auth = await requireAdminSession(request);
   if (auth instanceof NextResponse) return auth;
 
@@ -41,28 +44,19 @@ export async function PATCH(request: NextRequest) {
   try {
     body = await request.json();
   } catch {
-    return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 });
+    return apiError(requestId, 'INVALID_JSON', 'Invalid JSON body', 400);
   }
 
   const { oldName, newName } = body as { oldName?: unknown; newName?: unknown };
 
   if (!oldName || typeof oldName !== 'string' || !oldName.trim()) {
-    return NextResponse.json(
-      { error: 'oldName is required and must be a non-empty string' },
-      { status: 400 }
-    );
+    return apiError(requestId, 'MISSING_FIELD', 'oldName is required and must be a non-empty string', 400);
   }
   if (!newName || typeof newName !== 'string' || !newName.trim()) {
-    return NextResponse.json(
-      { error: 'newName is required and must be a non-empty string' },
-      { status: 400 }
-    );
+    return apiError(requestId, 'MISSING_FIELD', 'newName is required and must be a non-empty string', 400);
   }
   if (oldName.trim() === newName.trim()) {
-    return NextResponse.json(
-      { error: 'oldName and newName must differ' },
-      { status: 400 }
-    );
+    return apiError(requestId, 'INVALID_FIELD', 'oldName and newName must differ', 400);
   }
 
   const supabase = createServiceRoleClient();
@@ -73,9 +67,20 @@ export async function PATCH(request: NextRequest) {
     .eq('category', oldName.trim());
 
   if (error) {
-    console.error('[PATCH /api/admin/categories]', error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    log.error('admin.categories.patch.failed', error, { requestId });
+    return apiError(requestId, 'DB_ERROR', error.message, 500);
   }
 
-  return NextResponse.json({ ok: true, oldName, newName });
+  // Admin audit log
+  await supabase.from('admin_audit_log').insert({
+    action: 'category_rename',
+    entity_type: 'category',
+    entity_id: oldName.trim(),
+    user_id: (auth as { userId: string }).userId,
+    metadata: { oldName, newName, requestId },
+  });
+
+  log.info('admin.categories.patch.ok', { oldName, newName, requestId });
+
+  return NextResponse.json({ success: true, requestId, oldName, newName });
 }
