@@ -172,7 +172,7 @@ export async function updatePaymentStatusFromWebhook(
 }
 
 // ---------------------------------------------------------------------------
-// Webhook recovery
+// Webhook recovery — helpers
 // ---------------------------------------------------------------------------
 
 function generateOrderNumber(): string {
@@ -181,22 +181,29 @@ function generateOrderNumber(): string {
   return `BC-${ts}-${rand}`;
 }
 
+// ---------------------------------------------------------------------------
+// recoverOrderFromWebhook
+// ---------------------------------------------------------------------------
+
 /**
- * recoverOrderFromWebhook
- *
  * Called when payment.captured arrives but no order row exists.
  *
+ * Uses the SAME create_order_with_items() RPC as the browser checkout path,
+ * making recovery fully atomic: both the orders INSERT and the order_items
+ * INSERT are wrapped in the RPC's implicit PL/pgSQL transaction.
+ *
  * Recovery priority:
- *   1. Read pending_orders (written by create-order before the modal opened).
- *      This gives us the complete order: items, prices, shipping, customer.
- *      Creates order + order_items + decrements stock + sends email.
+ *   1. pending_orders (full cart + shipping + customer data)
+ *   2. Razorpay payment notes (partial — no items, no shipping address)
  *
- *   2. If pending_orders row is missing (browser crashed before create-order
- *      returned), fall back to partial recovery from Razorpay payment notes.
- *      Creates order with empty shipping address; logs admin warning.
- *      Does NOT decrement stock (no item data available).
+ * Idempotent:
+ *   - Checks orders table before any write.
+ *   - Catches 23505 (unique_violation) from the RPC for concurrent deliveries.
  *
- * Idempotent: checks orders table + pending_orders.status before any write.
+ * Stock deduction: performed after the RPC succeeds (same pattern as
+ * browser checkout — best-effort, non-fatal on failure).
+ *
+ * Email: sent after stock deduction, non-fatal on failure.
  */
 export async function recoverOrderFromWebhook(
   payment: RazorpayPaymentEntity
@@ -219,7 +226,9 @@ export async function recoverOrderFromWebhook(
 
     const now = new Date().toISOString();
 
-    // --- Priority 1: Full recovery from pending_orders ---
+    // -----------------------------------------------------------------------
+    // Priority 1: Full recovery from pending_orders
+    // -----------------------------------------------------------------------
     const { data: pending } = await supabase
       .from('pending_orders')
       .select('*')
@@ -233,103 +242,85 @@ export async function recoverOrderFromWebhook(
       const lineItems = (pending.items_json ?? []) as PendingLineItem[];
       const orderNumber = generateOrderNumber();
 
-      const { data: order, error: insertErr } = await supabase
-        .from('orders')
-        .insert({
-          order_number: orderNumber,
-          user_id: null,
+      // Build payloads in the same shape as the browser checkout path.
+      const orderPayload = {
+        order_number:              orderNumber,
+        user_id:                   '',
+        customer_name:             pending.customer_name,
+        customer_email:            pending.customer_email,
+        customer_phone:            pending.customer_phone ?? '',
+        shipping_name:             pending.shipping_name,
+        shipping_phone:            pending.shipping_phone,
+        shipping_email:            pending.shipping_email ?? '',
+        shipping_address_line1:    pending.shipping_address_line1,
+        shipping_address_line2:    pending.shipping_address_line2 ?? '',
+        shipping_city:             pending.shipping_city,
+        shipping_state:            pending.shipping_state,
+        shipping_postal_code:      pending.shipping_postal_code,
+        billing_same_as_shipping:  'true',
+        currency:                  pending.currency ?? 'INR',
+        subtotal:                  String(pending.subtotal),
+        discount:                  String(pending.discount),
+        shipping_fee:              String(pending.shipping_fee),
+        tax:                       '0',
+        grand_total:               String(pending.grand_total),
+        payment_provider:          'razorpay',
+        payment_method:            'razorpay-webhook-recovery',
+        payment_reference:         payment.id,
+        razorpay_order_id:         payment.order_id ?? '',
+        razorpay_payment_id:       payment.id,
+        payment_status:            'paid',
+        order_status:              'placed',
+        payment_verified_at:       now,
+        paid_at:                   now,
+      };
 
-          customer_name: pending.customer_name,
-          customer_email: pending.customer_email,
-          customer_phone: pending.customer_phone ?? null,
+      const itemsPayload = lineItems.map((li) => ({
+        product_id:   li.productId,
+        product_name: li.productName,
+        unit_price:   li.unitPrice,
+        quantity:     li.quantity,
+        line_total:   li.lineTotal,
+      }));
 
-          shipping_name: pending.shipping_name,
-          shipping_phone: pending.shipping_phone,
-          shipping_email: pending.shipping_email ?? null,
-          shipping_address_line1: pending.shipping_address_line1,
-          shipping_address_line2: pending.shipping_address_line2 ?? null,
-          shipping_city: pending.shipping_city,
-          shipping_state: pending.shipping_state,
-          shipping_postal_code: pending.shipping_postal_code,
-          shipping_country: pending.shipping_country,
-          billing_same_as_shipping: true,
-
-          currency: pending.currency,
-          subtotal: pending.subtotal,
-          discount: pending.discount,
-          shipping_fee: pending.shipping_fee,
-          tax: 0,
-          grand_total: pending.grand_total,
-
-          payment_provider: 'razorpay',
-          payment_method: 'razorpay-webhook-recovery',
-          payment_reference: payment.id,
-          razorpay_order_id: payment.order_id ?? null,
-          razorpay_payment_id: payment.id,
-          payment_status: 'paid',
-          order_status: 'placed',
-
-          payment_verified_at: now,
-          paid_at: now,
+      // --- Atomic RPC call — identical to browser checkout path ---
+      const { data: order, error: rpcErr } = await supabase
+        .rpc('create_order_with_items', {
+          p_order: orderPayload,
+          p_items: itemsPayload,
         })
-        .select('id, order_number, customer_name, customer_email, grand_total, subtotal, shipping_fee, discount')
         .single();
 
-      if (insertErr) {
-        // 23505 = unique_violation: concurrent webhook delivery already inserted.
-        if (insertErr.code === '23505') {
+      if (rpcErr) {
+        // 23505: concurrent webhook delivery already won the race.
+        if (rpcErr.code === '23505') {
           const { data: winner } = await supabase
             .from('orders')
             .select('id')
             .eq('razorpay_payment_id', payment.id)
             .maybeSingle();
+          rLog.info('recovery.race_winner', { orderId: winner?.id });
           return { recovered: true, orderId: winner?.id };
         }
-        rLog.error('recovery.order_insert.failed', insertErr);
-        return { recovered: false, error: insertErr.message };
+        rLog.error('recovery.rpc.failed', rpcErr);
+        return { recovered: false, error: rpcErr.message };
       }
 
-      if (!order) return { recovered: false, error: 'Order insert returned no data.' };
+      if (!order) return { recovered: false, error: 'RPC returned no data.' };
 
       rLog.info('recovery.order.created', { orderId: order.id, orderNumber });
 
-      // --- Insert order_items ---
-      if (lineItems.length > 0) {
-        const orderItemRows = lineItems.map((li) => ({
-          order_id: order.id,
-          product_id: li.productId,
-          product_name: li.productName,
-          unit_price: li.unitPrice,
-          quantity: li.quantity,
-          line_total: li.lineTotal,
-        }));
-
-        const { error: itemsErr } = await supabase
-          .from('order_items')
-          .insert(orderItemRows);
-
-        if (itemsErr) {
-          rLog.warn('recovery.order_items.failed', itemsErr, { orderId: order.id });
-          // Non-fatal: order row exists; items can be reconstructed from pending_orders.
-        } else {
-          rLog.info('recovery.order_items.inserted', { orderId: order.id, count: lineItems.length });
-        }
-
-        // --- Decrement stock ---
-        for (const li of lineItems) {
-          const { error: stockErr } = await supabase.rpc('decrement_product_stock', {
-            p_product_id: li.productId,
-            p_quantity: li.quantity,
+      // --- Decrement stock (best-effort, outside the RPC transaction) ---
+      for (const li of lineItems) {
+        const { error: stockErr } = await supabase.rpc('decrement_product_stock', {
+          p_product_id: li.productId,
+          p_quantity:   li.quantity,
+        });
+        if (stockErr) {
+          rLog.warn('recovery.stock.decrement_failed', stockErr, {
+            orderId:   order.id,
+            productId: li.productId,
           });
-
-          if (stockErr) {
-            rLog.warn('recovery.stock.decrement_failed', stockErr, {
-              orderId: order.id,
-              productId: li.productId,
-              quantity: li.quantity,
-            });
-            // Log but continue: partial stock failure is better than lost order.
-          }
         }
       }
 
@@ -342,23 +333,23 @@ export async function recoverOrderFromWebhook(
       // --- Send confirmation email (non-fatal) ---
       try {
         await sendOrderConfirmationEmail({
-          orderNumber: order.order_number,
-          customerName: order.customer_name,
-          customerEmail: order.customer_email,
+          orderNumber:     order.order_number,
+          customerName:    order.customer_name,
+          customerEmail:   order.customer_email,
           items: lineItems.map((li) => ({
-            name: li.productName,
+            name:     li.productName,
             quantity: li.quantity,
-            price: li.unitPrice,
+            price:    li.unitPrice,
           })),
-          subtotal: Number(order.subtotal),
+          subtotal:    Number(order.subtotal),
           shippingFee: Number(order.shipping_fee),
-          discount: Number(order.discount),
-          grandTotal: Number(order.grand_total),
+          discount:    Number(order.discount),
+          grandTotal:  Number(order.grand_total),
           shippingAddress: {
             addressLine1: pending.shipping_address_line1,
-            city: pending.shipping_city,
-            state: pending.shipping_state,
-            postalCode: pending.shipping_postal_code,
+            city:         pending.shipping_city,
+            state:        pending.shipping_state,
+            postalCode:   pending.shipping_postal_code,
           },
         });
         rLog.info('recovery.email.sent', { orderId: order.id });
@@ -369,52 +360,60 @@ export async function recoverOrderFromWebhook(
       return { recovered: true, orderId: order.id };
     }
 
-    // --- Priority 2: Partial recovery from Razorpay notes ---
+    // -----------------------------------------------------------------------
+    // Priority 2: Partial recovery from Razorpay payment notes
+    // (browser crashed before create-order returned — no pending_orders row)
+    // -----------------------------------------------------------------------
     rLog.warn('recovery.pending_orders.not_found', {
-      note: 'Browser may have crashed before create-order returned. Partial recovery only.',
+      note: 'Partial recovery only — missing items and shipping address.',
     });
 
-    const grandTotal = Math.round((payment.amount / 100) * 100) / 100;
-    const customerEmail = payment.email ?? 'unknown@bansaricollections.com';
-    const customerPhone = payment.contact ?? '';
-    const customerName = payment.notes?.customer_name ?? 'Customer';
-    const orderNumber = generateOrderNumber();
+    const grandTotal     = Math.round((payment.amount / 100) * 100) / 100;
+    const customerEmail  = payment.email ?? 'unknown@bansaricollections.com';
+    const customerPhone  = payment.contact ?? '';
+    const customerName   = payment.notes?.customer_name ?? 'Customer';
+    const orderNumber    = generateOrderNumber();
+
+    // Partial recovery has no items, so p_items is an empty array.
+    // create_order_with_items() accepts an empty items array gracefully
+    // (the inner INSERT … SELECT produces zero rows, which is fine).
+    const partialOrderPayload = {
+      order_number:              orderNumber,
+      user_id:                   '',
+      customer_name:             customerName,
+      customer_email:            customerEmail,
+      customer_phone:            customerPhone,
+      shipping_name:             customerName,
+      shipping_phone:            customerPhone,
+      shipping_email:            customerEmail,
+      shipping_address_line1:    '[Pending — webhook recovery]',
+      shipping_address_line2:    '',
+      shipping_city:             '',
+      shipping_state:            '',
+      shipping_postal_code:      '',
+      billing_same_as_shipping:  'true',
+      currency:                  payment.currency ?? 'INR',
+      subtotal:                  String(grandTotal),
+      discount:                  '0',
+      shipping_fee:              '0',
+      tax:                       '0',
+      grand_total:               String(grandTotal),
+      payment_provider:          'razorpay',
+      payment_method:            'razorpay-webhook-recovery-partial',
+      payment_reference:         payment.id,
+      razorpay_order_id:         payment.order_id ?? '',
+      razorpay_payment_id:       payment.id,
+      payment_status:            'paid',
+      order_status:              'placed',
+      payment_verified_at:       now,
+      paid_at:                   now,
+    };
 
     const { data: partialOrder, error: partialErr } = await supabase
-      .from('orders')
-      .insert({
-        order_number: orderNumber,
-        user_id: null,
-        customer_name: customerName,
-        customer_email: customerEmail,
-        customer_phone: customerPhone || null,
-        shipping_name: customerName,
-        shipping_phone: customerPhone || '',
-        shipping_email: customerEmail,
-        shipping_address_line1: '[Pending — webhook recovery]',
-        shipping_address_line2: null,
-        shipping_city: '',
-        shipping_state: '',
-        shipping_postal_code: '',
-        shipping_country: 'IN',
-        billing_same_as_shipping: true,
-        currency: payment.currency ?? 'INR',
-        subtotal: grandTotal,
-        discount: 0,
-        shipping_fee: 0,
-        tax: 0,
-        grand_total: grandTotal,
-        payment_provider: 'razorpay',
-        payment_method: 'razorpay-webhook-recovery-partial',
-        payment_reference: payment.id,
-        razorpay_order_id: payment.order_id ?? null,
-        razorpay_payment_id: payment.id,
-        payment_status: 'paid',
-        order_status: 'placed',
-        payment_verified_at: now,
-        paid_at: now,
+      .rpc('create_order_with_items', {
+        p_order: partialOrderPayload,
+        p_items: [],
       })
-      .select('id, order_number')
       .single();
 
     if (partialErr) {
@@ -426,7 +425,7 @@ export async function recoverOrderFromWebhook(
           .maybeSingle();
         return { recovered: true, orderId: winner?.id };
       }
-      rLog.error('recovery.partial.failed', partialErr);
+      rLog.error('recovery.partial.rpc.failed', partialErr);
       return { recovered: false, error: partialErr.message };
     }
 
@@ -439,19 +438,19 @@ export async function recoverOrderFromWebhook(
     try {
       if (customerEmail !== 'unknown@bansaricollections.com') {
         await sendOrderConfirmationEmail({
-          orderNumber: partialOrder?.order_number ?? orderNumber,
+          orderNumber:  partialOrder?.order_number ?? orderNumber,
           customerName,
           customerEmail,
-          items: [],
-          subtotal: grandTotal,
-          shippingFee: 0,
-          discount: 0,
+          items:        [],
+          subtotal:     grandTotal,
+          shippingFee:  0,
+          discount:     0,
           grandTotal,
           shippingAddress: {
             addressLine1: 'Please contact us to confirm your delivery address.',
-            city: '',
-            state: '',
-            postalCode: '',
+            city:         '',
+            state:        '',
+            postalCode:   '',
           },
         });
       }
@@ -460,6 +459,7 @@ export async function recoverOrderFromWebhook(
     }
 
     return { recovered: true, orderId: partialOrder?.id };
+
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     rLog.error('recovery.unhandled', err);

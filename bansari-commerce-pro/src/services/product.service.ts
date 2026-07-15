@@ -1,14 +1,19 @@
 import { createServiceRoleClient } from '@/lib/supabase/service';
 
+// ---------------------------------------------------------------------------
+// Types — fields must exactly match public.products column names
+// ---------------------------------------------------------------------------
+
 export type Product = {
   id: number;
   name: string;
   slug: string;
   price: number;
-  stock_quantity: number;
-  is_active: boolean;
-  is_deleted: boolean;
-  images?: string[];
+  /** Maps to the `stock` column in public.products (integer). */
+  stock: number;
+  /** Maps to the `active` column in public.products (boolean). */
+  active: boolean;
+  images?: unknown[];
   category?: string;
 };
 
@@ -29,16 +34,26 @@ export type CartValidationResult =
   | { valid: true; lineItems: LineItem[] }
   | { valid: false; errors: string[] };
 
+// ---------------------------------------------------------------------------
+// getProductById
+// ---------------------------------------------------------------------------
+
 /**
  * Fetch a single product by id via the service-role client.
- * Returns null when the product does not exist or has been deleted.
+ * Returns null when the product does not exist.
+ *
+ * The SELECT clause matches the exact column names in public.products:
+ *   id, name, slug, price, stock, active, images, category
+ *
+ * NOTE: There is no `stock_quantity`, `is_active`, or `is_deleted` column
+ * in the database schema. Those names were the source of P0-1.
  */
 export async function getProductById(id: number): Promise<Product | null> {
   const supabase = createServiceRoleClient();
 
   const { data, error } = await supabase
     .from('products')
-    .select('id, name, slug, price, stock_quantity, is_active, is_deleted, images, category')
+    .select('id, name, slug, price, stock, active, images, category')
     .eq('id', id)
     .maybeSingle();
 
@@ -46,15 +61,16 @@ export async function getProductById(id: number): Promise<Product | null> {
   return data as Product | null;
 }
 
+// ---------------------------------------------------------------------------
+// validateCartItems
+// ---------------------------------------------------------------------------
+
 /**
- * validateCartItems
- *
  * Validates a set of cart items against live database state:
  *   - Product must exist
- *   - Product must not be deleted
- *   - Product must be active
+ *   - Product must be active (active = true)
+ *   - Requested quantity must be a positive integer ≤ 100
  *   - Requested quantity must not exceed available stock
- *   - Quantity must be a positive integer ≤ 100
  *
  * Returns { valid: true, lineItems } with authoritative server prices,
  * or { valid: false, errors: string[] } listing every failure.
@@ -84,12 +100,7 @@ export async function validateCartItems(
       continue;
     }
 
-    if (product.is_deleted) {
-      errors.push(`Product "${product.name}" is no longer available.`);
-      continue;
-    }
-
-    if (!product.is_active) {
+    if (!product.active) {
       errors.push(`Product "${product.name}" is currently unavailable.`);
       continue;
     }
@@ -104,9 +115,10 @@ export async function validateCartItems(
       continue;
     }
 
-    if (product.stock_quantity < item.quantity) {
+    // Uses `product.stock` — the actual column name in public.products.
+    if (product.stock < item.quantity) {
       errors.push(
-        `Insufficient stock for "${product.name}": ${product.stock_quantity} available, ${item.quantity} requested.`
+        `Insufficient stock for "${product.name}": ${product.stock} available, ${item.quantity} requested.`
       );
       continue;
     }
