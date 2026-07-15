@@ -1,3 +1,5 @@
+"use client";
+
 import Image from "next/image";
 import Link from "next/link";
 
@@ -245,7 +247,6 @@ export default function CategoryGrid() {
           <div
             className="grid gap-2"
             style={{
-              /* Desktop: featured at 3fr, supporting grid at 2fr */
               gridTemplateColumns: "1fr",
             }}
           >
@@ -263,7 +264,7 @@ export default function CategoryGrid() {
 
               {/* Supporting 2×2 grid */}
               <div className="grid grid-cols-2 gap-2">
-                {supporting.map((cat, i) => (
+                {supporting.map((cat) => (
                   <ImageTile
                     key={cat.title}
                     {...cat}
