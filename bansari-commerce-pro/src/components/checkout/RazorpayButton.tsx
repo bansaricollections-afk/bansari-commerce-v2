@@ -1,15 +1,12 @@
-"use client";
+'use client';
 
-import { useState } from "react";
-import { useRouter } from "next/navigation";
-
-import { useCart } from "@/store/cart";
+import { useRef, useState } from 'react';
+import { useRouter } from 'next/navigation';
+import { useCart } from '@/store/cart';
 
 declare global {
   interface Window {
-    Razorpay: new (options: Record<string, unknown>) => {
-      open: () => void;
-    };
+    Razorpay: new (options: Record<string, unknown>) => { open(): void };
   }
 }
 
@@ -20,11 +17,15 @@ type CustomerDetails = {
 };
 
 type ShippingDetails = {
+  name: string;
+  phone: string;
+  email?: string;
   addressLine1: string;
   addressLine2?: string;
   city: string;
   state: string;
   postalCode: string;
+  country?: string;
 };
 
 type Props = {
@@ -33,93 +34,106 @@ type Props = {
   disabled?: boolean;
 };
 
-export default function RazorpayButton({
-  customer,
-  shipping,
-  disabled = false,
-}: Props) {
+export default function RazorpayButton({ customer, shipping, disabled = false }: Props) {
   const router = useRouter();
-
   const { items, clearCart } = useCart();
 
+  // Prevent double-submit: true while any payment operation is in flight.
   const [loading, setLoading] = useState(false);
+  // Store the active Razorpay order id so we can detect retries and skip
+  // creating a second Razorpay order if the modal was already opened.
+  const activeRzpOrderId = useRef<string | null>(null);
 
   async function handlePayment() {
+    if (loading || items.length === 0) return;
+
     try {
       setLoading(true);
 
-      // Send only product IDs + quantities — the server computes the
-      // authoritative amount from the database.  Client never supplies a
-      // price or total.
-      const orderResponse = await fetch("/api/payment/create-order", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
+      let rzpOrderId: string;
+      let rzpAmount: number;
+      let rzpCurrency: string;
+
+      if (activeRzpOrderId.current) {
+        // User pressed Pay a second time while the modal was alive — do not
+        // create a new Razorpay order.  Re-open is not supported by the SDK
+        // once the modal is dismissed, so this guard only prevents the
+        // create-order call from firing twice on fast double-clicks.
+        setLoading(false);
+        return;
+      }
+
+      // --- Step 1: Create Razorpay order (server computes amount) ---
+      // Customer + shipping are sent NOW so pending_orders can store them
+      // for webhook recovery BEFORE the Razorpay modal opens.
+      const orderRes = await fetch('/api/payment/create-order', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          items: items.map((item) => ({
-            productId: item.id,
-            quantity: item.quantity,
-          })),
+          items: items.map((i) => ({ productId: i.id, quantity: i.quantity })),
+          customer,
+          shipping,
         }),
       });
 
-      const orderData = await orderResponse.json();
+      const orderData = await orderRes.json();
 
       if (!orderData.success) {
-        throw new Error(orderData.message ?? "Unable to create payment order.");
+        throw new Error(orderData.message ?? 'Unable to create payment order.');
       }
 
-      const order = orderData.order;
+      rzpOrderId = orderData.order.id;
+      rzpAmount = orderData.order.amount;
+      rzpCurrency = orderData.order.currency;
 
+      activeRzpOrderId.current = rzpOrderId;
+
+      // --- Step 2: Open Razorpay modal ---
       const options = {
         key: process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID,
-
-        // Amount comes from the Razorpay order object created server-side.
-        // This is the authoritative amount — the browser cannot modify it.
-        amount: order.amount,
-
-        currency: order.currency,
-
-        name: "Bansari Collections",
-
-        description: "Order Payment",
-
-        order_id: order.id,
-
-        theme: { color: "#8A5A6A" },
-
+        amount: rzpAmount,       // authoritative — set by server
+        currency: rzpCurrency,
+        name: 'Bansari Collections',
+        description: 'Order Payment',
+        order_id: rzpOrderId,
+        theme: { color: '#8A5A6A' },
         modal: {
           ondismiss() {
-            alert("Payment cancelled.");
+            // Allow re-attempt after dismissal by clearing the guard.
+            activeRzpOrderId.current = null;
+            setLoading(false);
           },
         },
-
         handler: async (response: {
           razorpay_order_id: string;
           razorpay_payment_id: string;
           razorpay_signature: string;
         }) => {
           try {
-            const verifyResponse = await fetch("/api/payment/verify-payment", {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
+            // --- Step 3: Verify signature ---
+            const verifyRes = await fetch('/api/payment/verify-payment', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify(response),
             });
 
-            const verify = await verifyResponse.json();
-
+            const verify = await verifyRes.json();
             if (!verify.success) {
-              alert("Payment verification failed.");
+              alert('Payment verification failed.');
+              activeRzpOrderId.current = null;
+              setLoading(false);
               return;
             }
 
-            const saveResponse = await fetch("/api/orders/create", {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
+            // --- Step 4: Create order in DB ---
+            // razorpayOrderId is the idempotency key: the DB UNIQUE index on
+            // razorpay_payment_id prevents duplicate rows even if this request
+            // fires more than once.
+            const saveRes = await fetch('/api/orders/create', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({
-                items: items.map((item) => ({
-                  productId: item.id,
-                  quantity: item.quantity,
-                })),
+                items: items.map((i) => ({ productId: i.id, quantity: i.quantity })),
                 customer,
                 shipping,
                 razorpay_order_id: response.razorpay_order_id,
@@ -128,28 +142,39 @@ export default function RazorpayButton({
               }),
             });
 
-            const saveOrder = await saveResponse.json();
+            const saved = await saveRes.json();
 
-            if (!saveOrder.success) {
-              alert(saveOrder.error ?? "Order save failed.");
+            if (!saved.success) {
+              // 409 = already exists (idempotency: webhook beat the browser)
+              if (saveRes.status === 409) {
+                clearCart();
+                router.push('/order-success');
+                return;
+              }
+              alert(saved.error ?? 'Order save failed.');
+              activeRzpOrderId.current = null;
+              setLoading(false);
               return;
             }
 
             clearCart();
-            router.push("/order-success");
-          } catch (error) {
-            console.error(error);
-            alert("Unable to complete your order.");
+            router.push('/order-success');
+          } catch (err) {
+            console.error(err);
+            alert('Unable to complete your order. Please contact support.');
+            activeRzpOrderId.current = null;
+            setLoading(false);
           }
         },
       };
 
-      const razorpay = new window.Razorpay(options);
-      razorpay.open();
-    } catch (error) {
-      console.error(error);
-      alert("Unable to initiate payment.");
-    } finally {
+      const rzp = new window.Razorpay(options);
+      rzp.open();
+      // Loading stays true until modal dismisses or order saves.
+    } catch (err) {
+      console.error(err);
+      alert(err instanceof Error ? err.message : 'Unable to initiate payment.');
+      activeRzpOrderId.current = null;
       setLoading(false);
     }
   }
@@ -161,7 +186,7 @@ export default function RazorpayButton({
       disabled={disabled || loading || items.length === 0}
       className="mt-10 flex w-full items-center justify-center rounded-full bg-[#8A5A6A] py-4 font-semibold text-white transition hover:bg-[#734757] disabled:cursor-not-allowed disabled:opacity-50"
     >
-      {loading ? "Processing..." : "Pay Securely"}
+      {loading ? 'Processing…' : 'Pay Securely'}
     </button>
   );
 }

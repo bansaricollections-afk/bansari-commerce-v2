@@ -1,156 +1,241 @@
-import { NextRequest, NextResponse } from "next/server";
-import { getRazorpay } from "@/lib/razorpay";
-import { getProductById } from "@/services/product.service";
+import { NextRequest, NextResponse } from 'next/server';
+import crypto from 'crypto';
+
+import { getRazorpay } from '@/lib/razorpay';
+import { validateCartItems, type CartItem } from '@/services/product.service';
+import { createServiceRoleClient } from '@/lib/supabase/service';
+import { createLogger } from '@/lib/logger';
 
 const FREE_SHIPPING_THRESHOLD = 2999;
 const STANDARD_SHIPPING_FEE = 99;
+const MAX_ITEMS = 50;
 
-function round2(value: number): number {
-  return Math.round(value * 100) / 100;
+function round2(n: number) {
+  return Math.round(n * 100) / 100;
 }
 
-type RequestedItem = {
-  productId: number;
-  quantity: number;
+function requireString(value: unknown, field: string): string | null {
+  if (typeof value === 'string' && value.trim().length > 0) return value.trim();
+  return null;
+}
+
+function parseItems(raw: unknown): CartItem[] | string {
+  if (!Array.isArray(raw) || raw.length === 0)
+    return 'items must be a non-empty array.';
+  if (raw.length > MAX_ITEMS)
+    return `Cart may not exceed ${MAX_ITEMS} distinct products.`;
+
+  const items: CartItem[] = [];
+  for (const [i, el] of raw.entries()) {
+    if (!el || typeof el !== 'object')
+      return `Item at index ${i} is invalid.`;
+    const { productId, quantity } = el as Record<string, unknown>;
+    if (!Number.isInteger(productId) || (productId as number) <= 0)
+      return `Item at index ${i} has an invalid productId.`;
+    if (!Number.isInteger(quantity) || (quantity as number) <= 0)
+      return `Item at index ${i} has an invalid quantity.`;
+    items.push({ productId: productId as number, quantity: quantity as number });
+  }
+  return items;
+}
+
+type CustomerInput = {
+  name: string;
+  email: string;
+  phone: string;
 };
 
-function isPositiveInteger(value: unknown): value is number {
-  return (
-    typeof value === "number" &&
-    Number.isInteger(value) &&
-    value > 0
-  );
+type ShippingInput = {
+  name: string;
+  phone: string;
+  email?: string;
+  addressLine1: string;
+  addressLine2?: string;
+  city: string;
+  state: string;
+  postalCode: string;
+  country?: string;
+};
+
+function parseCustomer(raw: unknown): CustomerInput | string {
+  if (!raw || typeof raw !== 'object') return 'customer is required.';
+  const c = raw as Record<string, unknown>;
+  const name = requireString(c.name, 'customer.name');
+  if (!name) return 'customer.name is required.';
+  const email = requireString(c.email, 'customer.email');
+  if (!email) return 'customer.email is required.';
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))
+    return 'customer.email is not a valid email address.';
+  const phone = requireString(c.phone, 'customer.phone');
+  if (!phone) return 'customer.phone is required.';
+  return { name, email, phone };
+}
+
+function parseShipping(raw: unknown): ShippingInput | string {
+  if (!raw || typeof raw !== 'object') return 'shipping is required.';
+  const s = raw as Record<string, unknown>;
+  const name = requireString(s.name, 'shipping.name');
+  if (!name) return 'shipping.name is required.';
+  const phone = requireString(s.phone, 'shipping.phone');
+  if (!phone) return 'shipping.phone is required.';
+  const addressLine1 = requireString(s.addressLine1, 'shipping.addressLine1');
+  if (!addressLine1) return 'shipping.addressLine1 is required.';
+  const city = requireString(s.city, 'shipping.city');
+  if (!city) return 'shipping.city is required.';
+  const state = requireString(s.state, 'shipping.state');
+  if (!state) return 'shipping.state is required.';
+  const postalCode = requireString(s.postalCode, 'shipping.postalCode');
+  if (!postalCode) return 'shipping.postalCode is required.';
+
+  return {
+    name,
+    phone,
+    email: requireString(s.email, 'shipping.email') ?? undefined,
+    addressLine1,
+    addressLine2: requireString(s.addressLine2, 'shipping.addressLine2') ?? undefined,
+    city,
+    state,
+    postalCode,
+    country: requireString(s.country, 'shipping.country') ?? 'IN',
+  };
 }
 
 export async function POST(request: NextRequest) {
+  const requestId = crypto.randomUUID();
+  const log = createLogger({ service: 'create-order', requestId });
+  const timer = log.startTimer('create-order.duration');
+
   try {
     const body = await request.json();
 
-    // Validate items array — client MUST send product IDs + quantities.
-    // Amount is never accepted from the client.
-    if (!Array.isArray(body?.items) || body.items.length === 0) {
+    // --- Input validation ---
+    const itemsResult = parseItems(body?.items);
+    if (typeof itemsResult === 'string') {
+      log.warn('create-order.validation.items', { error: itemsResult });
+      return NextResponse.json({ success: false, message: itemsResult }, { status: 400 });
+    }
+
+    const customerResult = parseCustomer(body?.customer);
+    if (typeof customerResult === 'string') {
+      log.warn('create-order.validation.customer', { error: customerResult });
+      return NextResponse.json({ success: false, message: customerResult }, { status: 400 });
+    }
+
+    const shippingResult = parseShipping(body?.shipping);
+    if (typeof shippingResult === 'string') {
+      log.warn('create-order.validation.shipping', { error: shippingResult });
+      return NextResponse.json({ success: false, message: shippingResult }, { status: 400 });
+    }
+
+    const customer = customerResult;
+    const shipping = shippingResult;
+    const couponCode =
+      typeof body?.coupon === 'string' && body.coupon.trim().length > 0
+        ? body.coupon.trim()
+        : null;
+
+    // --- Product validation (existence, active, stock) ---
+    const cartValidation = await validateCartItems(itemsResult);
+    if (!cartValidation.valid) {
+      log.warn('create-order.validation.cart', { errors: cartValidation.errors });
       return NextResponse.json(
-        { success: false, message: "items array is required." },
+        { success: false, message: cartValidation.errors.join(' ') },
         { status: 400 }
       );
     }
 
-    const rawItems = body.items as unknown[];
+    const { lineItems } = cartValidation;
 
-    for (const [index, item] of rawItems.entries()) {
-      if (!item || typeof item !== "object") {
-        return NextResponse.json(
-          { success: false, message: `Item at index ${index} is invalid.` },
-          { status: 400 }
-        );
-      }
-
-      const i = item as Record<string, unknown>;
-
-      if (!isPositiveInteger(i.productId)) {
-        return NextResponse.json(
-          { success: false, message: `Item at index ${index} is missing a valid productId.` },
-          { status: 400 }
-        );
-      }
-
-      if (!isPositiveInteger(i.quantity)) {
-        return NextResponse.json(
-          { success: false, message: `Item at index ${index} is missing a valid quantity.` },
-          { status: 400 }
-        );
-      }
-    }
-
-    const items = rawItems as RequestedItem[];
-
-    // Fetch every product from the database — price is authoritative here.
-    const productLookups = await Promise.all(
-      items.map((item) => getProductById(item.productId))
-    );
-
-    const invalidProductIds: number[] = [];
-
-    items.forEach((item, index) => {
-      if (!productLookups[index]) {
-        invalidProductIds.push(item.productId);
-      }
-    });
-
-    if (invalidProductIds.length > 0) {
-      return NextResponse.json(
-        {
-          success: false,
-          message: "One or more products are unavailable.",
-          invalidProductIds,
-        },
-        { status: 400 }
-      );
-    }
-
-    // Server-side pricing — same constants as /api/orders/create.
-    const lineItems = items.map((item, index) => {
-      const product = productLookups[index]!;
-      return {
-        productId: product.id,
-        productName: product.name,
-        unitPrice: product.price,
-        quantity: item.quantity,
-        lineTotal: round2(product.price * item.quantity),
-      };
-    });
-
-    const subtotal = round2(
-      lineItems.reduce((sum, row) => sum + row.lineTotal, 0)
-    );
-    const shippingFee =
-      subtotal >= FREE_SHIPPING_THRESHOLD ? 0 : STANDARD_SHIPPING_FEE;
-    const grandTotal = round2(subtotal + shippingFee);
-
-    // Amount in paise (Razorpay requires smallest currency unit).
+    // --- Server-side pricing ---
+    const subtotal = round2(lineItems.reduce((s, r) => s + r.lineTotal, 0));
+    const shippingFee = subtotal >= FREE_SHIPPING_THRESHOLD ? 0 : STANDARD_SHIPPING_FEE;
+    // Coupon discount: server validates; currently 0 (plug-in point).
+    const discount = 0;
+    const grandTotal = round2(subtotal + shippingFee - discount);
     const amountPaise = Math.round(grandTotal * 100);
+    const currency = 'INR';
 
-    const currency = (typeof body.currency === "string" && body.currency.length > 0)
-      ? body.currency
-      : "INR";
+    log.info('create-order.pricing', { subtotal, shippingFee, discount, grandTotal });
 
+    // --- Create Razorpay order ---
     const razorpay = getRazorpay();
-
-    const order = await razorpay.orders.create({
+    const rzpOrder = await razorpay.orders.create({
       amount: amountPaise,
       currency,
       receipt: `BC-${Date.now()}`,
-      // Store pricing in notes so the webhook recovery path can reconstruct
-      // the order without a browser round-trip (Phase 4).
       notes: {
+        // Stored so webhook recovery can cross-reference without a DB lookup.
+        customer_name: customer.name,
+        customer_email: customer.email,
         subtotal: String(subtotal),
         shipping_fee: String(shippingFee),
         grand_total: String(grandTotal),
-        item_count: String(items.length),
+        item_count: String(lineItems.length),
       },
     });
 
+    log.info('create-order.razorpay.created', { razorpayOrderId: rzpOrder.id, amountPaise });
+
+    // --- Persist full metadata to pending_orders ---
+    // UPSERT on razorpay_order_id: if the client retries (network timeout
+    // after Razorpay already created the order), we update in place rather
+    // than creating a duplicate.
+    const supabase = createServiceRoleClient();
+    const { error: pendingError } = await supabase
+      .from('pending_orders')
+      .upsert(
+        {
+          razorpay_order_id: rzpOrder.id,
+          status: 'pending',
+          subtotal,
+          shipping_fee: shippingFee,
+          discount,
+          grand_total: grandTotal,
+          currency,
+          coupon_code: couponCode,
+          items_json: lineItems,
+          customer_name: customer.name,
+          customer_email: customer.email,
+          customer_phone: customer.phone,
+          shipping_name: shipping.name,
+          shipping_phone: shipping.phone,
+          shipping_email: shipping.email ?? null,
+          shipping_address_line1: shipping.addressLine1,
+          shipping_address_line2: shipping.addressLine2 ?? null,
+          shipping_city: shipping.city,
+          shipping_state: shipping.state,
+          shipping_postal_code: shipping.postalCode,
+          shipping_country: shipping.country ?? 'IN',
+        },
+        { onConflict: 'razorpay_order_id' }
+      );
+
+    if (pendingError) {
+      // Non-fatal: log and continue. The payment can still proceed;
+      // webhook recovery will fall back to partial data from Razorpay notes.
+      log.warn('create-order.pending_orders.write_failed', pendingError, {
+        razorpayOrderId: rzpOrder.id,
+      });
+    } else {
+      log.info('create-order.pending_orders.saved', { razorpayOrderId: rzpOrder.id });
+    }
+
+    timer('info', { razorpayOrderId: rzpOrder.id });
+
     return NextResponse.json({
       success: true,
-      order,
-      // Return server-computed pricing so the client UI can display
-      // accurate totals without any client-side calculation.
-      pricing: {
-        subtotal,
-        shippingFee,
-        grandTotal,
-      },
+      order: rzpOrder,
+      pricing: { subtotal, shippingFee, discount, grandTotal },
     });
   } catch (error) {
-    console.error("Razorpay Order Error:", error);
+    timer('error', { error: error instanceof Error ? error.message : String(error) });
+    log.error('create-order.unhandled', error);
 
     return NextResponse.json(
       {
         success: false,
         message:
-          error instanceof Error
-            ? error.message
-            : "Unable to create payment order.",
+          error instanceof Error ? error.message : 'Unable to create payment order.',
       },
       { status: 500 }
     );
