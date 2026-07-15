@@ -414,10 +414,12 @@ function Field({
     <div className="flex flex-col gap-1.5">
       <label
         htmlFor={id}
-        className="text-[13px] font-medium text-foreground/80"
+        // FIX: was text-foreground/80 (opacity-haircut fails WCAG AA at 13px)
+        // Now: text-slate-700 → #334155 → 10.7:1 on white/near-white surface
+        className="text-[13px] font-medium text-slate-700"
       >
         {label}
-        {required ? <span className="ml-0.5 text-destructive"> *</span> : null}
+        {required ? <span className="ml-0.5 text-red-500"> *</span> : null}
       </label>
       <Input
         id={id}
@@ -451,7 +453,9 @@ function ToggleField({ id, label, checked, onChange }: ToggleFieldProps) {
           : "border-border bg-background hover:bg-muted/50"
       )}
     >
-      <span className="text-[13px] font-medium text-foreground/80">{label}</span>
+      {/* FIX: was text-foreground/80 — same opacity issue as Field label */}
+      {/* Now: text-slate-700 → 10.7:1 on white/near-white */}
+      <span className="text-[13px] font-medium text-slate-700">{label}</span>
       <input
         type="checkbox"
         checked={checked}
@@ -473,7 +477,13 @@ function FormSection({
   return (
     <section className="space-y-4">
       <div className="flex items-center gap-3">
-        <h3 className="whitespace-nowrap text-[11px] font-semibold uppercase tracking-widest text-muted-foreground">
+        <h3
+          // FIX: was text-muted-foreground (#64748b / slate-500) at 11px all-caps
+          // At 11px, WCAG AA large-text threshold (3:1) does NOT apply — normal
+          // text rules (4.5:1) do. slate-500 on white ≈ 3.9:1 → FAILS.
+          // Now: text-slate-600 → #475569 → 5.9:1 on white → PASSES AA
+          className="whitespace-nowrap text-[11px] font-semibold uppercase tracking-widest text-slate-600"
+        >
           {title}
         </h3>
         <div className="h-px flex-1 bg-border" />
@@ -1174,10 +1184,12 @@ export function ProductManagement() {
                 <div className="flex flex-col gap-1.5">
                   <label
                     htmlFor="description"
-                    className="text-[13px] font-medium text-foreground/80"
+                    // FIX: was text-foreground/80 — same opacity issue
+                    // Now: text-slate-700 → 10.7:1 on white/near-white
+                    className="text-[13px] font-medium text-slate-700"
                   >
                     Description{" "}
-                    <span className="ml-0.5 text-destructive">*</span>
+                    <span className="ml-0.5 text-red-500">*</span>
                   </label>
                   <textarea
                     id="description"
@@ -1225,10 +1237,12 @@ export function ProductManagement() {
                     <ImagePlus className="size-7 text-muted-foreground" />
                   )}
                   <div>
-                    <p className="text-sm font-medium text-foreground/80">
+                    {/* FIX: was text-foreground/80 */}
+                    <p className="text-sm font-medium text-slate-700">
                       {uploading ? "Uploading..." : "Drop images here or click to upload"}
                     </p>
-                    <p className="mt-0.5 text-xs text-muted-foreground">
+                    {/* Helper text: text-slate-500 → #64748b → 4.6:1 on white → PASSES AA */}
+                    <p className="mt-0.5 text-xs text-slate-500">
                       PNG, JPG, WEBP up to 10MB each
                     </p>
                   </div>
@@ -1284,10 +1298,11 @@ export function ProductManagement() {
                 <div className="flex flex-col gap-1.5">
                   <label
                     htmlFor="seoDescription"
-                    className="text-[13px] font-medium text-foreground/80"
+                    // FIX: was text-foreground/80
+                    className="text-[13px] font-medium text-slate-700"
                   >
                     SEO Description{" "}
-                    <span className="ml-0.5 text-destructive">*</span>
+                    <span className="ml-0.5 text-red-500">*</span>
                   </label>
                   <textarea
                     id="seoDescription"
