@@ -1,6 +1,12 @@
 import { MetadataRoute } from 'next';
 
+/**
+ * Auto-generates /robots.txt via Next.js Metadata API.
+ * No manual file needed in /public.
+ */
 export default function robots(): MetadataRoute.Robots {
+  const base = process.env.NEXT_PUBLIC_SITE_URL ?? 'https://bansaricollections.com';
+
   return {
     rules: [
       {
@@ -9,13 +15,12 @@ export default function robots(): MetadataRoute.Robots {
         disallow: [
           '/admin/',
           '/api/',
-          '/checkout/',
-          '/order-success/',
-          '/order-failed/',
+          '/checkout/processing',
+          '/_next/',
         ],
       },
     ],
-    sitemap: 'https://www.bansaricollection.in/sitemap.xml',
-    host: 'https://www.bansaricollection.in',
+    sitemap: `${base}/sitemap.xml`,
+    host: base,
   };
 }

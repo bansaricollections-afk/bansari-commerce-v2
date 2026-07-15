@@ -1,51 +1,55 @@
 import { MetadataRoute } from 'next';
-import { createClient } from '@/lib/supabase/server';
+import { createServiceRoleClient } from '@/lib/supabase/service';
 
-const BASE_URL = 'https://www.bansaricollection.in';
-
+/**
+ * Auto-generates /sitemap.xml via Next.js Metadata API.
+ *
+ * Includes:
+ *   - Static marketing pages (always)
+ *   - All active, non-deleted products (fetched at build time / ISR)
+ *
+ * Product pages use weekly changefreq; static pages use monthly.
+ * Priority follows standard SEO convention: home=1.0, collections=0.8,
+ * products=0.7, static=0.5.
+ */
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
-  const supabase = await createClient();
+  const base = process.env.NEXT_PUBLIC_SITE_URL ?? 'https://bansaricollections.com';
 
-  // Fetch all published products
-  const { data: products } = await supabase
-    .from('products')
-    .select('id, updated_at')
-    .eq('is_active', true);
-
-  // Fetch all active categories
-  const { data: categories } = await supabase
-    .from('categories')
-    .select('slug, updated_at')
-    .eq('is_active', true);
-
-  const productUrls: MetadataRoute.Sitemap = (products ?? []).map((p) => ({
-    url: `${BASE_URL}/product/${p.id}`,
-    lastModified: new Date(p.updated_at),
-    changeFrequency: 'weekly',
-    priority: 0.8,
-  }));
-
-  const categoryUrls: MetadataRoute.Sitemap = (categories ?? []).map((c) => ({
-    url: `${BASE_URL}/collections/${c.slug}`,
-    lastModified: new Date(c.updated_at),
-    changeFrequency: 'weekly',
-    priority: 0.7,
-  }));
-
-  const staticUrls: MetadataRoute.Sitemap = [
-    { url: BASE_URL, lastModified: new Date(), changeFrequency: 'daily', priority: 1.0 },
-    { url: `${BASE_URL}/shop`, lastModified: new Date(), changeFrequency: 'daily', priority: 0.9 },
-    { url: `${BASE_URL}/collections`, lastModified: new Date(), changeFrequency: 'weekly', priority: 0.8 },
-    { url: `${BASE_URL}/new-arrivals`, lastModified: new Date(), changeFrequency: 'daily', priority: 0.8 },
-    { url: `${BASE_URL}/about`, lastModified: new Date(), changeFrequency: 'monthly', priority: 0.5 },
-    { url: `${BASE_URL}/contact`, lastModified: new Date(), changeFrequency: 'monthly', priority: 0.5 },
-    { url: `${BASE_URL}/faq`, lastModified: new Date(), changeFrequency: 'monthly', priority: 0.4 },
-    { url: `${BASE_URL}/privacy-policy`, lastModified: new Date(), changeFrequency: 'yearly', priority: 0.3 },
-    { url: `${BASE_URL}/terms-and-conditions`, lastModified: new Date(), changeFrequency: 'yearly', priority: 0.3 },
-    { url: `${BASE_URL}/shipping-policy`, lastModified: new Date(), changeFrequency: 'yearly', priority: 0.3 },
-    { url: `${BASE_URL}/return-refund-policy`, lastModified: new Date(), changeFrequency: 'yearly', priority: 0.3 },
-    { url: `${BASE_URL}/cancellation-policy`, lastModified: new Date(), changeFrequency: 'yearly', priority: 0.3 },
+  // Static pages
+  const staticPages: MetadataRoute.Sitemap = [
+    { url: base,                          lastModified: new Date(), changeFrequency: 'weekly',  priority: 1.0 },
+    { url: `${base}/shop`,               lastModified: new Date(), changeFrequency: 'daily',   priority: 0.9 },
+    { url: `${base}/collections`,        lastModified: new Date(), changeFrequency: 'weekly',  priority: 0.8 },
+    { url: `${base}/about`,              lastModified: new Date(), changeFrequency: 'monthly', priority: 0.5 },
+    { url: `${base}/contact`,            lastModified: new Date(), changeFrequency: 'monthly', priority: 0.5 },
+    { url: `${base}/shipping-policy`,    lastModified: new Date(), changeFrequency: 'monthly', priority: 0.4 },
+    { url: `${base}/return-policy`,      lastModified: new Date(), changeFrequency: 'monthly', priority: 0.4 },
+    { url: `${base}/privacy-policy`,     lastModified: new Date(), changeFrequency: 'monthly', priority: 0.4 },
+    { url: `${base}/terms-of-service`,   lastModified: new Date(), changeFrequency: 'monthly', priority: 0.4 },
   ];
 
-  return [...staticUrls, ...productUrls, ...categoryUrls];
+  // Product pages — fetched from DB; fails gracefully (returns static-only)
+  let productPages: MetadataRoute.Sitemap = [];
+  try {
+    const supabase = createServiceRoleClient();
+    const { data: products } = await supabase
+      .from('products')
+      .select('slug, updated_at')
+      .eq('active', true)
+      .is('deleted_at' as never, null)
+      .order('updated_at', { ascending: false });
+
+    if (products) {
+      productPages = products.map((p) => ({
+        url:             `${base}/products/${p.slug}`,
+        lastModified:    new Date(p.updated_at),
+        changeFrequency: 'weekly' as const,
+        priority:        0.7,
+      }));
+    }
+  } catch {
+    // Sitemap generation must never fail the build.
+  }
+
+  return [...staticPages, ...productPages];
 }
