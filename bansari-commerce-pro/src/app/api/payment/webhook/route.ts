@@ -9,6 +9,9 @@ import {
 } from '@/services/order.service';
 import { createLogger } from '@/lib/logger';
 import { withRetry, isTransientError } from '@/lib/retry';
+import { generateRequestId } from '@/lib/request-id';
+import { checkRateLimit, RATE_LIMIT_WEBHOOK } from '@/lib/rate-limit';
+import { apiError } from '@/lib/api-response';
 
 const log = createLogger({ service: 'webhook' });
 
@@ -30,7 +33,6 @@ async function fetchRazorpayPayment(
   const credentials = Buffer.from(`${keyId}:${keySecret}`).toString('base64');
 
   try {
-    // withRetry is safe here: GET /v1/payments/:id is idempotent.
     const data = await withRetry(
       async () => {
         const res = await fetch(`https://api.razorpay.com/v1/payments/${paymentId}`, {
@@ -47,11 +49,7 @@ async function fetchRazorpayPayment(
         }
         return (await res.json()) as RazorpayPaymentEntity;
       },
-      {
-        maxAttempts: 3,
-        baseDelayMs: 300,
-        shouldRetry: isTransientError,
-      }
+      { maxAttempts: 3, baseDelayMs: 300, shouldRetry: isTransientError }
     );
     return data;
   } catch (err) {
@@ -61,19 +59,19 @@ async function fetchRazorpayPayment(
 }
 
 export async function POST(request: NextRequest): Promise<NextResponse> {
-  const requestId = crypto.randomUUID();
+  const requestId = generateRequestId();
   const wLog = log.child({ requestId });
   const timer = wLog.startTimer('webhook.duration');
+
+  const rateLimitResponse = checkRateLimit(request, 'webhook', RATE_LIMIT_WEBHOOK, requestId);
+  if (rateLimitResponse) return rateLimitResponse;
 
   const rawBody = await request.text();
   const signature = request.headers.get('x-razorpay-signature');
 
   if (!signature || !verifyWebhookSignature(rawBody, signature)) {
     wLog.warn('webhook.signature_invalid');
-    return NextResponse.json(
-      { success: false, error: 'Invalid webhook signature.' },
-      { status: 400 }
-    );
+    return apiError(requestId, 'INVALID_SIGNATURE', 'Invalid webhook signature.', 400);
   }
 
   let event: unknown;
@@ -81,23 +79,17 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     event = JSON.parse(rawBody);
   } catch {
     wLog.warn('webhook.json_parse_failed');
-    return NextResponse.json(
-      { success: false, error: 'Invalid JSON payload.' },
-      { status: 400 }
-    );
+    return apiError(requestId, 'INVALID_JSON', 'Invalid JSON payload.', 400);
   }
 
   if (!event || typeof event !== 'object') {
-    return NextResponse.json(
-      { success: false, error: 'Invalid webhook payload.' },
-      { status: 400 }
-    );
+    return apiError(requestId, 'INVALID_PAYLOAD', 'Invalid webhook payload.', 400);
   }
 
   const eventType = (event as Record<string, unknown>).event;
 
   if (typeof eventType !== 'string' || !HANDLED_EVENTS.has(eventType)) {
-    return NextResponse.json({ success: true, handled: false }, { status: 200 });
+    return NextResponse.json({ success: true, requestId, handled: false }, { status: 200 });
   }
 
   const payload = (event as Record<string, unknown>).payload as Record<string, unknown> | undefined;
@@ -108,10 +100,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 
   if (typeof paymentId !== 'string' || paymentId.length === 0) {
     wLog.warn('webhook.missing_payment_id');
-    return NextResponse.json(
-      { success: false, error: 'Missing payment id.' },
-      { status: 400 }
-    );
+    return apiError(requestId, 'MISSING_PAYMENT_ID', 'Missing payment id.', 400);
   }
 
   const wLogP = wLog.child({ paymentId, razorpayOrderId: razorpayOrderId as string | undefined });
@@ -124,19 +113,13 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     if (!result.updated && eventType === 'payment.captured') {
       wLogP.warn('webhook.no_order_found.starting_recovery');
 
-      // Fetch full payment details from Razorpay for recovery.
-      // Safe to retry (GET is idempotent).
       const paymentDetails = await fetchRazorpayPayment(paymentId, requestId);
 
       if (!paymentDetails) {
         wLogP.error('webhook.recovery.fetch_failed', undefined, {
           note: 'CRITICAL: Manual intervention required.',
         });
-        // Return 500 so Razorpay retries delivery.
-        return NextResponse.json(
-          { success: false, error: 'Could not fetch payment details for recovery.' },
-          { status: 500 }
-        );
+        return apiError(requestId, 'RECOVERY_FETCH_FAILED', 'Could not fetch payment details for recovery.', 500);
       }
 
       const recovery = await recoverOrderFromWebhook(paymentDetails);
@@ -146,28 +129,29 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
           error: recovery.error,
           note: 'CRITICAL: Manual intervention required.',
         });
-        return NextResponse.json(
-          { success: false, error: 'Order recovery failed.' },
-          { status: 500 }
-        );
+        return apiError(requestId, 'RECOVERY_FAILED', 'Order recovery failed.', 500);
       }
 
       wLogP.info('webhook.recovery.success', { orderId: recovery.orderId });
     } else if (!result.updated && eventType === 'payment.failed') {
-      wLogP.warn('webhook.failed_no_order', {
-        note: 'Expected for pre-order payment failures.',
-      });
+      wLogP.warn('webhook.failed_no_order', { note: 'Expected for pre-order payment failures.' });
     } else {
       wLogP.info('webhook.order_updated', { status });
     }
   } catch (err) {
     wLogP.error('webhook.unhandled', err);
-    return NextResponse.json(
-      { success: false, error: err instanceof Error ? err.message : 'Webhook processing failed.' },
-      { status: 500 }
+    return apiError(
+      requestId,
+      'INTERNAL_ERROR',
+      err instanceof Error ? err.message : 'Webhook processing failed.',
+      500
     );
   }
 
   timer('info');
-  return NextResponse.json({ success: true, handled: true }, { status: 200 });
+  return NextResponse.json({ success: true, requestId, handled: true }, { status: 200 });
 }
+
+// keep crypto import used by generateRequestId transitive dep
+const _c = crypto.randomUUID;
+void _c;
