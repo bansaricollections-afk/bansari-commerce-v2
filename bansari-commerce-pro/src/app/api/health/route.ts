@@ -16,7 +16,9 @@ type HealthResponse = {
   timestamp: string;
   version: string;
   gitCommit: string;
+  nodeVersion: string;
   uptimeSeconds: number;
+  memoryMb: { rss: number; heapUsed: number; heapTotal: number };
   checks: {
     database: CheckResult;
     payments: CheckResult;
@@ -67,12 +69,14 @@ export async function GET(request: Request): Promise<NextResponse> {
   ]);
 
   const environment = checkEnvironment();
-
   const checks = { database, payments, email, environment };
 
   const hasError = Object.values(checks).some((c) => c.status === 'error');
   const hasDegraded = Object.values(checks).some((c) => c.status === 'degraded');
   const overallStatus = hasError ? 'error' : hasDegraded ? 'degraded' : 'ok';
+
+  const mem = process.memoryUsage();
+  const toMb = (n: number) => Math.round(n / 1024 / 1024);
 
   const body: HealthResponse = {
     status: overallStatus,
@@ -80,7 +84,13 @@ export async function GET(request: Request): Promise<NextResponse> {
     timestamp: new Date().toISOString(),
     version: process.env.npm_package_version ?? '0.0.0',
     gitCommit: process.env.VERCEL_GIT_COMMIT_SHA?.slice(0, 8) ?? 'local',
+    nodeVersion: process.version,
     uptimeSeconds: Math.floor((Date.now() - SERVER_START) / 1_000),
+    memoryMb: {
+      rss: toMb(mem.rss),
+      heapUsed: toMb(mem.heapUsed),
+      heapTotal: toMb(mem.heapTotal),
+    },
     checks,
   };
 
