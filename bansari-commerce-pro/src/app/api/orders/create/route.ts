@@ -4,6 +4,7 @@ import { NextRequest, NextResponse } from "next/server";
 
 import { getProductById } from "@/services/product.service";
 import { createServiceRoleClient } from "@/lib/supabase/service";
+import { sendOrderConfirmationEmail } from "@/services/email.service";
 
 const FREE_SHIPPING_THRESHOLD = 2999;
 const STANDARD_SHIPPING_FEE = 99;
@@ -194,6 +195,14 @@ function round2(value: number): number {
 type OrderRow = {
   id: string;
   order_number: string;
+  customer_name: string;
+  customer_email: string;
+  customer_phone: string | null;
+  shipping_address_line1: string;
+  shipping_address_line2: string | null;
+  shipping_city: string;
+  shipping_state: string;
+  shipping_postal_code: string;
   subtotal: number;
   shipping_fee: number;
   tax: number;
@@ -258,7 +267,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json(
       {
         success: true,
-        order: formatOrderResponse(existingOrder),
+        order: formatOrderResponse(existingOrder as OrderRow),
       },
       { status: 200 }
     );
@@ -420,7 +429,7 @@ export async function POST(request: NextRequest) {
         return NextResponse.json(
           {
             success: true,
-            order: formatOrderResponse(winningOrder),
+            order: formatOrderResponse(winningOrder as OrderRow),
           },
           { status: 200 }
         );
@@ -469,6 +478,46 @@ export async function POST(request: NextRequest) {
         stockError?.message
       );
     }
+  }
+
+  // Send order confirmation email.
+  // Failure is non-fatal: we log a warning and continue so that a Resend
+  // outage or misconfiguration never blocks the checkout success page.
+  try {
+    const emailResult = await sendOrderConfirmationEmail({
+      orderNumber: order.order_number,
+      customerName: customer.name,
+      customerEmail: customer.email,
+      items: orderItemRows.map((row) => ({
+        product_name: row.product_name,
+        quantity: row.quantity,
+        unit_price: row.unit_price,
+        line_total: row.line_total,
+      })),
+      subtotal,
+      shippingFee,
+      discount,
+      grandTotal,
+      shippingAddress: {
+        addressLine1: shipping.addressLine1,
+        addressLine2: shipping.addressLine2,
+        city: shipping.city,
+        state: shipping.state,
+        postalCode: shipping.postalCode,
+      },
+    });
+
+    if (!emailResult.sent) {
+      console.warn(
+        `[orders/create] Confirmation email not sent for order ${order.id}:`,
+        emailResult.error
+      );
+    }
+  } catch (emailErr) {
+    console.warn(
+      `[orders/create] Unexpected error sending confirmation email for order ${order.id}:`,
+      emailErr
+    );
   }
 
   return NextResponse.json(
