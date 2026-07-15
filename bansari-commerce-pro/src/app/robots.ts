@@ -1,23 +1,28 @@
-import type { MetadataRoute } from "next";
+import { MetadataRoute } from 'next';
 
 export default function robots(): MetadataRoute.Robots {
+  const siteUrl =
+    process.env.NEXT_PUBLIC_SITE_URL ?? 'https://bansaricollections.com';
+
   return {
     rules: [
       {
-        userAgent: "*",
-        allow: "/",
+        userAgent: '*',
+        allow: '/',
         disallow: [
-          "/admin/",
-          "/auth/",
-          "/api/",
-          "/cart/",
-          "/checkout/",
-          "/wishlist/",
-          "/order-success/",
-          "/order-failed/",
+          '/admin',
+          '/admin/',
+          '/api/',
+          '/auth/',
+          '/order-success',
+          '/order-failed',
+          '/checkout',
+          '/cart',
+          '/wishlist',
         ],
       },
     ],
-    sitemap: "https://www.bansaricollection.in/sitemap.xml",
+    sitemap: `${siteUrl}/sitemap.xml`,
+    host: siteUrl,
   };
 }
