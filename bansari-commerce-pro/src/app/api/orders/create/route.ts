@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import crypto from 'crypto';
 
 import { createServiceRoleClient } from '@/lib/supabase/service';
+import { verifyPaymentSignature } from '@/lib/razorpay';
 import { validateCartItems } from '@/services/product.service';
 import { sendOrderConfirmationEmail } from '@/services/email.service';
 import { createLogger } from '@/lib/logger';
@@ -31,7 +32,10 @@ export async function POST(request: NextRequest) {
       razorpay_signature,
     } = body ?? {};
 
-    // --- Basic field presence check ---
+    // --- Step 1: Field presence validation ---
+    // All three Razorpay fields must be present as non-empty strings before
+    // any other processing. Rejection here is safe — nothing has been read
+    // from the DB yet.
     if (!razorpay_payment_id || typeof razorpay_payment_id !== 'string') {
       return NextResponse.json(
         { success: false, error: 'razorpay_payment_id is required.' },
@@ -51,6 +55,38 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // --- Step 2: Cryptographic HMAC verification ---
+    // MUST run before ANY database read or write, including the idempotency
+    // check. A valid signature proves the client received these IDs from
+    // Razorpay after a real payment; without it, a caller with a known
+    // payment_id could forge an order.
+    //
+    // verifyPaymentSignature uses RAZORPAY_KEY_SECRET (not the webhook
+    // secret) over `${razorpay_order_id}|${razorpay_payment_id}` via
+    // crypto.timingSafeEqual — never string equality.
+    const signatureValid = verifyPaymentSignature(
+      razorpay_order_id,
+      razorpay_payment_id,
+      razorpay_signature
+    );
+
+    if (!signatureValid) {
+      rLog.warn('orders.create.signature_invalid', {
+        razorpayOrderId: razorpay_order_id,
+        paymentId: razorpay_payment_id,
+      });
+      // Exit immediately. Nothing written to DB.
+      return NextResponse.json(
+        { success: false, error: 'Invalid payment signature.' },
+        { status: 400 }
+      );
+    }
+
+    rLog.info('orders.create.signature_verified', {
+      razorpayOrderId: razorpay_order_id,
+      paymentId: razorpay_payment_id,
+    });
+
     rLog.info('orders.create.start', {
       razorpayOrderId: razorpay_order_id,
       paymentId: razorpay_payment_id,
@@ -58,9 +94,10 @@ export async function POST(request: NextRequest) {
 
     const supabase = createServiceRoleClient();
 
-    // --- Idempotency: check for existing order by payment id ---
-    // The UNIQUE index on razorpay_payment_id is the DB-level guard;
-    // this check provides a clean 409 instead of a Postgres 23505 error.
+    // --- Step 3: Idempotency check ---
+    // Runs only after signature is verified. The UNIQUE index on
+    // razorpay_payment_id is the DB-level guard; this check provides a clean
+    // 200 instead of a Postgres 23505 error.
     const { data: existing } = await supabase
       .from('orders')
       .select('id, order_number')
@@ -72,15 +109,13 @@ export async function POST(request: NextRequest) {
         orderId: existing.id,
         paymentId: razorpay_payment_id,
       });
-      // Return 200 (not 409) so the client can redirect to success.
-      // The webhook also POSTs to this path sometimes; 200 is correct there too.
       return NextResponse.json(
         { success: true, orderId: existing.id, orderNumber: existing.order_number, idempotent: true },
         { status: 200 }
       );
     }
 
-    // --- Try to read from pending_orders (server-side cart) ---
+    // --- Step 4: Read pending_orders (server-side cart) ---
     const { data: pending } = await supabase
       .from('pending_orders')
       .select('*')
@@ -185,9 +220,11 @@ export async function POST(request: NextRequest) {
     }
 
     const orderNumber = generateOrderNumber();
+    // payment_verified_at is set here — AFTER cryptographic verification
+    // in Step 2 above. It is never written without a valid HMAC check.
     const now = new Date().toISOString();
 
-    // --- Insert order ---
+    // --- Step 5: Insert order ---
     const { data: order, error: orderErr } = await supabase
       .from('orders')
       .insert({
@@ -219,6 +256,7 @@ export async function POST(request: NextRequest) {
         razorpay_payment_id,
         payment_status: 'paid',
         order_status: 'placed',
+        // Written only after HMAC verification passed (Step 2).
         payment_verified_at: now,
         paid_at: now,
       })
@@ -253,7 +291,7 @@ export async function POST(request: NextRequest) {
       paymentId: razorpay_payment_id,
     });
 
-    // --- Insert order_items ---
+    // --- Step 6: Insert order_items ---
     if (lineItems.length > 0) {
       const itemRows = lineItems.map((li) => ({
         order_id: order.id,
@@ -269,7 +307,7 @@ export async function POST(request: NextRequest) {
         rLog.warn('orders.create.items_failed', itemsErr, { orderId: order.id });
       }
 
-      // --- Decrement stock via RPC ---
+      // --- Step 7: Decrement stock via RPC ---
       for (const li of lineItems) {
         const { error: stockErr } = await supabase.rpc('decrement_product_stock', {
           p_product_id: li.productId,
@@ -284,7 +322,7 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // --- Mark pending_orders as consumed (idempotency lock) ---
+    // --- Step 8: Mark pending_orders as consumed (idempotency lock) ---
     if (pending) {
       await supabase
         .from('pending_orders')
@@ -292,7 +330,7 @@ export async function POST(request: NextRequest) {
         .eq('id', pending.id);
     }
 
-    // --- Confirmation email (non-fatal) ---
+    // --- Step 9: Confirmation email (non-fatal) ---
     try {
       await sendOrderConfirmationEmail({
         orderNumber: order.order_number,
