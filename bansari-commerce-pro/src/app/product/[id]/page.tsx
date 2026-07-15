@@ -30,14 +30,16 @@ export async function generateMetadata({
   }
 
   return {
-    title: `${product.name} | Bansari Collections`,
+    title: `${product.seo?.title || product.name} | Bansari Collections`,
     description:
-      product.description ??
+      product.seo?.description ||
+      product.description ||
       `Buy ${product.name} online from Bansari Collections.`,
     openGraph: {
-      title: product.name,
+      title: product.seo?.title || product.name,
       description:
-        product.description ??
+        product.seo?.description ||
+        product.description ||
         `Buy ${product.name} online.`,
       images: product.images?.[0]?.url
         ? [
@@ -61,8 +63,64 @@ export default async function ProductPage({
     notFound();
   }
 
+  // --- JSON-LD: Product structured data (Sprint 24) ---
+  // Domain is read from the NEXT_PUBLIC_SITE_URL environment variable so
+  // the schema works across staging and production without hardcoding.
+  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "";
+
+  const productSchema: Record<string, unknown> = {
+    "@context": "https://schema.org",
+    "@type": "Product",
+    name: product.name,
+    ...(product.description && { description: product.description }),
+    ...(product.sku && { sku: product.sku }),
+    ...(product.category && { category: product.category }),
+    ...(product.images.length > 0 && {
+      image: product.images.map((img) => img.url),
+    }),
+    brand: {
+      "@type": "Brand",
+      name: "Bansari Collections",
+    },
+    ...(product.variants?.[0]?.color && {
+      color: product.variants[0].color,
+    }),
+    ...(product.specifications?.fabric && {
+      material: product.specifications.fabric,
+    }),
+    offers: {
+      "@type": "Offer",
+      priceCurrency: "INR",
+      price: product.price,
+      availability:
+        product.stock > 0
+          ? "https://schema.org/InStock"
+          : "https://schema.org/OutOfStock",
+      ...(siteUrl && {
+        url: `${siteUrl}/product/${id}`,
+      }),
+      seller: {
+        "@type": "Organization",
+        name: "Bansari Collections",
+      },
+    },
+    ...(product.reviewCount > 0 && {
+      aggregateRating: {
+        "@type": "AggregateRating",
+        ratingValue: product.rating,
+        reviewCount: product.reviewCount,
+      },
+    }),
+  };
+
   return (
     <main className="min-h-screen bg-[#FFFDF9]">
+
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(productSchema) }}
+      />
+
       {/* Product */}
       <section className="mx-auto max-w-7xl px-6 py-14">
         <div className="grid gap-16 lg:grid-cols-2">
@@ -91,6 +149,7 @@ export default async function ProductPage({
       <section className="mx-auto max-w-7xl px-6 pb-24">
         <RecentlyViewed />
       </section>
+
     </main>
   );
 }
