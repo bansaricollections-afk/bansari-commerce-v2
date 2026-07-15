@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" fill="none">
+  <!-- Bansari Collections — Brand mark placeholder -->
+  <!-- Replace with your actual brand icon before launch -->
+  <rect width="32" height="32" rx="6" fill="#7c3f2e"/>
+  <text
+    x="16"
+    y="22"
+    font-family="Georgia, serif"
+    font-size="18"
+    font-weight="700"
+    fill="#f5e6d3"
+    text-anchor="middle"
+    letter-spacing="-0.5"
+  >B</text>
+</svg>
