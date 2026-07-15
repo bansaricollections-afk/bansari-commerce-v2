@@ -1,148 +1,140 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest, NextResponse } from 'next/server';
+import crypto from 'crypto';
 
-import { verifyWebhookSignature } from "@/lib/razorpay";
+import { verifyWebhookSignature } from '@/lib/razorpay';
 import {
   updatePaymentStatusFromWebhook,
   recoverOrderFromWebhook,
   type RazorpayPaymentEntity,
-} from "@/services/order.service";
-import { sendOrderConfirmationEmail } from "@/services/email.service";
+} from '@/services/order.service';
+import { createLogger } from '@/lib/logger';
+import { withRetry, isTransientError } from '@/lib/retry';
 
-const HANDLED_EVENTS = new Set(["payment.captured", "payment.failed"]);
+const log = createLogger({ service: 'webhook' });
 
-/**
- * Fetch full payment details from the Razorpay REST API.
- *
- * Required for webhook recovery: the webhook payload contains only a
- * subset of payment fields.  We need email, contact, and notes to
- * reconstruct the order when the browser never reached /api/orders/create.
- */
+const HANDLED_EVENTS = new Set(['payment.captured', 'payment.failed']);
+
 async function fetchRazorpayPayment(
-  paymentId: string
+  paymentId: string,
+  requestId: string
 ): Promise<RazorpayPaymentEntity | null> {
   const keyId = process.env.RAZORPAY_KEY_ID;
   const keySecret = process.env.RAZORPAY_KEY_SECRET;
+  const wLog = log.child({ requestId, paymentId });
 
   if (!keyId || !keySecret) {
-    console.error(
-      "[webhook] Missing RAZORPAY_KEY_ID / RAZORPAY_KEY_SECRET — cannot fetch payment details for recovery."
-    );
+    wLog.error('webhook.razorpay_creds_missing');
     return null;
   }
 
+  const credentials = Buffer.from(`${keyId}:${keySecret}`).toString('base64');
+
   try {
-    const credentials = Buffer.from(`${keyId}:${keySecret}`).toString("base64");
-    const response = await fetch(
-      `https://api.razorpay.com/v1/payments/${paymentId}`,
+    // withRetry is safe here: GET /v1/payments/:id is idempotent.
+    const data = await withRetry(
+      async () => {
+        const res = await fetch(`https://api.razorpay.com/v1/payments/${paymentId}`, {
+          headers: {
+            Authorization: `Basic ${credentials}`,
+            'Content-Type': 'application/json',
+          },
+        });
+        if (!res.ok) {
+          const text = await res.text();
+          const err = new Error(`Razorpay ${res.status}: ${text}`) as Error & { statusCode: number };
+          err.statusCode = res.status;
+          throw err;
+        }
+        return (await res.json()) as RazorpayPaymentEntity;
+      },
       {
-        headers: {
-          Authorization: `Basic ${credentials}`,
-          "Content-Type": "application/json",
-        },
+        maxAttempts: 3,
+        baseDelayMs: 300,
+        shouldRetry: isTransientError,
       }
     );
-
-    if (!response.ok) {
-      const text = await response.text();
-      console.error(
-        `[webhook] Razorpay fetch payment ${paymentId} returned ${response.status}: ${text}`
-      );
-      return null;
-    }
-
-    return (await response.json()) as RazorpayPaymentEntity;
+    return data;
   } catch (err) {
-    console.error(
-      `[webhook] Failed to fetch payment ${paymentId} from Razorpay:`,
-      err
-    );
+    wLog.error('webhook.fetch_payment.failed', err);
     return null;
   }
 }
 
-export async function POST(request: NextRequest) {
-  // Signature verification requires the exact raw body bytes — parsing via
-  // request.json() first would lose that, so read as text and verify
-  // before ever attempting to interpret it as JSON.
+export async function POST(request: NextRequest): Promise<NextResponse> {
+  const requestId = crypto.randomUUID();
+  const wLog = log.child({ requestId });
+  const timer = wLog.startTimer('webhook.duration');
+
   const rawBody = await request.text();
-  const signature = request.headers.get("x-razorpay-signature");
+  const signature = request.headers.get('x-razorpay-signature');
 
   if (!signature || !verifyWebhookSignature(rawBody, signature)) {
+    wLog.warn('webhook.signature_invalid');
     return NextResponse.json(
-      { success: false, error: "Invalid webhook signature." },
+      { success: false, error: 'Invalid webhook signature.' },
       { status: 400 }
     );
   }
 
   let event: unknown;
-
   try {
     event = JSON.parse(rawBody);
   } catch {
+    wLog.warn('webhook.json_parse_failed');
     return NextResponse.json(
-      { success: false, error: "Invalid JSON payload." },
+      { success: false, error: 'Invalid JSON payload.' },
       { status: 400 }
     );
   }
 
-  if (!event || typeof event !== "object") {
+  if (!event || typeof event !== 'object') {
     return NextResponse.json(
-      { success: false, error: "Invalid webhook payload." },
+      { success: false, error: 'Invalid webhook payload.' },
       { status: 400 }
     );
   }
 
   const eventType = (event as Record<string, unknown>).event;
 
-  if (typeof eventType !== "string" || !HANDLED_EVENTS.has(eventType)) {
-    // Acknowledge unhandled event types with 2xx so Razorpay doesn't retry
-    // deliveries we have no handling for.
-    return NextResponse.json(
-      { success: true, handled: false },
-      { status: 200 }
-    );
+  if (typeof eventType !== 'string' || !HANDLED_EVENTS.has(eventType)) {
+    return NextResponse.json({ success: true, handled: false }, { status: 200 });
   }
 
-  const payload = (event as Record<string, unknown>).payload as
-    | Record<string, unknown>
-    | undefined;
-  const payment = payload?.payment as Record<string, unknown> | undefined;
-  const entity = payment?.entity as Record<string, unknown> | undefined;
+  const payload = (event as Record<string, unknown>).payload as Record<string, unknown> | undefined;
+  const paymentWrapper = payload?.payment as Record<string, unknown> | undefined;
+  const entity = paymentWrapper?.entity as Record<string, unknown> | undefined;
   const paymentId = entity?.id;
+  const razorpayOrderId = entity?.order_id;
 
-  if (typeof paymentId !== "string" || paymentId.length === 0) {
+  if (typeof paymentId !== 'string' || paymentId.length === 0) {
+    wLog.warn('webhook.missing_payment_id');
     return NextResponse.json(
-      { success: false, error: "Webhook payload is missing a payment id." },
+      { success: false, error: 'Missing payment id.' },
       { status: 400 }
     );
   }
 
-  try {
-    const status = eventType === "payment.captured" ? "paid" : "failed";
+  const wLogP = wLog.child({ paymentId, razorpayOrderId: razorpayOrderId as string | undefined });
+  wLogP.info('webhook.received', { eventType });
 
-    // --- payment.captured: attempt to update existing order ---
-    // --- if no order exists, recover it from Razorpay ----------
+  try {
+    const status = eventType === 'payment.captured' ? 'paid' : 'failed';
     const result = await updatePaymentStatusFromWebhook(paymentId, status);
 
-    if (!result.updated && eventType === "payment.captured") {
-      // The browser closed before /api/orders/create ran.
-      // Attempt automatic recovery.
-      console.warn(
-        `[webhook] payment.captured for ${paymentId} — no matching order found. Starting recovery.`
-      );
+    if (!result.updated && eventType === 'payment.captured') {
+      wLogP.warn('webhook.no_order_found.starting_recovery');
 
-      // Fetch the full payment object from Razorpay to get contact details.
-      const paymentDetails = await fetchRazorpayPayment(paymentId);
+      // Fetch full payment details from Razorpay for recovery.
+      // Safe to retry (GET is idempotent).
+      const paymentDetails = await fetchRazorpayPayment(paymentId, requestId);
 
       if (!paymentDetails) {
-        // Cannot recover without payment details.  Log critical alert.
-        // Razorpay will retry the webhook delivery, so do NOT return 2xx
-        // here — return 500 to trigger a retry.
-        console.error(
-          `[webhook] CRITICAL: payment.captured for ${paymentId} — recovery FAILED (could not fetch payment from Razorpay). Manual intervention required.`
-        );
+        wLogP.error('webhook.recovery.fetch_failed', undefined, {
+          note: 'CRITICAL: Manual intervention required.',
+        });
+        // Return 500 so Razorpay retries delivery.
         return NextResponse.json(
-          { success: false, error: "Could not fetch payment details for recovery." },
+          { success: false, error: 'Could not fetch payment details for recovery.' },
           { status: 500 }
         );
       }
@@ -150,83 +142,32 @@ export async function POST(request: NextRequest) {
       const recovery = await recoverOrderFromWebhook(paymentDetails);
 
       if (!recovery.recovered) {
-        console.error(
-          `[webhook] CRITICAL: payment.captured for ${paymentId} — recovery FAILED: ${
-            recovery.error
-          }. Manual intervention required.`
-        );
-        // Return 500 so Razorpay retries delivery.
+        wLogP.error('webhook.recovery.failed', undefined, {
+          error: recovery.error,
+          note: 'CRITICAL: Manual intervention required.',
+        });
         return NextResponse.json(
-          { success: false, error: "Order recovery failed." },
+          { success: false, error: 'Order recovery failed.' },
           { status: 500 }
         );
       }
 
-      console.warn(
-        `[webhook] Recovery succeeded — created order ${recovery.orderId} for payment ${paymentId}.`
-      );
-
-      // Send a best-effort confirmation email using whatever contact
-      // information is available from the Razorpay payment object.
-      // Non-fatal: failure only logs a warning.
-      try {
-        const customerEmail = paymentDetails.email;
-        const customerName =
-          paymentDetails.notes?.customer_name ?? "Customer";
-        const grandTotal = Math.round((paymentDetails.amount / 100) * 100) / 100;
-
-        if (customerEmail) {
-          // Determine what order number was created.
-          // We pass a dummy order number derived from the recovery result
-          // since we only have the UUID from recoverOrderFromWebhook.
-          // The email is best-effort in the recovery path.
-          await sendOrderConfirmationEmail({
-            orderNumber: recovery.orderId ?? paymentId,
-            customerName,
-            customerEmail,
-            items: [],           // item detail unavailable in recovery path
-            subtotal: grandTotal,
-            shippingFee: 0,
-            discount: 0,
-            grandTotal,
-            shippingAddress: {
-              addressLine1: "Please contact us to confirm your delivery address.",
-              city: "",
-              state: "",
-              postalCode: "",
-            },
-          });
-        }
-      } catch (emailErr) {
-        console.warn(
-          `[webhook] Recovery email failed for payment ${paymentId}:`,
-          emailErr
-        );
-      }
-    } else if (!result.updated && eventType === "payment.failed") {
-      // Failed payment with no order row is expected when the customer
-      // abandoned before order creation.  Not an error.
-      console.warn(
-        `[webhook] payment.failed for ${paymentId} — no matching order row (expected for pre-order failures).`
-      );
+      wLogP.info('webhook.recovery.success', { orderId: recovery.orderId });
+    } else if (!result.updated && eventType === 'payment.failed') {
+      wLogP.warn('webhook.failed_no_order', {
+        note: 'Expected for pre-order payment failures.',
+      });
+    } else {
+      wLogP.info('webhook.order_updated', { status });
     }
-  } catch (error) {
+  } catch (err) {
+    wLogP.error('webhook.unhandled', err);
     return NextResponse.json(
-      {
-        success: false,
-        error:
-          error instanceof Error
-            ? error.message
-            : "Unable to process webhook.",
-      },
+      { success: false, error: err instanceof Error ? err.message : 'Webhook processing failed.' },
       { status: 500 }
     );
   }
 
-  // 200 for all successfully handled events (including recovery success
-  // and payment.failed with no matching order).
-  return NextResponse.json(
-    { success: true, handled: true },
-    { status: 200 }
-  );
+  timer('info');
+  return NextResponse.json({ success: true, handled: true }, { status: 200 });
 }

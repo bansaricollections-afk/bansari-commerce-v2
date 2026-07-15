@@ -1,47 +1,36 @@
-import { createServiceRoleClient } from "@/lib/supabase/service";
+import { createServiceRoleClient } from '@/lib/supabase/service';
+import { createLogger } from '@/lib/logger';
+import { sendOrderConfirmationEmail } from '@/services/email.service';
 
-/**
- * Order read/write operations for admin use.
- *
- * Uses the service-role client, not the regular server/browser client.
- * RLS on `orders`/`order_items` only allows a customer to SELECT their own
- * rows (`user_id = auth.uid()`), and orders are currently created with
- * `user_id: null` (no customer-account system exists yet) — so no
- * authenticated session, including an admin's, can read or write any order
- * row under that policy alone. There is also no authenticated write policy
- * of any kind, so status updates from the admin UI can only happen through
- * a trusted server-side path using this service-role client.
- *
- * SERVER-SIDE USE ONLY — never import this into a Client Component, the
- * service-role key must never reach the browser. `updateOrderStatus` is
- * called only from `src/app/api/admin/orders/status/route.ts`, which the
- * new OrderStatusSelect Client Component calls over `fetch()`, following
- * the same API route → service layer → service-role client pattern
- * already used by `/api/orders/create`.
- */
+const log = createLogger({ service: 'order.service' });
 
-// The DB's order_status CHECK constraint only permits these exact lowercase
-// values — this is the single source of truth both this service and
-// OrderStatusSelect's display labels are built from.
+// ---------------------------------------------------------------------------
+// Constants
+// ---------------------------------------------------------------------------
+
 export const ORDER_STATUSES = [
-  "placed",
-  "processing",
-  "packed",
-  "shipped",
-  "delivered",
-  "cancelled",
+  'placed',
+  'processing',
+  'packed',
+  'shipped',
+  'delivered',
+  'cancelled',
 ] as const;
 
 export type OrderStatus = (typeof ORDER_STATUSES)[number];
 
 export const ORDER_STATUS_LABELS: Record<OrderStatus, string> = {
-  placed: "Placed",
-  processing: "Processing",
-  packed: "Packed",
-  shipped: "Shipped",
-  delivered: "Delivered",
-  cancelled: "Cancelled",
+  placed: 'Placed',
+  processing: 'Processing',
+  packed: 'Packed',
+  shipped: 'Shipped',
+  delivered: 'Delivered',
+  cancelled: 'Cancelled',
 };
+
+// ---------------------------------------------------------------------------
+// Types
+// ---------------------------------------------------------------------------
 
 export type Order = {
   id: string;
@@ -89,243 +78,391 @@ export type OrderItem = {
   line_total: number;
 };
 
-export type OrderWithItems = Order & {
-  order_items: OrderItem[];
-};
-
-export async function getOrders(): Promise<Order[]> {
-  const supabase = createServiceRoleClient();
-
-  const { data, error } = await supabase
-    .from("orders")
-    .select("*")
-    .order("created_at", { ascending: false });
-
-  if (error) {
-    throw new Error(error.message);
-  }
-
-  return (data ?? []) as Order[];
-}
-
-export async function getOrderById(id: string): Promise<OrderWithItems | null> {
-  const supabase = createServiceRoleClient();
-
-  const { data, error } = await supabase
-    .from("orders")
-    .select("*, order_items(*)")
-    .eq("id", id)
-    .maybeSingle();
-
-  if (error) {
-    throw new Error(error.message);
-  }
-
-  return data as OrderWithItems | null;
-}
-
-export async function updateOrderStatus(
-  id: string,
-  status: OrderStatus
-): Promise<void> {
-  if (!ORDER_STATUSES.includes(status)) {
-    throw new Error(`Invalid order status: ${status}`);
-  }
-
-  const supabase = createServiceRoleClient();
-
-  const { error } = await supabase
-    .from("orders")
-    .update({ order_status: status })
-    .eq("id", id);
-
-  if (error) {
-    throw new Error(error.message);
-  }
-}
-
-export async function updatePaymentStatusFromWebhook(
-  razorpayPaymentId: string,
-  status: "paid" | "failed"
-): Promise<{ updated: boolean }> {
-  const supabase = createServiceRoleClient();
-
-  const updatePayload: Record<string, unknown> = {
-    payment_status: status,
-  };
-
-  if (status === "paid") {
-    updatePayload.paid_at = new Date().toISOString();
-  }
-
-  let query = supabase
-    .from("orders")
-    .update(updatePayload)
-    .eq("razorpay_payment_id", razorpayPaymentId);
-
-  if (status === "failed") {
-    query = query.neq("payment_status", "paid");
-  }
-
-  const { data, error } = await query
-    .select("id")
-    .maybeSingle();
-
-  if (error) {
-    throw new Error(error.message);
-  }
-
-  return {
-    updated: !!data,
-  };
-}
+export type OrderWithItems = Order & { order_items: OrderItem[] };
 
 /**
- * RazorpayPaymentEntity — the shape of `payment.entity` inside a
- * Razorpay webhook payload, as well as the Razorpay Fetch Payment API
- * response.  Only the fields we actually use are declared.
+ * RazorpayPaymentEntity — fields we use from the Razorpay payment object
+ * (webhook payload and Fetch Payment API response).
  */
 export type RazorpayPaymentEntity = {
   id: string;
   order_id: string;
-  amount: number;          // in paise
+  amount: number;  // paise
   currency: string;
   status: string;
-  contact?: string;        // phone, may include country code prefix
+  contact?: string;
   email?: string;
   description?: string;
   notes?: Record<string, string>;
 };
 
+/** A single line item as stored in pending_orders.items_json */
+type PendingLineItem = {
+  productId: number;
+  productName: string;
+  unitPrice: number;
+  quantity: number;
+  lineTotal: number;
+};
+
+// ---------------------------------------------------------------------------
+// Reads
+// ---------------------------------------------------------------------------
+
+export async function getOrders(): Promise<Order[]> {
+  const supabase = createServiceRoleClient();
+  const { data, error } = await supabase
+    .from('orders')
+    .select('*')
+    .order('created_at', { ascending: false });
+  if (error) throw new Error(error.message);
+  return (data ?? []) as Order[];
+}
+
+export async function getOrderById(id: string): Promise<OrderWithItems | null> {
+  const supabase = createServiceRoleClient();
+  const { data, error } = await supabase
+    .from('orders')
+    .select('*, order_items(*)')
+    .eq('id', id)
+    .maybeSingle();
+  if (error) throw new Error(error.message);
+  return data as OrderWithItems | null;
+}
+
+// ---------------------------------------------------------------------------
+// Writes
+// ---------------------------------------------------------------------------
+
+export async function updateOrderStatus(id: string, status: OrderStatus): Promise<void> {
+  if (!ORDER_STATUSES.includes(status)) throw new Error(`Invalid order status: ${status}`);
+  const supabase = createServiceRoleClient();
+  const { error } = await supabase.from('orders').update({ order_status: status }).eq('id', id);
+  if (error) throw new Error(error.message);
+}
+
+/**
+ * updatePaymentStatusFromWebhook
+ *
+ * Updates the payment_status column for the order matching razorpayPaymentId.
+ * Returns { updated: true } when a row was found and updated.
+ * Returns { updated: false } when no matching order exists (recovery needed).
+ */
+export async function updatePaymentStatusFromWebhook(
+  razorpayPaymentId: string,
+  status: 'paid' | 'failed'
+): Promise<{ updated: boolean }> {
+  const supabase = createServiceRoleClient();
+
+  const updatePayload: Record<string, unknown> = { payment_status: status };
+  if (status === 'paid') updatePayload.paid_at = new Date().toISOString();
+
+  let query = supabase
+    .from('orders')
+    .update(updatePayload)
+    .eq('razorpay_payment_id', razorpayPaymentId);
+
+  // Never downgrade a paid order to failed (race condition guard).
+  if (status === 'failed') query = query.neq('payment_status', 'paid');
+
+  const { data, error } = await query.select('id').maybeSingle();
+  if (error) throw new Error(error.message);
+
+  return { updated: !!data };
+}
+
+// ---------------------------------------------------------------------------
+// Webhook recovery
+// ---------------------------------------------------------------------------
+
+function generateOrderNumber(): string {
+  const ts = Date.now().toString(36).toUpperCase();
+  const rand = Math.random().toString(36).substring(2, 6).toUpperCase();
+  return `BC-${ts}-${rand}`;
+}
+
 /**
  * recoverOrderFromWebhook
  *
- * Called by the webhook handler when `payment.captured` arrives but no
- * order row exists for that payment id.  This happens when the customer's
- * browser closed (or crashed) between Razorpay capturing the payment and
- * the client calling /api/orders/create.
+ * Called when payment.captured arrives but no order row exists.
  *
- * Creates a minimal-but-complete order row from the Razorpay payment
- * entity.  Shipping address will be empty because the browser never
- * submitted it — this is logged and the order is marked with
- * payment_method = 'razorpay-webhook-recovery' so admin can identify and
- * follow up to confirm the delivery address.
+ * Recovery priority:
+ *   1. Read pending_orders (written by create-order before the modal opened).
+ *      This gives us the complete order: items, prices, shipping, customer.
+ *      Creates order + order_items + decrements stock + sends email.
  *
- * Does NOT decrement stock — that is logged as a manual-review item,
- * consistent with the existing stock-error handling in orders/create.
+ *   2. If pending_orders row is missing (browser crashed before create-order
+ *      returned), fall back to partial recovery from Razorpay payment notes.
+ *      Creates order with empty shipping address; logs admin warning.
+ *      Does NOT decrement stock (no item data available).
  *
- * Returns { recovered: true, orderId } on success.
- * Returns { recovered: false, error } on failure — never throws.
+ * Idempotent: checks orders table + pending_orders.status before any write.
  */
 export async function recoverOrderFromWebhook(
   payment: RazorpayPaymentEntity
 ): Promise<{ recovered: boolean; orderId?: string; error?: string }> {
-  try {
-    const supabase = createServiceRoleClient();
+  const supabase = createServiceRoleClient();
+  const rLog = log.child({ paymentId: payment.id, razorpayOrderId: payment.order_id });
 
-    // Idempotency: bail out early if an order already exists for this
-    // payment id.  The unique index prevents a duplicate insert, but
-    // checking first lets us return a clean result without relying on
-    // catching Postgres error code 23505.
-    const { data: existing } = await supabase
-      .from("orders")
-      .select("id")
-      .eq("razorpay_payment_id", payment.id)
+  try {
+    // --- Idempotency check ---
+    const { data: existingOrder } = await supabase
+      .from('orders')
+      .select('id')
+      .eq('razorpay_payment_id', payment.id)
       .maybeSingle();
 
-    if (existing) {
-      return { recovered: true, orderId: existing.id };
+    if (existingOrder) {
+      rLog.info('recovery.already_exists', { orderId: existingOrder.id });
+      return { recovered: true, orderId: existingOrder.id };
     }
 
-    // Derive what we can from the payment entity.
-    const grandTotal = Math.round((payment.amount / 100) * 100) / 100;
-    const customerEmail = payment.email ?? "unknown@bansaricollections.com";
-    const customerPhone = payment.contact ?? "";
-    // Razorpay contact may include a +91 prefix — strip it for the name
-    // fallback; we cannot infer a real name from payment alone.
-    const customerName = payment.notes?.customer_name ?? "Customer";
     const now = new Date().toISOString();
 
-    const crypto = await import("crypto");
-    const timestamp = Date.now().toString(36).toUpperCase();
-    const random = crypto.default.randomBytes(3).toString("hex").toUpperCase();
-    const orderNumber = `BC-${timestamp}-${random}`;
+    // --- Priority 1: Full recovery from pending_orders ---
+    const { data: pending } = await supabase
+      .from('pending_orders')
+      .select('*')
+      .eq('razorpay_order_id', payment.order_id)
+      .eq('status', 'pending')
+      .maybeSingle();
 
-    const { data: order, error: insertError } = await supabase
-      .from("orders")
+    if (pending) {
+      rLog.info('recovery.pending_orders.found', { pendingId: pending.id });
+
+      const lineItems = (pending.items_json ?? []) as PendingLineItem[];
+      const orderNumber = generateOrderNumber();
+
+      const { data: order, error: insertErr } = await supabase
+        .from('orders')
+        .insert({
+          order_number: orderNumber,
+          user_id: null,
+
+          customer_name: pending.customer_name,
+          customer_email: pending.customer_email,
+          customer_phone: pending.customer_phone ?? null,
+
+          shipping_name: pending.shipping_name,
+          shipping_phone: pending.shipping_phone,
+          shipping_email: pending.shipping_email ?? null,
+          shipping_address_line1: pending.shipping_address_line1,
+          shipping_address_line2: pending.shipping_address_line2 ?? null,
+          shipping_city: pending.shipping_city,
+          shipping_state: pending.shipping_state,
+          shipping_postal_code: pending.shipping_postal_code,
+          shipping_country: pending.shipping_country,
+          billing_same_as_shipping: true,
+
+          currency: pending.currency,
+          subtotal: pending.subtotal,
+          discount: pending.discount,
+          shipping_fee: pending.shipping_fee,
+          tax: 0,
+          grand_total: pending.grand_total,
+
+          payment_provider: 'razorpay',
+          payment_method: 'razorpay-webhook-recovery',
+          payment_reference: payment.id,
+          razorpay_order_id: payment.order_id ?? null,
+          razorpay_payment_id: payment.id,
+          payment_status: 'paid',
+          order_status: 'placed',
+
+          payment_verified_at: now,
+          paid_at: now,
+        })
+        .select('id, order_number, customer_name, customer_email, grand_total, subtotal, shipping_fee, discount')
+        .single();
+
+      if (insertErr) {
+        // 23505 = unique_violation: concurrent webhook delivery already inserted.
+        if (insertErr.code === '23505') {
+          const { data: winner } = await supabase
+            .from('orders')
+            .select('id')
+            .eq('razorpay_payment_id', payment.id)
+            .maybeSingle();
+          return { recovered: true, orderId: winner?.id };
+        }
+        rLog.error('recovery.order_insert.failed', insertErr);
+        return { recovered: false, error: insertErr.message };
+      }
+
+      if (!order) return { recovered: false, error: 'Order insert returned no data.' };
+
+      rLog.info('recovery.order.created', { orderId: order.id, orderNumber });
+
+      // --- Insert order_items ---
+      if (lineItems.length > 0) {
+        const orderItemRows = lineItems.map((li) => ({
+          order_id: order.id,
+          product_id: li.productId,
+          product_name: li.productName,
+          unit_price: li.unitPrice,
+          quantity: li.quantity,
+          line_total: li.lineTotal,
+        }));
+
+        const { error: itemsErr } = await supabase
+          .from('order_items')
+          .insert(orderItemRows);
+
+        if (itemsErr) {
+          rLog.warn('recovery.order_items.failed', itemsErr, { orderId: order.id });
+          // Non-fatal: order row exists; items can be reconstructed from pending_orders.
+        } else {
+          rLog.info('recovery.order_items.inserted', { orderId: order.id, count: lineItems.length });
+        }
+
+        // --- Decrement stock ---
+        for (const li of lineItems) {
+          const { error: stockErr } = await supabase.rpc('decrement_product_stock', {
+            p_product_id: li.productId,
+            p_quantity: li.quantity,
+          });
+
+          if (stockErr) {
+            rLog.warn('recovery.stock.decrement_failed', stockErr, {
+              orderId: order.id,
+              productId: li.productId,
+              quantity: li.quantity,
+            });
+            // Log but continue: partial stock failure is better than lost order.
+          }
+        }
+      }
+
+      // --- Mark pending_orders as recovered ---
+      await supabase
+        .from('pending_orders')
+        .update({ status: 'recovered' })
+        .eq('id', pending.id);
+
+      // --- Send confirmation email (non-fatal) ---
+      try {
+        await sendOrderConfirmationEmail({
+          orderNumber: order.order_number,
+          customerName: order.customer_name,
+          customerEmail: order.customer_email,
+          items: lineItems.map((li) => ({
+            name: li.productName,
+            quantity: li.quantity,
+            price: li.unitPrice,
+          })),
+          subtotal: Number(order.subtotal),
+          shippingFee: Number(order.shipping_fee),
+          discount: Number(order.discount),
+          grandTotal: Number(order.grand_total),
+          shippingAddress: {
+            addressLine1: pending.shipping_address_line1,
+            city: pending.shipping_city,
+            state: pending.shipping_state,
+            postalCode: pending.shipping_postal_code,
+          },
+        });
+        rLog.info('recovery.email.sent', { orderId: order.id });
+      } catch (emailErr) {
+        rLog.warn('recovery.email.failed', emailErr, { orderId: order.id });
+      }
+
+      return { recovered: true, orderId: order.id };
+    }
+
+    // --- Priority 2: Partial recovery from Razorpay notes ---
+    rLog.warn('recovery.pending_orders.not_found', {
+      note: 'Browser may have crashed before create-order returned. Partial recovery only.',
+    });
+
+    const grandTotal = Math.round((payment.amount / 100) * 100) / 100;
+    const customerEmail = payment.email ?? 'unknown@bansaricollections.com';
+    const customerPhone = payment.contact ?? '';
+    const customerName = payment.notes?.customer_name ?? 'Customer';
+    const orderNumber = generateOrderNumber();
+
+    const { data: partialOrder, error: partialErr } = await supabase
+      .from('orders')
       .insert({
         order_number: orderNumber,
         user_id: null,
-
         customer_name: customerName,
         customer_email: customerEmail,
         customer_phone: customerPhone || null,
-
-        // Shipping address is unavailable — filled with empty strings so
-        // NOT NULL constraints are satisfied; admin must follow up.
         shipping_name: customerName,
-        shipping_phone: customerPhone || "",
+        shipping_phone: customerPhone || '',
         shipping_email: customerEmail,
-        shipping_address_line1: "[Pending — webhook recovery]",
+        shipping_address_line1: '[Pending — webhook recovery]',
         shipping_address_line2: null,
-        shipping_city: "",
-        shipping_state: "",
-        shipping_postal_code: "",
-        shipping_country: "IN",
-
+        shipping_city: '',
+        shipping_state: '',
+        shipping_postal_code: '',
+        shipping_country: 'IN',
         billing_same_as_shipping: true,
-
-        currency: payment.currency ?? "INR",
+        currency: payment.currency ?? 'INR',
         subtotal: grandTotal,
         discount: 0,
         shipping_fee: 0,
         tax: 0,
         grand_total: grandTotal,
-
-        payment_provider: "razorpay",
-        // Distinguishes webhook-recovered orders from browser-submitted ones.
-        payment_method: "razorpay-webhook-recovery",
+        payment_provider: 'razorpay',
+        payment_method: 'razorpay-webhook-recovery-partial',
         payment_reference: payment.id,
         razorpay_order_id: payment.order_id ?? null,
         razorpay_payment_id: payment.id,
-        payment_status: "paid",
-
-        order_status: "placed",
-
+        payment_status: 'paid',
+        order_status: 'placed',
         payment_verified_at: now,
         paid_at: now,
       })
-      .select("id, order_number, customer_name, customer_email, grand_total, shipping_fee, subtotal, discount")
+      .select('id, order_number')
       .single();
 
-    if (insertError) {
-      // 23505 = unique_violation: a concurrent webhook delivery already
-      // inserted this order.  Treat as success.
-      if (insertError.code === "23505") {
-        const { data: raceWinner } = await supabase
-          .from("orders")
-          .select("id")
-          .eq("razorpay_payment_id", payment.id)
+    if (partialErr) {
+      if (partialErr.code === '23505') {
+        const { data: winner } = await supabase
+          .from('orders')
+          .select('id')
+          .eq('razorpay_payment_id', payment.id)
           .maybeSingle();
-        return { recovered: true, orderId: raceWinner?.id };
+        return { recovered: true, orderId: winner?.id };
       }
-
-      return { recovered: false, error: insertError.message };
+      rLog.error('recovery.partial.failed', partialErr);
+      return { recovered: false, error: partialErr.message };
     }
 
-    if (!order) {
-      return { recovered: false, error: "Insert returned no data." };
+    rLog.warn('recovery.partial.created', {
+      orderId: partialOrder?.id,
+      note: 'MISSING shipping address and items. Admin must follow up.',
+    });
+
+    // Best-effort partial email.
+    try {
+      if (customerEmail !== 'unknown@bansaricollections.com') {
+        await sendOrderConfirmationEmail({
+          orderNumber: partialOrder?.order_number ?? orderNumber,
+          customerName,
+          customerEmail,
+          items: [],
+          subtotal: grandTotal,
+          shippingFee: 0,
+          discount: 0,
+          grandTotal,
+          shippingAddress: {
+            addressLine1: 'Please contact us to confirm your delivery address.',
+            city: '',
+            state: '',
+            postalCode: '',
+          },
+        });
+      }
+    } catch (emailErr) {
+      rLog.warn('recovery.partial.email_failed', emailErr);
     }
 
-    console.warn(
-      `[webhook-recovery] Created order ${order.id} (${orderNumber}) for payment ${
-        payment.id
-      }. Shipping address is MISSING — admin must contact ${customerEmail} to confirm delivery details. Stock was NOT decremented — manual review required.`
-    );
-
-    return { recovered: true, orderId: order.id };
+    return { recovered: true, orderId: partialOrder?.id };
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
+    rLog.error('recovery.unhandled', err);
     return { recovered: false, error: message };
   }
 }
