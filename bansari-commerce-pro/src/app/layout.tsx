@@ -15,9 +15,14 @@ const inter = Inter({
 });
 
 export const metadata: Metadata = {
+  metadataBase: new URL("https://www.bansaricollection.in"),
   title: "Bansari Collections | Wear What Words Cannot Say",
   description:
     "Premium Ethnic Wear | Sarees | Kurta Sets | Lehenga | Gowns | Co-ord Sets",
+  robots: {
+    index: true,
+    follow: true,
+  },
 };
 
 export default function RootLayout({
