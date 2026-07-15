@@ -60,7 +60,7 @@ const PRODUCT_IMAGES_BUCKET = "product-images";
 const PAGE_SIZE = 8;
 const LOW_STOCK_THRESHOLD = 5;
 
-// ─── Schemas ─────────────────────────────────────────────────────────────────
+// ─── Schemas ───────────────────────────────────────────────────────────────
 
 const imageSchema = z.object({
   url: z.string().min(1),
@@ -186,7 +186,7 @@ const emptyForm: ProductFormState = {
   images: [],
 };
 
-// ─── Pure helpers ─────────────────────────────────────────────────────────────
+// ─── Pure helpers ──────────────────────────────────────────────────────────────
 
 function slugify(value: string) {
   return value
@@ -414,10 +414,10 @@ function Field({
     <div className="flex flex-col gap-1.5">
       <label
         htmlFor={id}
-        className="text-[13px] font-medium text-slate-700"
+        className="text-[13px] font-medium text-foreground/80"
       >
         {label}
-        {required ? <span className="ml-0.5 text-red-500"> *</span> : null}
+        {required ? <span className="ml-0.5 text-destructive"> *</span> : null}
       </label>
       <Input
         id={id}
@@ -425,7 +425,7 @@ function Field({
         value={value}
         onChange={(e) => onChange(id, e.target.value)}
         placeholder={placeholder}
-        className="h-10 bg-white text-sm"
+        className="h-10 text-sm"
       />
     </div>
   );
@@ -447,11 +447,11 @@ function ToggleField({ id, label, checked, onChange }: ToggleFieldProps) {
       className={cn(
         "flex cursor-pointer items-center justify-between gap-3 rounded-lg border px-4 py-3 transition-colors",
         checked
-          ? "border-[#8A5A6A]/30 bg-[#8A5A6A]/5"
-          : "border-slate-200 bg-white hover:bg-slate-50"
+          ? "border-[#8A5A6A]/40 bg-[#8A5A6A]/10"
+          : "border-border bg-background hover:bg-muted/50"
       )}
     >
-      <span className="text-[13px] font-medium text-slate-700">{label}</span>
+      <span className="text-[13px] font-medium text-foreground/80">{label}</span>
       <input
         type="checkbox"
         checked={checked}
@@ -473,10 +473,10 @@ function FormSection({
   return (
     <section className="space-y-4">
       <div className="flex items-center gap-3">
-        <h3 className="whitespace-nowrap text-[11px] font-semibold uppercase tracking-widest text-slate-400">
+        <h3 className="whitespace-nowrap text-[11px] font-semibold uppercase tracking-widest text-muted-foreground">
           {title}
         </h3>
-        <div className="h-px flex-1 bg-slate-100" />
+        <div className="h-px flex-1 bg-border" />
       </div>
       {children}
     </section>
@@ -726,8 +726,8 @@ export function ProductManagement() {
       {/* Page header */}
       <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-slate-950">Products</h1>
-          <p className="mt-1 text-sm text-slate-500">
+          <h1 className="text-2xl font-bold text-foreground">Products</h1>
+          <p className="mt-1 text-sm text-muted-foreground">
             Manage catalog, pricing, stock, media, and SEO for Bansari products.
           </p>
         </div>
@@ -738,9 +738,9 @@ export function ProductManagement() {
       </div>
 
       {/* Product table card */}
-      <Card className="bg-white shadow-sm">
+      <Card className="shadow-sm">
         <CardHeader>
-          <CardTitle className="text-base font-semibold text-slate-950">
+          <CardTitle className="text-base font-semibold text-foreground">
             Product Catalog
           </CardTitle>
         </CardHeader>
@@ -750,19 +750,19 @@ export function ProductManagement() {
           <div className="grid gap-3 lg:grid-cols-[1fr_180px_180px_180px_auto]">
             <label className="relative">
               <span className="sr-only">Search products</span>
-              <Search className="absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-slate-400" />
+              <Search className="absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
               <Input
                 value={query}
                 onChange={(e) => updateQuery(e.target.value)}
                 placeholder="Search by name, SKU, slug, category..."
-                className="h-9 bg-white pl-8"
+                className="h-9 pl-8"
               />
             </label>
 
             <select
               value={categoryFilter}
               onChange={(e) => updateCategoryFilter(e.target.value)}
-              className="h-9 rounded-md border border-input bg-white px-2 text-xs outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/30"
+              className="h-9 rounded-md border border-input bg-background px-2 text-xs text-foreground outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/30"
             >
               <option value="all">All categories</option>
               {categories.map((cat) => (
@@ -775,7 +775,7 @@ export function ProductManagement() {
             <select
               value={statusFilter}
               onChange={(e) => updateStatusFilter(e.target.value)}
-              className="h-9 rounded-md border border-input bg-white px-2 text-xs outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/30"
+              className="h-9 rounded-md border border-input bg-background px-2 text-xs text-foreground outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/30"
             >
               <option value="all">All statuses</option>
               <option value="active">Active</option>
@@ -788,7 +788,7 @@ export function ProductManagement() {
             <select
               value={stockFilter}
               onChange={(e) => updateStockFilter(e.target.value)}
-              className="h-9 rounded-md border border-input bg-white px-2 text-xs outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/30"
+              className="h-9 rounded-md border border-input bg-background px-2 text-xs text-foreground outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/30"
             >
               <option value="all">All stock</option>
               <option value="in-stock">In stock</option>
@@ -809,13 +809,13 @@ export function ProductManagement() {
           </div>
 
           {error ? (
-            <div className="rounded-md border border-red-200 bg-red-50 p-4 text-sm text-red-700">
+            <div className="rounded-md border border-destructive/30 bg-destructive/10 p-4 text-sm text-destructive">
               {error}
             </div>
           ) : null}
 
           {/* Table */}
-          <div className="overflow-hidden rounded-md border border-slate-200">
+          <div className="overflow-hidden rounded-md border border-border">
             <Table>
               <TableHeader>
                 <TableRow>
@@ -832,7 +832,7 @@ export function ProductManagement() {
                 {loading ? (
                   <TableRow>
                     <TableCell colSpan={6} className="h-40 text-center">
-                      <span className="inline-flex items-center gap-2 text-slate-500">
+                      <span className="inline-flex items-center gap-2 text-muted-foreground">
                         <Loader2 className="size-4 animate-spin" />
                         Loading products...
                       </span>
@@ -843,7 +843,7 @@ export function ProductManagement() {
                     <TableRow key={product.id}>
                       <TableCell className="px-4">
                         <div className="flex items-center gap-3">
-                          <div className="relative size-12 overflow-hidden rounded-md bg-slate-100">
+                          <div className="relative size-12 overflow-hidden rounded-md bg-muted">
                             {product.images[0]?.url ? (
                               <Image
                                 src={product.images[0].url}
@@ -853,14 +853,14 @@ export function ProductManagement() {
                                 className="object-cover"
                               />
                             ) : (
-                              <ImagePlus className="absolute left-1/2 top-1/2 size-5 -translate-x-1/2 -translate-y-1/2 text-slate-400" />
+                              <ImagePlus className="absolute left-1/2 top-1/2 size-5 -translate-x-1/2 -translate-y-1/2 text-muted-foreground" />
                             )}
                           </div>
                           <div className="min-w-0">
-                            <p className="truncate font-semibold text-slate-950">
+                            <p className="truncate font-semibold text-foreground">
                               {product.name}
                             </p>
-                            <p className="mt-1 truncate text-xs text-slate-500">
+                            <p className="mt-1 truncate text-xs text-muted-foreground">
                               {product.sku}
                             </p>
                           </div>
@@ -921,7 +921,7 @@ export function ProductManagement() {
                 ) : (
                   <TableRow>
                     <TableCell colSpan={6} className="h-40 text-center">
-                      <div className="text-sm text-slate-500">
+                      <div className="text-sm text-muted-foreground">
                         No products match the current filters.
                       </div>
                     </TableCell>
@@ -932,7 +932,7 @@ export function ProductManagement() {
           </div>
 
           {/* Pagination */}
-          <div className="flex flex-col gap-3 text-sm text-slate-500 md:flex-row md:items-center md:justify-between">
+          <div className="flex flex-col gap-3 text-sm text-muted-foreground md:flex-row md:items-center md:justify-between">
             <p>
               Showing {visibleProducts.length} of {filteredProducts.length}{" "}
               products
@@ -970,23 +970,21 @@ export function ProductManagement() {
       <Sheet open={formOpen} onOpenChange={setFormOpen}>
         <SheetContent
           className={cn(
-            // Responsive drawer widths
             "w-full",
             "md:max-w-[700px]",
             "lg:max-w-[800px]",
             "xl:max-w-[900px]",
-            // Full viewport height, no outer scroll
             "flex h-screen flex-col overflow-hidden p-0"
           )}
         >
           {/* ── Sticky header ── */}
-          <SheetHeader className="shrink-0 border-b border-slate-100 bg-white px-8 py-5">
+          <SheetHeader className="shrink-0 border-b border-border bg-background px-8 py-5">
             <div className="flex items-start justify-between gap-4">
               <div>
-                <SheetTitle className="text-xl font-semibold text-slate-950">
+                <SheetTitle className="text-xl font-semibold text-foreground">
                   {drawerMode === "create" ? "Create Product" : "Edit Product"}
                 </SheetTitle>
-                <SheetDescription className="mt-0.5 text-sm text-slate-500">
+                <SheetDescription className="mt-0.5 text-sm text-muted-foreground">
                   {drawerMode === "create"
                     ? "Fill in the details below to add a new product to the catalog."
                     : "Update product data, media, inventory, and SEO metadata."}
@@ -996,12 +994,11 @@ export function ProductManagement() {
           </SheetHeader>
 
           {/* ── Scrollable form body ── */}
-          <div className="flex-1 overflow-y-auto">
+          <div className="flex-1 overflow-y-auto bg-muted/30">
             <div className="space-y-8 px-8 py-7">
 
               {/* ── Section 1: Basic Information ── */}
               <FormSection title="Basic Information">
-                {/* Name — full width */}
                 <Field
                   id="name"
                   label="Product Name"
@@ -1011,7 +1008,6 @@ export function ProductManagement() {
                   required
                 />
 
-                {/* Slug row with generate button */}
                 <div className="flex items-end gap-2">
                   <div className="flex-1">
                     <Field
@@ -1034,7 +1030,6 @@ export function ProductManagement() {
                   </Button>
                 </div>
 
-                {/* SKU row with generate button */}
                 <div className="flex items-end gap-2">
                   <div className="flex-1">
                     <Field
@@ -1179,17 +1174,17 @@ export function ProductManagement() {
                 <div className="flex flex-col gap-1.5">
                   <label
                     htmlFor="description"
-                    className="text-[13px] font-medium text-slate-700"
+                    className="text-[13px] font-medium text-foreground/80"
                   >
                     Description{" "}
-                    <span className="ml-0.5 text-red-500">*</span>
+                    <span className="ml-0.5 text-destructive">*</span>
                   </label>
                   <textarea
                     id="description"
                     value={form.description}
                     onChange={(e) => updateForm("description", e.target.value)}
                     placeholder="Describe the product — fabric, craftsmanship, occasions, care instructions..."
-                    className="w-full resize-y rounded-lg border border-input bg-white px-3.5 py-3 text-sm text-slate-900 outline-none transition focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/30"
+                    className="w-full resize-y rounded-lg border border-input bg-background px-3.5 py-3 text-sm text-foreground outline-none placeholder:text-muted-foreground transition focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/30"
                     style={{ minHeight: "220px" }}
                   />
                 </div>
@@ -1197,7 +1192,6 @@ export function ProductManagement() {
 
               {/* ── Section 6: Media ── */}
               <FormSection title="Media">
-                {/* Drag-and-drop upload zone */}
                 <div
                   role="button"
                   tabIndex={0}
@@ -1221,20 +1215,20 @@ export function ProductManagement() {
                   className={cn(
                     "flex cursor-pointer flex-col items-center justify-center gap-3 rounded-xl border-2 border-dashed px-6 py-10 text-center transition-colors",
                     dragOver
-                      ? "border-[#8A5A6A] bg-[#8A5A6A]/5"
-                      : "border-slate-200 bg-slate-50 hover:border-slate-300 hover:bg-slate-100"
+                      ? "border-[#8A5A6A] bg-[#8A5A6A]/10"
+                      : "border-border bg-muted/50 hover:border-border hover:bg-muted"
                   )}
                 >
                   {uploading ? (
-                    <Loader2 className="size-7 animate-spin text-slate-400" />
+                    <Loader2 className="size-7 animate-spin text-muted-foreground" />
                   ) : (
-                    <ImagePlus className="size-7 text-slate-400" />
+                    <ImagePlus className="size-7 text-muted-foreground" />
                   )}
                   <div>
-                    <p className="text-sm font-medium text-slate-700">
+                    <p className="text-sm font-medium text-foreground/80">
                       {uploading ? "Uploading..." : "Drop images here or click to upload"}
                     </p>
-                    <p className="mt-0.5 text-xs text-slate-400">
+                    <p className="mt-0.5 text-xs text-muted-foreground">
                       PNG, JPG, WEBP up to 10MB each
                     </p>
                   </div>
@@ -1249,13 +1243,12 @@ export function ProductManagement() {
                   />
                 </div>
 
-                {/* Thumbnail grid */}
                 {form.images.length > 0 ? (
                   <div className="mt-4 grid grid-cols-3 gap-3 sm:grid-cols-4 md:grid-cols-5">
                     {form.images.map((image) => (
                       <div
                         key={image.url}
-                        className="group relative aspect-square overflow-hidden rounded-lg border border-slate-200 bg-slate-100"
+                        className="group relative aspect-square overflow-hidden rounded-lg border border-border bg-muted"
                       >
                         <Image
                           src={image.url}
@@ -1268,7 +1261,7 @@ export function ProductManagement() {
                           type="button"
                           aria-label="Remove image"
                           onClick={() => removeImage(image.url)}
-                          className="absolute right-1.5 top-1.5 flex size-6 items-center justify-center rounded-full bg-red-500 text-white opacity-0 shadow transition group-hover:opacity-100"
+                          className="absolute right-1.5 top-1.5 flex size-6 items-center justify-center rounded-full bg-destructive text-destructive-foreground opacity-0 shadow transition group-hover:opacity-100"
                         >
                           <X className="size-3.5" />
                         </button>
@@ -1291,10 +1284,10 @@ export function ProductManagement() {
                 <div className="flex flex-col gap-1.5">
                   <label
                     htmlFor="seoDescription"
-                    className="text-[13px] font-medium text-slate-700"
+                    className="text-[13px] font-medium text-foreground/80"
                   >
                     SEO Description{" "}
-                    <span className="ml-0.5 text-red-500">*</span>
+                    <span className="ml-0.5 text-destructive">*</span>
                   </label>
                   <textarea
                     id="seoDescription"
@@ -1304,7 +1297,7 @@ export function ProductManagement() {
                     }
                     placeholder="Shop authentic Kanjivaram Pure Silk Sarees at Bansari Collections. Premium ethnic wear for weddings and festivals."
                     rows={3}
-                    className="w-full resize-y rounded-lg border border-input bg-white px-3.5 py-3 text-sm text-slate-900 outline-none transition focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/30"
+                    className="w-full resize-y rounded-lg border border-input bg-background px-3.5 py-3 text-sm text-foreground outline-none placeholder:text-muted-foreground transition focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/30"
                   />
                 </div>
               </FormSection>
@@ -1343,7 +1336,7 @@ export function ProductManagement() {
           </div>
 
           {/* ── Sticky footer ── */}
-          <SheetFooter className="shrink-0 border-t border-slate-100 bg-white px-8 py-4">
+          <SheetFooter className="shrink-0 border-t border-border bg-background px-8 py-4">
             <div className="flex w-full items-center justify-between gap-3">
               <Button
                 type="button"
@@ -1387,7 +1380,7 @@ export function ProductManagement() {
               </SheetHeader>
               <div className="space-y-5 px-6 pb-6">
                 {detailsProduct.images[0]?.url ? (
-                  <div className="relative aspect-[4/5] overflow-hidden rounded-md bg-slate-100">
+                  <div className="relative aspect-[4/5] overflow-hidden rounded-md bg-muted">
                     <Image
                       src={detailsProduct.images[0].url}
                       alt={detailsProduct.images[0].alt}
@@ -1457,9 +1450,9 @@ export function ProductManagement() {
 
 function Detail({ label, value }: { label: string; value: string }) {
   return (
-    <div className="grid gap-1 rounded-md border border-slate-200 p-3">
-      <dt className="text-xs font-medium text-slate-500">{label}</dt>
-      <dd className="text-sm text-slate-950">{value || "-"}</dd>
+    <div className="grid gap-1 rounded-md border border-border p-3">
+      <dt className="text-xs font-medium text-muted-foreground">{label}</dt>
+      <dd className="text-sm text-foreground">{value || "-"}</dd>
     </div>
   );
 }
