@@ -40,11 +40,7 @@ export default function RazorpayButton({
 }: Props) {
   const router = useRouter();
 
-  const {
-    items,
-    totalPrice,
-    clearCart,
-  } = useCart();
+  const { items, clearCart } = useCart();
 
   const [loading, setLoading] = useState(false);
 
@@ -52,25 +48,24 @@ export default function RazorpayButton({
     try {
       setLoading(true);
 
-      const amount = totalPrice();
-
-      const orderResponse = await fetch(
-        "/api/payment/create-order",
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            amount,
-          }),
-        }
-      );
+      // Send only product IDs + quantities — the server computes the
+      // authoritative amount from the database.  Client never supplies a
+      // price or total.
+      const orderResponse = await fetch("/api/payment/create-order", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          items: items.map((item) => ({
+            productId: item.id,
+            quantity: item.quantity,
+          })),
+        }),
+      });
 
       const orderData = await orderResponse.json();
 
       if (!orderData.success) {
-        throw new Error("Unable to create payment order.");
+        throw new Error(orderData.message ?? "Unable to create payment order.");
       }
 
       const order = orderData.order;
@@ -78,6 +73,8 @@ export default function RazorpayButton({
       const options = {
         key: process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID,
 
+        // Amount comes from the Razorpay order object created server-side.
+        // This is the authoritative amount — the browser cannot modify it.
         amount: order.amount,
 
         currency: order.currency,
@@ -88,9 +85,7 @@ export default function RazorpayButton({
 
         order_id: order.id,
 
-        theme: {
-          color: "#8A5A6A",
-        },
+        theme: { color: "#8A5A6A" },
 
         modal: {
           ondismiss() {
@@ -104,16 +99,11 @@ export default function RazorpayButton({
           razorpay_signature: string;
         }) => {
           try {
-            const verifyResponse = await fetch(
-              "/api/payment/verify-payment",
-              {
-                method: "POST",
-                headers: {
-                  "Content-Type": "application/json",
-                },
-                body: JSON.stringify(response),
-              }
-            );
+            const verifyResponse = await fetch("/api/payment/verify-payment", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify(response),
+            });
 
             const verify = await verifyResponse.json();
 
@@ -122,53 +112,42 @@ export default function RazorpayButton({
               return;
             }
 
-            const saveResponse = await fetch(
-              "/api/orders/create",
-              {
-                method: "POST",
-                headers: {
-                  "Content-Type": "application/json",
-                },
-                body: JSON.stringify({
-                  items: items.map((item) => ({
-                    productId: item.id,
-                    quantity: item.quantity,
-                  })),
-
-                  customer,
-                  shipping,
-
-                  razorpay_order_id: response.razorpay_order_id,
-                  razorpay_payment_id: response.razorpay_payment_id,
-                  razorpay_signature: response.razorpay_signature,
-                }),
-              }
-            );
+            const saveResponse = await fetch("/api/orders/create", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                items: items.map((item) => ({
+                  productId: item.id,
+                  quantity: item.quantity,
+                })),
+                customer,
+                shipping,
+                razorpay_order_id: response.razorpay_order_id,
+                razorpay_payment_id: response.razorpay_payment_id,
+                razorpay_signature: response.razorpay_signature,
+              }),
+            });
 
             const saveOrder = await saveResponse.json();
 
             if (!saveOrder.success) {
-              alert(saveOrder.error ?? "Order saved failed.");
+              alert(saveOrder.error ?? "Order save failed.");
               return;
             }
 
             clearCart();
-
             router.push("/order-success");
           } catch (error) {
             console.error(error);
-
             alert("Unable to complete your order.");
           }
         },
       };
 
       const razorpay = new window.Razorpay(options);
-
       razorpay.open();
     } catch (error) {
       console.error(error);
-
       alert("Unable to initiate payment.");
     } finally {
       setLoading(false);
