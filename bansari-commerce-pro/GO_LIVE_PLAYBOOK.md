@@ -1,200 +1,151 @@
 # Bansari Commerce — Go-Live Playbook
 
-This is the minute-by-minute procedure for the day of launch.
-Assign one person to execute this. Do not multitask during the launch window.
+> **Domain:** `https://www.bansaricollection.in`  
+> **Prerequisite:** All LAUNCH_CHECKLIST.md items complete. Vercel deployment status = Ready.
 
 ---
 
-## Prerequisites (Complete Day Before)
+## MINUTE 0 — Flip the Switch
 
-- [ ] All LAUNCH_CHECKLIST.md items completed
-- [ ] Smoke test passed in full
-- [ ] ₹1 real payment tested and refunded
-- [ ] DNS propagated (site loads at production URL)
-- [ ] All 9 Vercel env vars confirmed present
-- [ ] Razorpay webhook confirmed 200 OK
-- [ ] Admin email confirmed working
-- [ ] Trusted tester has confirmed site works on their device
-
----
-
-## Minute 0 — Go Live Declaration
-
-**What to do:**
-- [ ] Open 4 tabs:
-  1. `https://bansaricollections.com` (storefront)
-  2. `https://bansaricollections.com/admin` (admin panel)
-  3. Vercel Dashboard → Deployments
-  4. Supabase Dashboard → Logs → API
-- [ ] Confirm latest Vercel deployment is green
-- [ ] Confirm storefront loads with no errors
-- [ ] Confirm admin panel loads
-- [ ] Announce launch URL to your first audience (WhatsApp, Instagram, etc.)
-
-**Expected state:**
-- Site is live, accessible, and loading correctly
-- No error banners or 500 pages
-- Admin panel accessible
-
-**Rollback condition:**
-- If homepage returns 500 or fails to load → immediately check Vercel deployment logs
-- If Vercel deployment is red → roll back: Vercel → Deployments → previous deployment → Promote to Production
-
----
-
-## Minute 5 — First Order Readiness Check
-
-**What to do:**
-- [ ] Add 1 product to cart
-- [ ] Proceed to checkout
-- [ ] Confirm Razorpay modal opens (do NOT complete payment — just confirm the modal opens)
-- [ ] Close modal
-- [ ] Check Supabase → Logs → API for any 5xx errors
-- [ ] Check browser console: no red errors
-
-**Expected state:**
-- Razorpay modal opens correctly with correct amount
-- No 500 errors in Supabase logs
-
-**Rollback condition:**
-- Razorpay modal does not open → check `RAZORPAY_KEY_ID` in Vercel env vars
-- 500 error on `/api/payment/create-order` → check `RAZORPAY_KEY_SECRET` and `SUPABASE_SERVICE_ROLE_KEY`
-
----
-
-## Minute 15 — Live Transaction Test
-
-**What to do:**
-- [ ] Complete a real ₹1 payment using your own card
-- [ ] Confirm redirect to `/order-success`
-- [ ] Confirm order number displayed on success page
-- [ ] Open Supabase → Table Editor → `orders` table → confirm row exists with `payment_status = 'paid'`
-- [ ] Open Razorpay Dashboard → Payments → confirm payment captured
-- [ ] Open Razorpay Dashboard → Webhooks → Recent Deliveries → confirm `200 OK`
-- [ ] Check your email inbox → order confirmation email received
-- [ ] Open `/admin/orders` → confirm order visible
-- [ ] Issue ₹1 refund from Razorpay Dashboard immediately
-
-**Expected state:**
-- Order in database with `paid` status
-- Webhook delivered with 200
-- Confirmation email in inbox within 60 seconds
-- Order visible in admin
-
-**Rollback condition:**
-- Order not in database → check `/api/payment/verify` endpoint and Supabase function logs
-- Webhook 400 → `RAZORPAY_WEBHOOK_SECRET` mismatch — correct in Vercel → Redeploy
-- Email not received → check Resend Dashboard → Logs for delivery status
-
----
-
-## Minute 30 — Traffic & Performance Check
-
-**What to do:**
-- [ ] Open Vercel Dashboard → Project → Analytics (if enabled)
-- [ ] Check Vercel Dashboard → Project → Functions → confirm no function errors
-- [ ] Open Supabase → Logs → API → filter by `status >= 500` → should be empty
-- [ ] Test site on mobile (your phone, incognito)
-- [ ] Test site on a different network (mobile data, not WiFi)
-- [ ] Share with 2–3 trusted contacts and ask for immediate feedback
-
-**Expected state:**
-- No 5xx function errors
-- Site loads on mobile in < 3 seconds on 4G
-- No layout issues on mobile
-
-**Rollback condition:**
-- Sustained 5xx errors → roll back deployment immediately
-- Critical UI broken on mobile → hot-fix commit or roll back
-
----
-
-## Hour 1 — Stability Confirmation
-
-**What to do:**
-- [ ] Check Supabase → Logs → Auth → no unexpected errors
-- [ ] Check Razorpay → Webhooks → no failed deliveries
-- [ ] Confirm Resend Dashboard → Logs → all emails delivered
-- [ ] Review Vercel → Functions log for any repeated errors
-- [ ] Check `orders` table row count matches expected orders placed
-- [ ] Check `products` table stock values are decrementing correctly
+**Actions:**
+- Open 4 browser tabs: storefront, admin `/admin`, Supabase dashboard, Razorpay dashboard
+- Navigate to `https://www.bansaricollection.in` — confirm homepage loads
+- Check Vercel Functions tab — confirm 0 errors
+- Announce URL to team
 
 **Expected metrics:**
-- 0 webhook failures
-- 0 failed email deliveries
-- 0 unmatched orders (every payment has a corresponding order row)
+- Homepage HTTP 200
+- No console errors
+- Vercel Realtime: 0 function errors
 
-**Rollback condition:**
-- Multiple customers reporting payment taken but no order created → pause Razorpay payments immediately (Razorpay Dashboard → Disable payments) → investigate → fix → re-enable
+**Rollback condition:** Homepage returns 500 for > 2 minutes → rollback immediately (see Rollback section)
 
 ---
 
-## Hour 6 — Business Health Review
+## MINUTE 5 — Payment Flow
 
-**What to do:**
-- [ ] Log in to `/admin/analytics` → review order count, revenue
-- [ ] Log in to Razorpay Dashboard → review captured payments total
-- [ ] Cross-check: Razorpay total = Supabase orders total (no orphaned payments)
-- [ ] Review any customer emails or WhatsApp messages
-- [ ] Check product stock levels — restock any items near zero
-- [ ] Check Vercel → Usage → confirm within free tier or expected plan limits
+**Actions:**
+- Add any product to cart
+- Proceed to checkout
+- Confirm Razorpay payment modal opens
+- Check Supabase → Logs → confirm no 5xx errors
 
 **Expected metrics:**
-- Razorpay captured amount = sum of `orders.total_amount` where `payment_status = 'paid'`
-- No orphaned Razorpay payments without matching order rows
+- Razorpay modal initialises without JS errors
+- Supabase logs: 0 errors
 
-**Rollback condition:**
-- None at this stage — issues are operational, not deployment. Handle case by case.
+**Rollback condition:** Modal fails to open → check `RAZORPAY_KEY_ID` in Vercel env vars → redeploy
 
 ---
 
-## Hour 24 — End of Day 1 Review
+## MINUTE 15 — Live Transaction Test
 
-**What to do:**
-- [ ] Full reconciliation: count orders in Supabase = count captured payments in Razorpay
-- [ ] Review all Resend email logs for bounces or failures
-- [ ] Check Google Search Console for crawl errors (if submitted)
-- [ ] Review Vercel Analytics for top traffic sources, top pages, bounce rate
-- [ ] Update product stock for any sold-out items
-- [ ] Respond to all customer inquiries
-- [ ] Document any issues found and create GitHub issues for v1.0.1
-- [ ] Backup: export Supabase data (Dashboard → Settings → Backups)
+**Actions:**
+- Make a real ₹1 payment with a live card
+- Verify: order row appears in Supabase `orders` table with `status = paid`
+- Verify: `/api/payment/webhook` received HTTP 200 in Razorpay → Webhooks → Recent Deliveries
+- Verify: confirmation email received in inbox
+- Verify: order appears in admin panel `/admin`
+- **Issue refund immediately** from Razorpay dashboard
 
 **Expected metrics:**
-- 100% webhook delivery rate
-- 100% email delivery rate
-- 0 orphaned payments
-- Stock levels accurate
+- DB row: `status = 'paid'`, correct `amount`, correct `razorpay_payment_id`
+- Webhook: HTTP 200, delivery time < 5s
+- Email: received within 60s
+
+**Rollback condition:** No DB row after payment → check `/api/payment/verify` logs → rollback if not fixable in 10 min
 
 ---
 
-## Rollback Plan (Any Time)
+## MINUTE 30 — Cross-Device Check
 
-### Instant Rollback (< 60 seconds)
+**Actions:**
+- Open `https://www.bansaricollection.in` on mobile (different network — 4G/5G)
+- Test: homepage → product page → cart → checkout flow (stop before payment)
+- Check Vercel Functions for any new errors
+- Share URL with 2-3 trusted contacts for independent check
 
-1. Go to: **Vercel Dashboard → Project → Deployments**
-2. Find the previous successful deployment
-3. Click the three-dot menu → **"Promote to Production"**
-4. Confirm. Rollback is live in < 60 seconds.
+**Expected metrics:**
+- Mobile LCP < 3s on 4G
+- Vercel Functions: 0 new errors
 
-### When to Roll Back
+**Rollback condition:** Sustained 5xx errors from multiple users → rollback
 
-| Condition | Action |
-|---|---|---|
-| Homepage returns 500 for > 2 minutes | Roll back immediately |
-| Payments failing for > 2 minutes | Disable Razorpay payments + roll back |
-| Admin panel inaccessible | Roll back |
-| Database connection errors | Roll back + check Supabase status |
-| Multiple customers report wrong charges | Pause Razorpay + roll back + investigate |
+---
 
-### Database Rollback
+## HOUR 1 — First Reconciliation
 
-Database migrations cannot be auto-rolled back. If a migration caused issues:
-1. Go to Supabase → SQL Editor
-2. Run the corresponding `down` migration from `supabase/migrations/`
-3. Re-deploy the previous code version via Vercel
+**Actions:**
+- Razorpay: count `payment.captured` events
+- Supabase: `SELECT COUNT(*) FROM orders WHERE status = 'paid'`
+- Both counts must match
+- Resend: confirm 0 bounced/failed email deliveries
+- Razorpay: confirm 0 webhook failures
 
-### Do NOT Roll Back If:
-- A single customer reports an issue (investigate first)
-- Webhook delivery is delayed (Razorpay retries for 24 hours)
-- Email is delayed (Resend has queuing)
+**Expected metrics:**
+- Razorpay captured count = Supabase paid count
+- Webhook failure rate: 0%
+- Email bounce rate: 0%
+
+**Rollback condition:** Multiple customers report wrong charge amount → pause Razorpay live key → rollback deployment immediately
+
+---
+
+## HOUR 6 — Admin Review
+
+**Actions:**
+- Open `/admin` → review all orders
+- Check for any `status = pending` orders older than 30 min (possible webhook failure)
+- Check stock levels — any product at 0 stock must be marked out-of-stock
+- Cross-check: Razorpay total captured (₹) vs sum of `orders.total` in Supabase
+
+**Expected metrics:**
+- 0 stuck pending orders
+- All captured payments reflected in DB
+- Stock levels non-negative
+
+**Rollback condition:** Orphaned payments (Razorpay captured, no DB row) → investigate immediately. Do not rollback yet — run corrective SQL insert. Escalate if > 2 occurrences.
+
+---
+
+## HOUR 24 — End of Day 1
+
+**Actions:**
+- Full payment reconciliation: export Razorpay transactions CSV + Supabase orders CSV
+- Export Supabase backup: Settings → Backups → Download
+- Review Vercel Analytics: bounce rate, top pages, conversion
+- Review error rate: Vercel Functions → any 500s in last 24h
+- Log any issues for v1.0.1 patch
+- Confirm SSL certificate valid: `https://www.bansaricollection.in` shows 🔒
+
+**Expected metrics:**
+- 0 unresolved errors
+- 0 payment discrepancies
+- SSL: valid, expiry > 80 days
+
+---
+
+## ROLLBACK PROCEDURE
+
+### Instant rollback (< 60 seconds)
+
+1. Vercel Dashboard → Project → **Deployments**
+2. Find the previous successful deployment (one row above current)
+3. Click `⋯` → **Promote to Production**
+4. Confirm — previous build goes live within 30s
+
+### When to rollback
+- Homepage 500 for > 2 minutes
+- Payment failures for > 2 minutes
+- Admin panel inaccessible
+- Multiple customers report wrong charges
+- Webhook endpoint returning 500 consistently
+
+### Do NOT rollback for
+- Single isolated customer issue
+- Webhook delivery delay (Razorpay retries for 24h automatically)
+- Email delivery delay < 5 minutes
+- Single 404 on a non-critical page
+
+### Database note
+Vercel rollback does NOT rollback the database. If a migration caused the issue, run the corresponding down-migration SQL in Supabase → SQL Editor manually before or after the Vercel rollback.
