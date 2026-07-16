@@ -3,6 +3,7 @@
 import Image from "next/image";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
+  CheckCircle2,
   Edit,
   Eye,
   ImagePlus,
@@ -20,12 +21,6 @@ import { z } from "zod";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
-import {
   Dialog,
   DialogContent,
   DialogDescription,
@@ -33,7 +28,6 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
 import {
   Sheet,
   SheetContent,
@@ -53,14 +47,14 @@ import {
 import { createClient } from "@/lib/supabase/client";
 import { cn } from "@/lib/utils";
 
-// ─── Constants ───────────────────────────────────────────────────────────────
+// ─── Constants ────────────────────────────────────────────────────────────────
 
 const PRODUCTS_TABLE = "products";
 const PRODUCT_IMAGES_BUCKET = "product-images";
 const PAGE_SIZE = 8;
 const LOW_STOCK_THRESHOLD = 5;
 
-// ─── Schemas ───────────────────────────────────────────────────────────────
+// ─── Schemas ──────────────────────────────────────────────────────────────────
 
 const imageSchema = z.object({
   url: z.string().min(1),
@@ -158,6 +152,8 @@ type ProductFormState = {
   images: ProductImage[];
 };
 
+type FieldErrors = Partial<Record<keyof ProductFormState, string>>;
+
 // ─── Defaults ─────────────────────────────────────────────────────────────────
 
 const emptyForm: ProductFormState = {
@@ -185,6 +181,26 @@ const emptyForm: ProductFormState = {
   active: true,
   images: [],
 };
+
+// ─── Required fields for completeness tracker ─────────────────────────────────
+
+const REQUIRED_FIELDS: Array<keyof ProductFormState> = [
+  "name",
+  "slug",
+  "sku",
+  "category",
+  "collection",
+  "brand",
+  "fabric",
+  "color",
+  "sizes",
+  "price",
+  "stock",
+  "hsn",
+  "description",
+  "seoTitle",
+  "seoDescription",
+];
 
 // ─── Pure helpers ──────────────────────────────────────────────────────────────
 
@@ -389,84 +405,201 @@ function stockVariant(product: Product) {
   return "outline" as const;
 }
 
-// ─── Form field sub-components ────────────────────────────────────────────────
+/** Compute listing completeness 0–100 */
+function computeCompleteness(form: ProductFormState): number {
+  const filled = REQUIRED_FIELDS.filter((key) => {
+    const val = form[key];
+    if (typeof val === "string") return val.trim().length > 0;
+    if (typeof val === "boolean") return true;
+    return false;
+  }).length;
+  // images bonus
+  const imageBonus = form.images.length > 0 ? 1 : 0;
+  return Math.round(((filled + imageBonus) / (REQUIRED_FIELDS.length + 1)) * 100);
+}
 
-type FieldProps = {
-  id: keyof ProductFormState;
-  label: string;
-  value: string;
-  onChange: (id: keyof ProductFormState, value: string) => void;
-  type?: string;
-  required?: boolean;
-  placeholder?: string;
-};
+// ─── Design-system primitives (admin-only, no CSS variables) ──────────────────
 
-function Field({
-  id,
+/**
+ * Label + input slot. Wires htmlFor, shows required asterisk, shows
+ * field-level error. Uses hardcoded slate values — zero CSS variable
+ * dependence.
+ */
+function FormField({
   label,
-  value,
-  onChange,
-  type = "text",
-  required = false,
-  placeholder,
-}: FieldProps) {
+  htmlFor,
+  required,
+  error,
+  hint,
+  counter,
+  children,
+}: {
+  label: string;
+  htmlFor: string;
+  required?: boolean;
+  error?: string;
+  hint?: string;
+  counter?: { current: number; max: number };
+  children: React.ReactNode;
+}) {
   return (
-    <div className="flex flex-col gap-1.5">
-      <label
-        htmlFor={id}
-        // FIX: was text-foreground/80 (opacity-haircut fails WCAG AA at 13px)
-        // Now: text-slate-700 → #334155 → 10.7:1 on white/near-white surface
-        className="text-[13px] font-medium text-slate-700"
-      >
-        {label}
-        {required ? <span className="ml-0.5 text-red-500"> *</span> : null}
-      </label>
-      <Input
-        id={id}
-        type={type}
-        value={value}
-        onChange={(e) => onChange(id, e.target.value)}
-        placeholder={placeholder}
-        className="h-10 text-sm"
-      />
+    <div className="flex flex-col gap-2">
+      <div className="flex items-baseline justify-between gap-2">
+        <label
+          htmlFor={htmlFor}
+          className="block text-sm font-semibold leading-none text-slate-700"
+        >
+          {label}
+          {required ? <span className="ml-0.5 text-red-500"> *</span> : null}
+        </label>
+        {counter ? (
+          <span
+            className={cn(
+              "text-xs tabular-nums",
+              counter.current > counter.max
+                ? "text-red-500"
+                : counter.current > counter.max * 0.85
+                ? "text-amber-600"
+                : "text-slate-400"
+            )}
+          >
+            {counter.current}/{counter.max}
+          </span>
+        ) : null}
+      </div>
+      {children}
+      {error ? (
+        <p className="text-xs text-red-600" role="alert">
+          {error}
+        </p>
+      ) : hint ? (
+        <p className="text-xs text-slate-500">{hint}</p>
+      ) : null}
     </div>
   );
 }
 
-type ToggleFieldProps = {
-  id: keyof Pick<
-    ProductFormState,
-    "featured" | "newArrival" | "bestSeller" | "active"
-  >;
-  label: string;
-  checked: boolean;
-  onChange: (id: ToggleFieldProps["id"], checked: boolean) => void;
-};
-
-function ToggleField({ id, label, checked, onChange }: ToggleFieldProps) {
-  return (
-    <label
+/** Reusable admin text input — h-11, white bg, slate border, brand focus ring */
+function AdminInput({
+  id,
+  type = "text",
+  value,
+  onChange,
+  placeholder,
+  disabled,
+  invalid,
+  suffix,
+  className,
+}: {
+  id: string;
+  type?: string;
+  value: string;
+  onChange: (v: string) => void;
+  placeholder?: string;
+  disabled?: boolean;
+  invalid?: boolean;
+  suffix?: React.ReactNode;
+  className?: string;
+}) {
+  const input = (
+    <input
+      id={id}
+      type={type}
+      value={value}
+      onChange={(e) => onChange(e.target.value)}
+      placeholder={placeholder}
+      disabled={disabled}
+      aria-invalid={invalid}
       className={cn(
-        "flex cursor-pointer items-center justify-between gap-3 rounded-lg border px-4 py-3 transition-colors",
-        checked
-          ? "border-[#8A5A6A]/40 bg-[#8A5A6A]/10"
-          : "border-border bg-background hover:bg-muted/50"
+        "h-11 w-full rounded-lg border bg-white px-3.5 text-sm text-slate-900",
+        "placeholder:text-slate-400",
+        "outline-none transition",
+        "focus:border-[#8A5A6A] focus:ring-2 focus:ring-[#8A5A6A]/20",
+        "disabled:cursor-not-allowed disabled:bg-slate-50 disabled:text-slate-400",
+        invalid
+          ? "border-red-400 focus:border-red-500 focus:ring-red-200"
+          : "border-slate-300",
+        suffix ? "pr-12" : "",
+        className
       )}
-    >
-      {/* FIX: was text-foreground/80 — same opacity issue as Field label */}
-      {/* Now: text-slate-700 → 10.7:1 on white/near-white */}
-      <span className="text-[13px] font-medium text-slate-700">{label}</span>
-      <input
-        type="checkbox"
-        checked={checked}
-        onChange={(e) => onChange(id, e.target.checked)}
-        className="size-4 accent-[#8A5A6A]"
-      />
-    </label>
+    />
+  );
+  if (!suffix) return input;
+  return (
+    <div className="relative">
+      {input}
+      <span className="pointer-events-none absolute right-3.5 top-1/2 -translate-y-1/2 text-xs text-slate-500">
+        {suffix}
+      </span>
+    </div>
   );
 }
 
-/** Layout-only section wrapper — no logic */
+/** Reusable admin textarea — white bg, slate border, brand focus ring */
+function AdminTextarea({
+  id,
+  value,
+  onChange,
+  placeholder,
+  rows = 6,
+  minHeight,
+  invalid,
+}: {
+  id: string;
+  value: string;
+  onChange: (v: string) => void;
+  placeholder?: string;
+  rows?: number;
+  minHeight?: string;
+  invalid?: boolean;
+}) {
+  return (
+    <textarea
+      id={id}
+      value={value}
+      onChange={(e) => onChange(e.target.value)}
+      placeholder={placeholder}
+      rows={rows}
+      aria-invalid={invalid}
+      className={cn(
+        "w-full resize-y rounded-lg border bg-white px-3.5 py-3",
+        "text-sm text-slate-900 placeholder:text-slate-400",
+        "outline-none transition",
+        "focus:border-[#8A5A6A] focus:ring-2 focus:ring-[#8A5A6A]/20",
+        invalid
+          ? "border-red-400 focus:border-red-500 focus:ring-red-200"
+          : "border-slate-300"
+      )}
+      style={minHeight ? { minHeight } : undefined}
+    />
+  );
+}
+
+/** Reusable admin filter select — h-9, white bg, slate border */
+function FilterSelect({
+  value,
+  onChange,
+  "aria-label": ariaLabel,
+  children,
+}: {
+  value: string;
+  onChange: (v: string) => void;
+  "aria-label": string;
+  children: React.ReactNode;
+}) {
+  return (
+    <select
+      value={value}
+      onChange={(e) => onChange(e.target.value)}
+      aria-label={ariaLabel}
+      className="h-9 rounded-lg border border-slate-300 bg-white px-2.5 text-xs text-slate-900 outline-none transition focus:border-[#8A5A6A] focus:ring-2 focus:ring-[#8A5A6A]/20"
+    >
+      {children}
+    </select>
+  );
+}
+
+/** Section wrapper with uppercase label + horizontal rule */
 function FormSection({
   title,
   children,
@@ -477,19 +610,93 @@ function FormSection({
   return (
     <section className="space-y-4">
       <div className="flex items-center gap-3">
-        <h3
-          // FIX: was text-muted-foreground (#64748b / slate-500) at 11px all-caps
-          // At 11px, WCAG AA large-text threshold (3:1) does NOT apply — normal
-          // text rules (4.5:1) do. slate-500 on white ≈ 3.9:1 → FAILS.
-          // Now: text-slate-600 → #475569 → 5.9:1 on white → PASSES AA
-          className="whitespace-nowrap text-[11px] font-semibold uppercase tracking-widest text-slate-600"
-        >
+        <h3 className="whitespace-nowrap text-[11px] font-semibold uppercase tracking-widest text-slate-600">
           {title}
         </h3>
-        <div className="h-px flex-1 bg-border" />
+        {/* bg-slate-200: hardcoded — never bg-border */}
+        <div className="h-px flex-1 bg-slate-200" />
       </div>
       {children}
     </section>
+  );
+}
+
+/** Toggle card — checked = brand tint, unchecked = white/slate */
+type ToggleFieldId = keyof Pick<
+  ProductFormState,
+  "featured" | "newArrival" | "bestSeller" | "active"
+>;
+
+function ToggleCard({
+  id,
+  label,
+  description,
+  checked,
+  onChange,
+}: {
+  id: ToggleFieldId;
+  label: string;
+  description?: string;
+  checked: boolean;
+  onChange: (id: ToggleFieldId, checked: boolean) => void;
+}) {
+  return (
+    <label
+      htmlFor={id}
+      className={cn(
+        "flex cursor-pointer items-start gap-3 rounded-xl border p-4 transition-colors",
+        checked
+          ? "border-[#8A5A6A] bg-[#8A5A6A]/10"
+          : "border-slate-200 bg-white hover:bg-slate-50"
+      )}
+    >
+      <input
+        id={id}
+        type="checkbox"
+        checked={checked}
+        onChange={(e) => onChange(id, e.target.checked)}
+        className="mt-0.5 size-4 accent-[#8A5A6A]"
+      />
+      <div className="min-w-0">
+        <p className="text-sm font-semibold text-slate-800">{label}</p>
+        {description ? (
+          <p className="mt-0.5 text-xs text-slate-500">{description}</p>
+        ) : null}
+      </div>
+    </label>
+  );
+}
+
+/** Product detail row (view-only sheet) */
+function Detail({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="grid gap-1 rounded-lg border border-slate-200 bg-white p-3">
+      <dt className="text-xs font-medium text-slate-500">{label}</dt>
+      <dd className="text-sm text-slate-900">{value || "-"}</dd>
+    </div>
+  );
+}
+
+/** Completeness pill strip */
+function CompletenessBar({ pct }: { pct: number }) {
+  const color =
+    pct >= 90
+      ? "bg-emerald-500"
+      : pct >= 60
+      ? "bg-amber-400"
+      : "bg-red-400";
+  return (
+    <div className="flex items-center gap-2.5">
+      <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-slate-200">
+        <div
+          className={cn("h-full rounded-full transition-all", color)}
+          style={{ width: `${pct}%` }}
+        />
+      </div>
+      <span className="shrink-0 text-xs font-medium tabular-nums text-slate-600">
+        {pct}% complete
+      </span>
+    </div>
   );
 }
 
@@ -512,8 +719,22 @@ export function ProductManagement() {
   const [detailsProduct, setDetailsProduct] = useState<Product | null>(null);
   const [deleteProduct, setDeleteProduct] = useState<Product | null>(null);
   const [form, setForm] = useState<ProductFormState>(emptyForm);
+  const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
+  const [isDirty, setIsDirty] = useState(false);
   const [dragOver, setDragOver] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // ── Unsaved changes guard ──────────────────────────────────────────────────
+
+  useEffect(() => {
+    function handleBeforeUnload(e: BeforeUnloadEvent) {
+      if (isDirty && formOpen) {
+        e.preventDefault();
+      }
+    }
+    window.addEventListener("beforeunload", handleBeforeUnload);
+    return () => window.removeEventListener("beforeunload", handleBeforeUnload);
+  }, [isDirty, formOpen]);
 
   // ── Data loading ──────────────────────────────────────────────────────────
 
@@ -589,7 +810,9 @@ export function ProductManagement() {
     page * PAGE_SIZE
   );
 
-  // ── Event handlers (business logic — unchanged) ───────────────────────────
+  const completeness = useMemo(() => computeCompleteness(form), [form]);
+
+  // ── Event handlers (business logic unchanged) ─────────────────────────────
 
   function resetFilters() {
     setPage(1);
@@ -612,18 +835,28 @@ export function ProductManagement() {
   }
   function updateForm(id: keyof ProductFormState, value: string) {
     setForm((c) => ({ ...c, [id]: value }));
+    setIsDirty(true);
+    // clear field error on change
+    if (fieldErrors[id]) {
+      setFieldErrors((e) => { const n = { ...e }; delete n[id]; return n; });
+    }
   }
-  function updateToggle(id: ToggleFieldProps["id"], checked: boolean) {
+  function updateToggle(id: ToggleFieldId, checked: boolean) {
     setForm((c) => ({ ...c, [id]: checked }));
+    setIsDirty(true);
   }
   function openCreateForm() {
     setDrawerMode("create");
     setForm(emptyForm);
+    setFieldErrors({});
+    setIsDirty(false);
     setFormOpen(true);
   }
   function openEditForm(product: Product) {
     setDrawerMode("edit");
     setForm(productToForm(product));
+    setFieldErrors({});
+    setIsDirty(false);
     setFormOpen(true);
   }
   function applySlug() {
@@ -632,12 +865,14 @@ export function ProductManagement() {
       slug: slugify(c.name),
       seoTitle: c.seoTitle || c.name,
     }));
+    setIsDirty(true);
   }
   function applySku() {
     setForm((c) => ({
       ...c,
       sku: generateSku(c.category, c.name),
     }));
+    setIsDirty(true);
   }
 
   async function handleImageUpload(files: FileList | null) {
@@ -662,19 +897,29 @@ export function ProductManagement() {
     }
     setForm((c) => ({ ...c, images: [...c.images, ...uploadedImages] }));
     setUploading(false);
-    toast.success("Images uploaded.");
+    setIsDirty(true);
+    toast.success(`${uploadedImages.length} image${uploadedImages.length > 1 ? "s" : ""} uploaded.`);
   }
 
   function removeImage(url: string) {
     setForm((c) => ({ ...c, images: c.images.filter((img) => img.url !== url) }));
+    setIsDirty(true);
   }
 
   async function handleSubmit() {
     const result = prepareForm(form);
     if (!result.success) {
+      // surface all field errors
+      const errors: FieldErrors = {};
+      for (const issue of result.error.issues) {
+        const key = issue.path[0] as keyof ProductFormState | undefined;
+        if (key) errors[key] = issue.message;
+      }
+      setFieldErrors(errors);
       toast.error(result.error.issues[0]?.message ?? "Invalid product data.");
       return;
     }
+    setFieldErrors({});
     setSaving(true);
     const payload = toPayload(result.data);
     if (drawerMode === "create") {
@@ -687,7 +932,7 @@ export function ProductManagement() {
         setSaving(false);
         return;
       }
-      toast.success("Product created.");
+      toast.success("Product created successfully.");
     } else {
       const product = products.find((p) => p.sku === form.sku);
       if (!product) {
@@ -704,9 +949,10 @@ export function ProductManagement() {
         setSaving(false);
         return;
       }
-      toast.success("Product updated.");
+      toast.success("Product updated successfully.");
     }
     setSaving(false);
+    setIsDirty(false);
     setFormOpen(false);
     await loadProducts();
   }
@@ -729,15 +975,25 @@ export function ProductManagement() {
     await loadProducts();
   }
 
+  function handleDrawerOpenChange(open: boolean) {
+    if (!open && isDirty) {
+      if (!window.confirm("You have unsaved changes. Discard them?")) return;
+    }
+    setFormOpen(open);
+    if (!open) setIsDirty(false);
+  }
+
   // ── Render ────────────────────────────────────────────────────────────────
 
   return (
     <div className="space-y-6">
-      {/* Page header */}
+      {/* ── Page header ─────────────────────────────────────────────────── */}
       <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-foreground">Products</h1>
-          <p className="mt-1 text-sm text-muted-foreground">
+          {/* text-slate-900 — hardcoded, never text-foreground */}
+          <h1 className="text-2xl font-bold text-slate-900">Products</h1>
+          {/* text-slate-500 — hardcoded, never text-muted-foreground */}
+          <p className="mt-1 text-sm text-slate-500">
             Manage catalog, pricing, stock, media, and SEO for Bansari products.
           </p>
         </div>
@@ -747,503 +1003,371 @@ export function ProductManagement() {
         </Button>
       </div>
 
-      {/* Product table card */}
-      <Card className="shadow-sm">
-        <CardHeader>
-          <CardTitle className="text-base font-semibold text-foreground">
+      {/* ── Product table card ───────────────────────────────────────────── */}
+      {/* bg-white border-slate-200 shadow-sm — hardcoded, never shadcn Card */}
+      <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+        {/* Card header */}
+        <div className="border-b border-slate-200 px-6 py-4">
+          <h2 className="text-base font-semibold text-slate-900">
             Product Catalog
-          </CardTitle>
-        </CardHeader>
+          </h2>
+          <p className="mt-0.5 text-sm text-slate-500">
+            {filteredProducts.length} product{filteredProducts.length !== 1 ? "s" : ""}
+          </p>
+        </div>
 
-        <CardContent className="space-y-4">
-          {/* Filters */}
-          <div className="grid gap-3 lg:grid-cols-[1fr_180px_180px_180px_auto]">
-            <label className="relative">
-              <span className="sr-only">Search products</span>
-              <Search className="absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-              <Input
-                value={query}
-                onChange={(e) => updateQuery(e.target.value)}
-                placeholder="Search by name, SKU, slug, category..."
-                className="h-9 pl-8"
-              />
-            </label>
+        {/* Filters */}
+        <div className="flex flex-wrap items-center gap-3 border-b border-slate-200 bg-slate-50 px-5 py-3">
+          {/* Search */}
+          <label className="relative min-w-[200px] flex-1">
+            <span className="sr-only">Search products</span>
+            {/* text-slate-400 — hardcoded, never text-muted-foreground */}
+            <Search className="absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-slate-400" />
+            <input
+              type="search"
+              value={query}
+              onChange={(e) => updateQuery(e.target.value)}
+              placeholder="Search by name, SKU, category…"
+              className="h-9 w-full rounded-lg border border-slate-300 bg-white pl-9 pr-3 text-sm text-slate-900 placeholder:text-slate-400 outline-none transition focus:border-[#8A5A6A] focus:ring-2 focus:ring-[#8A5A6A]/20"
+            />
+          </label>
 
-            <select
-              value={categoryFilter}
-              onChange={(e) => updateCategoryFilter(e.target.value)}
-              className="h-9 rounded-md border border-input bg-background px-2 text-xs text-foreground outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/30"
-            >
-              <option value="all">All categories</option>
-              {categories.map((cat) => (
-                <option key={cat} value={cat}>
-                  {cat}
-                </option>
-              ))}
-            </select>
+          {/* bg-white text-slate-900 border-slate-300 — hardcoded, never bg-background */}
+          <FilterSelect
+            value={categoryFilter}
+            onChange={updateCategoryFilter}
+            aria-label="Filter by category"
+          >
+            <option value="all">All categories</option>
+            {categories.map((cat) => (
+              <option key={cat} value={cat}>{cat}</option>
+            ))}
+          </FilterSelect>
 
-            <select
-              value={statusFilter}
-              onChange={(e) => updateStatusFilter(e.target.value)}
-              className="h-9 rounded-md border border-input bg-background px-2 text-xs text-foreground outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/30"
-            >
-              <option value="all">All statuses</option>
-              <option value="active">Active</option>
-              <option value="inactive">Inactive</option>
-              <option value="featured">Featured</option>
-              <option value="new-arrival">New Arrival</option>
-              <option value="best-seller">Best Seller</option>
-            </select>
+          <FilterSelect
+            value={statusFilter}
+            onChange={updateStatusFilter}
+            aria-label="Filter by status"
+          >
+            <option value="all">All statuses</option>
+            <option value="active">Active</option>
+            <option value="inactive">Inactive</option>
+            <option value="featured">Featured</option>
+            <option value="new-arrival">New Arrival</option>
+            <option value="best-seller">Best Seller</option>
+          </FilterSelect>
 
-            <select
-              value={stockFilter}
-              onChange={(e) => updateStockFilter(e.target.value)}
-              className="h-9 rounded-md border border-input bg-background px-2 text-xs text-foreground outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/30"
-            >
-              <option value="all">All stock</option>
-              <option value="in-stock">In stock</option>
-              <option value="low-stock">Low stock</option>
-              <option value="out-of-stock">Out of stock</option>
-            </select>
+          <FilterSelect
+            value={stockFilter}
+            onChange={updateStockFilter}
+            aria-label="Filter by stock"
+          >
+            <option value="all">All stock</option>
+            <option value="in-stock">In stock</option>
+            <option value="low-stock">Low stock</option>
+            <option value="out-of-stock">Out of stock</option>
+          </FilterSelect>
 
-            <Button
-              type="button"
-              variant="outline"
-              size="lg"
-              onClick={loadProducts}
-              disabled={loading}
-            >
-              <RefreshCw className={cn("size-4", loading && "animate-spin")} />
-              Refresh
-            </Button>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={loadProducts}
+            disabled={loading}
+            className="border-slate-300 text-slate-700 hover:bg-slate-50"
+          >
+            <RefreshCw className={cn("size-3.5", loading && "animate-spin")} />
+            Refresh
+          </Button>
+        </div>
+
+        {/* Error banner */}
+        {error ? (
+          {/* border-red-200 bg-red-50 text-red-700 — hardcoded, never border-destructive/30 */}
+          <div className="border-b border-red-200 bg-red-50 px-5 py-3 text-sm text-red-700">
+            {error}
           </div>
+        ) : null}
 
-          {error ? (
-            <div className="rounded-md border border-destructive/30 bg-destructive/10 p-4 text-sm text-destructive">
-              {error}
-            </div>
-          ) : null}
+        {/* Table */}
+        {/* border-slate-200 — hardcoded, never border-border */}
+        <div className="overflow-x-auto">
+          <Table>
+            <TableHeader>
+              <TableRow className="border-slate-200 bg-slate-50/60">
+                <TableHead className="w-[320px] px-5 py-3.5 text-xs font-semibold uppercase tracking-wide text-slate-500">Product</TableHead>
+                <TableHead className="px-4 py-3.5 text-xs font-semibold uppercase tracking-wide text-slate-500">Category</TableHead>
+                <TableHead className="px-4 py-3.5 text-xs font-semibold uppercase tracking-wide text-slate-500">Price</TableHead>
+                <TableHead className="px-4 py-3.5 text-xs font-semibold uppercase tracking-wide text-slate-500">Stock</TableHead>
+                <TableHead className="px-4 py-3.5 text-xs font-semibold uppercase tracking-wide text-slate-500">Status</TableHead>
+                <TableHead className="px-4 py-3.5 text-right text-xs font-semibold uppercase tracking-wide text-slate-500">Actions</TableHead>
+              </TableRow>
+            </TableHeader>
 
-          {/* Table */}
-          <div className="overflow-hidden rounded-md border border-border">
-            <Table>
-              <TableHeader>
+            <TableBody>
+              {loading ? (
                 <TableRow>
-                  <TableHead className="w-[320px] px-4">Product</TableHead>
-                  <TableHead>Category</TableHead>
-                  <TableHead>Price</TableHead>
-                  <TableHead>Stock</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
+                  <TableCell colSpan={6} className="h-40 text-center">
+                    {/* text-slate-500 — hardcoded, never text-muted-foreground */}
+                    <span className="inline-flex items-center gap-2 text-slate-500">
+                      <Loader2 className="size-4 animate-spin" />
+                      Loading products…
+                    </span>
+                  </TableCell>
                 </TableRow>
-              </TableHeader>
-
-              <TableBody>
-                {loading ? (
-                  <TableRow>
-                    <TableCell colSpan={6} className="h-40 text-center">
-                      <span className="inline-flex items-center gap-2 text-muted-foreground">
-                        <Loader2 className="size-4 animate-spin" />
-                        Loading products...
+              ) : visibleProducts.length > 0 ? (
+                visibleProducts.map((product) => (
+                  <TableRow
+                    key={product.id}
+                    className="border-slate-100 hover:bg-slate-50/60 transition-colors"
+                  >
+                    <TableCell className="px-5 py-4">
+                      <div className="flex items-center gap-3.5">
+                        {/* bg-slate-100 — hardcoded, never bg-muted */}
+                        <div className="relative size-12 shrink-0 overflow-hidden rounded-lg border border-slate-200 bg-slate-100">
+                          {product.images[0]?.url ? (
+                            <Image
+                              src={product.images[0].url}
+                              alt={product.images[0].alt}
+                              fill
+                              sizes="48px"
+                              className="object-cover"
+                            />
+                          ) : (
+                            {/* text-slate-400 — hardcoded, never text-muted-foreground */}
+                            <ImagePlus className="absolute left-1/2 top-1/2 size-5 -translate-x-1/2 -translate-y-1/2 text-slate-400" />
+                          )}
+                        </div>
+                        <div className="min-w-0">
+                          {/* text-slate-900 — hardcoded, never text-foreground */}
+                          <p className="truncate text-sm font-semibold text-slate-900">
+                            {product.name}
+                          </p>
+                          {/* text-slate-500 — hardcoded, never text-muted-foreground */}
+                          <p className="mt-0.5 truncate text-xs text-slate-500">
+                            {product.sku}
+                          </p>
+                        </div>
+                      </div>
+                    </TableCell>
+                    <TableCell className="px-4 py-4">
+                      <span className="inline-flex items-center rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-medium text-slate-700">
+                        {product.category}
                       </span>
                     </TableCell>
-                  </TableRow>
-                ) : visibleProducts.length > 0 ? (
-                  visibleProducts.map((product) => (
-                    <TableRow key={product.id}>
-                      <TableCell className="px-4">
-                        <div className="flex items-center gap-3">
-                          <div className="relative size-12 overflow-hidden rounded-md bg-muted">
-                            {product.images[0]?.url ? (
-                              <Image
-                                src={product.images[0].url}
-                                alt={product.images[0].alt}
-                                fill
-                                sizes="48px"
-                                className="object-cover"
-                              />
-                            ) : (
-                              <ImagePlus className="absolute left-1/2 top-1/2 size-5 -translate-x-1/2 -translate-y-1/2 text-muted-foreground" />
-                            )}
-                          </div>
-                          <div className="min-w-0">
-                            <p className="truncate font-semibold text-foreground">
-                              {product.name}
-                            </p>
-                            <p className="mt-1 truncate text-xs text-muted-foreground">
-                              {product.sku}
-                            </p>
-                          </div>
-                        </div>
-                      </TableCell>
-                      <TableCell>{product.category}</TableCell>
-                      <TableCell>{formatCurrency(product.price)}</TableCell>
-                      <TableCell>
-                        <Badge variant={stockVariant(product)}>
-                          {stockLabel(product)}
-                        </Badge>
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex flex-wrap gap-1.5">
-                          <Badge
-                            variant={product.active ? "outline" : "secondary"}
-                          >
-                            {product.active ? "Active" : "Inactive"}
-                          </Badge>
-                          {product.featured ? (
-                            <Badge variant="secondary">Featured</Badge>
-                          ) : null}
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex justify-end gap-1">
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="icon"
-                            aria-label={`View ${product.name}`}
-                            onClick={() => setDetailsProduct(product)}
-                          >
-                            <Eye className="size-4" />
-                          </Button>
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="icon"
-                            aria-label={`Edit ${product.name}`}
-                            onClick={() => openEditForm(product)}
-                          >
-                            <Edit className="size-4" />
-                          </Button>
-                          <Button
-                            type="button"
-                            variant="destructive"
-                            size="icon"
-                            aria-label={`Delete ${product.name}`}
-                            onClick={() => setDeleteProduct(product)}
-                          >
-                            <Trash2 className="size-4" />
-                          </Button>
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  ))
-                ) : (
-                  <TableRow>
-                    <TableCell colSpan={6} className="h-40 text-center">
-                      <div className="text-sm text-muted-foreground">
-                        No products match the current filters.
+                    <TableCell className="px-4 py-4">
+                      <span className="text-sm font-semibold text-slate-900 tabular-nums">
+                        {formatCurrency(product.price)}
+                      </span>
+                      {product.comparePrice && product.comparePrice > product.price ? (
+                        <span className="ml-1.5 text-xs text-slate-400 line-through tabular-nums">
+                          {formatCurrency(product.comparePrice)}
+                        </span>
+                      ) : null}
+                    </TableCell>
+                    <TableCell className="px-4 py-4">
+                      <Badge variant={stockVariant(product)}>
+                        {stockLabel(product)}
+                      </Badge>
+                      <p className="mt-0.5 text-xs text-slate-500 tabular-nums">
+                        {product.stock} units
+                      </p>
+                    </TableCell>
+                    <TableCell className="px-4 py-4">
+                      <div className="flex flex-wrap gap-1.5">
+                        <span
+                          className={cn(
+                            "inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium",
+                            product.active
+                              ? "bg-emerald-50 text-emerald-700"
+                              : "bg-slate-100 text-slate-600"
+                          )}
+                        >
+                          {product.active ? "Active" : "Inactive"}
+                        </span>
+                        {product.featured ? (
+                          <span className="inline-flex items-center rounded-full bg-[#8A5A6A]/10 px-2.5 py-0.5 text-xs font-medium text-[#8A5A6A]">
+                            Featured
+                          </span>
+                        ) : null}
+                        {product.bestSeller ? (
+                          <span className="inline-flex items-center rounded-full bg-amber-50 px-2.5 py-0.5 text-xs font-medium text-amber-700">
+                            Best Seller
+                          </span>
+                        ) : null}
+                        {product.newArrival ? (
+                          <span className="inline-flex items-center rounded-full bg-blue-50 px-2.5 py-0.5 text-xs font-medium text-blue-700">
+                            New
+                          </span>
+                        ) : null}
+                      </div>
+                    </TableCell>
+                    <TableCell className="px-4 py-4">
+                      <div className="flex justify-end gap-1">
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          aria-label={`View ${product.name}`}
+                          onClick={() => setDetailsProduct(product)}
+                          className="size-8 text-slate-500 hover:text-slate-900"
+                        >
+                          <Eye className="size-4" />
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          aria-label={`Edit ${product.name}`}
+                          onClick={() => openEditForm(product)}
+                          className="size-8 text-slate-500 hover:text-slate-900"
+                        >
+                          <Edit className="size-4" />
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="destructive"
+                          size="icon"
+                          aria-label={`Delete ${product.name}`}
+                          onClick={() => setDeleteProduct(product)}
+                          className="size-8"
+                        >
+                          <Trash2 className="size-4" />
+                        </Button>
                       </div>
                     </TableCell>
                   </TableRow>
-                )}
-              </TableBody>
-            </Table>
-          </div>
+                ))
+              ) : (
+                <TableRow>
+                  <TableCell colSpan={6} className="h-40 text-center">
+                    <div className="flex flex-col items-center gap-2">
+                      <ImagePlus className="size-8 text-slate-300" />
+                      {/* text-slate-500 — hardcoded, never text-muted-foreground */}
+                      <p className="text-sm text-slate-500">
+                        No products match the current filters.
+                      </p>
+                    </div>
+                  </TableCell>
+                </TableRow>
+              )}
+            </TableBody>
+          </Table>
+        </div>
 
-          {/* Pagination */}
-          <div className="flex flex-col gap-3 text-sm text-muted-foreground md:flex-row md:items-center md:justify-between">
-            <p>
-              Showing {visibleProducts.length} of {filteredProducts.length}{" "}
-              products
-            </p>
-            <div className="flex items-center gap-2">
-              <Button
-                type="button"
-                variant="outline"
-                disabled={page === 1}
-                onClick={() => setPage((p) => Math.max(1, p - 1))}
-              >
-                Previous
-              </Button>
-              <span className="text-xs">
-                Page {page} of {totalPages}
-              </span>
-              <Button
-                type="button"
-                variant="outline"
-                disabled={page === totalPages}
-                onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-              >
-                Next
-              </Button>
-            </div>
+        {/* Pagination */}
+        <div className="flex flex-col gap-3 border-t border-slate-200 bg-slate-50/60 px-5 py-3 text-sm md:flex-row md:items-center md:justify-between">
+          {/* text-slate-500 — hardcoded, never text-muted-foreground */}
+          <p className="text-slate-500">
+            Showing <span className="font-medium text-slate-700">{(page - 1) * PAGE_SIZE + 1}–{Math.min(page * PAGE_SIZE, filteredProducts.length)}</span> of{" "}
+            <span className="font-medium text-slate-700">{filteredProducts.length}</span> products
+          </p>
+          <div className="flex items-center gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              disabled={page === 1}
+              onClick={() => setPage((p) => Math.max(1, p - 1))}
+              className="border-slate-300"
+            >
+              Previous
+            </Button>
+            <span className="min-w-[80px] text-center text-xs text-slate-500 tabular-nums">
+              Page {page} of {totalPages}
+            </span>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              disabled={page === totalPages}
+              onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+              className="border-slate-300"
+            >
+              Next
+            </Button>
           </div>
-        </CardContent>
-      </Card>
+        </div>
+      </div>
 
-      {/* ─────────────────────────────────────────────────────────────────────
+      {/* ══════════════════════════════════════════════════════════════════════
           CREATE / EDIT PRODUCT DRAWER
-          Responsive widths: xl:900px  lg:800px  md:700px  mobile:100%
-          Layout: sticky header + scrollable body + sticky footer
-      ───────────────────────────────────────────────────────────────────── */}
-      <Sheet open={formOpen} onOpenChange={setFormOpen}>
+          Layout: sticky header (bg-white) + scrollable body (bg-slate-50)
+                  + sticky footer (bg-white)
+          All colors: hardcoded slate-* / white. Zero CSS variable references.
+      ══════════════════════════════════════════════════════════════════════ */}
+      <Sheet open={formOpen} onOpenChange={handleDrawerOpenChange}>
         <SheetContent
           className={cn(
             "w-full",
             "md:max-w-[700px]",
-            "lg:max-w-[800px]",
-            "xl:max-w-[900px]",
+            "lg:max-w-[820px]",
+            "xl:max-w-[960px]",
             "flex h-screen flex-col overflow-hidden p-0"
           )}
         >
-          {/* ── Sticky header ── */}
-          <SheetHeader className="shrink-0 border-b border-border bg-background px-8 py-5">
-            <div className="flex items-start justify-between gap-4">
-              <div>
-                <SheetTitle className="text-xl font-semibold text-foreground">
+          {/* ── Sticky header — bg-white border-slate-200 (NEVER bg-background border-border) */}
+          <SheetHeader className="shrink-0 border-b border-slate-200 bg-white px-8 py-5">
+            <div className="flex items-center justify-between gap-4">
+              <div className="min-w-0 flex-1">
+                {/* text-slate-900 — hardcoded, never text-foreground */}
+                <SheetTitle className="text-xl font-bold text-slate-900">
                   {drawerMode === "create" ? "Create Product" : "Edit Product"}
                 </SheetTitle>
-                <SheetDescription className="mt-0.5 text-sm text-muted-foreground">
+                {/* text-slate-500 — hardcoded, never text-muted-foreground */}
+                <SheetDescription className="mt-0.5 text-sm text-slate-500">
                   {drawerMode === "create"
                     ? "Fill in the details below to add a new product to the catalog."
-                    : "Update product data, media, inventory, and SEO metadata."}
+                    : `Editing: ${form.name || "(untitled)"}`}
                 </SheetDescription>
               </div>
+              {isDirty ? (
+                <span className="shrink-0 rounded-full bg-amber-50 px-2.5 py-0.5 text-xs font-medium text-amber-700">
+                  Unsaved
+                </span>
+              ) : null}
+            </div>
+            {/* Completeness bar */}
+            <div className="mt-3">
+              <CompletenessBar pct={completeness} />
             </div>
           </SheetHeader>
 
-          {/* ── Scrollable form body ── */}
-          <div className="flex-1 overflow-y-auto bg-muted/30">
+          {/* ── Scrollable form body — bg-slate-50 (NEVER bg-muted/30) ─────── */}
+          <div className="flex-1 overflow-y-auto bg-slate-50">
             <div className="space-y-8 px-8 py-7">
 
-              {/* ── Section 1: Basic Information ── */}
-              <FormSection title="Basic Information">
-                <Field
-                  id="name"
-                  label="Product Name"
-                  value={form.name}
-                  onChange={updateForm}
-                  placeholder="e.g. Kanjivaram Pure Silk Saree"
-                  required
-                />
-
-                <div className="flex items-end gap-2">
-                  <div className="flex-1">
-                    <Field
-                      id="slug"
-                      label="URL Slug"
-                      value={form.slug}
-                      onChange={updateForm}
-                      placeholder="kanjivaram-pure-silk-saree"
-                      required
-                    />
-                  </div>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    className="h-10 shrink-0 gap-1.5 text-xs"
-                    onClick={applySlug}
-                  >
-                    <Wand2 className="size-3.5" />
-                    Generate
-                  </Button>
-                </div>
-
-                <div className="flex items-end gap-2">
-                  <div className="flex-1">
-                    <Field
-                      id="sku"
-                      label="SKU"
-                      value={form.sku}
-                      onChange={updateForm}
-                      placeholder="BC-SAR-KAN-123456"
-                      required
-                    />
-                  </div>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    className="h-10 shrink-0 gap-1.5 text-xs"
-                    onClick={applySku}
-                  >
-                    <Wand2 className="size-3.5" />
-                    Generate
-                  </Button>
-                </div>
-              </FormSection>
-
-              {/* ── Section 2: Classification ── */}
-              <FormSection title="Classification">
-                <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-                  <Field
-                    id="category"
-                    label="Category"
-                    value={form.category}
-                    onChange={updateForm}
-                    placeholder="Sarees"
-                    required
-                  />
-                  <Field
-                    id="collection"
-                    label="Collection"
-                    value={form.collection}
-                    onChange={updateForm}
-                    placeholder="Summer 2025"
-                    required
-                  />
-                  <Field
-                    id="brand"
-                    label="Brand"
-                    value={form.brand}
-                    onChange={updateForm}
-                    required
-                  />
-                </div>
-              </FormSection>
-
-              {/* ── Section 3: Product Details ── */}
-              <FormSection title="Product Details">
-                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                  <Field
-                    id="fabric"
-                    label="Fabric"
-                    value={form.fabric}
-                    onChange={updateForm}
-                    placeholder="Pure Silk"
-                    required
-                  />
-                  <Field
-                    id="color"
-                    label="Color"
-                    value={form.color}
-                    onChange={updateForm}
-                    placeholder="Deep Crimson"
-                    required
-                  />
-                  <Field
-                    id="sizes"
-                    label="Sizes (comma-separated)"
-                    value={form.sizes}
-                    onChange={updateForm}
-                    placeholder="XS, S, M, L, XL"
-                    required
-                  />
-                  <Field
-                    id="hsn"
-                    label="HSN Code"
-                    value={form.hsn}
-                    onChange={updateForm}
-                    placeholder="5208"
-                    required
-                  />
-                </div>
-              </FormSection>
-
-              {/* ── Section 4: Pricing ── */}
-              <FormSection title="Pricing & Inventory">
-                <div className="grid grid-cols-2 gap-4 sm:grid-cols-5">
-                  <Field
-                    id="price"
-                    label="Price (₹)"
-                    value={form.price}
-                    onChange={updateForm}
-                    type="number"
-                    placeholder="0"
-                    required
-                  />
-                  <Field
-                    id="comparePrice"
-                    label="Compare Price"
-                    value={form.comparePrice}
-                    onChange={updateForm}
-                    type="number"
-                    placeholder="0"
-                  />
-                  <Field
-                    id="cost"
-                    label="Cost"
-                    value={form.cost}
-                    onChange={updateForm}
-                    type="number"
-                    placeholder="0"
-                  />
-                  <Field
-                    id="stock"
-                    label="Stock"
-                    value={form.stock}
-                    onChange={updateForm}
-                    type="number"
-                    placeholder="0"
-                    required
-                  />
-                  <Field
-                    id="gst"
-                    label="GST %"
-                    value={form.gst}
-                    onChange={updateForm}
-                    type="number"
-                    placeholder="5"
-                    required
-                  />
-                </div>
-              </FormSection>
-
-              {/* ── Section 5: Description ── */}
-              <FormSection title="Description">
-                <div className="flex flex-col gap-1.5">
-                  <label
-                    htmlFor="description"
-                    // FIX: was text-foreground/80 — same opacity issue
-                    // Now: text-slate-700 → 10.7:1 on white/near-white
-                    className="text-[13px] font-medium text-slate-700"
-                  >
-                    Description{" "}
-                    <span className="ml-0.5 text-red-500">*</span>
-                  </label>
-                  <textarea
-                    id="description"
-                    value={form.description}
-                    onChange={(e) => updateForm("description", e.target.value)}
-                    placeholder="Describe the product — fabric, craftsmanship, occasions, care instructions..."
-                    className="w-full resize-y rounded-lg border border-input bg-background px-3.5 py-3 text-sm text-foreground outline-none placeholder:text-muted-foreground transition focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/30"
-                    style={{ minHeight: "220px" }}
-                  />
-                </div>
-              </FormSection>
-
-              {/* ── Section 6: Media ── */}
+              {/* ── Section 1: Media (top — images set the product's identity) ── */}
               <FormSection title="Media">
                 <div
                   role="button"
                   tabIndex={0}
-                  aria-label="Upload product images"
-                  onDragOver={(e) => {
-                    e.preventDefault();
-                    setDragOver(true);
-                  }}
+                  aria-label="Upload product images — drop files here or press Enter to browse"
+                  onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
                   onDragLeave={() => setDragOver(false)}
-                  onDrop={(e) => {
-                    e.preventDefault();
-                    setDragOver(false);
-                    void handleImageUpload(e.dataTransfer.files);
-                  }}
+                  onDrop={(e) => { e.preventDefault(); setDragOver(false); void handleImageUpload(e.dataTransfer.files); }}
                   onClick={() => fileInputRef.current?.click()}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter" || e.key === " ") {
-                      fileInputRef.current?.click();
-                    }
-                  }}
+                  onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") fileInputRef.current?.click(); }}
                   className={cn(
                     "flex cursor-pointer flex-col items-center justify-center gap-3 rounded-xl border-2 border-dashed px-6 py-10 text-center transition-colors",
                     dragOver
                       ? "border-[#8A5A6A] bg-[#8A5A6A]/10"
-                      : "border-border bg-muted/50 hover:border-border hover:bg-muted"
+                      // bg-slate-50 hover:bg-slate-100 border-slate-200 — hardcoded, never bg-muted/50 border-border
+                      : "border-slate-200 bg-white hover:bg-slate-50"
                   )}
                 >
                   {uploading ? (
-                    <Loader2 className="size-7 animate-spin text-muted-foreground" />
+                    <Loader2 className="size-8 animate-spin text-[#8A5A6A]" />
                   ) : (
-                    <ImagePlus className="size-7 text-muted-foreground" />
+                    {/* text-slate-400 — hardcoded, never text-muted-foreground */}
+                    <ImagePlus className="size-8 text-slate-400" />
                   )}
                   <div>
-                    {/* FIX: was text-foreground/80 */}
-                    <p className="text-sm font-medium text-slate-700">
-                      {uploading ? "Uploading..." : "Drop images here or click to upload"}
+                    <p className="text-sm font-semibold text-slate-700">
+                      {uploading ? "Uploading…" : "Drop images here, or click to browse"}
                     </p>
-                    {/* Helper text: text-slate-500 → #64748b → 4.6:1 on white → PASSES AA */}
                     <p className="mt-0.5 text-xs text-slate-500">
-                      PNG, JPG, WEBP up to 10MB each
+                      PNG, JPG, WEBP · Up to 10 MB each · Multiple files supported
                     </p>
                   </div>
                   <input
@@ -1258,11 +1382,11 @@ export function ProductManagement() {
                 </div>
 
                 {form.images.length > 0 ? (
-                  <div className="mt-4 grid grid-cols-3 gap-3 sm:grid-cols-4 md:grid-cols-5">
-                    {form.images.map((image) => (
+                  <div className="mt-3 grid grid-cols-3 gap-3 sm:grid-cols-4 md:grid-cols-5">
+                    {form.images.map((image, index) => (
                       <div
                         key={image.url}
-                        className="group relative aspect-square overflow-hidden rounded-lg border border-border bg-muted"
+                        className="group relative aspect-square overflow-hidden rounded-xl border border-slate-200 bg-slate-100"
                       >
                         <Image
                           src={image.url}
@@ -1271,11 +1395,19 @@ export function ProductManagement() {
                           sizes="160px"
                           className="object-cover"
                         />
+                        {/* Cover badge on first image */}
+                        {index === 0 ? (
+                          <span className="absolute bottom-1.5 left-1.5 flex items-center gap-1 rounded-full bg-black/60 px-2 py-0.5 text-[10px] font-medium text-white">
+                            <CheckCircle2 className="size-2.5" />
+                            Cover
+                          </span>
+                        ) : null}
+                        {/* Delete button — visible on hover AND on focus for keyboard access */}
                         <button
                           type="button"
-                          aria-label="Remove image"
+                          aria-label={`Remove image ${index + 1}`}
                           onClick={() => removeImage(image.url)}
-                          className="absolute right-1.5 top-1.5 flex size-6 items-center justify-center rounded-full bg-destructive text-destructive-foreground opacity-0 shadow transition group-hover:opacity-100"
+                          className="absolute right-1.5 top-1.5 flex size-6 items-center justify-center rounded-full bg-white/90 text-slate-700 shadow-sm opacity-0 transition group-hover:opacity-100 focus-visible:opacity-100 hover:bg-red-50 hover:text-red-600"
                         >
                           <X className="size-3.5" />
                         </button>
@@ -1285,63 +1417,324 @@ export function ProductManagement() {
                 ) : null}
               </FormSection>
 
-              {/* ── Section 7: SEO ── */}
-              <FormSection title="SEO">
-                <Field
-                  id="seoTitle"
-                  label="SEO Title"
-                  value={form.seoTitle}
-                  onChange={updateForm}
-                  placeholder="Kanjivaram Pure Silk Saree | Bansari Collections"
+              {/* ── Section 2: Basic Information ── */}
+              <FormSection title="Basic Information">
+                <FormField
+                  label="Product Name"
+                  htmlFor="name"
                   required
-                />
-                <div className="flex flex-col gap-1.5">
-                  <label
-                    htmlFor="seoDescription"
-                    // FIX: was text-foreground/80
-                    className="text-[13px] font-medium text-slate-700"
-                  >
-                    SEO Description{" "}
-                    <span className="ml-0.5 text-red-500">*</span>
-                  </label>
-                  <textarea
-                    id="seoDescription"
-                    value={form.seoDescription}
-                    onChange={(e) =>
-                      updateForm("seoDescription", e.target.value)
-                    }
-                    placeholder="Shop authentic Kanjivaram Pure Silk Sarees at Bansari Collections. Premium ethnic wear for weddings and festivals."
-                    rows={3}
-                    className="w-full resize-y rounded-lg border border-input bg-background px-3.5 py-3 text-sm text-foreground outline-none placeholder:text-muted-foreground transition focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/30"
+                  error={fieldErrors.name}
+                >
+                  <AdminInput
+                    id="name"
+                    value={form.name}
+                    onChange={(v) => updateForm("name", v)}
+                    placeholder="e.g. Kanjivaram Pure Silk Saree"
+                    invalid={Boolean(fieldErrors.name)}
                   />
+                </FormField>
+
+                <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                  <FormField
+                    label="URL Slug"
+                    htmlFor="slug"
+                    required
+                    error={fieldErrors.slug}
+                    hint="Used in the product URL — auto-generated from name."
+                  >
+                    <div className="flex gap-2">
+                      <AdminInput
+                        id="slug"
+                        value={form.slug}
+                        onChange={(v) => updateForm("slug", v)}
+                        placeholder="kanjivaram-pure-silk-saree"
+                        invalid={Boolean(fieldErrors.slug)}
+                        className="flex-1"
+                      />
+                      <Button
+                        type="button"
+                        variant="outline"
+                        className="h-11 shrink-0 border-slate-300 text-slate-700 hover:bg-slate-50"
+                        onClick={applySlug}
+                        aria-label="Generate slug from product name"
+                      >
+                        <Wand2 className="size-3.5" />
+                      </Button>
+                    </div>
+                  </FormField>
+
+                  <FormField
+                    label="SKU"
+                    htmlFor="sku"
+                    required
+                    error={fieldErrors.sku}
+                    hint="Stock-keeping unit — unique per product."
+                  >
+                    <div className="flex gap-2">
+                      <AdminInput
+                        id="sku"
+                        value={form.sku}
+                        onChange={(v) => updateForm("sku", v)}
+                        placeholder="BC-SAR-KAN-123456"
+                        invalid={Boolean(fieldErrors.sku)}
+                        className="flex-1"
+                      />
+                      <Button
+                        type="button"
+                        variant="outline"
+                        className="h-11 shrink-0 border-slate-300 text-slate-700 hover:bg-slate-50"
+                        onClick={applySku}
+                        aria-label="Auto-generate SKU"
+                      >
+                        <Wand2 className="size-3.5" />
+                      </Button>
+                    </div>
+                  </FormField>
                 </div>
               </FormSection>
 
+              {/* ── Section 3: Classification ── */}
+              <FormSection title="Classification">
+                <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+                  <FormField label="Category" htmlFor="category" required error={fieldErrors.category}>
+                    <AdminInput
+                      id="category"
+                      value={form.category}
+                      onChange={(v) => updateForm("category", v)}
+                      placeholder="Sarees"
+                      invalid={Boolean(fieldErrors.category)}
+                    />
+                  </FormField>
+                  <FormField label="Collection" htmlFor="collection" required error={fieldErrors.collection}>
+                    <AdminInput
+                      id="collection"
+                      value={form.collection}
+                      onChange={(v) => updateForm("collection", v)}
+                      placeholder="Summer 2025"
+                      invalid={Boolean(fieldErrors.collection)}
+                    />
+                  </FormField>
+                  <FormField label="Brand" htmlFor="brand" required error={fieldErrors.brand}>
+                    <AdminInput
+                      id="brand"
+                      value={form.brand}
+                      onChange={(v) => updateForm("brand", v)}
+                      invalid={Boolean(fieldErrors.brand)}
+                    />
+                  </FormField>
+                </div>
+              </FormSection>
+
+              {/* ── Section 4: Product Details ── */}
+              <FormSection title="Product Details">
+                <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                  <FormField label="Fabric" htmlFor="fabric" required error={fieldErrors.fabric}>
+                    <AdminInput
+                      id="fabric"
+                      value={form.fabric}
+                      onChange={(v) => updateForm("fabric", v)}
+                      placeholder="Pure Silk"
+                      invalid={Boolean(fieldErrors.fabric)}
+                    />
+                  </FormField>
+                  <FormField label="Color" htmlFor="color" required error={fieldErrors.color}>
+                    <AdminInput
+                      id="color"
+                      value={form.color}
+                      onChange={(v) => updateForm("color", v)}
+                      placeholder="Deep Crimson"
+                      invalid={Boolean(fieldErrors.color)}
+                    />
+                  </FormField>
+                  <FormField
+                    label="Sizes"
+                    htmlFor="sizes"
+                    required
+                    error={fieldErrors.sizes}
+                    hint="Comma-separated: XS, S, M, L, XL"
+                  >
+                    <AdminInput
+                      id="sizes"
+                      value={form.sizes}
+                      onChange={(v) => updateForm("sizes", v)}
+                      placeholder="XS, S, M, L, XL"
+                      invalid={Boolean(fieldErrors.sizes)}
+                    />
+                  </FormField>
+                  <FormField label="HSN Code" htmlFor="hsn" required error={fieldErrors.hsn}>
+                    <AdminInput
+                      id="hsn"
+                      value={form.hsn}
+                      onChange={(v) => updateForm("hsn", v)}
+                      placeholder="5208"
+                      invalid={Boolean(fieldErrors.hsn)}
+                    />
+                  </FormField>
+                </div>
+              </FormSection>
+
+              {/* ── Section 5: Description ── */}
+              <FormSection title="Description">
+                <FormField
+                  label="Product Description"
+                  htmlFor="description"
+                  required
+                  error={fieldErrors.description}
+                  counter={{ current: form.description.length, max: 2000 }}
+                >
+                  {/* bg-white text-slate-900 border-slate-300 — hardcoded, never bg-background text-foreground border-input */}
+                  <AdminTextarea
+                    id="description"
+                    value={form.description}
+                    onChange={(v) => updateForm("description", v)}
+                    placeholder="Describe the product — fabric, craftsmanship, occasions, care instructions…"
+                    minHeight="220px"
+                    invalid={Boolean(fieldErrors.description)}
+                  />
+                </FormField>
+              </FormSection>
+
+              {/* ── Section 6: Pricing & Inventory ── */}
+              <FormSection title="Pricing & Inventory">
+                <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-5">
+                  <FormField label="Price (₹)" htmlFor="price" required error={fieldErrors.price}>
+                    <AdminInput
+                      id="price"
+                      type="number"
+                      value={form.price}
+                      onChange={(v) => updateForm("price", v)}
+                      placeholder="0"
+                      invalid={Boolean(fieldErrors.price)}
+                    />
+                  </FormField>
+                  <FormField label="Compare Price" htmlFor="comparePrice" error={fieldErrors.comparePrice}>
+                    <AdminInput
+                      id="comparePrice"
+                      type="number"
+                      value={form.comparePrice}
+                      onChange={(v) => updateForm("comparePrice", v)}
+                      placeholder="0"
+                    />
+                  </FormField>
+                  <FormField label="Cost" htmlFor="cost" error={fieldErrors.cost} hint="Not shown to customers">
+                    <AdminInput
+                      id="cost"
+                      type="number"
+                      value={form.cost}
+                      onChange={(v) => updateForm("cost", v)}
+                      placeholder="0"
+                    />
+                  </FormField>
+                  <FormField label="Stock" htmlFor="stock" required error={fieldErrors.stock}>
+                    <AdminInput
+                      id="stock"
+                      type="number"
+                      value={form.stock}
+                      onChange={(v) => updateForm("stock", v)}
+                      placeholder="0"
+                      invalid={Boolean(fieldErrors.stock)}
+                    />
+                  </FormField>
+                  <FormField label="GST %" htmlFor="gst" required error={fieldErrors.gst}>
+                    <AdminInput
+                      id="gst"
+                      type="number"
+                      value={form.gst}
+                      onChange={(v) => updateForm("gst", v)}
+                      placeholder="5"
+                      suffix="%"
+                      invalid={Boolean(fieldErrors.gst)}
+                    />
+                  </FormField>
+                </div>
+              </FormSection>
+
+              {/* ── Section 7: SEO ── */}
+              <FormSection title="SEO">
+                <FormField
+                  label="SEO Title"
+                  htmlFor="seoTitle"
+                  required
+                  error={fieldErrors.seoTitle}
+                  counter={{ current: form.seoTitle.length, max: 60 }}
+                  hint="Shown in browser tab and search results — keep under 60 characters."
+                >
+                  <AdminInput
+                    id="seoTitle"
+                    value={form.seoTitle}
+                    onChange={(v) => updateForm("seoTitle", v)}
+                    placeholder="Kanjivaram Pure Silk Saree | Bansari Collections"
+                    invalid={Boolean(fieldErrors.seoTitle)}
+                  />
+                </FormField>
+
+                <FormField
+                  label="SEO Description"
+                  htmlFor="seoDescription"
+                  required
+                  error={fieldErrors.seoDescription}
+                  counter={{ current: form.seoDescription.length, max: 160 }}
+                  hint="Shown in search snippets — keep under 160 characters."
+                >
+                  {/* bg-white text-slate-900 border-slate-300 — hardcoded, never bg-background text-foreground border-input */}
+                  <AdminTextarea
+                    id="seoDescription"
+                    value={form.seoDescription}
+                    onChange={(v) => updateForm("seoDescription", v)}
+                    placeholder="Shop authentic Kanjivaram Pure Silk Sarees at Bansari Collections. Premium ethnic wear for weddings and festivals."
+                    rows={3}
+                    invalid={Boolean(fieldErrors.seoDescription)}
+                  />
+                </FormField>
+
+                {/* Google SERP preview */}
+                {(form.seoTitle || form.seoDescription) ? (
+                  <div className="rounded-xl border border-slate-200 bg-white p-4">
+                    <p className="mb-2 text-[11px] font-semibold uppercase tracking-widest text-slate-500">
+                      Search Preview
+                    </p>
+                    <p className="text-[13px] font-medium text-[#1a0dab] hover:underline">
+                      {form.seoTitle || "Page title"}
+                    </p>
+                    <p className="text-xs text-[#006621]">
+                      bansaricollections.com › products › {form.slug || "product"}
+                    </p>
+                    <p className="mt-0.5 text-xs text-slate-600 line-clamp-2">
+                      {form.seoDescription || "Add a meta description…"}
+                    </p>
+                  </div>
+                ) : null}
+              </FormSection>
+
               {/* ── Section 8: Product Flags ── */}
-              <FormSection title="Product Flags">
-                <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-                  <ToggleField
+              <FormSection title="Visibility & Flags">
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                  <ToggleCard
+                    id="active"
+                    label="Active"
+                    description="Product is visible on the storefront."
+                    checked={form.active}
+                    onChange={updateToggle}
+                  />
+                  <ToggleCard
                     id="featured"
                     label="Featured"
+                    description="Shown on the homepage featured section."
                     checked={form.featured}
                     onChange={updateToggle}
                   />
-                  <ToggleField
+                  <ToggleCard
                     id="newArrival"
                     label="New Arrival"
+                    description="Tagged as new in listings and collections."
                     checked={form.newArrival}
                     onChange={updateToggle}
                   />
-                  <ToggleField
+                  <ToggleCard
                     id="bestSeller"
                     label="Best Seller"
+                    description="Shown in the best sellers collection."
                     checked={form.bestSeller}
-                    onChange={updateToggle}
-                  />
-                  <ToggleField
-                    id="active"
-                    label="Active"
-                    checked={form.active}
                     onChange={updateToggle}
                   />
                 </div>
@@ -1350,52 +1743,65 @@ export function ProductManagement() {
             </div>
           </div>
 
-          {/* ── Sticky footer ── */}
-          <SheetFooter className="shrink-0 border-t border-border bg-background px-8 py-4">
+          {/* ── Sticky footer — bg-white border-slate-200 (NEVER bg-background border-border) */}
+          <SheetFooter className="shrink-0 border-t border-slate-200 bg-white px-8 py-4">
             <div className="flex w-full items-center justify-between gap-3">
               <Button
                 type="button"
                 variant="outline"
                 size="lg"
-                onClick={() => setFormOpen(false)}
+                onClick={() => handleDrawerOpenChange(false)}
                 disabled={saving}
+                className="border-slate-300 text-slate-700 hover:bg-slate-50"
               >
                 Cancel
               </Button>
-              <Button
-                type="button"
-                size="lg"
-                onClick={handleSubmit}
-                disabled={saving || uploading}
-                className="min-w-[160px]"
-              >
-                {saving ? (
-                  <Loader2 className="size-4 animate-spin" />
-                ) : null}
-                {drawerMode === "create" ? "Create Product" : "Save Changes"}
-              </Button>
+              <div className="flex items-center gap-3">
+                {completeness < 100 ? (
+                  <span className="hidden text-xs text-slate-500 sm:block">
+                    {REQUIRED_FIELDS.length - Math.round(completeness / 100 * REQUIRED_FIELDS.length)} field{REQUIRED_FIELDS.length - Math.round(completeness / 100 * REQUIRED_FIELDS.length) !== 1 ? "s" : ""} remaining
+                  </span>
+                ) : (
+                  <span className="hidden items-center gap-1 text-xs text-emerald-600 sm:flex">
+                    <CheckCircle2 className="size-3.5" />
+                    All required fields filled
+                  </span>
+                )}
+                <Button
+                  type="button"
+                  size="lg"
+                  onClick={handleSubmit}
+                  disabled={saving || uploading}
+                  className="min-w-[160px] bg-[#8A5A6A] text-white hover:bg-[#7a4a5a]"
+                >
+                  {saving ? (
+                    <Loader2 className="size-4 animate-spin" />
+                  ) : null}
+                  {drawerMode === "create" ? "Create Product" : "Save Changes"}
+                </Button>
+              </div>
             </div>
           </SheetFooter>
         </SheetContent>
       </Sheet>
 
-      {/* ── Product details side sheet ── */}
+      {/* ── Product detail view sheet ──────────────────────────────────────── */}
       <Sheet
         open={Boolean(detailsProduct)}
-        onOpenChange={(open) => {
-          if (!open) setDetailsProduct(null);
-        }}
+        onOpenChange={(open) => { if (!open) setDetailsProduct(null); }}
       >
-        <SheetContent className="w-full overflow-y-auto sm:max-w-xl">
+        <SheetContent className="flex w-full flex-col overflow-hidden p-0 sm:max-w-xl">
           {detailsProduct ? (
             <>
-              <SheetHeader>
-                <SheetTitle>{detailsProduct.name}</SheetTitle>
-                <SheetDescription>{detailsProduct.sku}</SheetDescription>
-              </SheetHeader>
-              <div className="space-y-5 px-6 pb-6">
+              {/* Header */}
+              <div className="shrink-0 border-b border-slate-200 bg-white px-6 py-5">
+                <h2 className="text-lg font-bold text-slate-900">{detailsProduct.name}</h2>
+                <p className="mt-0.5 text-sm text-slate-500">{detailsProduct.sku}</p>
+              </div>
+              <div className="flex-1 overflow-y-auto bg-slate-50 px-6 pb-6 pt-5">
+                {/* Cover image */}
                 {detailsProduct.images[0]?.url ? (
-                  <div className="relative aspect-[4/5] overflow-hidden rounded-md bg-muted">
+                  <div className="relative mb-5 aspect-[4/5] overflow-hidden rounded-xl border border-slate-200 bg-slate-100">
                     <Image
                       src={detailsProduct.images[0].url}
                       alt={detailsProduct.images[0].alt}
@@ -1405,7 +1811,17 @@ export function ProductManagement() {
                     />
                   </div>
                 ) : null}
-                <div className="grid gap-3 text-sm">
+                {/* Additional images strip */}
+                {detailsProduct.images.length > 1 ? (
+                  <div className="mb-5 grid grid-cols-5 gap-2">
+                    {detailsProduct.images.slice(1).map((img) => (
+                      <div key={img.url} className="relative aspect-square overflow-hidden rounded-lg border border-slate-200 bg-slate-100">
+                        <Image src={img.url} alt={img.alt} fill sizes="96px" className="object-cover" />
+                      </div>
+                    ))}
+                  </div>
+                ) : null}
+                <dl className="grid gap-2 text-sm">
                   <Detail label="Slug" value={detailsProduct.slug} />
                   <Detail label="Category" value={detailsProduct.category} />
                   <Detail label="Collection" value={detailsProduct.collection} />
@@ -1414,29 +1830,45 @@ export function ProductManagement() {
                   <Detail label="Color" value={detailsProduct.color} />
                   <Detail label="Sizes" value={detailsProduct.sizes.join(", ")} />
                   <Detail label="Price" value={formatCurrency(detailsProduct.price)} />
-                  <Detail label="Stock" value={String(detailsProduct.stock)} />
+                  <Detail label="Stock" value={`${detailsProduct.stock} units`} />
                   <Detail label="GST" value={`${detailsProduct.gst}%`} />
+                  <Detail label="HSN" value={detailsProduct.hsn} />
                   <Detail label="Description" value={detailsProduct.description} />
-                </div>
+                  <Detail label="SEO Title" value={detailsProduct.seoTitle} />
+                  <Detail label="SEO Description" value={detailsProduct.seoDescription} />
+                </dl>
+              </div>
+              {/* Footer */}
+              <div className="shrink-0 border-t border-slate-200 bg-white px-6 py-4">
+                <Button
+                  type="button"
+                  className="w-full bg-[#8A5A6A] text-white hover:bg-[#7a4a5a]"
+                  onClick={() => {
+                    setDetailsProduct(null);
+                    openEditForm(detailsProduct);
+                  }}
+                >
+                  <Edit className="size-4" />
+                  Edit Product
+                </Button>
               </div>
             </>
           ) : null}
         </SheetContent>
       </Sheet>
 
-      {/* ── Delete confirmation dialog ── */}
+      {/* ── Delete confirmation dialog ─────────────────────────────────────── */}
       <Dialog
         open={Boolean(deleteProduct)}
-        onOpenChange={(open) => {
-          if (!open) setDeleteProduct(null);
-        }}
+        onOpenChange={(open) => { if (!open) setDeleteProduct(null); }}
       >
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Delete Product</DialogTitle>
             <DialogDescription>
-              This will permanently delete {deleteProduct?.name}. This action
-              cannot be undone.
+              This will permanently delete{" "}
+              <span className="font-semibold text-slate-900">{deleteProduct?.name}</span>.
+              This action cannot be undone.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
@@ -1444,6 +1876,7 @@ export function ProductManagement() {
               type="button"
               variant="outline"
               onClick={() => setDeleteProduct(null)}
+              className="border-slate-300"
             >
               Cancel
             </Button>
@@ -1454,20 +1887,11 @@ export function ProductManagement() {
               disabled={saving}
             >
               {saving ? <Loader2 className="size-4 animate-spin" /> : null}
-              Delete
+              Delete Product
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </div>
-  );
-}
-
-function Detail({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="grid gap-1 rounded-md border border-border p-3">
-      <dt className="text-xs font-medium text-muted-foreground">{label}</dt>
-      <dd className="text-sm text-foreground">{value || "-"}</dd>
     </div>
   );
 }
