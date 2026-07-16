@@ -4,7 +4,7 @@ import { useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { Heart, Star, ShoppingBag, Eye } from "lucide-react";
-import { useCart } from "@/context/CartContext";
+import { useCart } from "@/hooks/useCart";
 
 import { Product } from "@/types";
 
