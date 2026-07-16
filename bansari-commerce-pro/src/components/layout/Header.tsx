@@ -2,18 +2,12 @@
 
 import Link from "next/link";
 import { Heart, Menu, Search, ShoppingBag, User } from "lucide-react";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useCart } from "@/store/cart";
 import { useWishlist } from "@/store/wishlist";
-import AnnouncementBar, {
-  type AnnouncementBarProps,
-} from "./AnnouncementBar";
+import AnnouncementBar, { type AnnouncementBarProps } from "./AnnouncementBar";
 import MobileMenu from "./MobileMenu";
 
-// ---------------------------------------------------------------------------
-// Shared navigation configuration
-// Single source of truth consumed by both the desktop mega-menu and MobileMenu.
-// ---------------------------------------------------------------------------
 export const NAV_CATEGORIES = [
   "Kurta Sets",
   "Ethnic Dresses",
@@ -33,73 +27,121 @@ export const NAV_COLLECTIONS = [
 
 export const NAV_TOP_LINKS = [
   { label: "New Arrivals", href: "/new-arrivals" },
-  { label: "Collections", href: "/collections" },
+  { label: "Collections",  href: "/collections" },
   { label: "About",        href: "/about" },
   { label: "Contact",      href: "/contact" },
 ] as const;
 
-// ---------------------------------------------------------------------------
-// Announcement configuration
-// Increment storageKey version to re-surface after a content change.
-// ---------------------------------------------------------------------------
 const ANNOUNCEMENT: AnnouncementBarProps = {
-  message:
-    "🚚 Free shipping on orders above ₹999 · Use code BANSARI10 for 10% off your first order",
-  storageKey: "announcement:v1",
+  storageKey: "announcement:v3",
 };
 
-// ---------------------------------------------------------------------------
-// Header
-// ---------------------------------------------------------------------------
 export default function Header() {
-  const { items } = useCart();
+  const { items }           = useCart();
   const { items: wishlist } = useWishlist();
-
   const [shopOpen, setShopOpen]     = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [scrolled, setScrolled]     = useState(false);
+
+  useEffect(() => {
+    const onScroll = () => setScrolled(window.scrollY > 48);
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => window.removeEventListener("scroll", onScroll);
+  }, []);
 
   return (
     <>
-      {/* AnnouncementBar lives ABOVE the sticky <header> so it scrolls away naturally. */}
       <AnnouncementBar {...ANNOUNCEMENT} />
 
-      <header className="sticky top-0 z-50 border-b border-[#ECE7E2] bg-white/90 backdrop-blur-lg">
-
-        <div className="mx-auto flex h-20 max-w-7xl items-center justify-between px-6">
-
-          {/* Logo */}
+      <header
+        className="sticky top-0 z-[var(--bc-z-sticky)] backdrop-blur-lg"
+        style={{
+          backgroundColor: scrolled ? "rgba(255,253,249,0.97)" : "rgba(255,253,249,0.92)",
+          borderBottom: scrolled
+            ? "1px solid var(--bc-border-default)"
+            : "1px solid transparent",
+          boxShadow: scrolled ? "var(--bc-shadow-sm)" : "none",
+          transition:
+            "background-color var(--bc-transition-base), border-color var(--bc-transition-base), box-shadow var(--bc-transition-base)",
+        }}
+      >
+        <div
+          className="mx-auto flex items-center justify-between px-6"
+          style={{ maxWidth: "var(--bc-content-wide)", height: "5rem" }}
+        >
+          {/* ── Logo ── */}
           <Link
             href="/"
-            className="font-[family:var(--font-playfair)] text-3xl font-bold tracking-wide text-[#8A5A6A]"
+            className="font-[family:var(--font-playfair)] tracking-wide"
+            style={{
+              fontSize: "1.75rem",
+              fontWeight: 700,
+              color: "var(--bc-brand-mauve)",
+              letterSpacing: "0.06em",
+            }}
           >
             Bansari
           </Link>
 
-          {/* Desktop Navigation */}
-          <nav className="hidden items-center gap-10 lg:flex">
+          {/* ── Desktop Nav ── */}
+          <nav className="hidden items-center lg:flex" style={{ gap: "2.25rem" }}>
 
+            {/* Shop mega-menu */}
             <div
               className="relative"
               onMouseEnter={() => setShopOpen(true)}
               onMouseLeave={() => setShopOpen(false)}
             >
-              <button className="font-medium hover:text-[#8A5A6A]">
+              <button
+                className="bc-nav-link uppercase tracking-[0.12em] font-medium"
+                style={{
+                  fontSize: "var(--bc-text-xs)",
+                  background: "none",
+                  border: "none",
+                  borderBottom: shopOpen
+                    ? "1px solid var(--bc-brand-mauve)"
+                    : "1px solid transparent",
+                  paddingBottom: "2px",
+                  color: "var(--bc-text-primary)",
+                  transition: "color var(--bc-transition-fast), border-color var(--bc-transition-fast)",
+                }}
+              >
                 Shop
               </button>
 
               {shopOpen && (
-                <div className="absolute left-0 top-10 w-[620px] rounded-3xl border border-[#ECE7E2] bg-white p-8 shadow-2xl">
-
-                  <div className="grid grid-cols-2 gap-10">
-
+                <div
+                  className="absolute"
+                  style={{
+                    left: "-1.5rem",
+                    top: "2.5rem",
+                    width: "560px",
+                    backgroundColor: "#fff",
+                    border: "1px solid var(--bc-border-soft)",
+                    boxShadow: "var(--bc-shadow-xl)",
+                    padding: "1.75rem",
+                    zIndex: "var(--bc-z-dropdown)",
+                  }}
+                >
+                  <div className="grid grid-cols-2" style={{ gap: "2rem" }}>
                     <div>
-                      <h3 className="mb-4 text-lg font-bold">Categories</h3>
-                      <div className="space-y-3">
+                      <p
+                        className="uppercase tracking-[0.16em] mb-4"
+                        style={{
+                          fontSize: "var(--bc-text-xs)",
+                          fontWeight: 500,
+                          color: "var(--bc-text-gold)",
+                        }}
+                      >
+                        Categories
+                      </p>
+                      <div className="flex flex-col" style={{ gap: "0.625rem" }}>
                         {NAV_CATEGORIES.map((item) => (
                           <Link
                             key={item}
                             href="/shop"
-                            className="block hover:text-[#8A5A6A]"
+                            className="bc-dropdown-link"
+                            style={{ fontSize: "var(--bc-text-sm)", color: "var(--bc-text-primary)" }}
                           >
                             {item}
                           </Link>
@@ -108,96 +150,120 @@ export default function Header() {
                     </div>
 
                     <div>
-                      <h3 className="mb-4 text-lg font-bold">Collections</h3>
-                      <div className="space-y-3">
+                      <p
+                        className="uppercase tracking-[0.16em] mb-4"
+                        style={{
+                          fontSize: "var(--bc-text-xs)",
+                          fontWeight: 500,
+                          color: "var(--bc-text-gold)",
+                        }}
+                      >
+                        Collections
+                      </p>
+                      <div className="flex flex-col" style={{ gap: "0.625rem" }}>
                         {NAV_COLLECTIONS.map((item) => (
                           <Link
                             key={item}
                             href="/shop"
-                            className="block hover:text-[#8A5A6A]"
+                            className="bc-dropdown-link"
+                            style={{ fontSize: "var(--bc-text-sm)", color: "var(--bc-text-primary)" }}
                           >
                             {item}
                           </Link>
                         ))}
                       </div>
                     </div>
-
                   </div>
 
-                  <div className="mt-8 rounded-2xl bg-[#F8F2EE] p-6">
-                    <p className="uppercase tracking-[4px] text-[#8A5A6A] text-sm">
-                      Featured Collection
+                  <div
+                    className="mt-5 pt-4"
+                    style={{
+                      borderTop: "1px solid var(--bc-border-soft)",
+                      backgroundColor: "var(--bc-surface-warm)",
+                      padding: "1rem 1.25rem",
+                      marginTop: "1.25rem",
+                    }}
+                  >
+                    <p
+                      className="uppercase tracking-[0.16em]"
+                      style={{ fontSize: "var(--bc-text-xs)", fontWeight: 500, color: "var(--bc-brand-mauve)" }}
+                    >
+                      Featured
                     </p>
-                    <h3 className="mt-2 text-2xl font-bold">Wedding Edit 2026</h3>
-                    <p className="mt-2 text-gray-600">
-                      Handcrafted festive styles curated for unforgettable celebrations.
+                    <p
+                      className="font-[family:var(--font-playfair)] mt-1"
+                      style={{ fontSize: "var(--bc-text-lg)", fontWeight: 400, color: "var(--bc-text-primary)" }}
+                    >
+                      Wedding Edit 2026
                     </p>
                   </div>
-
                 </div>
               )}
             </div>
 
             {NAV_TOP_LINKS.map(({ label, href }) => (
-              <Link key={label} href={href}>
+              <Link
+                key={label}
+                href={href}
+                className="bc-nav-link uppercase tracking-[0.12em] font-medium"
+                style={{
+                  fontSize: "var(--bc-text-xs)",
+                  color: "var(--bc-text-primary)",
+                  borderBottom: "1px solid transparent",
+                  paddingBottom: "2px",
+                  transition: "color var(--bc-transition-fast), border-color var(--bc-transition-fast)",
+                }}
+              >
                 {label}
               </Link>
             ))}
-
           </nav>
 
-          {/* Right Side */}
-          <div className="flex items-center gap-2">
-
-            <button className="rounded-full p-3 hover:bg-[#F6F0EB]">
-              <Search size={20} />
+          {/* ── Icons ── */}
+          <div className="flex items-center" style={{ gap: "0.125rem" }}>
+            <button
+              aria-label="Search"
+              className="bc-icon-btn rounded-full p-2.5 transition-colors"
+            >
+              <Search size={19} />
             </button>
 
             <Link
               href="/wishlist"
-              className="relative rounded-full p-3 hover:bg-[#F6F0EB]"
+              aria-label={`Wishlist${wishlist.length > 0 ? `, ${wishlist.length} items` : ""}`}
+              className="bc-icon-btn relative rounded-full p-2.5 transition-colors"
             >
-              <Heart size={20} />
-              {wishlist.length > 0 && (
-                <span className="absolute -right-1 -top-1 flex h-5 w-5 items-center justify-center rounded-full bg-[#8A5A6A] text-xs text-white">
-                  {wishlist.length}
-                </span>
-              )}
+              <Heart size={19} />
+              {wishlist.length > 0 && <NavBadge n={wishlist.length} />}
             </Link>
 
             <Link
               href="/cart"
-              className="relative rounded-full p-3 hover:bg-[#F6F0EB]"
+              aria-label={`Cart${items.length > 0 ? `, ${items.length} items` : ""}`}
+              className="bc-icon-btn relative rounded-full p-2.5 transition-colors"
             >
-              <ShoppingBag size={20} />
-              {items.length > 0 && (
-                <span className="absolute -right-1 -top-1 flex h-5 w-5 items-center justify-center rounded-full bg-[#8A5A6A] text-xs text-white">
-                  {items.length}
-                </span>
-              )}
+              <ShoppingBag size={19} />
+              {items.length > 0 && <NavBadge n={items.length} />}
             </Link>
 
             <Link
               href="/auth/login"
-              className="rounded-full p-3 hover:bg-[#F6F0EB]"
+              aria-label="Account"
+              className="bc-icon-btn rounded-full p-2.5 transition-colors"
             >
-              <User size={20} />
+              <User size={19} />
             </Link>
 
-            {/* Mobile hamburger — wired to MobileMenu */}
             <button
               aria-label="Open navigation menu"
               aria-expanded={mobileOpen}
               onClick={() => setMobileOpen(true)}
-              className="rounded-full p-3 lg:hidden"
+              className="bc-icon-btn rounded-full p-2.5 transition-colors lg:hidden"
             >
-              <Menu size={22} />
+              <Menu size={21} />
             </button>
-
           </div>
-
         </div>
-
       </header>
 
       <MobileMenu
@@ -206,6 +272,50 @@ export default function Header() {
         cartCount={items.length}
         wishlistCount={wishlist.length}
       />
+
+      <style>{`
+        .bc-nav-link:hover {
+          color: var(--bc-brand-mauve) !important;
+          border-bottom-color: var(--bc-brand-mauve) !important;
+        }
+        .bc-dropdown-link {
+          display: block;
+          transition: color var(--bc-transition-fast);
+        }
+        .bc-dropdown-link:hover {
+          color: var(--bc-brand-mauve) !important;
+        }
+        .bc-icon-btn {
+          color: var(--bc-text-primary);
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+        }
+        .bc-icon-btn:hover {
+          background-color: var(--bc-surface-warm);
+        }
+      `}</style>
     </>
+  );
+}
+
+function NavBadge({ n }: { n: number }) {
+  return (
+    <span
+      aria-hidden="true"
+      className="absolute flex items-center justify-center rounded-full text-white"
+      style={{
+        top: "0.15rem",
+        right: "0.15rem",
+        width: "1.1rem",
+        height: "1.1rem",
+        fontSize: "0.6rem",
+        fontWeight: 700,
+        backgroundColor: "var(--bc-brand-mauve)",
+        lineHeight: 1,
+      }}
+    >
+      {n}
+    </span>
   );
 }

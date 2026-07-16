@@ -3,59 +3,52 @@
 import { X } from "lucide-react";
 import { useEffect, useState } from "react";
 
-/**
- * AnnouncementBar
- *
- * Displays a full-width promotional banner above the site header.
- *
- * Design constraints:
- * - Height is driven entirely by the --bc-announcement-h CSS token (globals.css).
- *   No JavaScript writes to :root or any inline style property.
- * - Dismissal is persisted via localStorage using an explicit versioned key
- *   (e.g. "announcement:v1"). Increment the key to re-show the bar after
- *   content changes without touching any hashing logic.
- */
-
 export interface AnnouncementBarProps {
-  /** Promotional message — supports React nodes for inline formatting. */
-  message: React.ReactNode;
-  /**
-   * Explicit versioned localStorage key, e.g. "announcement:v1".
-   * Increment the version to re-surface the bar after a content change.
-   */
+  /** Versioned localStorage key — increment to re-surface after content changes */
   storageKey: string;
-  /** Optional callback fired after the user dismisses the bar. */
   onDismiss?: () => void;
   className?: string;
 }
 
+const MESSAGES = [
+  "Free shipping on all orders above ₹999 — delivered across India",
+  "Cash on Delivery available · No prepayment required",
+  "Secure payments · Easy 7-day returns · Trusted by 10,000+ customers",
+  "New arrivals every week — The Festive Edit is now live",
+];
+
 export default function AnnouncementBar({
-  message,
   storageKey,
   onDismiss,
   className = "",
 }: AnnouncementBarProps) {
   const [visible, setVisible] = useState(false);
+  const [msgIndex, setMsgIndex] = useState(0);
+  const [fading, setFading] = useState(false);
 
-  // Hydrate visibility from localStorage on the client only.
   useEffect(() => {
     try {
-      if (localStorage.getItem(storageKey) !== "dismissed") {
-        setVisible(true);
-      }
+      if (localStorage.getItem(storageKey) !== "dismissed") setVisible(true);
     } catch {
-      // localStorage unavailable (SSR guard, private browsing) — show bar.
       setVisible(true);
     }
   }, [storageKey]);
 
+  useEffect(() => {
+    if (!visible) return;
+    const id = setInterval(() => {
+      setFading(true);
+      setTimeout(() => {
+        setMsgIndex((i) => (i + 1) % MESSAGES.length);
+        setFading(false);
+      }, 350);
+    }, 4500);
+    return () => clearInterval(id);
+  }, [visible]);
+
   function handleDismiss() {
     setVisible(false);
-    try {
-      localStorage.setItem(storageKey, "dismissed");
-    } catch {
-      // Silently ignore storage errors.
-    }
+    try { localStorage.setItem(storageKey, "dismissed"); } catch { /* noop */ }
     onDismiss?.();
   }
 
@@ -66,28 +59,31 @@ export default function AnnouncementBar({
       role="banner"
       aria-label="Promotional announcement"
       className={[
-        // Height from design token — no inline style, no JS :root mutation.
         "h-[var(--bc-announcement-h)]",
-        // Brand: deep plum background, cream text.
         "flex items-center justify-center",
         "bg-[var(--bc-brand-plum)] text-[var(--bc-text-inverse)]",
-        "relative px-10",
+        "relative px-10 overflow-hidden",
         className,
-      ]
-        .filter(Boolean)
-        .join(" ")}
+      ].filter(Boolean).join(" ")}
     >
-      {/* Centring spacer — mirrors the dismiss button width so the message is truly centred. */}
       <span className="invisible w-7 shrink-0" aria-hidden="true" />
 
-      <p className="text-center text-[var(--bc-text-xs)] tracking-wide">
-        {message}
+      <p
+        className="text-center tracking-[0.12em] uppercase"
+        style={{
+          fontSize: "var(--bc-text-xs)",
+          opacity: fading ? 0 : 1,
+          transform: fading ? "translateY(-4px)" : "translateY(0)",
+          transition: "opacity 350ms ease, transform 350ms ease",
+        }}
+      >
+        {MESSAGES[msgIndex]}
       </p>
 
       <button
         onClick={handleDismiss}
         aria-label="Dismiss announcement"
-        className="ml-3 shrink-0 rounded-full p-1 transition-colors duration-[var(--bc-transition-fast)] hover:bg-[var(--bc-brand-plum-light)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--bc-gold-warm)]"
+        className="ml-3 shrink-0 rounded-full p-1 transition-colors hover:bg-[var(--bc-brand-plum-light)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--bc-gold-warm)]"
       >
         <X size={14} strokeWidth={2} className="text-[var(--bc-gold-warm)]" />
       </button>

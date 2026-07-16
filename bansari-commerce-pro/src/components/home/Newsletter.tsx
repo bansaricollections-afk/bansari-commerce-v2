@@ -1,86 +1,176 @@
 "use client";
 
-import { Mail } from "lucide-react";
-
 export default function Newsletter() {
   return (
-    <section className="bg-[#8A5A6A] py-24 text-white">
+    <section
+      aria-label="Bansari Privé Club newsletter sign-up"
+      style={{
+        backgroundColor: "var(--bc-surface-dark)",
+        paddingBlock: "var(--bc-section-padding)",
+      }}
+    >
+      <div
+        className="mx-auto bc-newsletter-grid"
+        style={{
+          maxWidth: "var(--bc-content-wide)",
+          paddingInline: "var(--bc-gutter)",
+        }}
+      >
+        {/* ── Left: editorial headline ── */}
+        <div>
+          <p
+            className="uppercase tracking-[0.2em]"
+            style={{
+              fontSize: "var(--bc-text-xs)",
+              fontWeight: 500,
+              color: "var(--bc-text-gold)",
+              marginBottom: "var(--bc-space-5)",
+            }}
+          >
+            Bansari Privé
+          </p>
 
-      <div className="mx-auto max-w-4xl px-6 text-center">
+          <h2
+            className="font-[family:var(--font-playfair)]"
+            style={{
+              fontSize: "var(--bc-text-2xl)",
+              fontWeight: 400,
+              lineHeight: 1.08,
+              letterSpacing: "-0.01em",
+              color: "var(--bc-text-inverse)",
+              marginBottom: "var(--bc-space-6)",
+            }}
+          >
+            Be first to discover
+            <br />
+            <em style={{ fontStyle: "italic" }}>every collection.</em>
+          </h2>
 
-        <p className="uppercase tracking-[5px] text-[#F5E6D3]">
-          Bansari Privé Club
-        </p>
+          <p
+            style={{
+              fontSize: "var(--bc-text-sm)",
+              lineHeight: 1.8,
+              color: "var(--bc-text-inverse)",
+              opacity: 0.55,
+              maxWidth: "38ch",
+            }}
+          >
+            Early access to new arrivals, festive edits, exclusive member offers
+            and styling inspiration — delivered directly to your inbox.
+          </p>
+        </div>
 
-        <h2 className="mt-4 font-[family:var(--font-playfair)] text-5xl font-bold">
-          Be the First to Discover Every Collection
-        </h2>
-
-        <p className="mx-auto mt-6 max-w-2xl text-lg leading-8 text-white/80">
-          Join our community for early access to new arrivals, festive edits,
-          exclusive member offers and styling inspiration delivered directly to
-          your inbox.
-        </p>
-
-        <div className="mx-auto mt-12 flex max-w-2xl flex-col gap-4 md:flex-row">
-
-          <div className="relative flex-1">
-
-            <Mail
-              size={20}
-              className="absolute left-5 top-1/2 -translate-y-1/2 text-gray-400"
-            />
+        {/* ── Right: form ── */}
+        <div>
+          <form
+            onSubmit={(e) => e.preventDefault()}
+            className="flex flex-col"
+            style={{ gap: "var(--bc-space-3)" }}
+          >
+            <label
+              htmlFor="newsletter-email"
+              className="uppercase tracking-[0.14em]"
+              style={{
+                fontSize: "var(--bc-text-xs)",
+                fontWeight: 500,
+                color: "var(--bc-text-inverse)",
+                opacity: 0.6,
+              }}
+            >
+              Your email address
+            </label>
 
             <input
+              id="newsletter-email"
               type="email"
-              placeholder="Enter your email address"
-              className="h-14 w-full rounded-full bg-white pl-14 pr-5 text-black outline-none"
+              placeholder="you@example.com"
+              required
+              className="bc-nl-input"
+              style={{
+                height: "3.25rem",
+                backgroundColor: "transparent",
+                border: "1px solid var(--bc-border-dark)",
+                color: "var(--bc-text-inverse)",
+                fontSize: "var(--bc-text-sm)",
+                padding: "0 1.25rem",
+                outline: "none",
+                fontFamily: "inherit",
+                transition: "border-color var(--bc-transition-fast)",
+              }}
             />
 
-          </div>
+            <button
+              type="submit"
+              className="bc-nl-btn uppercase tracking-[0.16em]"
+              style={{
+                height: "3.25rem",
+                backgroundColor: "var(--bc-gold-warm)",
+                border: "none",
+                color: "var(--bc-surface-dark)",
+                fontSize: "var(--bc-text-xs)",
+                fontWeight: 600,
+                cursor: "pointer",
+                transition: "opacity var(--bc-transition-fast)",
+                fontFamily: "inherit",
+              }}
+            >
+              Join Privé
+            </button>
 
-          <button
-            className="rounded-full bg-[#C9A96E] px-10 py-4 font-semibold text-black transition hover:opacity-90"
+            <p
+              style={{
+                fontSize: "var(--bc-text-xs)",
+                color: "var(--bc-text-inverse)",
+                opacity: 0.35,
+                marginTop: "var(--bc-space-1)",
+              }}
+            >
+              No spam. Unsubscribe at any time.
+            </p>
+          </form>
+
+          {/* Benefit chips */}
+          <div
+            className="flex flex-wrap"
+            style={{ gap: "var(--bc-space-3)", marginTop: "var(--bc-space-10)" }}
           >
-            Join Now
-          </button>
-
+            {["Early Access", "Member Offers", "Style Tips", "Celebration Edits"].map((b) => (
+              <span
+                key={b}
+                className="uppercase tracking-[0.1em]"
+                style={{
+                  fontSize: "var(--bc-text-xs)",
+                  fontWeight: 500,
+                  color: "var(--bc-text-inverse)",
+                  opacity: 0.45,
+                  border: "1px solid var(--bc-border-dark)",
+                  padding: "0.375rem 0.875rem",
+                }}
+              >
+                {b}
+              </span>
+            ))}
+          </div>
         </div>
-
-        <div className="mt-12 grid gap-8 md:grid-cols-4">
-
-          <div>
-            <h3 className="text-2xl font-bold">Early Access</h3>
-            <p className="mt-2 text-sm text-white/70">
-              New launches before everyone else.
-            </p>
-          </div>
-
-          <div>
-            <h3 className="text-2xl font-bold">Member Offers</h3>
-            <p className="mt-2 text-sm text-white/70">
-              Exclusive promotions and rewards.
-            </p>
-          </div>
-
-          <div>
-            <h3 className="text-2xl font-bold">Style Tips</h3>
-            <p className="mt-2 text-sm text-white/70">
-              Seasonal styling inspiration.
-            </p>
-          </div>
-
-          <div>
-            <h3 className="text-2xl font-bold">Celebration Edits</h3>
-            <p className="mt-2 text-sm text-white/70">
-              Curated looks for every occasion.
-            </p>
-          </div>
-
-        </div>
-
       </div>
 
+      <style>{`
+        .bc-newsletter-grid {
+          display: grid;
+          gap: var(--bc-space-16);
+          grid-template-columns: 1fr;
+        }
+        @media (min-width: 1024px) {
+          .bc-newsletter-grid {
+            grid-template-columns: 1fr 1fr;
+            gap: var(--bc-space-24);
+            align-items: center;
+          }
+        }
+        .bc-nl-input::placeholder { opacity: 0.35; color: var(--bc-text-inverse); }
+        .bc-nl-input:focus { border-color: var(--bc-gold-warm) !important; }
+        .bc-nl-btn:hover { opacity: 0.88; }
+      `}</style>
     </section>
   );
 }
