@@ -91,7 +91,7 @@ const productFormSchema = z.object({
   images: z.array(imageSchema),
 });
 
-// ─── Types ────────────────────────────────────────────────────────────────────
+// ─── Types ────────────────────────────────���───────────────────────────────────
 
 type ProductImage = z.infer<typeof imageSchema>;
 type ValidProductForm = z.infer<typeof productFormSchema>;
@@ -613,7 +613,6 @@ function FormSection({
         <h3 className="whitespace-nowrap text-[11px] font-semibold uppercase tracking-widest text-slate-600">
           {title}
         </h3>
-        {/* bg-slate-200: hardcoded — never bg-border */}
         <div className="h-px flex-1 bg-slate-200" />
       </div>
       {children}
@@ -990,9 +989,7 @@ export function ProductManagement() {
       {/* ── Page header ─────────────────────────────────────────────────── */}
       <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
         <div>
-          {/* text-slate-900 — hardcoded, never text-foreground */}
           <h1 className="text-2xl font-bold text-slate-900">Products</h1>
-          {/* text-slate-500 — hardcoded, never text-muted-foreground */}
           <p className="mt-1 text-sm text-slate-500">
             Manage catalog, pricing, stock, media, and SEO for Bansari products.
           </p>
@@ -1004,7 +1001,6 @@ export function ProductManagement() {
       </div>
 
       {/* ── Product table card ───────────────────────────────────────────── */}
-      {/* bg-white border-slate-200 shadow-sm — hardcoded, never shadcn Card */}
       <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
         {/* Card header */}
         <div className="border-b border-slate-200 px-6 py-4">
@@ -1021,7 +1017,6 @@ export function ProductManagement() {
           {/* Search */}
           <label className="relative min-w-[200px] flex-1">
             <span className="sr-only">Search products</span>
-            {/* text-slate-400 — hardcoded, never text-muted-foreground */}
             <Search className="absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-slate-400" />
             <input
               type="search"
@@ -1032,7 +1027,6 @@ export function ProductManagement() {
             />
           </label>
 
-          {/* bg-white text-slate-900 border-slate-300 — hardcoded, never bg-background */}
           <FilterSelect
             value={categoryFilter}
             onChange={updateCategoryFilter}
@@ -1083,14 +1077,12 @@ export function ProductManagement() {
 
         {/* Error banner */}
         {error ? (
-          {/* border-red-200 bg-red-50 text-red-700 — hardcoded, never border-destructive/30 */}
           <div className="border-b border-red-200 bg-red-50 px-5 py-3 text-sm text-red-700">
             {error}
           </div>
         ) : null}
 
         {/* Table */}
-        {/* border-slate-200 — hardcoded, never border-border */}
         <div className="overflow-x-auto">
           <Table>
             <TableHeader>
@@ -1108,7 +1100,6 @@ export function ProductManagement() {
               {loading ? (
                 <TableRow>
                   <TableCell colSpan={6} className="h-40 text-center">
-                    {/* text-slate-500 — hardcoded, never text-muted-foreground */}
                     <span className="inline-flex items-center gap-2 text-slate-500">
                       <Loader2 className="size-4 animate-spin" />
                       Loading products…
@@ -1123,7 +1114,6 @@ export function ProductManagement() {
                   >
                     <TableCell className="px-5 py-4">
                       <div className="flex items-center gap-3.5">
-                        {/* bg-slate-100 — hardcoded, never bg-muted */}
                         <div className="relative size-12 shrink-0 overflow-hidden rounded-lg border border-slate-200 bg-slate-100">
                           {product.images[0]?.url ? (
                             <Image
@@ -1134,16 +1124,13 @@ export function ProductManagement() {
                               className="object-cover"
                             />
                           ) : (
-                            {/* text-slate-400 — hardcoded, never text-muted-foreground */}
                             <ImagePlus className="absolute left-1/2 top-1/2 size-5 -translate-x-1/2 -translate-y-1/2 text-slate-400" />
                           )}
                         </div>
                         <div className="min-w-0">
-                          {/* text-slate-900 — hardcoded, never text-foreground */}
                           <p className="truncate text-sm font-semibold text-slate-900">
                             {product.name}
                           </p>
-                          {/* text-slate-500 — hardcoded, never text-muted-foreground */}
                           <p className="mt-0.5 truncate text-xs text-slate-500">
                             {product.sku}
                           </p>
@@ -1243,7 +1230,6 @@ export function ProductManagement() {
                   <TableCell colSpan={6} className="h-40 text-center">
                     <div className="flex flex-col items-center gap-2">
                       <ImagePlus className="size-8 text-slate-300" />
-                      {/* text-slate-500 — hardcoded, never text-muted-foreground */}
                       <p className="text-sm text-slate-500">
                         No products match the current filters.
                       </p>
@@ -1257,7 +1243,6 @@ export function ProductManagement() {
 
         {/* Pagination */}
         <div className="flex flex-col gap-3 border-t border-slate-200 bg-slate-50/60 px-5 py-3 text-sm md:flex-row md:items-center md:justify-between">
-          {/* text-slate-500 — hardcoded, never text-muted-foreground */}
           <p className="text-slate-500">
             Showing <span className="font-medium text-slate-700">{(page - 1) * PAGE_SIZE + 1}–{Math.min(page * PAGE_SIZE, filteredProducts.length)}</span> of{" "}
             <span className="font-medium text-slate-700">{filteredProducts.length}</span> products
@@ -1306,15 +1291,13 @@ export function ProductManagement() {
             "flex h-screen flex-col overflow-hidden p-0"
           )}
         >
-          {/* ── Sticky header — bg-white border-slate-200 (NEVER bg-background border-border) */}
+          {/* ── Sticky header ── */}
           <SheetHeader className="shrink-0 border-b border-slate-200 bg-white px-8 py-5">
             <div className="flex items-center justify-between gap-4">
               <div className="min-w-0 flex-1">
-                {/* text-slate-900 — hardcoded, never text-foreground */}
                 <SheetTitle className="text-xl font-bold text-slate-900">
                   {drawerMode === "create" ? "Create Product" : "Edit Product"}
                 </SheetTitle>
-                {/* text-slate-500 — hardcoded, never text-muted-foreground */}
                 <SheetDescription className="mt-0.5 text-sm text-slate-500">
                   {drawerMode === "create"
                     ? "Fill in the details below to add a new product to the catalog."
@@ -1333,11 +1316,11 @@ export function ProductManagement() {
             </div>
           </SheetHeader>
 
-          {/* ── Scrollable form body — bg-slate-50 (NEVER bg-muted/30) ─────── */}
+          {/* ── Scrollable form body ── */}
           <div className="flex-1 overflow-y-auto bg-slate-50">
             <div className="space-y-8 px-8 py-7">
 
-              {/* ── Section 1: Media (top — images set the product's identity) ── */}
+              {/* ── Section 1: Media ── */}
               <FormSection title="Media">
                 <div
                   role="button"
@@ -1352,14 +1335,12 @@ export function ProductManagement() {
                     "flex cursor-pointer flex-col items-center justify-center gap-3 rounded-xl border-2 border-dashed px-6 py-10 text-center transition-colors",
                     dragOver
                       ? "border-[#8A5A6A] bg-[#8A5A6A]/10"
-                      // bg-slate-50 hover:bg-slate-100 border-slate-200 — hardcoded, never bg-muted/50 border-border
                       : "border-slate-200 bg-white hover:bg-slate-50"
                   )}
                 >
                   {uploading ? (
                     <Loader2 className="size-8 animate-spin text-[#8A5A6A]" />
                   ) : (
-                    {/* text-slate-400 — hardcoded, never text-muted-foreground */}
                     <ImagePlus className="size-8 text-slate-400" />
                   )}
                   <div>
@@ -1395,19 +1376,17 @@ export function ProductManagement() {
                           sizes="160px"
                           className="object-cover"
                         />
-                        {/* Cover badge on first image */}
                         {index === 0 ? (
-                          <span className="absolute bottom-1.5 left-1.5 flex items-center gap-1 rounded-full bg-black/60 px-2 py-0.5 text-[10px] font-medium text-white">
-                            <CheckCircle2 className="size-2.5" />
-                            Cover
-                          </span>
+                          <div className="absolute left-1.5 top-1.5 flex items-center gap-1 rounded-full bg-black/60 px-1.5 py-0.5">
+                            <CheckCircle2 className="size-2.5 text-white" />
+                            <span className="text-[10px] font-medium text-white">Primary</span>
+                          </div>
                         ) : null}
-                        {/* Delete button — visible on hover AND on focus for keyboard access */}
                         <button
                           type="button"
                           aria-label={`Remove image ${index + 1}`}
-                          onClick={() => removeImage(image.url)}
-                          className="absolute right-1.5 top-1.5 flex size-6 items-center justify-center rounded-full bg-white/90 text-slate-700 shadow-sm opacity-0 transition group-hover:opacity-100 focus-visible:opacity-100 hover:bg-red-50 hover:text-red-600"
+                          onClick={(e) => { e.stopPropagation(); removeImage(image.url); }}
+                          className="absolute right-1.5 top-1.5 flex size-6 items-center justify-center rounded-full bg-black/60 text-white opacity-0 transition-opacity group-hover:opacity-100"
                         >
                           <X className="size-3.5" />
                         </button>
@@ -1417,46 +1396,114 @@ export function ProductManagement() {
                 ) : null}
               </FormSection>
 
-              {/* ── Section 2: Basic Information ── */}
-              <FormSection title="Basic Information">
-                <FormField
-                  label="Product Name"
-                  htmlFor="name"
-                  required
-                  error={fieldErrors.name}
-                >
-                  <AdminInput
-                    id="name"
-                    value={form.name}
-                    onChange={(v) => updateForm("name", v)}
-                    placeholder="e.g. Kanjivaram Pure Silk Saree"
-                    invalid={Boolean(fieldErrors.name)}
-                  />
-                </FormField>
+              {/* ── Section 2: Basic Info ── */}
+              <FormSection title="Basic Info">
+                <div className="grid gap-5 sm:grid-cols-2">
+                  <FormField label="Product Name" htmlFor="name" required error={fieldErrors.name}>
+                    <AdminInput
+                      id="name"
+                      value={form.name}
+                      onChange={(v) => updateForm("name", v)}
+                      placeholder="e.g. Bansari Silk Saree"
+                      invalid={!!fieldErrors.name}
+                    />
+                  </FormField>
 
-                <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                  <FormField label="Brand" htmlFor="brand" required error={fieldErrors.brand}>
+                    <AdminInput
+                      id="brand"
+                      value={form.brand}
+                      onChange={(v) => updateForm("brand", v)}
+                      placeholder="e.g. Bansari Collections"
+                      invalid={!!fieldErrors.brand}
+                    />
+                  </FormField>
+
+                  <FormField label="Category" htmlFor="category" required error={fieldErrors.category}>
+                    <AdminInput
+                      id="category"
+                      value={form.category}
+                      onChange={(v) => updateForm("category", v)}
+                      placeholder="e.g. Saree, Lehenga, Kurti"
+                      invalid={!!fieldErrors.category}
+                    />
+                  </FormField>
+
+                  <FormField label="Collection" htmlFor="collection" required error={fieldErrors.collection}>
+                    <AdminInput
+                      id="collection"
+                      value={form.collection}
+                      onChange={(v) => updateForm("collection", v)}
+                      placeholder="e.g. Festive 2025, Wedding Edit"
+                      invalid={!!fieldErrors.collection}
+                    />
+                  </FormField>
+
+                  <FormField label="Fabric" htmlFor="fabric" required error={fieldErrors.fabric}>
+                    <AdminInput
+                      id="fabric"
+                      value={form.fabric}
+                      onChange={(v) => updateForm("fabric", v)}
+                      placeholder="e.g. Pure Silk, Cotton Blend"
+                      invalid={!!fieldErrors.fabric}
+                    />
+                  </FormField>
+
+                  <FormField label="Color" htmlFor="color" required error={fieldErrors.color}>
+                    <AdminInput
+                      id="color"
+                      value={form.color}
+                      onChange={(v) => updateForm("color", v)}
+                      placeholder="e.g. Royal Blue, Crimson Red"
+                      invalid={!!fieldErrors.color}
+                    />
+                  </FormField>
+
+                  <FormField
+                    label="Sizes"
+                    htmlFor="sizes"
+                    required
+                    error={fieldErrors.sizes}
+                    hint="Comma-separated — e.g. S, M, L, XL or Free Size"
+                  >
+                    <AdminInput
+                      id="sizes"
+                      value={form.sizes}
+                      onChange={(v) => updateForm("sizes", v)}
+                      placeholder="S, M, L, XL"
+                      invalid={!!fieldErrors.sizes}
+                    />
+                  </FormField>
+                </div>
+              </FormSection>
+
+              {/* ── Section 3: Slug + SKU ── */}
+              <FormSection title="Identifiers">
+                <div className="grid gap-5 sm:grid-cols-2">
                   <FormField
                     label="URL Slug"
                     htmlFor="slug"
                     required
                     error={fieldErrors.slug}
-                    hint="Used in the product URL — auto-generated from name."
+                    hint="URL-safe identifier — letters, numbers, hyphens only"
                   >
                     <div className="flex gap-2">
                       <AdminInput
                         id="slug"
                         value={form.slug}
                         onChange={(v) => updateForm("slug", v)}
-                        placeholder="kanjivaram-pure-silk-saree"
-                        invalid={Boolean(fieldErrors.slug)}
+                        placeholder="bansari-silk-saree"
+                        invalid={!!fieldErrors.slug}
                         className="flex-1"
                       />
                       <Button
                         type="button"
                         variant="outline"
-                        className="h-11 shrink-0 border-slate-300 text-slate-700 hover:bg-slate-50"
+                        size="sm"
                         onClick={applySlug}
-                        aria-label="Generate slug from product name"
+                        disabled={!form.name}
+                        className="shrink-0 self-start border-slate-300 text-slate-700 hover:bg-slate-50"
+                        title="Generate slug from product name"
                       >
                         <Wand2 className="size-3.5" />
                       </Button>
@@ -1468,23 +1515,25 @@ export function ProductManagement() {
                     htmlFor="sku"
                     required
                     error={fieldErrors.sku}
-                    hint="Stock-keeping unit — unique per product."
+                    hint="Stock-keeping unit — must be unique across the catalog"
                   >
                     <div className="flex gap-2">
                       <AdminInput
                         id="sku"
                         value={form.sku}
                         onChange={(v) => updateForm("sku", v)}
-                        placeholder="BC-SAR-KAN-123456"
-                        invalid={Boolean(fieldErrors.sku)}
+                        placeholder="BC-SAR-SLK-001"
+                        invalid={!!fieldErrors.sku}
                         className="flex-1"
                       />
                       <Button
                         type="button"
                         variant="outline"
-                        className="h-11 shrink-0 border-slate-300 text-slate-700 hover:bg-slate-50"
+                        size="sm"
                         onClick={applySku}
-                        aria-label="Auto-generate SKU"
+                        disabled={!form.category && !form.name}
+                        className="shrink-0 self-start border-slate-300 text-slate-700 hover:bg-slate-50"
+                        title="Generate SKU from category + name"
                       >
                         <Wand2 className="size-3.5" />
                       </Button>
@@ -1493,81 +1542,78 @@ export function ProductManagement() {
                 </div>
               </FormSection>
 
-              {/* ── Section 3: Classification ── */}
-              <FormSection title="Classification">
-                <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-                  <FormField label="Category" htmlFor="category" required error={fieldErrors.category}>
+              {/* ── Section 4: Pricing & Tax ── */}
+              <FormSection title="Pricing &amp; Tax">
+                <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
+                  <FormField label="Price" htmlFor="price" required error={fieldErrors.price}>
                     <AdminInput
-                      id="category"
-                      value={form.category}
-                      onChange={(v) => updateForm("category", v)}
-                      placeholder="Sarees"
-                      invalid={Boolean(fieldErrors.category)}
+                      id="price"
+                      type="number"
+                      value={form.price}
+                      onChange={(v) => updateForm("price", v)}
+                      placeholder="0"
+                      suffix="₹"
+                      invalid={!!fieldErrors.price}
                     />
                   </FormField>
-                  <FormField label="Collection" htmlFor="collection" required error={fieldErrors.collection}>
+
+                  <FormField label="Compare Price" htmlFor="comparePrice" error={fieldErrors.comparePrice} hint="Original / MRP">
                     <AdminInput
-                      id="collection"
-                      value={form.collection}
-                      onChange={(v) => updateForm("collection", v)}
-                      placeholder="Summer 2025"
-                      invalid={Boolean(fieldErrors.collection)}
+                      id="comparePrice"
+                      type="number"
+                      value={form.comparePrice}
+                      onChange={(v) => updateForm("comparePrice", v)}
+                      placeholder="0"
+                      suffix="₹"
+                      invalid={!!fieldErrors.comparePrice}
                     />
                   </FormField>
-                  <FormField label="Brand" htmlFor="brand" required error={fieldErrors.brand}>
+
+                  <FormField label="Cost" htmlFor="cost" error={fieldErrors.cost} hint="For margin tracking">
                     <AdminInput
-                      id="brand"
-                      value={form.brand}
-                      onChange={(v) => updateForm("brand", v)}
-                      invalid={Boolean(fieldErrors.brand)}
+                      id="cost"
+                      type="number"
+                      value={form.cost}
+                      onChange={(v) => updateForm("cost", v)}
+                      placeholder="0"
+                      suffix="₹"
+                      invalid={!!fieldErrors.cost}
+                    />
+                  </FormField>
+
+                  <FormField label="GST Rate" htmlFor="gst" required error={fieldErrors.gst}>
+                    <AdminInput
+                      id="gst"
+                      type="number"
+                      value={form.gst}
+                      onChange={(v) => updateForm("gst", v)}
+                      placeholder="5"
+                      suffix="%"
+                      invalid={!!fieldErrors.gst}
                     />
                   </FormField>
                 </div>
-              </FormSection>
 
-              {/* ── Section 4: Product Details ── */}
-              <FormSection title="Product Details">
-                <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                  <FormField label="Fabric" htmlFor="fabric" required error={fieldErrors.fabric}>
+                <div className="grid gap-5 sm:grid-cols-2">
+                  <FormField label="Stock" htmlFor="stock" required error={fieldErrors.stock}>
                     <AdminInput
-                      id="fabric"
-                      value={form.fabric}
-                      onChange={(v) => updateForm("fabric", v)}
-                      placeholder="Pure Silk"
-                      invalid={Boolean(fieldErrors.fabric)}
+                      id="stock"
+                      type="number"
+                      value={form.stock}
+                      onChange={(v) => updateForm("stock", v)}
+                      placeholder="0"
+                      suffix="units"
+                      invalid={!!fieldErrors.stock}
                     />
                   </FormField>
-                  <FormField label="Color" htmlFor="color" required error={fieldErrors.color}>
-                    <AdminInput
-                      id="color"
-                      value={form.color}
-                      onChange={(v) => updateForm("color", v)}
-                      placeholder="Deep Crimson"
-                      invalid={Boolean(fieldErrors.color)}
-                    />
-                  </FormField>
-                  <FormField
-                    label="Sizes"
-                    htmlFor="sizes"
-                    required
-                    error={fieldErrors.sizes}
-                    hint="Comma-separated: XS, S, M, L, XL"
-                  >
-                    <AdminInput
-                      id="sizes"
-                      value={form.sizes}
-                      onChange={(v) => updateForm("sizes", v)}
-                      placeholder="XS, S, M, L, XL"
-                      invalid={Boolean(fieldErrors.sizes)}
-                    />
-                  </FormField>
-                  <FormField label="HSN Code" htmlFor="hsn" required error={fieldErrors.hsn}>
+
+                  <FormField label="HSN Code" htmlFor="hsn" required error={fieldErrors.hsn} hint="Required for GST compliance">
                     <AdminInput
                       id="hsn"
                       value={form.hsn}
                       onChange={(v) => updateForm("hsn", v)}
-                      placeholder="5208"
-                      invalid={Boolean(fieldErrors.hsn)}
+                      placeholder="e.g. 5208"
+                      invalid={!!fieldErrors.hsn}
                     />
                   </FormField>
                 </div>
@@ -1582,74 +1628,19 @@ export function ProductManagement() {
                   error={fieldErrors.description}
                   counter={{ current: form.description.length, max: 2000 }}
                 >
-                  {/* bg-white text-slate-900 border-slate-300 — hardcoded, never bg-background text-foreground border-input */}
                   <AdminTextarea
                     id="description"
                     value={form.description}
                     onChange={(v) => updateForm("description", v)}
-                    placeholder="Describe the product — fabric, craftsmanship, occasions, care instructions…"
-                    minHeight="220px"
-                    invalid={Boolean(fieldErrors.description)}
+                    placeholder="Describe the product in detail — fabric, weave, occasion, care instructions…"
+                    rows={6}
+                    minHeight="140px"
+                    invalid={!!fieldErrors.description}
                   />
                 </FormField>
               </FormSection>
 
-              {/* ── Section 6: Pricing & Inventory ── */}
-              <FormSection title="Pricing & Inventory">
-                <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-5">
-                  <FormField label="Price (₹)" htmlFor="price" required error={fieldErrors.price}>
-                    <AdminInput
-                      id="price"
-                      type="number"
-                      value={form.price}
-                      onChange={(v) => updateForm("price", v)}
-                      placeholder="0"
-                      invalid={Boolean(fieldErrors.price)}
-                    />
-                  </FormField>
-                  <FormField label="Compare Price" htmlFor="comparePrice" error={fieldErrors.comparePrice}>
-                    <AdminInput
-                      id="comparePrice"
-                      type="number"
-                      value={form.comparePrice}
-                      onChange={(v) => updateForm("comparePrice", v)}
-                      placeholder="0"
-                    />
-                  </FormField>
-                  <FormField label="Cost" htmlFor="cost" error={fieldErrors.cost} hint="Not shown to customers">
-                    <AdminInput
-                      id="cost"
-                      type="number"
-                      value={form.cost}
-                      onChange={(v) => updateForm("cost", v)}
-                      placeholder="0"
-                    />
-                  </FormField>
-                  <FormField label="Stock" htmlFor="stock" required error={fieldErrors.stock}>
-                    <AdminInput
-                      id="stock"
-                      type="number"
-                      value={form.stock}
-                      onChange={(v) => updateForm("stock", v)}
-                      placeholder="0"
-                      invalid={Boolean(fieldErrors.stock)}
-                    />
-                  </FormField>
-                  <FormField label="GST %" htmlFor="gst" required error={fieldErrors.gst}>
-                    <AdminInput
-                      id="gst"
-                      type="number"
-                      value={form.gst}
-                      onChange={(v) => updateForm("gst", v)}
-                      placeholder="5"
-                      suffix="%"
-                      invalid={Boolean(fieldErrors.gst)}
-                    />
-                  </FormField>
-                </div>
-              </FormSection>
-
-              {/* ── Section 7: SEO ── */}
+              {/* ── Section 6: SEO ── */}
               <FormSection title="SEO">
                 <FormField
                   label="SEO Title"
@@ -1657,14 +1648,14 @@ export function ProductManagement() {
                   required
                   error={fieldErrors.seoTitle}
                   counter={{ current: form.seoTitle.length, max: 60 }}
-                  hint="Shown in browser tab and search results — keep under 60 characters."
+                  hint="Shown in browser tab and Google results — aim for 50–60 characters"
                 >
                   <AdminInput
                     id="seoTitle"
                     value={form.seoTitle}
                     onChange={(v) => updateForm("seoTitle", v)}
-                    placeholder="Kanjivaram Pure Silk Saree | Bansari Collections"
-                    invalid={Boolean(fieldErrors.seoTitle)}
+                    placeholder="Buy Bansari Silk Saree Online | Bansari Collections"
+                    invalid={!!fieldErrors.seoTitle}
                   />
                 </FormField>
 
@@ -1674,66 +1665,48 @@ export function ProductManagement() {
                   required
                   error={fieldErrors.seoDescription}
                   counter={{ current: form.seoDescription.length, max: 160 }}
-                  hint="Shown in search snippets — keep under 160 characters."
+                  hint="Shown below the title in Google results — aim for 120–160 characters"
                 >
-                  {/* bg-white text-slate-900 border-slate-300 — hardcoded, never bg-background text-foreground border-input */}
                   <AdminTextarea
                     id="seoDescription"
                     value={form.seoDescription}
                     onChange={(v) => updateForm("seoDescription", v)}
-                    placeholder="Shop authentic Kanjivaram Pure Silk Sarees at Bansari Collections. Premium ethnic wear for weddings and festivals."
+                    placeholder="Shop authentic Bansari silk sarees — handpicked fabrics, rich colours, and festive-ready designs. Free shipping on orders above ₹999."
                     rows={3}
-                    invalid={Boolean(fieldErrors.seoDescription)}
+                    minHeight="80px"
+                    invalid={!!fieldErrors.seoDescription}
                   />
                 </FormField>
-
-                {/* Google SERP preview */}
-                {(form.seoTitle || form.seoDescription) ? (
-                  <div className="rounded-xl border border-slate-200 bg-white p-4">
-                    <p className="mb-2 text-[11px] font-semibold uppercase tracking-widest text-slate-500">
-                      Search Preview
-                    </p>
-                    <p className="text-[13px] font-medium text-[#1a0dab] hover:underline">
-                      {form.seoTitle || "Page title"}
-                    </p>
-                    <p className="text-xs text-[#006621]">
-                      bansaricollections.com › products › {form.slug || "product"}
-                    </p>
-                    <p className="mt-0.5 text-xs text-slate-600 line-clamp-2">
-                      {form.seoDescription || "Add a meta description…"}
-                    </p>
-                  </div>
-                ) : null}
               </FormSection>
 
-              {/* ── Section 8: Product Flags ── */}
-              <FormSection title="Visibility & Flags">
-                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              {/* ── Section 7: Visibility ── */}
+              <FormSection title="Visibility">
+                <div className="grid gap-3 sm:grid-cols-2">
                   <ToggleCard
                     id="active"
                     label="Active"
-                    description="Product is visible on the storefront."
+                    description="Visible on the storefront"
                     checked={form.active}
                     onChange={updateToggle}
                   />
                   <ToggleCard
                     id="featured"
                     label="Featured"
-                    description="Shown on the homepage featured section."
+                    description="Shown in featured sections"
                     checked={form.featured}
                     onChange={updateToggle}
                   />
                   <ToggleCard
                     id="newArrival"
                     label="New Arrival"
-                    description="Tagged as new in listings and collections."
+                    description="Shown in New Arrivals"
                     checked={form.newArrival}
                     onChange={updateToggle}
                   />
                   <ToggleCard
                     id="bestSeller"
                     label="Best Seller"
-                    description="Shown in the best sellers collection."
+                    description="Shown in Best Sellers"
                     checked={form.bestSeller}
                     onChange={updateToggle}
                   />
@@ -1743,139 +1716,122 @@ export function ProductManagement() {
             </div>
           </div>
 
-          {/* ── Sticky footer — bg-white border-slate-200 (NEVER bg-background border-border) */}
+          {/* ── Sticky footer ── */}
           <SheetFooter className="shrink-0 border-t border-slate-200 bg-white px-8 py-4">
-            <div className="flex w-full items-center justify-between gap-3">
+            <div className="flex w-full items-center justify-between gap-4">
               <Button
                 type="button"
                 variant="outline"
-                size="lg"
                 onClick={() => handleDrawerOpenChange(false)}
                 disabled={saving}
-                className="border-slate-300 text-slate-700 hover:bg-slate-50"
+                className="border-slate-300 text-slate-700"
               >
                 Cancel
               </Button>
-              <div className="flex items-center gap-3">
-                {completeness < 100 ? (
-                  <span className="hidden text-xs text-slate-500 sm:block">
-                    {REQUIRED_FIELDS.length - Math.round(completeness / 100 * REQUIRED_FIELDS.length)} field{REQUIRED_FIELDS.length - Math.round(completeness / 100 * REQUIRED_FIELDS.length) !== 1 ? "s" : ""} remaining
-                  </span>
-                ) : (
-                  <span className="hidden items-center gap-1 text-xs text-emerald-600 sm:flex">
-                    <CheckCircle2 className="size-3.5" />
-                    All required fields filled
-                  </span>
-                )}
-                <Button
-                  type="button"
-                  size="lg"
-                  onClick={handleSubmit}
-                  disabled={saving || uploading}
-                  className="min-w-[160px] bg-[#8A5A6A] text-white hover:bg-[#7a4a5a]"
-                >
-                  {saving ? (
+              <Button
+                type="button"
+                onClick={handleSubmit}
+                disabled={saving || uploading}
+                className="min-w-[140px]"
+              >
+                {saving ? (
+                  <>
                     <Loader2 className="size-4 animate-spin" />
-                  ) : null}
-                  {drawerMode === "create" ? "Create Product" : "Save Changes"}
-                </Button>
-              </div>
+                    Saving…
+                  </>
+                ) : drawerMode === "create" ? (
+                  "Create Product"
+                ) : (
+                  "Save Changes"
+                )}
+              </Button>
             </div>
           </SheetFooter>
         </SheetContent>
       </Sheet>
 
-      {/* ── Product detail view sheet ──────────────────────────────────────── */}
-      <Sheet
-        open={Boolean(detailsProduct)}
-        onOpenChange={(open) => { if (!open) setDetailsProduct(null); }}
-      >
-        <SheetContent className="flex w-full flex-col overflow-hidden p-0 sm:max-w-xl">
-          {detailsProduct ? (
-            <>
-              {/* Header */}
-              <div className="shrink-0 border-b border-slate-200 bg-white px-6 py-5">
-                <h2 className="text-lg font-bold text-slate-900">{detailsProduct.name}</h2>
-                <p className="mt-0.5 text-sm text-slate-500">{detailsProduct.sku}</p>
-              </div>
-              <div className="flex-1 overflow-y-auto bg-slate-50 px-6 pb-6 pt-5">
-                {/* Cover image */}
+      {/* ── Product Details Sheet (view-only) ── */}
+      <Sheet open={!!detailsProduct} onOpenChange={(open) => { if (!open) setDetailsProduct(null); }}>
+        <SheetContent className="flex h-screen w-full flex-col overflow-hidden p-0 md:max-w-[520px]">
+          <SheetHeader className="shrink-0 border-b border-slate-200 bg-white px-6 py-4">
+            <SheetTitle className="text-lg font-bold text-slate-900">Product Details</SheetTitle>
+            <SheetDescription className="text-sm text-slate-500">
+              {detailsProduct?.name}
+            </SheetDescription>
+          </SheetHeader>
+          <div className="flex-1 overflow-y-auto bg-slate-50 px-6 py-5">
+            {detailsProduct ? (
+              <dl className="space-y-3">
                 {detailsProduct.images[0]?.url ? (
-                  <div className="relative mb-5 aspect-[4/5] overflow-hidden rounded-xl border border-slate-200 bg-slate-100">
+                  <div className="relative mb-5 aspect-square w-full overflow-hidden rounded-xl border border-slate-200 bg-slate-100">
                     <Image
                       src={detailsProduct.images[0].url}
                       alt={detailsProduct.images[0].alt}
                       fill
-                      sizes="480px"
+                      sizes="(max-width: 520px) 100vw, 520px"
                       className="object-cover"
                     />
                   </div>
                 ) : null}
-                {/* Additional images strip */}
-                {detailsProduct.images.length > 1 ? (
-                  <div className="mb-5 grid grid-cols-5 gap-2">
-                    {detailsProduct.images.slice(1).map((img) => (
-                      <div key={img.url} className="relative aspect-square overflow-hidden rounded-lg border border-slate-200 bg-slate-100">
-                        <Image src={img.url} alt={img.alt} fill sizes="96px" className="object-cover" />
-                      </div>
-                    ))}
-                  </div>
+                <Detail label="Name" value={detailsProduct.name} />
+                <Detail label="SKU" value={detailsProduct.sku} />
+                <Detail label="Slug" value={detailsProduct.slug} />
+                <Detail label="Category" value={detailsProduct.category} />
+                <Detail label="Collection" value={detailsProduct.collection} />
+                <Detail label="Brand" value={detailsProduct.brand} />
+                <Detail label="Fabric" value={detailsProduct.fabric} />
+                <Detail label="Color" value={detailsProduct.color} />
+                <Detail label="Sizes" value={detailsProduct.sizes.join(", ")} />
+                <Detail label="Price" value={formatCurrency(detailsProduct.price)} />
+                {detailsProduct.comparePrice ? (
+                  <Detail label="Compare Price" value={formatCurrency(detailsProduct.comparePrice)} />
                 ) : null}
-                <dl className="grid gap-2 text-sm">
-                  <Detail label="Slug" value={detailsProduct.slug} />
-                  <Detail label="Category" value={detailsProduct.category} />
-                  <Detail label="Collection" value={detailsProduct.collection} />
-                  <Detail label="Brand" value={detailsProduct.brand} />
-                  <Detail label="Fabric" value={detailsProduct.fabric} />
-                  <Detail label="Color" value={detailsProduct.color} />
-                  <Detail label="Sizes" value={detailsProduct.sizes.join(", ")} />
-                  <Detail label="Price" value={formatCurrency(detailsProduct.price)} />
-                  <Detail label="Stock" value={`${detailsProduct.stock} units`} />
-                  <Detail label="GST" value={`${detailsProduct.gst}%`} />
-                  <Detail label="HSN" value={detailsProduct.hsn} />
-                  <Detail label="Description" value={detailsProduct.description} />
-                  <Detail label="SEO Title" value={detailsProduct.seoTitle} />
-                  <Detail label="SEO Description" value={detailsProduct.seoDescription} />
-                </dl>
-              </div>
-              {/* Footer */}
-              <div className="shrink-0 border-t border-slate-200 bg-white px-6 py-4">
-                <Button
-                  type="button"
-                  className="w-full bg-[#8A5A6A] text-white hover:bg-[#7a4a5a]"
-                  onClick={() => {
-                    setDetailsProduct(null);
-                    openEditForm(detailsProduct);
-                  }}
-                >
-                  <Edit className="size-4" />
-                  Edit Product
-                </Button>
-              </div>
-            </>
-          ) : null}
+                {detailsProduct.cost ? (
+                  <Detail label="Cost" value={formatCurrency(detailsProduct.cost)} />
+                ) : null}
+                <Detail label="Stock" value={`${detailsProduct.stock} units`} />
+                <Detail label="HSN" value={detailsProduct.hsn} />
+                <Detail label="GST" value={`${detailsProduct.gst}%`} />
+                <Detail label="SEO Title" value={detailsProduct.seoTitle} />
+                <Detail label="SEO Description" value={detailsProduct.seoDescription} />
+                <Detail label="Status" value={[
+                  detailsProduct.active ? "Active" : "Inactive",
+                  detailsProduct.featured ? "Featured" : "",
+                  detailsProduct.newArrival ? "New Arrival" : "",
+                  detailsProduct.bestSeller ? "Best Seller" : "",
+                ].filter(Boolean).join(" · ")} />
+              </dl>
+            ) : null}
+          </div>
+          <SheetFooter className="shrink-0 border-t border-slate-200 bg-white px-6 py-4">
+            <Button
+              type="button"
+              variant="outline"
+              className="w-full border-slate-300"
+              onClick={() => setDetailsProduct(null)}
+            >
+              Close
+            </Button>
+          </SheetFooter>
         </SheetContent>
       </Sheet>
 
-      {/* ── Delete confirmation dialog ─────────────────────────────────────── */}
-      <Dialog
-        open={Boolean(deleteProduct)}
-        onOpenChange={(open) => { if (!open) setDeleteProduct(null); }}
-      >
-        <DialogContent>
+      {/* ── Delete Confirmation Dialog ── */}
+      <Dialog open={!!deleteProduct} onOpenChange={(open) => { if (!open) setDeleteProduct(null); }}>
+        <DialogContent className="sm:max-w-[400px]">
           <DialogHeader>
-            <DialogTitle>Delete Product</DialogTitle>
-            <DialogDescription>
-              This will permanently delete{" "}
-              <span className="font-semibold text-slate-900">{deleteProduct?.name}</span>.
-              This action cannot be undone.
+            <DialogTitle className="text-slate-900">Delete Product</DialogTitle>
+            <DialogDescription className="text-slate-500">
+              Are you sure you want to permanently delete{" "}
+              <span className="font-semibold text-slate-800">{deleteProduct?.name}</span>? This action cannot be undone.
             </DialogDescription>
           </DialogHeader>
-          <DialogFooter>
+          <DialogFooter className="gap-2 sm:gap-0">
             <Button
               type="button"
               variant="outline"
               onClick={() => setDeleteProduct(null)}
+              disabled={saving}
               className="border-slate-300"
             >
               Cancel
@@ -1886,8 +1842,14 @@ export function ProductManagement() {
               onClick={handleDelete}
               disabled={saving}
             >
-              {saving ? <Loader2 className="size-4 animate-spin" /> : null}
-              Delete Product
+              {saving ? (
+                <>
+                  <Loader2 className="size-4 animate-spin" />
+                  Deleting…
+                </>
+              ) : (
+                "Delete"
+              )}
             </Button>
           </DialogFooter>
         </DialogContent>
