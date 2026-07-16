@@ -6,6 +6,7 @@ import ActiveFilters from "@/components/shop/ActiveFilters";
 import Pagination from "@/components/shop/Pagination";
 import ShopTrustStrip from "@/components/shop/ShopTrustStrip";
 import MobileFilterBar from "@/components/shop/MobileFilterBar";
+import CategoryPills from "@/components/shop/CategoryPills";
 
 export const metadata: Metadata = {
   title: "Shop All — Bansari Collections",
@@ -44,37 +45,64 @@ export default function ShopPage() {
         }}
       />
 
+      {/* Collection schema */}
+      <script
+        type="application/ld+json"
+        suppressHydrationWarning
+        dangerouslySetInnerHTML={{
+          __html: JSON.stringify({
+            "@context": "https://schema.org",
+            "@type": "CollectionPage",
+            name: "Shop All — Bansari Collections",
+            description: "Luxury ethnic wear — Kurta Sets, Sarees, Lehengas, Gowns and more.",
+            url: "https://bansaricollections.com/shop",
+          }),
+        }}
+      />
+
       <main className="min-h-screen bg-slate-50">
+
         {/* ─── Editorial Page Header ─── */}
         <div className="border-b border-slate-200 bg-white">
           <div className="mx-auto max-w-[1440px] px-5 py-10 md:px-10 lg:px-16">
+
             {/* Breadcrumb */}
             <nav aria-label="Breadcrumb" className="mb-5">
-              <ol className="flex items-center gap-2 text-xs text-slate-500">
-                <li><a href="/" className="transition hover:text-slate-900">Home</a></li>
-                <li aria-hidden="true" className="text-slate-300">/</li>
-                <li className="text-slate-900" aria-current="page">Shop</li>
+              <ol className="flex items-center gap-2 text-[11px] tracking-wide text-slate-400">
+                <li>
+                  <a href="/" className="transition-colors duration-200 hover:text-slate-700">
+                    Home
+                  </a>
+                </li>
+                <li aria-hidden="true" className="text-slate-200">/</li>
+                <li className="font-medium text-slate-900" aria-current="page">Shop</li>
               </ol>
             </nav>
 
-            <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+            <div className="flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
               <div>
-                <p className="mb-2 text-xs font-medium uppercase tracking-[0.18em] text-[#8A5A6A]">Bansari Collections</p>
-                <h1 className="font-[family:var(--font-playfair)] text-3xl font-normal text-slate-900 md:text-4xl lg:text-[2.75rem] lg:leading-tight">
+                <p className="mb-2 text-[10px] font-semibold uppercase tracking-[0.22em] text-[#8A5A6A]">
+                  Bansari Collections
+                </p>
+                <h1 className="font-[family:var(--font-playfair)] text-[2rem] font-normal leading-tight text-slate-900 md:text-[2.5rem] lg:text-[3rem]">
                   The Collection
                 </h1>
-                <p className="mt-3 max-w-xl text-sm leading-relaxed text-slate-500">
+                <p className="mt-3 max-w-md text-sm leading-relaxed text-slate-500">
                   Curated ethnic wear crafted for weddings, celebrations, and every occasion in between.
                 </p>
               </div>
               <ShopTrustStrip />
             </div>
           </div>
+
+          {/* Category scroll pills */}
+          <CategoryPills />
         </div>
 
         {/* ─── Main Layout ─── */}
         <div className="mx-auto max-w-[1440px] px-5 md:px-10 lg:px-16">
           <div className="flex gap-10 py-8">
+
             {/* Filter Sidebar — sticky desktop */}
             <aside
               aria-label="Product filters"
@@ -84,7 +112,7 @@ export default function ShopPage() {
             </aside>
 
             {/* Product section */}
-            <section className="min-w-0 flex-1">
+            <section className="min-w-0 flex-1" aria-label="Product listing">
               <ShopToolbar />
               <ActiveFilters />
               <ProductGrid />

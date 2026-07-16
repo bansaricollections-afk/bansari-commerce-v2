@@ -1,43 +1,56 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 
 const PILLS = [
-  { label: "All", value: "all" },
-  { label: "Kurta Sets", value: "kurta-sets" },
-  { label: "Sarees", value: "sarees" },
-  { label: "Lehengas", value: "lehengas" },
-  { label: "Co-ord Sets", value: "coord-sets" },
-  { label: "Gowns", value: "gowns" },
-  { label: "Ethnic Dresses", value: "ethnic-dresses" },
-  { label: "New Arrivals", value: "new-arrivals" },
+  { label: "All",            href: "/shop" },
+  { label: "Kurta Sets",     href: "/shop?category=kurta-sets" },
+  { label: "Sarees",         href: "/shop?category=sarees" },
+  { label: "Lehengas",       href: "/shop?category=lehengas" },
+  { label: "Co-ord Sets",    href: "/shop?category=coord-sets" },
+  { label: "Gowns",          href: "/shop?category=gowns" },
+  { label: "Ethnic Dresses", href: "/shop?category=ethnic-dresses" },
+  { label: "Festive Wear",   href: "/shop?category=festive-wear" },
+  { label: "New Arrivals",   href: "/shop?category=new-arrivals" },
 ];
 
 export default function CategoryPills() {
-  const [selected, setSelected] = useState("all");
+  const [active, setActive] = useState("All");
 
   return (
     <div
-      className="flex gap-2 overflow-x-auto pb-1 scrollbar-none"
-      role="tablist"
-      aria-label="Filter by category"
+      className="border-t border-slate-100 bg-white"
+      aria-label="Browse by category"
     >
-      {PILLS.map((pill) => (
-        <button
-          key={pill.value}
-          type="button"
-          role="tab"
-          aria-selected={selected === pill.value}
-          onClick={() => setSelected(pill.value)}
-          className={`shrink-0 border px-4 py-2 text-xs font-medium whitespace-nowrap transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#8A5A6A] focus-visible:ring-offset-1 ${
-            selected === pill.value
-              ? "border-[#8A5A6A] bg-[#8A5A6A] text-white"
-              : "border-slate-200 bg-white text-slate-600 hover:border-slate-400 hover:text-slate-900"
-          }`}
+      <div className="mx-auto max-w-[1440px] px-5 md:px-10 lg:px-16">
+        <div
+          className="flex items-center gap-0 overflow-x-auto py-3 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+          role="tablist"
+          aria-label="Product categories"
         >
-          {pill.label}
-        </button>
-      ))}
+          {PILLS.map((pill) => {
+            const isActive = active === pill.label;
+            return (
+              <Link
+                key={pill.label}
+                href={pill.href}
+                role="tab"
+                aria-selected={isActive}
+                onClick={() => setActive(pill.label)}
+                className={[
+                  "whitespace-nowrap border-b-2 px-4 py-2 text-[10px] font-semibold uppercase tracking-[0.14em] transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#8A5A6A] focus-visible:ring-inset",
+                  isActive
+                    ? "border-[#8A5A6A] text-[#8A5A6A]"
+                    : "border-transparent text-slate-400 hover:border-slate-200 hover:text-slate-700",
+                ].join(" ")}
+              >
+                {pill.label}
+              </Link>
+            );
+          })}
+        </div>
+      </div>
     </div>
   );
 }
