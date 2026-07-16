@@ -1,22 +1,24 @@
-export default function ShopHero() {
+import CategoryPills from "@/components/shop/CategoryPills";
+
+type Props = {
+  title?: string;
+  description?: string;
+};
+
+export default function ShopHero({
+  title = "The Collection",
+  description = "Curated ethnic wear crafted for weddings, celebrations, and every occasion in between.",
+}: Props) {
   return (
-    <section className="mb-16 rounded-[40px] bg-gradient-to-r from-[#FFF7F3] to-[#F6F0EB] p-12">
-
-      <p className="mb-3 uppercase tracking-[6px] text-[#8A5A6A]">
-        Discover
+    <div className="mb-6">
+      <p className="mb-2 text-xs font-medium uppercase tracking-[0.18em] text-[#8A5A6A]">
+        Bansari Collections
       </p>
-
-      <h1 className="font-[family:var(--font-playfair)] text-5xl font-bold">
-        Curated Fashion
-        <br />
-        For Every Occasion
+      <h1 className="font-[family:var(--font-playfair)] text-3xl font-normal text-slate-900 md:text-4xl">
+        {title}
       </h1>
-
-      <p className="mt-6 max-w-2xl text-lg text-gray-600">
-        Explore premium ethnic wear thoughtfully curated for weddings,
-        celebrations, workdays and every memorable moment.
-      </p>
-
-    </section>
+      <p className="mt-3 mb-6 max-w-xl text-sm leading-relaxed text-slate-500">{description}</p>
+      <CategoryPills />
+    </div>
   );
 }

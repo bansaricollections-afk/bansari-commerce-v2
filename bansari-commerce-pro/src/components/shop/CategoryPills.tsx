@@ -1,50 +1,43 @@
 "use client";
 
-const categories = [
-  "All",
-  "Kurta Sets",
-  "Anarkali Sets",
-  "Ethnic Dresses",
-  "Lehenga Sets",
-  "Sarees",
-  "Co-ord Sets",
-  "Gowns",
+import { useState } from "react";
+
+const PILLS = [
+  { label: "All", value: "all" },
+  { label: "Kurta Sets", value: "kurta-sets" },
+  { label: "Sarees", value: "sarees" },
+  { label: "Lehengas", value: "lehengas" },
+  { label: "Co-ord Sets", value: "coord-sets" },
+  { label: "Gowns", value: "gowns" },
+  { label: "Ethnic Dresses", value: "ethnic-dresses" },
+  { label: "New Arrivals", value: "new-arrivals" },
 ];
 
-type Props = {
-  selected: string;
-  onSelect: (category: string) => void;
-};
+export default function CategoryPills() {
+  const [selected, setSelected] = useState("all");
 
-export default function CategoryPills({
-  selected,
-  onSelect,
-}: Props) {
   return (
-    <div className="mb-10 flex gap-3 overflow-x-auto pb-2">
-
-      {categories.map((category) => {
-
-        const active = category === selected;
-
-        return (
-          <button
-            key={category}
-            onClick={() => onSelect(category)}
-            className={`whitespace-nowrap rounded-full px-6 py-3 text-sm font-medium transition
-
-              ${
-                active
-                  ? "bg-[#8A5A6A] text-white"
-                  : "border border-[#ECE7E2] bg-white hover:border-[#8A5A6A]"
-              }
-
-            `}
-          >
-            {category}
-          </button>
-        );
-      })}
+    <div
+      className="flex gap-2 overflow-x-auto pb-1 scrollbar-none"
+      role="tablist"
+      aria-label="Filter by category"
+    >
+      {PILLS.map((pill) => (
+        <button
+          key={pill.value}
+          type="button"
+          role="tab"
+          aria-selected={selected === pill.value}
+          onClick={() => setSelected(pill.value)}
+          className={`shrink-0 border px-4 py-2 text-xs font-medium whitespace-nowrap transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#8A5A6A] focus-visible:ring-offset-1 ${
+            selected === pill.value
+              ? "border-[#8A5A6A] bg-[#8A5A6A] text-white"
+              : "border-slate-200 bg-white text-slate-600 hover:border-slate-400 hover:text-slate-900"
+          }`}
+        >
+          {pill.label}
+        </button>
+      ))}
     </div>
   );
 }

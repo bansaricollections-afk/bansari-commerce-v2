@@ -3,99 +3,58 @@
 type Props = {
   selectedOccasion: string;
   setSelectedOccasion: (value: string) => void;
-
   selectedFabric: string;
   setSelectedFabric: (value: string) => void;
-
   selectedPrice: string;
   setSelectedPrice: (value: string) => void;
 };
 
-const occasions = [
-  "All",
-  "Wedding",
-  "Festive",
-  "Office",
-  "Party",
-  "Travel",
-];
+const occasions = ["All", "Wedding", "Festive", "Office", "Party", "Travel"];
+const fabrics   = ["All", "Cotton", "Silk", "Rayon", "Georgette", "Organza"];
+const prices    = ["All", "Under ₹1,500", "₹1,500–3,000", "₹3,000–5,000", "Above ₹5,000"];
 
-const fabrics = [
-  "All",
-  "Cotton",
-  "Silk",
-  "Rayon",
-  "Georgette",
-  "Organza",
-];
-
-const prices = [
-  "All",
-  "Under ₹1500",
-  "₹1500-3000",
-  "₹3000-5000",
-  "Above ₹5000",
-];
+function FilterSelect({
+  id,
+  label,
+  value,
+  options,
+  onChange,
+}: {
+  id: string;
+  label: string;
+  value: string;
+  options: string[];
+  onChange: (v: string) => void;
+}) {
+  return (
+    <div>
+      <label htmlFor={id} className="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-slate-500">
+        {label}
+      </label>
+      <select
+        id={id}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        className="w-full border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-700 focus:border-[#8A5A6A] focus:outline-none"
+      >
+        {options.map((opt) => (
+          <option key={opt}>{opt}</option>
+        ))}
+      </select>
+    </div>
+  );
+}
 
 export default function ShopFilters({
-  selectedOccasion,
-  setSelectedOccasion,
-  selectedFabric,
-  setSelectedFabric,
-  selectedPrice,
-  setSelectedPrice,
+  selectedOccasion, setSelectedOccasion,
+  selectedFabric,   setSelectedFabric,
+  selectedPrice,    setSelectedPrice,
 }: Props) {
   return (
-    <div className="mb-12 grid gap-6 rounded-3xl border border-[#ECE7E2] bg-white p-6 lg:grid-cols-3">
-
-      <div>
-        <label className="mb-2 block text-sm font-semibold">
-          Occasion
-        </label>
-
-        <select
-          value={selectedOccasion}
-          onChange={(e) => setSelectedOccasion(e.target.value)}
-          className="w-full rounded-xl border p-3"
-        >
-          {occasions.map((item) => (
-            <option key={item}>{item}</option>
-          ))}
-        </select>
-      </div>
-
-      <div>
-        <label className="mb-2 block text-sm font-semibold">
-          Fabric
-        </label>
-
-        <select
-          value={selectedFabric}
-          onChange={(e) => setSelectedFabric(e.target.value)}
-          className="w-full rounded-xl border p-3"
-        >
-          {fabrics.map((item) => (
-            <option key={item}>{item}</option>
-          ))}
-        </select>
-      </div>
-
-      <div>
-        <label className="mb-2 block text-sm font-semibold">
-          Price
-        </label>
-
-        <select
-          value={selectedPrice}
-          onChange={(e) => setSelectedPrice(e.target.value)}
-          className="w-full rounded-xl border p-3"
-        >
-          {prices.map((item) => (
-            <option key={item}>{item}</option>
-          ))}
-        </select>
-      </div>
-
+    <div className="mb-8 grid gap-4 border-b border-slate-200 pb-6 lg:grid-cols-3">
+      <FilterSelect id="filter-occasion" label="Occasion" value={selectedOccasion} options={occasions} onChange={setSelectedOccasion} />
+      <FilterSelect id="filter-fabric"   label="Fabric"   value={selectedFabric}   options={fabrics}   onChange={setSelectedFabric}   />
+      <FilterSelect id="filter-price"    label="Price"    value={selectedPrice}    options={prices}    onChange={setSelectedPrice}    />
     </div>
   );
 }
