@@ -10,7 +10,9 @@ import { NextRequest, NextResponse } from 'next/server';
  *
  * Limits:
  *   checkout  — 20 requests / 60 s
+ *   payment   — 10 requests / 60 s  (verify-payment)
  *   webhook   — 120 requests / 60 s
+ *   admin     — 60 requests / 60 s
  */
 
 type WindowEntry = {
@@ -42,8 +44,10 @@ export type RateLimitConfig = {
   windowMs: number;
 };
 
-export const RATE_LIMIT_CHECKOUT: RateLimitConfig = { limit: 20, windowMs: 60_000 };
-export const RATE_LIMIT_WEBHOOK: RateLimitConfig = { limit: 120, windowMs: 60_000 };
+export const RATE_LIMIT_CHECKOUT: RateLimitConfig  = { limit: 20,  windowMs: 60_000 };
+export const RATE_LIMIT_PAYMENT: RateLimitConfig   = { limit: 10,  windowMs: 60_000 };
+export const RATE_LIMIT_WEBHOOK: RateLimitConfig   = { limit: 120, windowMs: 60_000 };
+export const RATE_LIMIT_ADMIN: RateLimitConfig     = { limit: 60,  windowMs: 60_000 };
 
 /**
  * Extracts the best-available client IP from the request.
@@ -63,9 +67,9 @@ function getClientIp(request: NextRequest): string {
  * Returns null when the request is allowed.
  * Returns a NextResponse(429) when the limit is exceeded.
  *
- * @param request - The incoming NextRequest.
+ * @param request   - The incoming NextRequest.
  * @param namespace - Unique string identifying this endpoint (e.g. 'checkout').
- * @param config   - Limit and window configuration.
+ * @param config    - Limit and window configuration.
  * @param requestId - The current request ID for inclusion in the error response.
  */
 export function checkRateLimit(
@@ -90,7 +94,9 @@ export function checkRateLimit(
   entry.count += 1;
 
   if (entry.count > config.limit) {
-    const retryAfterSec = Math.ceil((config.windowMs - (now - entry.windowStart)) / 1_000);
+    const retryAfterSec = Math.ceil(
+      (config.windowMs - (now - entry.windowStart)) / 1_000
+    );
     return new NextResponse(
       JSON.stringify({
         success: false,
