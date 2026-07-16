@@ -4,6 +4,8 @@ import { ChevronLeft, ChevronRight } from "lucide-react";
 import { useState } from "react";
 
 const TOTAL_PAGES = 8;
+const PER_PAGE = 24;
+const TOTAL_PRODUCTS = 192;
 
 function getPageRange(current: number, total: number): (number | "...")[] {
   if (total <= 7) return Array.from({ length: total }, (_, i) => i + 1);
@@ -16,61 +18,95 @@ export default function Pagination() {
   const [page, setPage] = useState(1);
   const pages = getPageRange(page, TOTAL_PAGES);
 
+  const from = (page - 1) * PER_PAGE + 1;
+  const to = Math.min(page * PER_PAGE, TOTAL_PRODUCTS);
+  const progressPct = (page / TOTAL_PAGES) * 100;
+
+  function handleSetPage(p: number) {
+    setPage(p);
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }
+
   return (
     <nav
       aria-label="Pagination"
-      className="mt-14 flex flex-col items-center justify-between gap-4 border-t border-slate-200 pt-8 sm:flex-row"
+      className="mt-16 border-t border-slate-200 pt-10"
     >
-      <p className="text-xs text-slate-500">
-        Showing{" "}
-        <span className="font-semibold text-slate-900">
-          {(page - 1) * 24 + 1}–{Math.min(page * 24, 192)}
-        </span>{" "}
-        of <span className="font-semibold text-slate-900">192</span> products
-      </p>
+      {/* Progress bar */}
+      <div className="mb-8 flex flex-col items-center gap-3">
+        <div
+          className="h-px w-48 bg-slate-100"
+          role="progressbar"
+          aria-valuenow={progressPct}
+          aria-valuemin={0}
+          aria-valuemax={100}
+          aria-label={`Page ${page} of ${TOTAL_PAGES}`}
+        >
+          <div
+            className="h-full bg-[#8A5A6A] transition-all duration-500"
+            style={{ width: `${progressPct}%` }}
+          />
+        </div>
+        <p className="text-[10px] uppercase tracking-[0.14em] text-slate-400">
+          {from}–{to} of {TOTAL_PRODUCTS} products
+        </p>
+      </div>
 
-      <div className="flex items-center gap-1">
+      {/* Page buttons */}
+      <div className="flex flex-col items-center gap-6 sm:flex-row sm:justify-between">
+        {/* Prev */}
         <button
           type="button"
           aria-label="Previous page"
           disabled={page === 1}
-          onClick={() => setPage((p) => Math.max(1, p - 1))}
-          className="flex h-9 w-9 items-center justify-center border border-slate-200 bg-white text-slate-500 transition hover:border-slate-400 hover:text-slate-900 disabled:cursor-not-allowed disabled:opacity-40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#8A5A6A]"
+          onClick={() => handleSetPage(Math.max(1, page - 1))}
+          className="flex items-center gap-2 border border-slate-200 bg-white px-5 py-2.5 text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-600 transition-all duration-200 hover:border-slate-400 hover:text-slate-900 disabled:cursor-not-allowed disabled:opacity-30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#8A5A6A]"
         >
-          <ChevronLeft size={14} />
+          <ChevronLeft size={13} aria-hidden="true" />
+          Previous
         </button>
 
-        {pages.map((p, i) =>
-          p === "..." ? (
-            <span key={`ellipsis-${i}`} className="flex h-9 w-9 items-center justify-center text-xs text-slate-400">
-              &hellip;
-            </span>
-          ) : (
-            <button
-              key={p}
-              type="button"
-              aria-label={`Page ${p}`}
-              aria-current={page === p ? "page" : undefined}
-              onClick={() => setPage(p as number)}
-              className={`h-9 w-9 border text-xs font-medium transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#8A5A6A] ${
-                page === p
-                  ? "border-[#8A5A6A] bg-[#8A5A6A] text-white"
-                  : "border-slate-200 bg-white text-slate-700 hover:border-slate-400"
-              }`}
-            >
-              {p}
-            </button>
-          )
-        )}
+        {/* Page numbers */}
+        <div className="flex items-center gap-1">
+          {pages.map((p, i) =>
+            p === "..." ? (
+              <span
+                key={`ellipsis-${i}`}
+                className="flex h-9 w-9 items-center justify-center text-[11px] text-slate-300"
+                aria-hidden="true"
+              >
+                &hellip;
+              </span>
+            ) : (
+              <button
+                key={p}
+                type="button"
+                aria-label={`Page ${p}`}
+                aria-current={page === p ? "page" : undefined}
+                onClick={() => handleSetPage(p as number)}
+                className={[
+                  "flex h-9 w-9 items-center justify-center border text-[11px] font-semibold transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#8A5A6A]",
+                  page === p
+                    ? "border-[#8A5A6A] bg-[#8A5A6A] text-white"
+                    : "border-slate-200 bg-white text-slate-600 hover:border-slate-400 hover:text-slate-900",
+                ].join(" ")}
+              >
+                {p}
+              </button>
+            )
+          )}
+        </div>
 
+        {/* Next */}
         <button
           type="button"
           aria-label="Next page"
           disabled={page === TOTAL_PAGES}
-          onClick={() => setPage((p) => Math.min(TOTAL_PAGES, p + 1))}
-          className="flex h-9 w-9 items-center justify-center border border-slate-200 bg-white text-slate-500 transition hover:border-slate-400 hover:text-slate-900 disabled:cursor-not-allowed disabled:opacity-40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#8A5A6A]"
+          onClick={() => handleSetPage(Math.min(TOTAL_PAGES, page + 1))}
+          className="flex items-center gap-2 border border-slate-200 bg-white px-5 py-2.5 text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-600 transition-all duration-200 hover:border-slate-400 hover:text-slate-900 disabled:cursor-not-allowed disabled:opacity-30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#8A5A6A]"
         >
-          <ChevronRight size={14} />
+          Next
+          <ChevronRight size={13} aria-hidden="true" />
         </button>
       </div>
     </nav>

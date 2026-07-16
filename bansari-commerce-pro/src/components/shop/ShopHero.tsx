@@ -1,24 +1,35 @@
-import CategoryPills from "@/components/shop/CategoryPills";
-
-type Props = {
-  title?: string;
-  description?: string;
-};
-
-export default function ShopHero({
-  title = "The Collection",
-  description = "Curated ethnic wear crafted for weddings, celebrations, and every occasion in between.",
-}: Props) {
+export default function ShopHero() {
   return (
-    <div className="mb-6">
-      <p className="mb-2 text-xs font-medium uppercase tracking-[0.18em] text-[#8A5A6A]">
-        Bansari Collections
-      </p>
-      <h1 className="font-[family:var(--font-playfair)] text-3xl font-normal text-slate-900 md:text-4xl">
-        {title}
-      </h1>
-      <p className="mt-3 mb-6 max-w-xl text-sm leading-relaxed text-slate-500">{description}</p>
-      <CategoryPills />
+    <div
+      className="relative overflow-hidden border-b border-slate-100 bg-[#F9F6F3]"
+      aria-hidden="true"
+    >
+      <div className="mx-auto flex max-w-[1440px] items-center justify-between px-5 py-8 md:px-10 lg:px-16">
+        {/* Decorative rule lines */}
+        <div className="hidden gap-3 lg:flex" aria-hidden="true">
+          {[40, 60, 24, 48, 32].map((h, i) => (
+            <div
+              key={i}
+              className="w-px bg-slate-200"
+              style={{ height: h }}
+            />
+          ))}
+        </div>
+
+        <p className="font-[family:var(--font-playfair)] text-xs italic text-slate-400">
+          &ldquo;Wear what makes you feel alive.&rdquo;
+        </p>
+
+        <div className="hidden gap-3 lg:flex" aria-hidden="true">
+          {[32, 48, 24, 60, 40].map((h, i) => (
+            <div
+              key={i}
+              className="w-px bg-slate-200"
+              style={{ height: h }}
+            />
+          ))}
+        </div>
+      </div>
     </div>
   );
 }
