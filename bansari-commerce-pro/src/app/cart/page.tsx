@@ -11,6 +11,8 @@ import {
 } from "lucide-react";
 
 import { useCart } from "@/store/cart";
+import CartTrustStrip from "@/components/cart/CartTrustStrip";
+import ShippingProgress from "@/components/cart/ShippingProgress";
 
 export default function CartPage() {
   const {
@@ -131,65 +133,67 @@ export default function CartPage() {
 
             {/* Order Summary */}
 
-            <aside className="sticky top-28 h-fit rounded-3xl bg-white p-8 shadow-sm">
-              <h2 className="mb-8 text-3xl font-bold">
-                Order Summary
-              </h2>
+            <aside className="sticky top-28 h-fit rounded-3xl bg-white shadow-sm overflow-hidden">
+              <ShippingProgress totalAmount={subtotal} />
 
-              {remainingForFreeShipping > 0 ? (
-                <div className="mb-6 rounded-2xl bg-[#FFF5F7] p-4 text-sm text-[#8A5A6A]">
-                  Add ₹
-                  {remainingForFreeShipping.toLocaleString("en-IN")}
-                  {" "}more to unlock FREE shipping.
+              <div className="p-8">
+                <h2 className="mb-8 text-3xl font-bold">
+                  Order Summary
+                </h2>
+
+                {remainingForFreeShipping > 0 ? (
+                  <div className="mb-6 rounded-2xl bg-[#FFF5F7] p-4 text-sm text-[#8A5A6A]">
+                    Add ₹
+                    {remainingForFreeShipping.toLocaleString("en-IN")}
+                    {" "}more to unlock FREE shipping.
+                  </div>
+                ) : (
+                  <div className="mb-6 rounded-2xl bg-green-100 p-4 text-sm font-medium text-green-700">
+                    🎉 You qualify for FREE shipping.
+                  </div>
+                )}
+
+                <div className="space-y-4">
+                  <div className="flex justify-between">
+                    <span>Subtotal</span>
+
+                    <span>
+                      ₹{subtotal.toLocaleString("en-IN")}
+                    </span>
+                  </div>
+
+                  <div className="flex justify-between">
+                    <span>Shipping</span>
+
+                    <span>
+                      {shipping === 0
+                        ? "FREE"
+                        : `₹${shipping.toLocaleString("en-IN")}`}
+                    </span>
+                  </div>
+
+                  <hr />
+
+                  <div className="flex justify-between text-2xl font-bold">
+                    <span>Total</span>
+
+                    <span>
+                      ₹{total.toLocaleString("en-IN")}
+                    </span>
+                  </div>
                 </div>
-              ) : (
-                <div className="mb-6 rounded-2xl bg-green-100 p-4 text-sm font-medium text-green-700">
-                  🎉 You qualify for FREE shipping.
-                </div>
-              )}
 
-              <div className="space-y-4">
-                <div className="flex justify-between">
-                  <span>Subtotal</span>
+                <Link
+                  href="/checkout"
+                  className="mt-10 flex items-center justify-center gap-3 rounded-full bg-[#8A5A6A] py-4 font-semibold text-white transition hover:bg-[#734757]"
+                >
+                  Secure Checkout
 
-                  <span>
-                    ₹{subtotal.toLocaleString("en-IN")}
-                  </span>
-                </div>
-
-                <div className="flex justify-between">
-                  <span>Shipping</span>
-
-                  <span>
-                    {shipping === 0
-                      ? "FREE"
-                      : `₹${shipping.toLocaleString("en-IN")}`}
-                  </span>
-                </div>
-
-                <hr />
-
-                <div className="flex justify-between text-2xl font-bold">
-                  <span>Total</span>
-
-                  <span>
-                    ₹{total.toLocaleString("en-IN")}
-                  </span>
-                </div>
+                  <ArrowRight size={18} />
+                </Link>
               </div>
 
-              <Link
-                href="/checkout"
-                className="mt-10 flex items-center justify-center gap-3 rounded-full bg-[#8A5A6A] py-4 font-semibold text-white transition hover:bg-[#734757]"
-              >
-                Secure Checkout
-
-                <ArrowRight size={18} />
-              </Link>
-
-              <p className="mt-6 text-center text-sm text-gray-500">
-                Secure payment • Trusted delivery • Quality checked
-              </p>
+              <CartTrustStrip />
             </aside>
           </div>
         )}

@@ -9,6 +9,8 @@ import ProductAccordion from '@/components/product/ProductAccordion';
 import ProductGallery from '@/components/product/ProductGallery';
 import ProductInfo from '@/components/product/ProductInfo';
 import RecentlyViewed from '@/components/product/RecentlyViewed';
+import TrustBadges from '@/components/product/TrustBadges';
+import WhatsAppShare from '@/components/product/WhatsAppShare';
 
 const SITE_URL =
   process.env.NEXT_PUBLIC_SITE_URL ?? 'https://www.bansaricollection.in';
@@ -173,6 +175,18 @@ export default async function ProductPage({ params }: Props) {
           <ProductGallery product={product} />
           <ProductInfo product={product} />
         </div>
+      </section>
+
+      <section className="mx-auto max-w-7xl px-6">
+        <TrustBadges />
+      </section>
+
+      <section className="mx-auto max-w-7xl px-6">
+        <WhatsAppShare
+          productName={product.name}
+          productUrl={canonicalUrl}
+          price={product.price}
+        />
       </section>
 
       <section className="mx-auto max-w-7xl px-6">

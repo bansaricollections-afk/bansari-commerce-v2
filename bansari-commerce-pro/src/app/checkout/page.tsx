@@ -3,9 +3,11 @@
 import { useState } from "react";
 import Link from "next/link";
 import Script from "next/script";
-import { ArrowLeft, ShieldCheck } from "lucide-react";
+import { ArrowLeft } from "lucide-react";
 
 import RazorpayButton from "@/components/checkout/RazorpayButton";
+import CheckoutTrustStrip from "@/components/checkout/CheckoutTrustStrip";
+import LuxuryStepIndicator from "@/components/checkout/LuxuryStepIndicator";
 import { useCart } from "@/store/cart";
 
 export default function CheckoutPage() {
@@ -50,9 +52,11 @@ export default function CheckoutPage() {
             Back to Cart
           </Link>
 
-          <h1 className="mb-12 font-[family:var(--font-playfair)] text-5xl font-bold">
+          <h1 className="mb-4 font-[family:var(--font-playfair)] text-5xl font-bold">
             Secure Checkout
           </h1>
+
+          <LuxuryStepIndicator currentStep={1} />
 
           <div className="grid gap-12 lg:grid-cols-[2fr_1fr]">
             {/* LEFT */}
@@ -219,10 +223,7 @@ export default function CheckoutPage() {
                 disabled={!isValid}
               />
 
-              <div className="mt-6 flex items-center justify-center gap-2 text-sm text-gray-500">
-                <ShieldCheck size={16} />
-                Secure encrypted checkout
-              </div>
+              <CheckoutTrustStrip />
             </aside>
           </div>
         </div>
