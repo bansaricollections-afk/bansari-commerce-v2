@@ -35,25 +35,25 @@ export type CartValidationResult =
   | { valid: false; errors: string[] };
 
 // ---------------------------------------------------------------------------
+// Shared select clause
+// ---------------------------------------------------------------------------
+
+const PRODUCT_SELECT = 'id, name, slug, price, stock, active, images, category' as const;
+
+// ---------------------------------------------------------------------------
 // getProductById
 // ---------------------------------------------------------------------------
 
 /**
  * Fetch a single product by id via the service-role client.
  * Returns null when the product does not exist.
- *
- * The SELECT clause matches the exact column names in public.products:
- *   id, name, slug, price, stock, active, images, category
- *
- * NOTE: There is no `stock_quantity`, `is_active`, or `is_deleted` column
- * in the database schema. Those names were the source of P0-1.
  */
 export async function getProductById(id: number): Promise<Product | null> {
   const supabase = createServiceRoleClient();
 
   const { data, error } = await supabase
     .from('products')
-    .select('id, name, slug, price, stock, active, images, category')
+    .select(PRODUCT_SELECT)
     .eq('id', id)
     .maybeSingle();
 
@@ -62,20 +62,86 @@ export async function getProductById(id: number): Promise<Product | null> {
 }
 
 // ---------------------------------------------------------------------------
+// getProducts
+// ---------------------------------------------------------------------------
+
+/**
+ * Fetch all active products, newest first.
+ * Used by ProductGrid and WishlistPage.
+ */
+export async function getProducts(): Promise<Product[]> {
+  const supabase = createServiceRoleClient();
+
+  const { data, error } = await supabase
+    .from('products')
+    .select(PRODUCT_SELECT)
+    .eq('active', true)
+    .order('created_at', { ascending: false });
+
+  if (error) throw new Error(error.message);
+  return (data ?? []) as Product[];
+}
+
+// ---------------------------------------------------------------------------
+// getFeaturedProducts
+// ---------------------------------------------------------------------------
+
+/**
+ * Fetch active products where featured = true, newest first.
+ * Used by FeaturedProducts home component (sliced to 4 by the caller).
+ */
+export async function getFeaturedProducts(): Promise<Product[]> {
+  const supabase = createServiceRoleClient();
+
+  const { data, error } = await supabase
+    .from('products')
+    .select(PRODUCT_SELECT)
+    .eq('active', true)
+    .eq('featured', true)
+    .order('created_at', { ascending: false });
+
+  if (error) throw new Error(error.message);
+  return (data ?? []) as Product[];
+}
+
+// ---------------------------------------------------------------------------
+// getRelatedProducts
+// ---------------------------------------------------------------------------
+
+/**
+ * Fetch related products in the same category, excluding the current product.
+ * Used by CompleteLook — called as getRelatedProducts(id, category, limit).
+ *
+ * @param productId  — current product to exclude from results
+ * @param category   — category to match
+ * @param limit      — max number of results (default 4)
+ */
+export async function getRelatedProducts(
+  productId: number,
+  category: string,
+  limit = 4
+): Promise<Product[]> {
+  const supabase = createServiceRoleClient();
+
+  const { data, error } = await supabase
+    .from('products')
+    .select(PRODUCT_SELECT)
+    .eq('active', true)
+    .eq('category', category)
+    .neq('id', productId)
+    .limit(limit);
+
+  if (error) throw new Error(error.message);
+  return (data ?? []) as Product[];
+}
+
+// ---------------------------------------------------------------------------
 // validateCartItems
 // ---------------------------------------------------------------------------
 
 /**
- * Validates a set of cart items against live database state:
- *   - Product must exist
- *   - Product must be active (active = true)
- *   - Requested quantity must be a positive integer ≤ 100
- *   - Requested quantity must not exceed available stock
- *
- * Returns { valid: true, lineItems } with authoritative server prices,
- * or { valid: false, errors: string[] } listing every failure.
- *
- * One DB fetch per product (parallel via Promise.all).
+ * Validates a set of cart items against live database state.
+ * Returns { valid: true, lineItems } or { valid: false, errors }.
  */
 export async function validateCartItems(
   items: CartItem[]
@@ -115,7 +181,6 @@ export async function validateCartItems(
       continue;
     }
 
-    // Uses `product.stock` — the actual column name in public.products.
     if (product.stock < item.quantity) {
       errors.push(
         `Insufficient stock for "${product.name}": ${product.stock} available, ${item.quantity} requested.`
