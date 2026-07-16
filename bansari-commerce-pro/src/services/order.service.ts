@@ -105,6 +105,29 @@ type PendingLineItem = {
   lineTotal: number;
 };
 
+/** pending_orders row shape (only fields we use in recovery) */
+type PendingOrderRow = {
+  id: string;
+  user_id: string | null;           // P0-FIX: null for guests, UUID for auth users
+  items_json: PendingLineItem[] | null;
+  subtotal: number | string;
+  shipping_fee: number | string;
+  discount: number | string;
+  grand_total: number | string;
+  currency: string | null;
+  customer_name: string;
+  customer_email: string;
+  customer_phone: string | null;
+  shipping_name: string;
+  shipping_phone: string;
+  shipping_email: string | null;
+  shipping_address_line1: string;
+  shipping_address_line2: string | null;
+  shipping_city: string;
+  shipping_state: string;
+  shipping_postal_code: string;
+};
+
 // ---------------------------------------------------------------------------
 // Reads
 // ---------------------------------------------------------------------------
@@ -200,6 +223,11 @@ function generateOrderNumber(): string {
  *   - Checks orders table before any write.
  *   - Catches 23505 (unique_violation) from the RPC for concurrent deliveries.
  *
+ * P0 FIX — user_id ownership:
+ *   - Full recovery: reads pending.user_id (UUID for auth users, null for guests)
+ *   - Partial recovery: always null (no session available in async webhook context)
+ *   - NEVER inserts empty string ''
+ *
  * Stock deduction: performed after the RPC succeeds (same pattern as
  * browser checkout — best-effort, non-fatal on failure).
  *
@@ -237,33 +265,41 @@ export async function recoverOrderFromWebhook(
       .maybeSingle();
 
     if (pending) {
-      rLog.info('recovery.pending_orders.found', { pendingId: pending.id });
+      const typedPending = pending as PendingOrderRow;
+      rLog.info('recovery.pending_orders.found', {
+        pendingId: typedPending.id,
+        hasUserId: typedPending.user_id !== null,
+      });
 
-      const lineItems = (pending.items_json ?? []) as PendingLineItem[];
+      const lineItems = (typedPending.items_json ?? []) as PendingLineItem[];
       const orderNumber = generateOrderNumber();
 
-      // Build payloads in the same shape as the browser checkout path.
+      // P0 FIX: use pending.user_id (null for guests, UUID for auth users).
+      // Never use empty string '' — the RPC coerces '' to null via nullif anyway,
+      // but we pass the correct value explicitly for clarity and correctness.
+      const resolvedUserId: string | null = typedPending.user_id ?? null;
+
       const orderPayload = {
         order_number:              orderNumber,
-        user_id:                   '',
-        customer_name:             pending.customer_name,
-        customer_email:            pending.customer_email,
-        customer_phone:            pending.customer_phone ?? '',
-        shipping_name:             pending.shipping_name,
-        shipping_phone:            pending.shipping_phone,
-        shipping_email:            pending.shipping_email ?? '',
-        shipping_address_line1:    pending.shipping_address_line1,
-        shipping_address_line2:    pending.shipping_address_line2 ?? '',
-        shipping_city:             pending.shipping_city,
-        shipping_state:            pending.shipping_state,
-        shipping_postal_code:      pending.shipping_postal_code,
+        user_id:                   resolvedUserId,
+        customer_name:             typedPending.customer_name,
+        customer_email:            typedPending.customer_email,
+        customer_phone:            typedPending.customer_phone ?? '',
+        shipping_name:             typedPending.shipping_name,
+        shipping_phone:            typedPending.shipping_phone,
+        shipping_email:            typedPending.shipping_email ?? '',
+        shipping_address_line1:    typedPending.shipping_address_line1,
+        shipping_address_line2:    typedPending.shipping_address_line2 ?? '',
+        shipping_city:             typedPending.shipping_city,
+        shipping_state:            typedPending.shipping_state,
+        shipping_postal_code:      typedPending.shipping_postal_code,
         billing_same_as_shipping:  'true',
-        currency:                  pending.currency ?? 'INR',
-        subtotal:                  String(pending.subtotal),
-        discount:                  String(pending.discount),
-        shipping_fee:              String(pending.shipping_fee),
+        currency:                  typedPending.currency ?? 'INR',
+        subtotal:                  String(typedPending.subtotal),
+        discount:                  String(typedPending.discount),
+        shipping_fee:              String(typedPending.shipping_fee),
         tax:                       '0',
-        grand_total:               String(pending.grand_total),
+        grand_total:               String(typedPending.grand_total),
         payment_provider:          'razorpay',
         payment_method:            'razorpay-webhook-recovery',
         payment_reference:         payment.id,
@@ -308,7 +344,7 @@ export async function recoverOrderFromWebhook(
 
       if (!order) return { recovered: false, error: 'RPC returned no data.' };
 
-      rLog.info('recovery.order.created', { orderId: order.id, orderNumber });
+      rLog.info('recovery.order.created', { orderId: order.id, orderNumber, userId: resolvedUserId });
 
       // --- Decrement stock (best-effort, outside the RPC transaction) ---
       for (const li of lineItems) {
@@ -328,7 +364,7 @@ export async function recoverOrderFromWebhook(
       await supabase
         .from('pending_orders')
         .update({ status: 'recovered' })
-        .eq('id', pending.id);
+        .eq('id', typedPending.id);
 
       // --- Send confirmation email (non-fatal) ---
       try {
@@ -346,10 +382,10 @@ export async function recoverOrderFromWebhook(
           discount:    Number(order.discount),
           grandTotal:  Number(order.grand_total),
           shippingAddress: {
-            addressLine1: pending.shipping_address_line1,
-            city:         pending.shipping_city,
-            state:        pending.shipping_state,
-            postalCode:   pending.shipping_postal_code,
+            addressLine1: typedPending.shipping_address_line1,
+            city:         typedPending.shipping_city,
+            state:        typedPending.shipping_state,
+            postalCode:   typedPending.shipping_postal_code,
           },
         });
         rLog.info('recovery.email.sent', { orderId: order.id });
@@ -374,12 +410,12 @@ export async function recoverOrderFromWebhook(
     const customerName   = payment.notes?.customer_name ?? 'Customer';
     const orderNumber    = generateOrderNumber();
 
-    // Partial recovery has no items, so p_items is an empty array.
-    // create_order_with_items() accepts an empty items array gracefully
-    // (the inner INSERT … SELECT produces zero rows, which is fine).
+    // P0 FIX: partial recovery has no session context — user_id is always null.
+    // The payment arrived asynchronously; there is no JWT available.
+    // DO NOT use empty string ''. NULL is the correct value for unknown ownership.
     const partialOrderPayload = {
       order_number:              orderNumber,
-      user_id:                   '',
+      user_id:                   null,
       customer_name:             customerName,
       customer_email:            customerEmail,
       customer_phone:            customerPhone,
