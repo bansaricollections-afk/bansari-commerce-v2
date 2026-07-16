@@ -1,6 +1,8 @@
+"use client";
+
 import Link from "next/link";
 import { MapPin, Phone, Mail } from "lucide-react";
-import { FaInstagram, FaFacebookF } from "react-icons/fa";
+import { FaInstagram, FaFacebookF } from "react-icons/fa6";
 
 const SHOP_LINKS = [
   { label: "All Products",  href: "/shop" },
@@ -245,7 +247,7 @@ export default function Footer() {
               opacity: 0.4,
             }}
           >
-            © {new Date().getFullYear()} Bansari Collections. All rights reserved.
+            &copy; {new Date().getFullYear()} Bansari Collections. All rights reserved.
           </p>
 
           {/* Trust + Payment */}
