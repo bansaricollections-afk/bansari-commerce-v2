@@ -7,6 +7,7 @@ import {
   recoverOrderFromWebhook,
   type RazorpayPaymentEntity,
 } from '@/services/order.service';
+import { createServiceRoleClient } from '@/lib/supabase/service';
 import { createLogger } from '@/lib/logger';
 import { withRetry, isTransientError } from '@/lib/retry';
 import { generateRequestId } from '@/lib/request-id';
@@ -58,6 +59,51 @@ async function fetchRazorpayPayment(
   }
 }
 
+/**
+ * P0-2: Webhook exactly-once deduplication.
+ *
+ * Attempts to INSERT the Razorpay event_id into webhook_events.
+ * - Returns 'new'       if this is the first delivery (proceed with processing).
+ * - Returns 'duplicate' if the event was already processed (skip — return 200).
+ * - Returns 'error'     if the INSERT failed for a non-dedup reason (log, continue).
+ *
+ * Uses ON CONFLICT DO NOTHING semantics via INSERT + checking insert count.
+ * The unique index on webhook_events.event_id enforces exactly-once at DB level.
+ */
+async function deduplicateEvent(
+  eventId: string,
+  eventType: string,
+  paymentId: string | null,
+  requestId: string
+): Promise<'new' | 'duplicate' | 'error'> {
+  const wLog = log.child({ requestId, eventId, eventType });
+  try {
+    const supabase = createServiceRoleClient();
+    const { error } = await supabase
+      .from('webhook_events')
+      .insert({
+        event_id:   eventId,
+        event_type: eventType,
+        payment_id: paymentId,
+      });
+
+    if (!error) return 'new';
+
+    // PostgreSQL unique violation code: duplicate delivery
+    if (error.code === '23505') {
+      wLog.info('webhook.dedup.duplicate_event', { eventId });
+      return 'duplicate';
+    }
+
+    // Any other error: log but do not block processing
+    wLog.warn('webhook.dedup.write_failed', error, { eventId });
+    return 'error';
+  } catch (err) {
+    log.child({ requestId }).warn('webhook.dedup.unexpected', err);
+    return 'error';
+  }
+}
+
 export async function POST(request: NextRequest): Promise<NextResponse> {
   const requestId = generateRequestId();
   const wLog = log.child({ requestId });
@@ -86,16 +132,17 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     return apiError(requestId, 'INVALID_PAYLOAD', 'Invalid webhook payload.', 400);
   }
 
-  const eventType = (event as Record<string, unknown>).event;
+  const typedEvent = event as Record<string, unknown>;
+  const eventType  = typedEvent.event;
 
   if (typeof eventType !== 'string' || !HANDLED_EVENTS.has(eventType)) {
     return NextResponse.json({ success: true, requestId, handled: false }, { status: 200 });
   }
 
-  const payload = (event as Record<string, unknown>).payload as Record<string, unknown> | undefined;
+  const payload       = typedEvent.payload as Record<string, unknown> | undefined;
   const paymentWrapper = payload?.payment as Record<string, unknown> | undefined;
-  const entity = paymentWrapper?.entity as Record<string, unknown> | undefined;
-  const paymentId = entity?.id;
+  const entity         = paymentWrapper?.entity as Record<string, unknown> | undefined;
+  const paymentId      = entity?.id;
   const razorpayOrderId = entity?.order_id;
 
   if (typeof paymentId !== 'string' || paymentId.length === 0) {
@@ -106,6 +153,39 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   const wLogP = wLog.child({ paymentId, razorpayOrderId: razorpayOrderId as string | undefined });
   wLogP.info('webhook.received', { eventType });
 
+  // ---------------------------------------------------------------------------
+  // P0-2: Exactly-once deduplication
+  // Must occur AFTER signature verification and payload extraction.
+  // ---------------------------------------------------------------------------
+  const eventId = typeof typedEvent.id === 'string' ? typedEvent.id : null;
+
+  if (eventId) {
+    const dedupResult = await deduplicateEvent(
+      eventId,
+      eventType,
+      typeof paymentId === 'string' ? paymentId : null,
+      requestId
+    );
+
+    if (dedupResult === 'duplicate') {
+      // Already processed — acknowledge to stop Razorpay retries.
+      timer('info', { duplicate: true });
+      return NextResponse.json(
+        { success: true, requestId, handled: false, duplicate: true },
+        { status: 200 }
+      );
+    }
+    // 'error': dedup write failed for non-dedup reason — log and continue processing.
+    // 'new': proceed normally.
+  } else {
+    wLogP.warn('webhook.dedup.no_event_id', {
+      note: 'Razorpay event_id missing from payload. Deduplication skipped.',
+    });
+  }
+
+  // ---------------------------------------------------------------------------
+  // Business logic
+  // ---------------------------------------------------------------------------
   try {
     const status = eventType === 'payment.captured' ? 'paid' : 'failed';
     const result = await updatePaymentStatusFromWebhook(paymentId, status);

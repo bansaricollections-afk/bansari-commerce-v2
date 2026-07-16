@@ -4,6 +4,7 @@ import crypto from 'crypto';
 import { getRazorpay } from '@/lib/razorpay';
 import { validateCartItems, type CartItem } from '@/services/product.service';
 import { createServiceRoleClient } from '@/lib/supabase/service';
+import { createServerClient } from '@supabase/ssr';
 import { createLogger } from '@/lib/logger';
 import { generateRequestId } from '@/lib/request-id';
 import { checkRateLimit, RATE_LIMIT_CHECKOUT } from '@/lib/rate-limit';
@@ -87,6 +88,31 @@ function parseShipping(raw: unknown): ShippingInput | string {
   };
 }
 
+/**
+ * P0-3: Resolve the authenticated user's ID from the server-side JWT.
+ * Returns null for unauthenticated/guest users. Never returns ''.
+ * Used to populate pending_orders.user_id for ownership tracking in recovery.
+ */
+async function resolveUserId(request: NextRequest): Promise<string | null> {
+  try {
+    const supabaseUrl     = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+    if (!supabaseUrl || !supabaseAnonKey) return null;
+
+    const supabase = createServerClient(supabaseUrl, supabaseAnonKey, {
+      cookies: {
+        getAll() { return request.cookies.getAll(); },
+        setAll() { /* read-only in API route */ },
+      },
+    });
+
+    const { data: { user } } = await supabase.auth.getUser();
+    return user?.id ?? null;
+  } catch {
+    return null;
+  }
+}
+
 export async function POST(request: NextRequest) {
   const requestId = generateRequestId();
   const log = createLogger({ service: 'create-order', requestId });
@@ -131,27 +157,32 @@ export async function POST(request: NextRequest) {
 
     const { lineItems } = cartValidation;
 
-    const subtotal = round2(lineItems.reduce((s, r) => s + r.lineTotal, 0));
+    const subtotal    = round2(lineItems.reduce((s, r) => s + r.lineTotal, 0));
     const shippingFee = subtotal >= FREE_SHIPPING_THRESHOLD ? 0 : STANDARD_SHIPPING_FEE;
-    const discount = 0;
-    const grandTotal = round2(subtotal + shippingFee - discount);
+    const discount    = 0;
+    const grandTotal  = round2(subtotal + shippingFee - discount);
     const amountPaise = Math.round(grandTotal * 100);
-    const currency = 'INR';
+    const currency    = 'INR';
 
     log.info('create-order.pricing', { subtotal, shippingFee, discount, grandTotal });
 
-    const razorpay = getRazorpay();
-    const rzpOrder = await razorpay.orders.create({
-      amount: amountPaise,
+    // P0-3: Resolve user_id BEFORE creating the Razorpay order.
+    // This ensures pending_orders carries the correct ownership.
+    const userId = await resolveUserId(request);
+    log.info('create-order.user_resolved', { authenticated: userId !== null });
+
+    const razorpay  = getRazorpay();
+    const rzpOrder  = await razorpay.orders.create({
+      amount:   amountPaise,
       currency,
-      receipt: `BC-${Date.now()}`,
+      receipt:  `BC-${Date.now()}`,
       notes: {
-        customer_name: customer.name,
+        customer_name:  customer.name,
         customer_email: customer.email,
-        subtotal: String(subtotal),
-        shipping_fee: String(shippingFee),
-        grand_total: String(grandTotal),
-        item_count: String(lineItems.length),
+        subtotal:       String(subtotal),
+        shipping_fee:   String(shippingFee),
+        grand_total:    String(grandTotal),
+        item_count:     String(lineItems.length),
       },
     });
 
@@ -162,27 +193,28 @@ export async function POST(request: NextRequest) {
       .from('pending_orders')
       .upsert(
         {
-          razorpay_order_id: rzpOrder.id,
-          status: 'pending',
+          razorpay_order_id:      rzpOrder.id,
+          user_id:                userId,   // P0-3: null for guests, UUID for auth users
+          status:                 'pending',
           subtotal,
-          shipping_fee: shippingFee,
+          shipping_fee:           shippingFee,
           discount,
-          grand_total: grandTotal,
+          grand_total:            grandTotal,
           currency,
-          coupon_code: couponCode,
-          items_json: lineItems,
-          customer_name: customer.name,
-          customer_email: customer.email,
-          customer_phone: customer.phone,
-          shipping_name: shipping.name,
-          shipping_phone: shipping.phone,
-          shipping_email: shipping.email ?? null,
+          coupon_code:            couponCode,
+          items_json:             lineItems,
+          customer_name:          customer.name,
+          customer_email:         customer.email,
+          customer_phone:         customer.phone,
+          shipping_name:          shipping.name,
+          shipping_phone:         shipping.phone,
+          shipping_email:         shipping.email ?? null,
           shipping_address_line1: shipping.addressLine1,
           shipping_address_line2: shipping.addressLine2 ?? null,
-          shipping_city: shipping.city,
-          shipping_state: shipping.state,
-          shipping_postal_code: shipping.postalCode,
-          shipping_country: shipping.country ?? 'IN',
+          shipping_city:          shipping.city,
+          shipping_state:         shipping.state,
+          shipping_postal_code:   shipping.postalCode,
+          shipping_country:       shipping.country ?? 'IN',
         },
         { onConflict: 'razorpay_order_id' }
       );
@@ -190,7 +222,7 @@ export async function POST(request: NextRequest) {
     if (pendingError) {
       log.warn('create-order.pending_orders.write_failed', pendingError, { razorpayOrderId: rzpOrder.id });
     } else {
-      log.info('create-order.pending_orders.saved', { razorpayOrderId: rzpOrder.id });
+      log.info('create-order.pending_orders.saved', { razorpayOrderId: rzpOrder.id, userId });
     }
 
     timer('info', { razorpayOrderId: rzpOrder.id });
@@ -198,7 +230,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       success: true,
       requestId,
-      order: rzpOrder,
+      order:   rzpOrder,
       pricing: { subtotal, shippingFee, discount, grandTotal },
     });
   } catch (error) {
