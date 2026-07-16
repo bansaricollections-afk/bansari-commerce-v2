@@ -131,11 +131,8 @@ function validateEnvironment(): void {
     '',
   ].join('\n');
 
-  // Guard process.stdout — not available in Edge Runtime.
-  // instrumentation.ts runs under nodejs runtime only (guarded by
-  // NEXT_RUNTIME === 'nodejs' in register()), but Turbopack analyses
-  // the file statically, so we add an explicit runtime guard here.
-  if (typeof process !== 'undefined' && process.stdout) {
-    process.stdout.write(lines);
-  }
+  // Use console.log — available in all runtimes (nodejs, edge, browser).
+  // process.stdout is nodejs-only and triggers Turbopack static-analysis
+  // warnings even when guarded by a NEXT_RUNTIME runtime check.
+  console.log(lines);
 }
