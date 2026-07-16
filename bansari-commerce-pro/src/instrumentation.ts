@@ -76,7 +76,7 @@ const REQUIRED_ENV: EnvSpec[] = [
   {
     key: 'EMAIL_FROM',
     description: 'From address for transactional emails',
-    validate: (v) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v) || v.includes(' <') ,
+    validate: (v) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v) || v.includes(' <'),
     validateMessage: 'Must be a valid email address or "Name <email@domain.com>" format',
   },
 ];
@@ -130,5 +130,12 @@ function validateEnvironment(): void {
     `  ✓ ${REQUIRED_ENV.length} required variables present and valid.`,
     '',
   ].join('\n');
-  process.stdout.write(lines);
+
+  // Guard process.stdout — not available in Edge Runtime.
+  // instrumentation.ts runs under nodejs runtime only (guarded by
+  // NEXT_RUNTIME === 'nodejs' in register()), but Turbopack analyses
+  // the file statically, so we add an explicit runtime guard here.
+  if (typeof process !== 'undefined' && process.stdout) {
+    process.stdout.write(lines);
+  }
 }
