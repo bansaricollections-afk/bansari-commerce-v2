@@ -1,4 +1,5 @@
 import BrandStory from "@/components/home/BrandStory";
+import CampaignBanner from "@/components/home/CampaignBanner";
 import CategoryGrid from "@/components/home/CategoryGrid";
 import CelebrationEdit from "@/components/home/CelebrationEdit";
 import FeaturedProducts from "@/components/home/FeaturedProducts";
@@ -15,6 +16,9 @@ export default function Home() {
     <main>
       {/* ── Hero ── */}
       <Hero />
+
+      {/* ── Campaign Banner ── */}
+      <CampaignBanner />
 
       {/* ── Trust Strip ── */}
       <HomeTrustStrip />
