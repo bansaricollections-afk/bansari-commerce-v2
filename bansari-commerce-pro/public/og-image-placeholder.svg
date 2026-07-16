@@ -1,0 +1,93 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630">
+  <!-- Bansari Collections — OG Image Placeholder -->
+  <!-- REPLACE THIS FILE with /public/og-image.jpg (1200x630 JPG) before launch -->
+  <!-- See DEPLOY_CHECKLIST.md Step 2 -->
+
+  <!-- Background -->
+  <rect width="1200" height="630" fill="#7c3f2e"/>
+
+  <!-- Subtle texture overlay -->
+  <rect width="1200" height="630" fill="url(#grain)" opacity="0.08"/>
+
+  <!-- Decorative border -->
+  <rect x="32" y="32" width="1136" height="566" rx="8" fill="none" stroke="#f5e6d3" stroke-width="1" opacity="0.4"/>
+  <rect x="40" y="40" width="1120" height="550" rx="6" fill="none" stroke="#f5e6d3" stroke-width="0.5" opacity="0.25"/>
+
+  <!-- Brand mark circle -->
+  <circle cx="600" cy="220" r="72" fill="none" stroke="#f5e6d3" stroke-width="1.5" opacity="0.6"/>
+  <circle cx="600" cy="220" r="60" fill="#f5e6d3" opacity="0.12"/>
+
+  <!-- B lettermark -->
+  <text
+    x="600"
+    y="244"
+    font-family="Georgia, 'Times New Roman', serif"
+    font-size="72"
+    font-weight="700"
+    fill="#f5e6d3"
+    text-anchor="middle"
+    dominant-baseline="auto"
+    letter-spacing="-1"
+  >B</text>
+
+  <!-- Brand name -->
+  <text
+    x="600"
+    y="342"
+    font-family="Georgia, 'Times New Roman', serif"
+    font-size="52"
+    font-weight="400"
+    fill="#f5e6d3"
+    text-anchor="middle"
+    letter-spacing="6"
+  >BANSARI</text>
+
+  <!-- Divider line -->
+  <line x1="460" y1="368" x2="740" y2="368" stroke="#f5e6d3" stroke-width="0.75" opacity="0.5"/>
+
+  <!-- Tagline -->
+  <text
+    x="600"
+    y="406"
+    font-family="Georgia, 'Times New Roman', serif"
+    font-size="22"
+    font-weight="400"
+    fill="#f5e6d3"
+    text-anchor="middle"
+    letter-spacing="4"
+    opacity="0.8"
+  >COLLECTIONS</text>
+
+  <!-- Sub-tagline -->
+  <text
+    x="600"
+    y="460"
+    font-family="Georgia, 'Times New Roman', serif"
+    font-size="17"
+    font-weight="400"
+    fill="#f5e6d3"
+    text-anchor="middle"
+    letter-spacing="1"
+    opacity="0.65"
+  >Premium Indian Ethnic Wear</text>
+
+  <!-- URL -->
+  <text
+    x="600"
+    y="556"
+    font-family="'Helvetica Neue', Arial, sans-serif"
+    font-size="14"
+    font-weight="400"
+    fill="#f5e6d3"
+    text-anchor="middle"
+    letter-spacing="1"
+    opacity="0.45"
+  >www.bansaricollection.in</text>
+
+  <defs>
+    <filter id="grain">
+      <feTurbulence type="fractalNoise" baseFrequency="0.65" numOctaves="3" stitchTiles="stitch"/>
+      <feColorMatrix type="saturate" values="0"/>
+    </filter>
+  </defs>
+</svg>
