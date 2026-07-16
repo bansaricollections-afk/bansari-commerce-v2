@@ -91,33 +91,38 @@ function TileLabel({
       }}
     >
       <span
-        className="font-inter block tracking-widest uppercase"
         style={{
+          fontFamily: "var(--font-inter), sans-serif",
           fontSize: "var(--bc-text-xs)",
           color: "var(--bc-text-gold)",
           letterSpacing: "0.14em",
+          textTransform: "uppercase",
+          display: "block",
         }}
       >
         {occasion}
       </span>
       <span
-        className="font-playfair block"
         style={{
+          fontFamily: "var(--font-playfair), serif",
           fontSize: "var(--bc-text-lg)",
           color: "var(--bc-text-inverse)",
           fontWeight: 500,
           lineHeight: 1.15,
+          display: "block",
         }}
       >
         {title}
       </span>
       {cta && (
         <span
-          className="font-inter mt-1 block"
           style={{
+            fontFamily: "var(--font-inter), sans-serif",
             fontSize: "var(--bc-text-sm)",
             color: "var(--bc-text-inverse)",
             opacity: 0.72,
+            marginTop: "var(--bc-space-1)",
+            display: "block",
           }}
         >
           Discover →
@@ -130,7 +135,7 @@ function TileLabel({
 /* ------------------------------------------------------------------
    IMAGE TILE
    overflow-hidden on the outer Link clips the scale transform.
-   No shadow. No radius. Scale 1 → 1.02 over 750 ms ease-out only.
+   No shadow. No radius. Scale 1 → 1.025 over 700 ms ease-out only.
 ------------------------------------------------------------------ */
 function ImageTile({
   title,
@@ -161,11 +166,9 @@ function ImageTile({
     >
       <div
         className="h-full w-full"
-        style={{
-          transition: "transform 750ms ease-out",
-        }}
+        style={{ transition: "transform 700ms ease-out" }}
         onMouseEnter={(e) => {
-          (e.currentTarget as HTMLDivElement).style.transform = "scale(1.02)";
+          (e.currentTarget as HTMLDivElement).style.transform = "scale(1.025)";
         }}
         onMouseLeave={(e) => {
           (e.currentTarget as HTMLDivElement).style.transform = "scale(1)";
@@ -187,10 +190,11 @@ function ImageTile({
 }
 
 /* ------------------------------------------------------------------
-   CATEGORY GRID — OPTION B v3
+   CATEGORY GRID — LUXURY EDITORIAL v2
    Desktop: featured (left, ~60%) + 2×2 supporting grid (right, ~40%)
    Closing: full-width editorial band for Ethnic Glory
    Mobile: natural single-column stack — no carousel
+   Gap: 1px (flush, editorial — closer to Massimo Dutti)
 ------------------------------------------------------------------ */
 export default function CategoryGrid() {
   return (
@@ -210,77 +214,66 @@ export default function CategoryGrid() {
       >
         {/* ── Section heading ── */}
         <div
-          className="mb-10"
-          style={{ borderBottom: "1px solid var(--bc-border-soft)", paddingBottom: "var(--bc-space-6)" }}
+          style={{
+            marginBottom: "var(--bc-space-10)",
+            borderBottom: "1px solid var(--bc-border-soft)",
+            paddingBottom: "var(--bc-space-6)",
+          }}
         >
           <p
-            className="font-inter mb-2 tracking-widest uppercase"
             style={{
+              fontFamily: "var(--font-inter), sans-serif",
               fontSize: "var(--bc-text-xs)",
+              fontWeight: 500,
+              letterSpacing: "0.18em",
+              textTransform: "uppercase",
               color: "var(--bc-text-gold)",
-              letterSpacing: "0.16em",
+              marginBottom: "var(--bc-space-2)",
             }}
           >
             The Edit
           </p>
           <h2
-            className="font-playfair"
             style={{
+              fontFamily: "var(--font-playfair), serif",
               fontSize: "var(--bc-text-xl)",
+              fontWeight: 400,
               color: "var(--bc-text-primary)",
-              fontWeight: 500,
-              lineHeight: 1.15,
+              lineHeight: 1.12,
+              letterSpacing: "-0.01em",
             }}
           >
-            Shop The Edit
+            Curated for You
           </h2>
         </div>
 
         {/* ── Main layout: featured left + 2×2 supporting right ── */}
-        <div
-          className="grid gap-2"
-          style={{
-            gridTemplateColumns: "1fr",
-          }}
-        >
-          {/* Desktop two-column wrapper */}
-          <div
-            className="grid gap-2"
-            style={{
-              gridTemplateColumns: "1fr",
-            }}
-          >
-            {/* Responsive two-column at md+ */}
-            <div
-              className="grid gap-2 md:grid-cols-[3fr_2fr]"
-            >
-              {/* Featured tile — Sarees */}
-              <ImageTile
-                {...featured}
-                priority
-                sizes="(min-width: 768px) 60vw, 100vw"
-                className=" md:min-h-[680px] min-h-[420px]"
-              />
+        <div className="grid gap-px md:grid-cols-[3fr_2fr]">
+          {/* Featured tile — Sarees */}
+          <ImageTile
+            {...featured}
+            priority
+            sizes="(min-width: 768px) 60vw, 100vw"
+            className="min-h-[420px] md:min-h-[680px]"
+          />
 
-              {/* Supporting 2×2 grid */}
-              <div className="grid grid-cols-2 gap-2">
-                {supporting.map((cat) => (
-                  <ImageTile
-                    key={cat.title}
-                    {...cat}
-                    priority={false}
-                    sizes="(min-width: 768px) 20vw, 50vw"
-                    className="min-h-[200px] md:min-h-[336px]"
-                  />
-                ))}
-              </div>
-            </div>
+          {/* Supporting 2×2 grid */}
+          <div className="grid grid-cols-2 gap-px">
+            {supporting.map((cat) => (
+              <ImageTile
+                key={cat.title}
+                {...cat}
+                priority={false}
+                sizes="(min-width: 768px) 20vw, 50vw"
+                className="min-h-[200px] md:min-h-[336px]"
+              />
+            ))}
           </div>
         </div>
 
         {/* ── Closing editorial band — Ethnic Glory ── */}
         <div
-          className="mt-2 grid md:grid-cols-[1fr_2fr] items-center gap-0"
+          className="mt-px grid md:grid-cols-[1fr_2fr] items-center"
           style={{
             borderTop: "1px solid var(--bc-border-soft)",
             borderBottom: "1px solid var(--bc-border-soft)",
@@ -293,33 +286,39 @@ export default function CategoryGrid() {
             style={{ padding: "var(--bc-space-10) var(--bc-space-8)" }}
           >
             <p
-              className="font-inter mb-3 tracking-widest uppercase"
               style={{
+                fontFamily: "var(--font-inter), sans-serif",
                 fontSize: "var(--bc-text-xs)",
+                fontWeight: 500,
+                letterSpacing: "0.18em",
+                textTransform: "uppercase",
                 color: "var(--bc-text-gold)",
-                letterSpacing: "0.16em",
+                marginBottom: "var(--bc-space-3)",
               }}
             >
               {closing.occasion}
             </p>
             <h3
-              className="font-playfair mb-4"
               style={{
+                fontFamily: "var(--font-playfair), serif",
                 fontSize: "var(--bc-text-xl)",
+                fontWeight: 400,
                 color: "var(--bc-text-primary)",
-                fontWeight: 500,
-                lineHeight: 1.15,
+                lineHeight: 1.12,
+                letterSpacing: "-0.01em",
+                marginBottom: "var(--bc-space-4)",
               }}
             >
               {closing.title}
             </h3>
             <p
-              className="font-inter mb-6"
               style={{
+                fontFamily: "var(--font-inter), sans-serif",
                 fontSize: "var(--bc-text-sm)",
                 color: "var(--bc-text-muted)",
                 maxWidth: "32ch",
-                lineHeight: 1.7,
+                lineHeight: 1.75,
+                marginBottom: "var(--bc-space-6)",
               }}
             >
               Craftsmanship rooted in tradition. Each piece honours the artisans
@@ -328,16 +327,23 @@ export default function CategoryGrid() {
             <Link
               href={closing.link}
               aria-label={`Shop ${closing.title} — ${closing.occasion}`}
-              className="font-inter inline-flex w-fit items-center gap-2"
               style={{
-                fontSize: "var(--bc-text-sm)",
+                fontFamily: "var(--font-inter), sans-serif",
+                fontSize: "var(--bc-text-xs)",
+                fontWeight: 500,
+                letterSpacing: "0.12em",
+                textTransform: "uppercase",
                 color: "var(--bc-text-secondary)",
                 borderBottom: "1px solid var(--bc-border-gold)",
                 paddingBottom: "2px",
+                display: "inline-flex",
+                alignItems: "center",
+                gap: "var(--bc-space-1)",
+                width: "fit-content",
                 transition: "color var(--bc-transition-base), border-color var(--bc-transition-base)",
               }}
             >
-              Discover →
+              Discover the collection
             </Link>
           </div>
 
@@ -348,9 +354,9 @@ export default function CategoryGrid() {
           >
             <div
               className="h-full w-full"
-              style={{ transition: "transform 750ms ease-out" }}
+              style={{ transition: "transform 700ms ease-out" }}
               onMouseEnter={(e) => {
-                (e.currentTarget as HTMLDivElement).style.transform = "scale(1.02)";
+                (e.currentTarget as HTMLDivElement).style.transform = "scale(1.025)";
               }}
               onMouseLeave={(e) => {
                 (e.currentTarget as HTMLDivElement).style.transform = "scale(1)";
