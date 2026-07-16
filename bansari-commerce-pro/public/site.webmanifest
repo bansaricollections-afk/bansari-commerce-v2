@@ -1,18 +1,27 @@
 {
   "name": "Bansari Collections",
   "short_name": "Bansari",
-  "description": "Premium Indian occasion wear — sarees, lehengas and kurtas.",
+  "description": "Premium Indian ethnic wear — sarees, lehengas, salwar suits and more.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#2d1515",
+  "theme_color": "#7c3f3f",
   "icons": [
     {
       "src": "/favicon.svg",
       "sizes": "any",
       "type": "image/svg+xml",
       "purpose": "any maskable"
+    },
+    {
+      "src": "/icon",
+      "sizes": "32x32",
+      "type": "image/png"
+    },
+    {
+      "src": "/apple-icon",
+      "sizes": "180x180",
+      "type": "image/png"
     }
-  ],
-  "theme_color": "#7c3f2e",
-  "background_color": "#f5e6d3",
-  "display": "standalone",
-  "start_url": "/",
-  "scope": "/"
+  ]
 }
