@@ -12,6 +12,20 @@ const geistMono = Geist_Mono({
   subsets: ['latin'],
 });
 
+/**
+ * ASSET STATUS (as of 2026-07-16):
+ * - /favicon.svg          ✅ EXISTS  — used for all icon slots below
+ * - /site.webmanifest    ✅ EXISTS
+ * - /favicon.ico          ❌ MISSING — generate before launch (see DEPLOY_CHECKLIST.md)
+ * - /favicon-16x16.png   ❌ MISSING — generate before launch
+ * - /apple-touch-icon.png❌ MISSING — generate before launch
+ * - /og-image.jpg        ❌ MISSING — generate before launch; SVG placeholder active
+ *
+ * The icon fields below use /favicon.svg for every slot so that
+ * Next.js does NOT serve 404 responses for missing binary assets on
+ * every page load. Replace each entry with the correct path once the
+ * binary files are placed in /public.
+ */
 export const metadata: Metadata = {
   metadataBase: new URL(
     process.env.NEXT_PUBLIC_SITE_URL ?? 'https://www.bansaricollection.in'
@@ -45,7 +59,9 @@ export const metadata: Metadata = {
       'Discover premium Indian ethnic wear — sarees, lehengas, salwar suits and more.',
     images: [
       {
-        url: '/og-image.jpg',
+        // TODO: replace with /og-image.jpg (1200x630) once generated
+        // See DEPLOY_CHECKLIST.md — Step 2
+        url: '/og-image-placeholder.svg',
         width: 1200,
         height: 630,
         alt: 'Bansari Collections — Indian Ethnic Wear',
@@ -57,7 +73,8 @@ export const metadata: Metadata = {
     title: 'Bansari Collections — Indian Ethnic Wear',
     description:
       'Discover premium Indian ethnic wear — sarees, lehengas, salwar suits and more.',
-    images: ['/og-image.jpg'],
+    // TODO: replace with /og-image.jpg once generated — see DEPLOY_CHECKLIST.md
+    images: ['/og-image-placeholder.svg'],
     creator: '@bansaricollections',
   },
   robots: {
@@ -72,9 +89,13 @@ export const metadata: Metadata = {
     },
   },
   icons: {
-    icon: '/favicon.ico',
-    shortcut: '/favicon-16x16.png',
-    apple: '/apple-touch-icon.png',
+    // Using SVG favicon for all slots until binary assets are generated.
+    // SVG favicons are supported in all modern browsers.
+    // TODO: replace with /favicon.ico, /favicon-16x16.png, /apple-touch-icon.png
+    // once generated — see DEPLOY_CHECKLIST.md Steps 3–5.
+    icon: '/favicon.svg',
+    shortcut: '/favicon.svg',
+    apple: '/favicon.svg',
   },
   manifest: '/site.webmanifest',
   alternates: {
@@ -87,7 +108,7 @@ const organizationSchema = {
   '@type': 'Organization',
   name: 'Bansari Collections',
   url: 'https://www.bansaricollection.in',
-  logo: 'https://www.bansaricollection.in/logo.png',
+  logo: 'https://www.bansaricollection.in/favicon.svg',
   description: 'Premium Indian ethnic wear — sarees, lehengas, salwar suits.',
   contactPoint: {
     '@type': 'ContactPoint',
