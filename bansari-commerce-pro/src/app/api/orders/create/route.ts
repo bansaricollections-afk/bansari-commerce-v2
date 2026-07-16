@@ -13,6 +13,21 @@ import { apiError } from '@/lib/api-response';
 
 const log = createLogger({ service: 'orders.create' });
 
+/**
+ * Shape returned by the create_order_with_items RPC.
+ * Mirrors the `orders` table columns that are read after insert.
+ */
+interface DbOrderRow {
+  id: string;
+  order_number: string;
+  customer_name: string;
+  customer_email: string;
+  subtotal: string;
+  shipping_fee: string;
+  discount: string;
+  grand_total: string;
+}
+
 function generateOrderNumber(): string {
   const ts = Date.now().toString(36).toUpperCase();
   const rand = Math.random().toString(36).substring(2, 6).toUpperCase();
@@ -248,7 +263,11 @@ export async function POST(request: NextRequest) {
     }));
 
     const { data: order, error: rpcErr } = await supabase
-      .rpc('create_order_with_items', { p_order: orderPayload, p_items: itemsPayload })
+      .rpc<'create_order_with_items', { Args: { p_order: typeof orderPayload; p_items: typeof itemsPayload }; Returns: DbOrderRow }>(
+        'create_order_with_items',
+        { p_order: orderPayload, p_items: itemsPayload },
+      )
+      .returns<DbOrderRow>()
       .single();
 
     if (rpcErr) {
