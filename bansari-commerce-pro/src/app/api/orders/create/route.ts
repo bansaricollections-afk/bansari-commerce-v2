@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import crypto from 'crypto';
 
 import { createServiceRoleClient } from '@/lib/supabase/service';
+import { createServerClient } from '@supabase/ssr';
 import { verifyPaymentSignature } from '@/lib/razorpay';
 import { validateCartItems } from '@/services/product.service';
 import { sendOrderConfirmationEmail } from '@/services/email.service';
@@ -16,6 +17,29 @@ function generateOrderNumber(): string {
   const ts = Date.now().toString(36).toUpperCase();
   const rand = Math.random().toString(36).substring(2, 6).toUpperCase();
   return `BC-${ts}-${rand}`;
+}
+
+/** Resolve the authenticated user's ID, or null for guests. Never returns ''. */
+async function resolveUserId(request: NextRequest): Promise<string | null> {
+  try {
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+    if (!supabaseUrl || !supabaseAnonKey) return null;
+
+    const supabase = createServerClient(supabaseUrl, supabaseAnonKey, {
+      cookies: {
+        getAll() {
+          return request.cookies.getAll();
+        },
+        setAll() { /* read-only in API route */ },
+      },
+    });
+
+    const { data: { user } } = await supabase.auth.getUser();
+    return user?.id ?? null;
+  } catch {
+    return null;
+  }
 }
 
 export async function POST(request: NextRequest) {
@@ -67,8 +91,13 @@ export async function POST(request: NextRequest) {
       paymentId: razorpay_payment_id,
     });
 
+    // Resolve authenticated user ID (null for guests — NEVER empty string)
+    const userId = await resolveUserId(request);
+    rLog.info('orders.create.user_resolved', { authenticated: userId !== null });
+
     const supabase = createServiceRoleClient();
 
+    // Idempotency: if order already exists for this payment, return it.
     const { data: existing } = await supabase
       .from('orders')
       .select('id, order_number')
@@ -176,9 +205,11 @@ export async function POST(request: NextRequest) {
     const orderNumber = generateOrderNumber();
     const now = new Date().toISOString();
 
+    // P0 FIX: user_id is NULL for guests, auth UUID for authenticated users.
+    // The create_order_with_items RPC accepts null via nullif coercion.
     const orderPayload = {
       order_number:             orderNumber,
-      user_id:                  '',
+      user_id:                  userId ?? null,
       customer_name:            customerName,
       customer_email:           customerEmail,
       customer_phone:           customerPhone ?? '',
@@ -245,6 +276,7 @@ export async function POST(request: NextRequest) {
       orderNumber,
       razorpayOrderId: razorpay_order_id,
       paymentId: razorpay_payment_id,
+      authenticated: userId !== null,
     });
 
     // Decrement stock (best-effort, outside order transaction)
@@ -265,9 +297,9 @@ export async function POST(request: NextRequest) {
         .eq('id', pending.id);
     }
 
-    // Write order audit trail: 'created' and 'paid' events
+    // Write order audit trail
     const auditRows = [
-      { order_id: order.id, event: 'created', actor: 'system', metadata: { requestId } },
+      { order_id: order.id, event: 'created', actor: 'system', metadata: { requestId, authenticated: userId !== null } },
       { order_id: order.id, event: 'paid', actor: 'razorpay', metadata: { razorpay_payment_id, requestId } },
     ];
     await supabase.from('order_audit_trail').insert(auditRows);
