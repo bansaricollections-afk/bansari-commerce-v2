@@ -1,51 +1,68 @@
-import ProductCard from "@/components/product/ProductCard";
-import { getProducts } from "@/services/product.service";
+import Image from 'next/image';
+import Link from 'next/link';
 
-type Props = {
-  product: {
-    id: number;
-    completeLook?: number[];
-  };
-};
+import { getRelatedProducts } from '@/services/product.service';
+import type { Product } from '@/types/product';
+
+interface Props {
+  product: Product;
+}
 
 export default async function CompleteLook({ product }: Props) {
-  const allProducts = await getProducts();
+  const related = await getRelatedProducts(product.id, product.category, 4);
 
-  const related =
-    product.completeLook && product.completeLook.length > 0
-      ? allProducts
-          .filter((p) => product.completeLook?.includes(p.id))
-          .slice(0, 4)
-      : allProducts.filter((p) => p.id !== product.id).slice(0, 4);
-
-  if (related.length === 0) return null;
+  if (!related || related.length === 0) return null;
 
   return (
-    <section className="py-20">
-
-      <div className="mb-10">
-
-        <p className="uppercase tracking-[5px] text-[#8A5A6A]">
-          Style Recommendation
-        </p>
-
-        <h2 className="mt-3 text-4xl font-bold font-[family:var(--font-playfair)]">
-          Complete The Look
+    <section className="py-16" aria-labelledby="complete-look-heading">
+      <div className="mb-8">
+        <p className="text-[11px] tracking-[0.25em] uppercase text-[#8A5A6A] mb-2">Styled Together</p>
+        <h2
+          id="complete-look-heading"
+          className="text-xl font-light text-slate-900 tracking-tight"
+        >
+          Complete the Look
         </h2>
-
       </div>
 
-      <div className="grid gap-8 sm:grid-cols-2 lg:grid-cols-4">
-
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         {related.map((item) => (
-          <ProductCard
+          <Link
             key={item.id}
-            product={item}
-          />
+            href={`/product/${item.id}`}
+            className="group block"
+            aria-label={`View ${item.name}`}
+          >
+            <div className="relative aspect-[3/4] overflow-hidden bg-slate-50 rounded-sm mb-3">
+              {item.images?.[0]?.url ? (
+                <Image
+                  src={item.images[0].url}
+                  alt={item.images[0].alt_text || item.name}
+                  fill
+                  className="object-cover transition-transform duration-500 group-hover:scale-105"
+                  sizes="(max-width: 768px) 50vw, 25vw"
+                  loading="lazy"
+                />
+              ) : (
+                <div className="w-full h-full bg-slate-100 flex items-center justify-center">
+                  <span className="text-slate-300 text-xs">No image</span>
+                </div>
+              )}
+              {item.is_new && (
+                <span className="absolute top-2 left-2 bg-[#8A5A6A] text-white text-[9px] font-medium tracking-[0.15em] uppercase px-2 py-0.5">
+                  New
+                </span>
+              )}
+            </div>
+            <div className="space-y-0.5">
+              <p className="text-xs font-medium text-slate-800 truncate group-hover:text-[#8A5A6A] transition-colors">
+                {item.name}
+              </p>
+              <p className="text-xs text-slate-500">₹{item.price.toLocaleString('en-IN')}</p>
+            </div>
+          </Link>
         ))}
-
       </div>
-
     </section>
   );
 }
