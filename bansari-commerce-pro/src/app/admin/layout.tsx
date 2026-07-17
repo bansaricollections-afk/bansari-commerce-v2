@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import { headers } from 'next/headers';
 import { AdminHeader } from '@/components/admin/AdminHeader';
 import { AdminSidebar } from '@/components/admin/AdminSidebar';
 import { requireAdminPage } from '@/lib/auth/requireAdmin';
@@ -14,7 +15,28 @@ interface AdminLayoutProps {
 }
 
 export default async function AdminLayout({ children }: Readonly<AdminLayoutProps>) {
-  // Server-side guard — middleware handles the edge but this provides defence-in-depth
+  // Read the current request path.
+  // Next.js App Router populates x-invoke-path (Vercel) or next-url in RSC.
+  const headersList = await headers();
+  const pathname =
+    headersList.get('x-invoke-path') ??
+    headersList.get('x-pathname') ??
+    headersList.get('next-url') ??
+    '';
+
+  // /admin/login must never be gated by requireAdminPage() or wrapped in the
+  // admin shell (sidebar + header). It is a public page.
+  // The middleware regex already excludes /admin/login from protection;
+  // this is defence-in-depth at the RSC layer so the layout guard cannot
+  // accidentally block the login page even if middleware is misconfigured.
+  const isLoginPage =
+    pathname === '/admin/login' || pathname.startsWith('/admin/login/');
+
+  if (isLoginPage) {
+    return <>{children}</>;
+  }
+
+  // For all other /admin/* pages enforce admin authentication.
   await requireAdminPage();
 
   return (
