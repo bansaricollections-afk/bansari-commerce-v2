@@ -95,11 +95,19 @@ async function deduplicateEvent(
       return 'duplicate';
     }
 
-    // Any other error: log but do not block processing
-    wLog.warn('webhook.dedup.write_failed', error, { eventId });
+    // Any other error: log but do not block processing.
+    // warn() signature: (event, ctx?) — merge Supabase error fields into ctx.
+    wLog.warn('webhook.dedup.write_failed', {
+      eventId,
+      errorCode: error.code,
+      errorMessage: error.message,
+    });
     return 'error';
   } catch (err) {
-    log.child({ requestId }).warn('webhook.dedup.unexpected', err);
+    // warn() signature: (event, ctx?) — merge caught error message into ctx.
+    log.child({ requestId }).warn('webhook.dedup.unexpected', {
+      errorMessage: err instanceof Error ? err.message : String(err),
+    });
     return 'error';
   }
 }

@@ -220,7 +220,13 @@ export async function POST(request: NextRequest) {
       );
 
     if (pendingError) {
-      log.warn('create-order.pending_orders.write_failed', pendingError, { razorpayOrderId: rzpOrder.id });
+      // warn() signature: (event, ctx?) — no error param.
+      // Merge Supabase error fields into ctx.
+      log.warn('create-order.pending_orders.write_failed', {
+        razorpayOrderId: rzpOrder.id,
+        errorCode: pendingError.code,
+        errorMessage: pendingError.message,
+      });
     } else {
       log.info('create-order.pending_orders.saved', { razorpayOrderId: rzpOrder.id, userId });
     }
