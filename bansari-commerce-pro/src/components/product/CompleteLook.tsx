@@ -9,7 +9,7 @@ interface Props {
 }
 
 export default async function CompleteLook({ product }: Props) {
-  const related = await getRelatedProducts(product.id, product.category, 4);
+  const related = product.category ? await getRelatedProducts(product.id, product.category, 4) : [];
 
   if (!related || related.length === 0) return null;
 
@@ -37,7 +37,7 @@ export default async function CompleteLook({ product }: Props) {
               {item.images?.[0]?.url ? (
                 <Image
                   src={item.images[0].url}
-                  alt={item.images[0].alt_text || item.name}
+                  alt={item.images[0].alt || item.name}
                   fill
                   className="object-cover transition-transform duration-500 group-hover:scale-105"
                   sizes="(max-width: 768px) 50vw, 25vw"
@@ -48,7 +48,7 @@ export default async function CompleteLook({ product }: Props) {
                   <span className="text-slate-300 text-xs">No image</span>
                 </div>
               )}
-              {item.is_new && (
+              {item.newArrival && (
                 <span className="absolute top-2 left-2 bg-[#8A5A6A] text-white text-[9px] font-medium tracking-[0.15em] uppercase px-2 py-0.5">
                   New
                 </span>

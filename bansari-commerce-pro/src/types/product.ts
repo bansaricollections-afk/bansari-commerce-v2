@@ -17,8 +17,10 @@ export type ProductVariant = {
   id: string;
   color: string;
   colorCode: string;
-  sizes: ProductSize[];
-  images: ProductImage[];
+  size?: string;  // Flat size property for backward compatibility
+  sizes?: ProductSize[];  // Array of sizes
+  stock?: number;  // Stock at variant level
+  images?: ProductImage[];
 };
 
 export type ProductSize = {
@@ -55,55 +57,35 @@ export type ProductSEO = {
 
 export interface Product {
   id: number;
-
-  sku: string;
-  styleCode: string;
-  slug: string;
-
   name: string;
-  shortName: string;
-
-  category: string;
-  subCategory: string;
-  collection: string;
-
-  badge?: string;
-
+  slug: string;
   price: number;
+  stock?: number;
+  active?: boolean;
+  images?: (ProductImage | { url?: string; alt?: string; type?: string })[];
+  category?: string;
+
+  sku?: string;
+  styleCode?: string;
+  shortName?: string;
+  subCategory?: string;
+  collection?: string;
+  badge?: string;
   oldPrice?: number;
-
-  discount: number;
-
-  currency: "INR";
-
-  rating: number;
-  reviewCount: number;
-
-  stock: number;
-
-  featured: boolean;
-
-  newArrival: boolean;
-
-  bestSeller: boolean;
-
-  images: ProductImage[];
-
-  variants: ProductVariant[];
-
-  specifications: ProductSpecification;
-
-  description: string;
-
-  seo: ProductSEO;
-
-  reviews: ProductReview[];
-
-  relatedProducts: number[];
-
-  completeLook: number[];
-
-  createdAt: string;
-
-  updatedAt: string;
+  discount?: number;
+  currency?: string;
+  rating?: number;
+  reviewCount?: number;
+  featured?: boolean;
+  newArrival?: boolean;
+  bestSeller?: boolean;
+  variants?: ProductVariant[];
+  specifications?: ProductSpecification;
+  description?: string;
+  seo?: ProductSEO;
+  reviews?: ProductReview[];
+  relatedProducts?: number[];
+  completeLook?: number[];
+  createdAt?: string;
+  updatedAt?: string;
 }

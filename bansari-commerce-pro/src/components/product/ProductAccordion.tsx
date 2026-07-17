@@ -98,11 +98,11 @@ export default function ProductAccordion({ product }: Props) {
           ),
         }
       : null,
-    specs?.work_details
+    specs?.work
       ? {
           id: 'work',
           label: 'Work & Craftsmanship',
-          content: <p>{specs.work_details}</p>,
+          content: <p>{specs.work}</p>,
         }
       : null,
     {

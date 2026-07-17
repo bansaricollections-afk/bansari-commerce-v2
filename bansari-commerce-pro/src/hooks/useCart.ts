@@ -16,9 +16,6 @@ import { useCart as useCartStore, CartItem } from '@/store/cart';
 
 export type { CartItem };
 
-// Re-export the raw store hook for consumers that use it directly.
-export { useCartStore as useCart };
-
 /**
  * Augmented hook that adds the `addToCart` and `addItem` adapters.
  * ProductActions.tsx imports { useCart } from '@/hooks/useCart' and

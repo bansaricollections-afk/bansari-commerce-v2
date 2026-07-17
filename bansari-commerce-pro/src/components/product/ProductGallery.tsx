@@ -60,9 +60,9 @@ export default function ProductGallery({ product }: Props) {
     );
   }
 
-  const isNew = product.is_new;
-  const isBestseller = product.is_bestseller;
-  const isLowStock = product.stock > 0 && product.stock <= 5;
+  const isNew = product.newArrival;
+  const isBestseller = product.bestSeller;
+  const isLowStock = product.stock && product.stock > 0 && product.stock <= 5;
   const isOutOfStock = product.stock === 0;
 
   return (
@@ -81,8 +81,8 @@ export default function ProductGallery({ product }: Props) {
             }`}
           >
             <Image
-              src={img.url}
-              alt={img.alt_text || `Product view ${i + 1}`}
+              src={img.url || '/placeholder.png'}
+              alt={img.alt || `Product view ${i + 1}`}
               fill
               className="object-cover"
               sizes="64px"
@@ -163,7 +163,7 @@ export default function ProductGallery({ product }: Props) {
 
           <Image
             src={images[activeIndex]?.url ?? ''}
-            alt={images[activeIndex]?.alt_text || product.name}
+            alt={images[activeIndex]?.alt || product.name}
             fill
             priority={activeIndex === 0}
             className="object-cover transition-opacity duration-300"
@@ -231,7 +231,7 @@ export default function ProductGallery({ product }: Props) {
           <div className="relative max-h-[90vh] max-w-[90vw] aspect-[3/4]">
             <Image
               src={images[lightboxIndex]?.url ?? ''}
-              alt={images[lightboxIndex]?.alt_text || product.name}
+              alt={images[lightboxIndex]?.alt || product.name}
               fill
               className="object-contain"
               sizes="90vw"

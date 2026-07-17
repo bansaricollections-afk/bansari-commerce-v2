@@ -255,7 +255,6 @@ export async function POST(request: NextRequest) {
     };
 
     const itemsPayload = lineItems.map((li) => ({
-      product_id:   li.productId,
       product_name: li.productName,
       unit_price:   li.unitPrice,
       quantity:     li.quantity,
@@ -350,7 +349,12 @@ export async function POST(request: NextRequest) {
         orderNumber: order.order_number,
         customerName: order.customer_name,
         customerEmail: order.customer_email,
-        items: lineItems.map((li) => ({ name: li.productName, quantity: li.quantity, price: li.unitPrice })),
+        items: lineItems.map((li) => ({
+          product_name: li.productName,
+          quantity: li.quantity,
+          unit_price: li.unitPrice,
+          line_total: Number(li.unitPrice) * Number(li.quantity),
+        })),
         subtotal: Number(order.subtotal),
         shippingFee: Number(order.shipping_fee),
         discount: Number(order.discount),

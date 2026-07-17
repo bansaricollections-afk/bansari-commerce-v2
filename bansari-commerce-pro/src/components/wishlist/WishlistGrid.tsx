@@ -75,7 +75,7 @@ export default function WishlistGrid({ products }: Props) {
             >
 
               <Image
-                src={product.images[0].url}
+                src={product.images?.[0]?.url || '/placeholder.png'}
                 alt={product.name}
                 width={500}
                 height={650}
@@ -99,7 +99,7 @@ export default function WishlistGrid({ products }: Props) {
                       addItem({
                         id: product.id,
                         name: product.name,
-                        image: product.images[0].url,
+                        image: product.images?.[0]?.url || '/placeholder.png',
                         price: product.price,
                         quantity: 1,
                       })

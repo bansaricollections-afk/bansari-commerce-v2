@@ -29,21 +29,26 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 
   const canonicalUrl = `${SITE_URL}/product/${id}`;
 
-  return {
-    title: `${product.seo?.title || product.name} | Bansari Collections`,
+   return {
+    title: `${product.seo_title || product.name} | Bansari Collections`,
     description:
-      product.seo?.description ||
+      product.seo_description ||
       product.description ||
       `Buy ${product.name} online from Bansari Collections.`,
-    alternates: { canonical: canonicalUrl },
+    alternates: {
+      canonical: canonicalUrl,
+    },
     openGraph: {
-      title: product.seo?.title || product.name,
+      title: product.seo_title || product.name,
       description:
-        product.seo?.description ||
+        product.seo_description ||
         product.description ||
         `Buy ${product.name} online.`,
       url: canonicalUrl,
-      images: product.images?.[0]?.url ? [{ url: product.images[0].url }] : [],
+      images:
+        product.images?.[0]?.url
+          ? [{ url: product.images[0].url }]
+          : [],
     },
   };
 }
@@ -63,8 +68,8 @@ export default async function ProductPage({ params }: Props) {
     ...(product.description && { description: product.description }),
     ...(product.sku && { sku: product.sku }),
     ...(product.category && { category: product.category }),
-    ...(product.images.length > 0 && {
-      image: product.images.map((img) => img.url),
+    ...(product.images && product.images.length > 0 && {
+      image: product.images.map((img: any) => img.url),
     }),
     brand: { '@type': 'Brand', name: 'Bansari Collections' },
     ...(product.variants?.[0]?.color && { color: product.variants[0].color }),
@@ -119,7 +124,7 @@ export default async function ProductPage({ params }: Props) {
         refundType: 'https://schema.org/FullRefund',
       },
     },
-    ...(product.reviewCount > 0 && {
+    ...(product.reviewCount && product.reviewCount > 0 && {
       aggregateRating: {
         '@type': 'AggregateRating',
         ratingValue: product.rating,

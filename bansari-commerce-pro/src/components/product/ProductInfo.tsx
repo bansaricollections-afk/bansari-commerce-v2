@@ -47,17 +47,18 @@ export default function ProductInfo({ product }: Props) {
   );
 
   const hasDiscount =
-    product.original_price && product.original_price > product.price;
+    product.oldPrice && product.oldPrice > product.price;
   const discountPercent = hasDiscount
     ? Math.round(
-        ((product.original_price! - product.price) / product.original_price!) *
+        ((product.oldPrice! - product.price) / product.oldPrice!) *
           100
       )
     : 0;
-  const isOutOfStock = product.stock === 0;
-  const isLowStock = product.stock > 0 && product.stock <= 5;
 
-  const specs = product.specifications;
+  const isLowStock = product.stock && product.stock > 0 && product.stock <= 5;
+  const isOutOfStock = !product.stock || product.stock === 0;
+
+  const specs: any = product.specifications || {};
 
   return (
     <div className="flex flex-col gap-7">
@@ -93,8 +94,8 @@ export default function ProductInfo({ product }: Props) {
         <h1 className="text-2xl lg:text-3xl font-light text-slate-900 leading-tight tracking-tight">
           {product.name}
         </h1>
-        {product.reviewCount > 0 && (
-          <StarRating rating={product.rating} count={product.reviewCount} />
+        {product.reviewCount && product.reviewCount > 0 && product.rating && (
+          <StarRating rating={product.rating ?? 0} count={product.reviewCount ?? 0} />
         )}
       </div>
 
@@ -106,7 +107,7 @@ export default function ProductInfo({ product }: Props) {
           </span>
           {hasDiscount && (
             <span className="text-base text-slate-400 line-through">
-              ₹{product.original_price!.toLocaleString('en-IN')}
+              ₹{product.oldPrice!.toLocaleString('en-IN')}
             </span>
           )}
           {hasDiscount && (
@@ -200,10 +201,10 @@ export default function ProductInfo({ product }: Props) {
               <span className="text-sm text-slate-700">{specs.fit}</span>
             </div>
           )}
-          {specs.work_details && (
+          {specs.work && (
             <div className="flex flex-col gap-0.5">
               <span className="text-[10px] tracking-[0.15em] uppercase text-slate-400">Craftsmanship</span>
-              <span className="text-sm text-slate-700">{specs.work_details}</span>
+              <span className="text-sm text-slate-700">{specs.work}</span>
             </div>
           )}
           {product.sku && (
