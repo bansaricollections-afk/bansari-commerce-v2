@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { SlidersHorizontal, ArrowUpDown, X, ChevronDown } from "lucide-react";
+import { SlidersHorizontal, ArrowUpDown, X } from "lucide-react";
 import FilterSidebar from "@/components/shop/FilterSidebar";
 
 const SORT_OPTIONS = [
@@ -16,16 +16,11 @@ const SORT_OPTIONS = [
 
 export default function MobileFilterBar() {
   const [filterOpen, setFilterOpen] = useState(false);
-  const [sortOpen, setSortOpen] = useState(false);
+  const [sortOpen,   setSortOpen]   = useState(false);
   const [sort, setSort] = useState("newest");
 
-  // Prevent body scroll when drawer is open
   useEffect(() => {
-    if (filterOpen || sortOpen) {
-      document.body.style.overflow = "hidden";
-    } else {
-      document.body.style.overflow = "";
-    }
+    document.body.style.overflow = filterOpen || sortOpen ? "hidden" : "";
     return () => { document.body.style.overflow = ""; };
   }, [filterOpen, sortOpen]);
 
@@ -35,16 +30,16 @@ export default function MobileFilterBar() {
     <>
       {/* ─── Sticky bottom bar ─── */}
       <div
-        className="fixed bottom-0 left-0 right-0 z-40 flex border-t border-slate-200 bg-white shadow-[0_-4px_20px_rgba(0,0,0,0.06)] lg:hidden"
+        className="fixed bottom-0 left-0 right-0 z-40 flex h-14 border-t border-slate-200 bg-white shadow-[0_-2px_16px_rgba(0,0,0,0.06)] lg:hidden"
         aria-label="Filter and sort controls"
       >
         <button
           type="button"
           aria-label="Open filters"
           onClick={() => setFilterOpen(true)}
-          className="flex flex-1 items-center justify-center gap-2 py-4 text-[12px] font-semibold uppercase tracking-[0.1em] text-slate-700 transition-colors duration-200 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-inset focus-visible:ring-2 focus-visible:ring-[#8A5A6A]"
+          className="flex flex-1 items-center justify-center gap-2.5 text-[11px] font-bold uppercase tracking-[0.12em] text-slate-700 transition-colors duration-200 hover:bg-slate-50 active:bg-slate-100 focus-visible:outline-none focus-visible:ring-inset focus-visible:ring-2 focus-visible:ring-[#8A5A6A]"
         >
-          <SlidersHorizontal size={15} aria-hidden="true" />
+          <SlidersHorizontal size={14} aria-hidden="true" />
           Filter
         </button>
 
@@ -54,14 +49,14 @@ export default function MobileFilterBar() {
           type="button"
           aria-label="Sort products"
           onClick={() => setSortOpen(true)}
-          className="flex flex-1 items-center justify-center gap-2 py-4 text-[12px] font-semibold uppercase tracking-[0.1em] text-slate-700 transition-colors duration-200 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-inset focus-visible:ring-2 focus-visible:ring-[#8A5A6A]"
+          className="flex flex-1 items-center justify-center gap-2.5 text-[11px] font-bold uppercase tracking-[0.12em] text-slate-700 transition-colors duration-200 hover:bg-slate-50 active:bg-slate-100 focus-visible:outline-none focus-visible:ring-inset focus-visible:ring-2 focus-visible:ring-[#8A5A6A]"
         >
-          <ArrowUpDown size={15} aria-hidden="true" />
+          <ArrowUpDown size={14} aria-hidden="true" />
           Sort
         </button>
       </div>
 
-      {/* ─── Filter drawer — slide from left ─── */}
+      {/* ─── Filter drawer ─── */}
       {filterOpen && (
         <div
           className="fixed inset-0 z-50 flex lg:hidden"
@@ -69,37 +64,32 @@ export default function MobileFilterBar() {
           aria-modal="true"
           aria-label="Product filters"
         >
-          {/* Backdrop */}
           <button
             type="button"
             aria-label="Close filters"
-            className="absolute inset-0 bg-black/40 backdrop-blur-[2px]"
+            className="absolute inset-0 bg-slate-900/50 backdrop-blur-[2px]"
             onClick={() => setFilterOpen(false)}
           />
-
-          {/* Panel */}
           <div className="relative flex w-[88vw] max-w-sm flex-col bg-white shadow-2xl">
             <div className="flex items-center justify-between border-b border-slate-100 px-5 py-4">
-              <span className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-900">
-                Filters
-              </span>
+              <span className="text-[10.5px] font-bold uppercase tracking-[0.18em] text-slate-900">Filters</span>
               <button
                 type="button"
                 aria-label="Close filters"
                 onClick={() => setFilterOpen(false)}
-                className="flex h-8 w-8 items-center justify-center text-slate-400 transition-colors hover:text-slate-900 focus-visible:outline-none"
+                className="flex h-8 w-8 items-center justify-center text-slate-400 hover:text-slate-900 focus-visible:outline-none"
               >
-                <X size={18} />
+                <X size={17} />
               </button>
             </div>
-            <div className="flex-1 overflow-y-auto">
+            <div className="flex-1 overflow-y-auto px-5">
               <FilterSidebar />
             </div>
             <div className="border-t border-slate-100 p-4">
               <button
                 type="button"
                 onClick={() => setFilterOpen(false)}
-                className="w-full bg-slate-900 py-3.5 text-[12px] font-semibold uppercase tracking-[0.14em] text-white transition-colors duration-200 hover:bg-[#8A5A6A] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#8A5A6A] focus-visible:ring-offset-2"
+                className="w-full bg-slate-900 py-4 text-[11px] font-bold uppercase tracking-[0.16em] text-white transition-colors duration-200 hover:bg-[#8A5A6A] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#8A5A6A] focus-visible:ring-offset-2"
               >
                 View Results
               </button>
@@ -108,7 +98,7 @@ export default function MobileFilterBar() {
         </div>
       )}
 
-      {/* ─── Sort drawer — slide from bottom ─── */}
+      {/* ─── Sort drawer (bottom sheet) ─── */}
       {sortOpen && (
         <div
           className="fixed inset-0 z-50 flex items-end lg:hidden"
@@ -116,30 +106,29 @@ export default function MobileFilterBar() {
           aria-modal="true"
           aria-label="Sort options"
         >
-          {/* Backdrop */}
           <button
             type="button"
             aria-label="Close sort"
-            className="absolute inset-0 bg-black/40 backdrop-blur-[2px]"
+            className="absolute inset-0 bg-slate-900/50 backdrop-blur-[2px]"
             onClick={() => setSortOpen(false)}
           />
-
-          {/* Panel */}
-          <div className="relative w-full rounded-t-2xl bg-white shadow-2xl">
-            <div className="flex items-center justify-between border-b border-slate-100 px-5 py-4">
-              <span className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-900">
-                Sort By
-              </span>
+          <div className="relative w-full rounded-t-xl bg-white shadow-2xl">
+            {/* Handle */}
+            <div className="flex justify-center pt-3 pb-1" aria-hidden="true">
+              <div className="h-1 w-10 rounded-full bg-slate-200" />
+            </div>
+            <div className="flex items-center justify-between border-b border-slate-100 px-5 py-3">
+              <span className="text-[10.5px] font-bold uppercase tracking-[0.18em] text-slate-900">Sort By</span>
               <button
                 type="button"
                 aria-label="Close sort"
                 onClick={() => setSortOpen(false)}
-                className="flex h-8 w-8 items-center justify-center text-slate-400 transition-colors hover:text-slate-900 focus-visible:outline-none"
+                className="flex h-8 w-8 items-center justify-center text-slate-400 hover:text-slate-900 focus-visible:outline-none"
               >
-                <X size={18} />
+                <X size={17} />
               </button>
             </div>
-            <ul role="listbox" aria-label="Sort options" className="pb-safe">
+            <ul role="listbox" aria-label="Sort options">
               {SORT_OPTIONS.map((opt) => (
                 <li key={opt.value} role="presentation">
                   <button
@@ -148,10 +137,8 @@ export default function MobileFilterBar() {
                     aria-selected={sort === opt.value}
                     onClick={() => { setSort(opt.value); setSortOpen(false); }}
                     className={[
-                      "flex w-full items-center justify-between px-5 py-4 text-[12px] transition-colors duration-150 hover:bg-slate-50",
-                      sort === opt.value
-                        ? "font-semibold text-[#8A5A6A]"
-                        : "font-medium text-slate-700",
+                      "flex w-full items-center justify-between px-5 py-4 text-[12px] transition-colors duration-150 hover:bg-slate-50 focus-visible:outline-none",
+                      sort === opt.value ? "font-bold text-[#8A5A6A]" : "font-medium text-slate-700",
                     ].join(" ")}
                   >
                     {opt.label}
@@ -168,7 +155,7 @@ export default function MobileFilterBar() {
               <button
                 type="button"
                 onClick={() => setSortOpen(false)}
-                className="w-full border border-slate-200 py-3 text-[12px] font-semibold uppercase tracking-[0.12em] text-slate-700 transition-colors hover:bg-slate-50 focus-visible:outline-none"
+                className="w-full border border-slate-200 py-3.5 text-[11px] font-bold uppercase tracking-[0.14em] text-slate-700 transition-colors hover:bg-slate-50 focus-visible:outline-none"
               >
                 Done
               </button>

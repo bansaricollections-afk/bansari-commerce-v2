@@ -17,6 +17,7 @@
     "isolatedModules": true,
     "jsx": "react-jsx",
     "incremental": true,
+    "ignoreDeprecations": "6.0",
     "plugins": [
       {
         "name": "next"
@@ -38,6 +39,6 @@
     "**/*.mts"
   ],
   "exclude": [
-    "node_modules"
+    "public/node_modules"
   ]
 }
