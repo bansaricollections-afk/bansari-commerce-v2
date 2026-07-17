@@ -31,6 +31,8 @@ export const metadata: Metadata = {
     'Bansari Collections',
     'Indian fashion',
     'online Indian clothes',
+    'ethnic wear Vadodara',
+    'Gujarat ethnic fashion',
   ],
   authors: [{ name: 'Bansari Collections' }],
   creator: 'Bansari Collections',
@@ -58,7 +60,7 @@ export const metadata: Metadata = {
     description:
       'Discover premium Indian ethnic wear — sarees, lehengas, salwar suits and more.',
     images: ['/opengraph-image'],
-    creator: '@bansaricollections',
+    creator: '@bansari_collections',
   },
   robots: {
     index: true,
@@ -84,15 +86,59 @@ const organizationSchema = {
   url: 'https://www.bansaricollection.in',
   logo: 'https://www.bansaricollection.in/favicon.svg',
   description: 'Premium Indian ethnic wear — sarees, lehengas, salwar suits.',
+  address: {
+    '@type': 'PostalAddress',
+    streetAddress: 'GF-4, Aruma Park, Near Shilchar Company, BIL',
+    addressLocality: 'Vadodara',
+    addressRegion: 'Gujarat',
+    postalCode: '391410',
+    addressCountry: 'IN',
+  },
   contactPoint: {
     '@type': 'ContactPoint',
     telephone: '+91-84601-92745',
     contactType: 'customer service',
-    availableLanguage: ['English', 'Hindi'],
+    availableLanguage: ['English', 'Hindi', 'Gujarati'],
   },
   sameAs: [
-    'https://www.instagram.com/bansaricollections',
-    'https://www.facebook.com/bansaricollections',
+    'https://www.instagram.com/bansari_collections',
+    'https://www.facebook.com/BansariCollection',
+    'https://www.pinterest.com/BansariCollections',
+  ],
+};
+
+const localBusinessSchema = {
+  '@context': 'https://schema.org',
+  '@type': 'ClothingStore',
+  name: 'Bansari Collections',
+  image: 'https://www.bansaricollection.in/opengraph-image',
+  url: 'https://www.bansaricollection.in',
+  telephone: '+91-84601-92745',
+  address: {
+    '@type': 'PostalAddress',
+    streetAddress: 'GF-4, Aruma Park, Near Shilchar Company, BIL',
+    addressLocality: 'Vadodara',
+    addressRegion: 'Gujarat',
+    postalCode: '391410',
+    addressCountry: 'IN',
+  },
+  geo: {
+    '@type': 'GeoCoordinates',
+    latitude: 22.3072,
+    longitude: 73.1812,
+  },
+  openingHoursSpecification: [
+    {
+      '@type': 'OpeningHoursSpecification',
+      dayOfWeek: ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'],
+      opens: '10:00',
+      closes: '20:00',
+    },
+  ],
+  sameAs: [
+    'https://www.instagram.com/bansari_collections',
+    'https://www.facebook.com/BansariCollection',
+    'https://www.pinterest.com/BansariCollections',
   ],
 };
 
@@ -122,6 +168,12 @@ export default function RootLayout({
           type="application/ld+json"
           dangerouslySetInnerHTML={{
             __html: JSON.stringify(organizationSchema),
+          }}
+        />
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{
+            __html: JSON.stringify(localBusinessSchema),
           }}
         />
         <script

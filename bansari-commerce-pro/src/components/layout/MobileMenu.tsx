@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { Heart, ShoppingBag, User, X } from "lucide-react";
 import { useEffect } from "react";
+import { FaInstagram, FaFacebookF, FaPinterestP } from "react-icons/fa6";
 import {
   NAV_CATEGORIES,
   NAV_COLLECTIONS,
@@ -148,6 +149,43 @@ export default function MobileMenu({
                 </li>
               ))}
             </ul>
+          </div>
+
+          {/* Social links */}
+          <div>
+            <p className="mb-3 text-xs font-semibold uppercase tracking-[3px] text-[var(--bc-text-muted)]">
+              Follow Us
+            </p>
+            <div className="flex items-center gap-4">
+              <a
+                href="https://instagram.com/bansari_collections"
+                target="_blank"
+                rel="noopener noreferrer"
+                aria-label="Follow on Instagram"
+                className="flex items-center gap-2 text-sm text-[var(--bc-text-secondary)] hover:text-[#8A5A6A] transition-colors"
+              >
+                <FaInstagram size={18} />
+                Instagram
+              </a>
+              <a
+                href="https://facebook.com/BansariCollection"
+                target="_blank"
+                rel="noopener noreferrer"
+                aria-label="Bansari Collections on Facebook"
+                className="flex items-center gap-2 text-sm text-[var(--bc-text-secondary)] hover:text-[#8A5A6A] transition-colors"
+              >
+                <FaFacebookF size={18} />
+              </a>
+              <a
+                href="https://pinterest.com/BansariCollections"
+                target="_blank"
+                rel="noopener noreferrer"
+                aria-label="Bansari Collections on Pinterest"
+                className="flex items-center gap-2 text-sm text-[var(--bc-text-secondary)] hover:text-[#8A5A6A] transition-colors"
+              >
+                <FaPinterestP size={18} />
+              </a>
+            </div>
           </div>
 
         </nav>

@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { Heart, Menu, Search, ShoppingBag, User } from "lucide-react";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { useCart } from "@/store/cart";
 import { useWishlist } from "@/store/wishlist";
 import AnnouncementBar, { type AnnouncementBarProps } from "./AnnouncementBar";
@@ -36,17 +36,65 @@ const ANNOUNCEMENT: AnnouncementBarProps = {
   storageKey: "announcement:v3",
 };
 
+/**
+ * SHOP DROPDOWN — hover tolerance fix
+ *
+ * Problem: React's onMouseLeave fires the instant the pointer leaves the
+ * trigger element boundary, even if the pointer is heading straight for the
+ * dropdown panel. Any mouse path that travels diagonally from the trigger
+ * label into the panel briefly exits the trigger bounding box, causing the
+ * panel to vanish before the pointer arrives.
+ *
+ * Solution: add a 120 ms close-delay via setTimeout. If the pointer enters
+ * the dropdown panel (or returns to the trigger) before the timer fires, the
+ * timer is cancelled and the panel stays open. This is exactly how Zara,
+ * H&M and most premium fashion retailers implement their mega-menus without
+ * heavyweight libraries.
+ *
+ * Implementation details:
+ * - closeTimerRef: stores the pending setTimeout id so we can cancel it.
+ * - openDropdown(): clears any pending close timer and sets shopOpen = true.
+ * - scheduleClose(): starts the 120 ms countdown; called on both trigger and
+ *   panel mouse-leave.
+ * - The dropdown container wraps both trigger and panel in a single <div>
+ *   so we can attach onMouseEnter/Leave to the outer wrapper. The wrapper
+ *   also has pointer-events: none gap elimination via a transparent
+ *   bridge element (bc-dropdown-bridge) that sits in the ~0.5 rem gap
+ *   between the trigger button bottom and the panel top, preventing the
+ *   pointer from exiting the hover region while crossing that gap.
+ */
 export default function Header() {
   const { items }           = useCart();
   const { items: wishlist } = useWishlist();
   const [shopOpen, setShopOpen]     = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [scrolled, setScrolled]     = useState(false);
+  const closeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 48);
     window.addEventListener("scroll", onScroll, { passive: true });
     return () => window.removeEventListener("scroll", onScroll);
+  }, []);
+
+  const openDropdown = useCallback(() => {
+    if (closeTimerRef.current !== null) {
+      clearTimeout(closeTimerRef.current);
+      closeTimerRef.current = null;
+    }
+    setShopOpen(true);
+  }, []);
+
+  const scheduleClose = useCallback(() => {
+    closeTimerRef.current = setTimeout(() => {
+      setShopOpen(false);
+      closeTimerRef.current = null;
+    }, 120);
+  }, []);
+
+  // Clean up timer on unmount
+  useEffect(() => () => {
+    if (closeTimerRef.current !== null) clearTimeout(closeTimerRef.current);
   }, []);
 
   return (
@@ -86,13 +134,15 @@ export default function Header() {
           {/* ── Desktop Nav ── */}
           <nav className="hidden items-center lg:flex" style={{ gap: "2.25rem" }}>
 
-            {/* Shop mega-menu */}
+            {/* Shop mega-menu — hover-tolerant wrapper */}
             <div
               className="relative"
-              onMouseEnter={() => setShopOpen(true)}
-              onMouseLeave={() => setShopOpen(false)}
+              onMouseEnter={openDropdown}
+              onMouseLeave={scheduleClose}
             >
               <button
+                aria-expanded={shopOpen}
+                aria-haspopup="true"
                 className="bc-nav-link uppercase tracking-[0.12em] font-medium"
                 style={{
                   fontSize: "var(--bc-text-xs)",
@@ -109,12 +159,31 @@ export default function Header() {
                 Shop
               </button>
 
+              {/* Transparent bridge: fills the gap between trigger and panel
+                  so moving the cursor downward does not exit the hover zone */}
               {shopOpen && (
                 <div
+                  aria-hidden="true"
+                  style={{
+                    position: "absolute",
+                    top: "100%",
+                    left: "-1.5rem",
+                    width: "560px",
+                    height: "0.75rem",
+                    background: "transparent",
+                  }}
+                />
+              )}
+
+              {shopOpen && (
+                <div
+                  role="menu"
                   className="absolute"
+                  onMouseEnter={openDropdown}
+                  onMouseLeave={scheduleClose}
                   style={{
                     left: "-1.5rem",
-                    top: "2.5rem",
+                    top: "calc(100% + 0.75rem)",
                     width: "560px",
                     backgroundColor: "#fff",
                     border: "1px solid var(--bc-border-soft)",
@@ -140,6 +209,7 @@ export default function Header() {
                           <Link
                             key={item}
                             href="/shop"
+                            role="menuitem"
                             className="bc-dropdown-link"
                             style={{ fontSize: "var(--bc-text-sm)", color: "var(--bc-text-primary)" }}
                           >
@@ -165,6 +235,7 @@ export default function Header() {
                           <Link
                             key={item}
                             href="/shop"
+                            role="menuitem"
                             className="bc-dropdown-link"
                             style={{ fontSize: "var(--bc-text-sm)", color: "var(--bc-text-primary)" }}
                           >
@@ -176,7 +247,6 @@ export default function Header() {
                   </div>
 
                   <div
-                    className="mt-5 pt-4"
                     style={{
                       borderTop: "1px solid var(--bc-border-soft)",
                       backgroundColor: "var(--bc-surface-warm)",

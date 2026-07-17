@@ -1,8 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { MapPin, Phone, Mail } from "lucide-react";
-import { FaInstagram, FaFacebookF } from "react-icons/fa6";
+import { MapPin, Phone, Mail, MessageCircle } from "lucide-react";
+import { FaInstagram, FaFacebookF, FaPinterestP } from "react-icons/fa6";
 
 const SHOP_LINKS = [
   { label: "All Products",  href: "/shop" },
@@ -31,7 +31,6 @@ const TRUST_ITEMS = [
   "Quality Checked",
 ] as const;
 
-// COD removed — prepaid only
 const PAYMENT_METHODS = [
   "Visa",
   "Mastercard",
@@ -39,6 +38,9 @@ const PAYMENT_METHODS = [
   "Razorpay",
   "Net Banking",
 ] as const;
+
+const WHATSAPP_NUMBER = "918460192745";
+const WHATSAPP_URL = `https://wa.me/${WHATSAPP_NUMBER}?text=Hi%2C%20I%20have%20a%20query%20about%20Bansari%20Collections`;
 
 export default function Footer() {
   return (
@@ -68,7 +70,7 @@ export default function Footer() {
               fontWeight: 400,
               color: "var(--bc-text-gold)",
               letterSpacing: "0.04em",
-              marginBottom: "var(--bc-space-5)",
+              marginBottom: "var(--bc-space-3)",
             }}
           >
             Bansari Collections
@@ -81,7 +83,7 @@ export default function Footer() {
               color: "var(--bc-text-inverse)",
               opacity: 0.55,
               maxWidth: "30ch",
-              marginBottom: "var(--bc-space-8)",
+              marginBottom: "var(--bc-space-6)",
             }}
           >
             Thoughtfully curated ethnic wear designed for weddings,
@@ -89,9 +91,9 @@ export default function Footer() {
           </p>
 
           {/* Social */}
-          <div className="flex items-center" style={{ gap: "var(--bc-space-3)" }}>
+          <div className="flex items-center" style={{ gap: "var(--bc-space-3)", marginBottom: "var(--bc-space-6)" }}>
             <a
-              href="https://instagram.com/bansaricollections"
+              href="https://instagram.com/bansari_collections"
               target="_blank"
               rel="noopener noreferrer"
               aria-label="Follow Bansari Collections on Instagram"
@@ -100,7 +102,7 @@ export default function Footer() {
               <FaInstagram size={16} />
             </a>
             <a
-              href="https://facebook.com"
+              href="https://facebook.com/BansariCollection"
               target="_blank"
               rel="noopener noreferrer"
               aria-label="Bansari Collections on Facebook"
@@ -108,7 +110,42 @@ export default function Footer() {
             >
               <FaFacebookF size={16} />
             </a>
+            <a
+              href="https://pinterest.com/BansariCollections"
+              target="_blank"
+              rel="noopener noreferrer"
+              aria-label="Bansari Collections on Pinterest"
+              className="bc-social-link"
+            >
+              <FaPinterestP size={16} />
+            </a>
           </div>
+
+          {/* WhatsApp CTA */}
+          <a
+            href={WHATSAPP_URL}
+            target="_blank"
+            rel="noopener noreferrer"
+            aria-label="Chat with us on WhatsApp"
+            className="bc-whatsapp-btn"
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              gap: "0.5rem",
+              fontSize: "var(--bc-text-xs)",
+              fontWeight: 500,
+              letterSpacing: "0.08em",
+              textTransform: "uppercase",
+              color: "#25D366",
+              border: "1px solid rgba(37,211,102,0.35)",
+              padding: "0.5rem 1rem",
+              borderRadius: "var(--bc-radius-full)",
+              transition: "border-color 0.2s, background-color 0.2s",
+            }}
+          >
+            <MessageCircle size={14} />
+            WhatsApp Us
+          </a>
         </div>
 
         {/* ── Col 2: Shop ── */}
@@ -204,18 +241,34 @@ export default function Footer() {
           <ul style={{ display: "flex", flexDirection: "column", gap: "var(--bc-space-4)" }}>
             <li className="flex items-start gap-2" style={{ fontSize: "var(--bc-text-sm)", opacity: 0.65 }}>
               <MapPin size={14} className="mt-0.5 flex-shrink-0" />
-              <span>Surat, Gujarat, India</span>
+              <span>
+                GF-4, Aruma Park,<br />
+                Near Shilchar Company, BIL,<br />
+                Vadodara, Gujarat – 391410
+              </span>
             </li>
             <li style={{ fontSize: "var(--bc-text-sm)", opacity: 0.65 }}>
-              <a href="tel:+919876543210" className="flex items-center gap-2 hover:opacity-100 transition-opacity">
+              <a href="tel:+918460192745" className="flex items-center gap-2 hover:opacity-100 transition-opacity">
                 <Phone size={14} className="flex-shrink-0" />
-                +91 98765 43210
+                +91 84601 92745
               </a>
             </li>
             <li style={{ fontSize: "var(--bc-text-sm)", opacity: 0.65 }}>
-              <a href="mailto:hello@bansaricollection.in" className="flex items-center gap-2 hover:opacity-100 transition-opacity">
+              <a href="mailto:support@bansaricollections.com" className="flex items-center gap-2 hover:opacity-100 transition-opacity">
                 <Mail size={14} className="flex-shrink-0" />
-                hello@bansaricollection.in
+                support@bansaricollections.com
+              </a>
+            </li>
+            <li style={{ fontSize: "var(--bc-text-sm)", opacity: 0.65 }}>
+              <a
+                href={WHATSAPP_URL}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center gap-2 hover:opacity-100 transition-opacity"
+                aria-label="Chat on WhatsApp"
+              >
+                <MessageCircle size={14} className="flex-shrink-0" />
+                WhatsApp: +91 84601 92745
               </a>
             </li>
           </ul>
