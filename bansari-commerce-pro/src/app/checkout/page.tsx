@@ -213,13 +213,15 @@ export default function CheckoutPage() {
                   email,
                   phone,
                 }}
-                shipping={{
-                  addressLine1,
-                  addressLine2,
-                  city,
-                  state,
-                  postalCode,
-                }}
+                shipping={{ 
+  name: fullName,
+  phone,
+  addressLine1,
+  addressLine2,
+  city,
+  state,
+  postalCode,
+}}
                 disabled={!isValid}
               />
 

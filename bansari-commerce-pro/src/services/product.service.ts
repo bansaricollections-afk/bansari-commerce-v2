@@ -13,8 +13,30 @@ export type Product = {
   stock: number;
   /** Maps to the `active` column in public.products (boolean). */
   active: boolean;
-  images?: unknown[];
+  images?: { url?: string; alt?: string; type?: string }[];
   category?: string;
+  /* Additional optional fields from full product schema */
+  seo_title?: string;
+  seo_description?: string;
+  description?: string;
+  sku?: string;
+  styleCode?: string;
+  shortName?: string;
+  subCategory?: string;
+  collection?: string;
+  badge?: string;
+  oldPrice?: number;
+  discount?: number;
+  currency?: string;
+  rating?: number;
+  reviewCount?: number;
+  featured?: boolean;
+  newArrival?: boolean;
+  bestSeller?: boolean;
+  variants?: any[];
+  specifications?: any;
+  seo?: any;
+  reviews?: any[];
 };
 
 export type CartItem = {

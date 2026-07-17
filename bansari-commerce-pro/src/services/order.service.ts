@@ -338,13 +338,14 @@ export async function recoverOrderFromWebhook(
           rLog.info('recovery.race_winner', { orderId: winner?.id });
           return { recovered: true, orderId: winner?.id };
         }
-        rLog.error('recovery.rpc.failed', rpcErr);
+        rLog.error('recovery.rpc.failed', { error: rpcErr });
         return { recovered: false, error: rpcErr.message };
       }
 
       if (!order) return { recovered: false, error: 'RPC returned no data.' };
 
-      rLog.info('recovery.order.created', { orderId: order.id, orderNumber, userId: resolvedUserId });
+      const orderData = order as Order;
+      rLog.info('recovery.order.created', { orderId: orderData.id, orderNumber, userId: resolvedUserId as string | undefined });
 
       // --- Decrement stock (best-effort, outside the RPC transaction) ---
       for (const li of lineItems) {
@@ -353,34 +354,30 @@ export async function recoverOrderFromWebhook(
           p_quantity:   li.quantity,
         });
         if (stockErr) {
-          rLog.warn('recovery.stock.decrement_failed', stockErr, {
-            orderId:   order.id,
-            productId: li.productId,
-          });
+          rLog.warn('recovery.stock.decrement_failed', { error: stockErr, orderId: orderData.id, productId: li.productId });
         }
       }
 
-      // --- Mark pending_orders as recovered ---
       await supabase
         .from('pending_orders')
         .update({ status: 'recovered' })
         .eq('id', typedPending.id);
 
-      // --- Send confirmation email (non-fatal) ---
       try {
         await sendOrderConfirmationEmail({
-          orderNumber:     order.order_number,
-          customerName:    order.customer_name,
-          customerEmail:   order.customer_email,
+          orderNumber:     orderData.order_number,
+          customerName:    orderData.customer_name,
+          customerEmail:   orderData.customer_email ?? undefined,
           items: lineItems.map((li) => ({
-            name:     li.productName,
+            product_name: li.productName,
             quantity: li.quantity,
-            price:    li.unitPrice,
-          })),
-          subtotal:    Number(order.subtotal),
-          shippingFee: Number(order.shipping_fee),
-          discount:    Number(order.discount),
-          grandTotal:  Number(order.grand_total),
+            unit_price: li.unitPrice,
+            line_total: li.lineTotal,
+          })) as unknown as OrderItem[],
+          subtotal:    Number(orderData.subtotal),
+          shippingFee: Number(orderData.shipping_fee),
+          discount:    Number(orderData.discount),
+          grandTotal:  Number(orderData.grand_total),
           shippingAddress: {
             addressLine1: typedPending.shipping_address_line1,
             city:         typedPending.shipping_city,
@@ -388,12 +385,12 @@ export async function recoverOrderFromWebhook(
             postalCode:   typedPending.shipping_postal_code,
           },
         });
-        rLog.info('recovery.email.sent', { orderId: order.id });
+        rLog.info('recovery.email.sent', { orderId: orderData.id });
       } catch (emailErr) {
-        rLog.warn('recovery.email.failed', emailErr, { orderId: order.id });
+        rLog.warn('recovery.email.failed', { error: emailErr, orderId: orderData.id });
       }
 
-      return { recovered: true, orderId: order.id };
+      return { recovered: true, orderId: orderData.id };
     }
 
     // -----------------------------------------------------------------------
@@ -461,20 +458,20 @@ export async function recoverOrderFromWebhook(
           .maybeSingle();
         return { recovered: true, orderId: winner?.id };
       }
-      rLog.error('recovery.partial.rpc.failed', partialErr);
+      rLog.error('recovery.partial.rpc.failed', { error: partialErr });
       return { recovered: false, error: partialErr.message };
     }
 
+    const partialOrderData = partialOrder as Order;
     rLog.warn('recovery.partial.created', {
-      orderId: partialOrder?.id,
+      orderId: partialOrderData?.id,
       note: 'MISSING shipping address and items. Admin must follow up.',
     });
 
-    // Best-effort partial email.
     try {
       if (customerEmail !== 'unknown@bansaricollections.com') {
         await sendOrderConfirmationEmail({
-          orderNumber:  partialOrder?.order_number ?? orderNumber,
+          orderNumber:  partialOrderData?.order_number ?? orderNumber,
           customerName,
           customerEmail,
           items:        [],
@@ -491,10 +488,10 @@ export async function recoverOrderFromWebhook(
         });
       }
     } catch (emailErr) {
-      rLog.warn('recovery.partial.email_failed', emailErr);
+      rLog.warn('recovery.partial.email_failed', { error: emailErr });
     }
 
-    return { recovered: true, orderId: partialOrder?.id };
+    return { recovered: true, orderId: partialOrderData?.id };
 
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);

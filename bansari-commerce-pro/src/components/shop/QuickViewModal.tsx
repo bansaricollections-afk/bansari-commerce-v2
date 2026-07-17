@@ -128,7 +128,7 @@ export default function QuickViewModal({ product, onClose }: Props) {
             &#x20B9;{product.price.toLocaleString("en-IN")}
           </p>
 
-          {product.stock <= 5 && product.stock > 0 && (
+          {product.stock && product.stock <= 5 && product.stock > 0 && (
             <p
               style={{
                 fontFamily: "var(--font-inter), sans-serif",

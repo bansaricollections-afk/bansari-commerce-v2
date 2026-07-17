@@ -11,8 +11,6 @@
 
 import { useWishlist as useWishlistStore } from '@/store/wishlist';
 
-export { useWishlistStore as useWishlist };
-
 /**
  * Augmented hook that adds toggleWishlist and isInWishlist adapters.
  */

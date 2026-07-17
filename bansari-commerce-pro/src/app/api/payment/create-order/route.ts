@@ -228,7 +228,7 @@ export async function POST(request: NextRequest) {
         errorMessage: pendingError.message,
       });
     } else {
-      log.info('create-order.pending_orders.saved', { razorpayOrderId: rzpOrder.id, userId });
+      log.info('create-order.pending_orders.saved', { razorpayOrderId: rzpOrder.id,  userId: userId ?? undefined, });
     }
 
     timer('info', { razorpayOrderId: rzpOrder.id });
