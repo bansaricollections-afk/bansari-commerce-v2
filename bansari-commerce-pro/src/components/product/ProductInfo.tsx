@@ -4,75 +4,65 @@ import Link from 'next/link';
 import { useState } from 'react';
 
 import type { Product } from '@/types/product';
+import type { ProductVariant } from '@/types/product';
 
 import ProductActions from './ProductActions';
 import ProductVariantSelector from './ProductVariantSelector';
 import QuantitySelector from './QuantitySelector';
+import PincodeChecker from './PincodeChecker';
 
-// TrustBadges intentionally NOT imported here.
-// The single trust section is rendered once in page.tsx, below the accordion.
+// TrustBadges rendered ONCE in page.tsx — never here.
 
 interface Props {
   product: Product;
+  canonicalUrl: string;
 }
 
-function StarRating({ rating, count }: { rating: number; count: number }) {
+function StarRow({ rating, count }: { rating: number; count: number }) {
+  const full = Math.round(rating);
   return (
     <div className="flex items-center gap-2">
-      <div className="flex items-center gap-0.5" aria-label={`Rating: ${rating} out of 5`}>
-        {[1, 2, 3, 4, 5].map((star) => (
-          <svg
-            key={star}
-            className={`w-3.5 h-3.5 ${
-              star <= Math.round(rating) ? 'text-[#8A5A6A]' : 'text-slate-200'
-            }`}
-            fill="currentColor"
-            viewBox="0 0 20 20"
-          >
+      <div className="flex gap-0.5" aria-label={`${rating} out of 5 stars`}>
+        {[1,2,3,4,5].map((s) => (
+          <svg key={s} className={`w-3.5 h-3.5 ${s <= full ? 'text-[#8A5A6A]' : 'text-slate-200'}`}
+            fill="currentColor" viewBox="0 0 20 20">
             <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
           </svg>
         ))}
       </div>
-      <span className="text-slate-500 text-xs tracking-wide">{rating.toFixed(1)}</span>
-      <span className="text-slate-300 text-xs">•</span>
-      <a href="#reviews" className="text-xs text-slate-500 hover:text-[#8A5A6A] transition-colors underline underline-offset-2">
+      <span className="text-[11px] text-slate-500">{rating.toFixed(1)}</span>
+      <span className="text-slate-200 text-xs">·</span>
+      <a href="#reviews" className="text-[11px] text-slate-500 underline underline-offset-2 hover:text-[#8A5A6A] transition-colors">
         {count} {count === 1 ? 'review' : 'reviews'}
       </a>
     </div>
   );
 }
 
-export default function ProductInfo({ product }: Props) {
+export default function ProductInfo({ product, canonicalUrl }: Props) {
   const [quantity, setQuantity] = useState(1);
-  const [selectedVariant, setSelectedVariant] = useState(
-    product.variants?.[0] ?? null
-  );
+  const [selectedVariant, setSelectedVariant] = useState<ProductVariant | null>(null);
 
-  const hasDiscount =
-    product.oldPrice && product.oldPrice > product.price;
-  const discountPercent = hasDiscount
-    ? Math.round(
-        ((product.oldPrice! - product.price) / product.oldPrice!) *
-          100
-      )
+  const hasDiscount = product.oldPrice && product.oldPrice > product.price;
+  const discountPct = hasDiscount
+    ? Math.round(((product.oldPrice! - product.price) / product.oldPrice!) * 100)
     : 0;
-
-  const isLowStock = product.stock && product.stock > 0 && product.stock <= 5;
   const isOutOfStock = !product.stock || product.stock === 0;
-
-  const specs: any = product.specifications || {};
+  const isLowStock = !isOutOfStock && (product.stock ?? 0) <= 5;
+  const specs = product.specifications;
 
   return (
-    <div className="flex flex-col gap-7">
+    <div className="flex flex-col gap-6 lg:sticky lg:top-24 lg:self-start">
+
       {/* ── Breadcrumb ── */}
       <nav aria-label="Breadcrumb">
-        <ol className="flex items-center gap-1.5 text-[11px] tracking-[0.12em] uppercase text-slate-400">
+        <ol className="flex flex-wrap items-center gap-1 text-[10px] tracking-[0.14em] uppercase text-slate-400">
           <li><Link href="/" className="hover:text-[#8A5A6A] transition-colors">Home</Link></li>
-          <li><span aria-hidden="true">›</span></li>
+          <li aria-hidden><span className="mx-1">›</span></li>
           <li><Link href="/shop" className="hover:text-[#8A5A6A] transition-colors">Shop</Link></li>
           {product.category && (
             <>
-              <li><span aria-hidden="true">›</span></li>
+              <li aria-hidden><span className="mx-1">›</span></li>
               <li>
                 <Link
                   href={`/collections/${product.category.toLowerCase().replace(/\s+/g, '-')}`}
@@ -86,71 +76,72 @@ export default function ProductInfo({ product }: Props) {
         </ol>
       </nav>
 
-      {/* ── Collection label + Product name ── */}
-      <div className="flex flex-col gap-2.5">
-        {product.collection && (
-          <p className="text-[11px] tracking-[0.2em] uppercase text-[#8A5A6A] font-medium">
-            {product.collection}
-          </p>
-        )}
-        <h1 className="text-2xl lg:text-3xl font-light text-slate-900 leading-tight tracking-tight">
+      {/* ── Collection label ── */}
+      {product.collection && (
+        <p className="text-[10px] tracking-[0.22em] uppercase text-[#8A5A6A] font-medium -mb-4">
+          {product.collection}
+        </p>
+      )}
+
+      {/* ── Product name ── */}
+      <div>
+        <h1 className="text-[1.65rem] lg:text-3xl font-light text-slate-900 leading-snug tracking-tight">
           {product.name}
         </h1>
-        {product.reviewCount && product.reviewCount > 0 && product.rating && (
-          <StarRating rating={product.rating ?? 0} count={product.reviewCount ?? 0} />
-        )}
+        {product.reviewCount && product.reviewCount > 0 && product.rating ? (
+          <div className="mt-2">
+            <StarRow rating={product.rating} count={product.reviewCount} />
+          </div>
+        ) : null}
       </div>
 
-      {/* ── Price ── */}
-      <div className="flex flex-col gap-1.5 pb-6 border-b border-slate-100">
+      {/* ── Price row ── */}
+      <div className="border-t border-b border-slate-100 py-4 flex flex-col gap-1">
         <div className="flex items-baseline gap-3">
           <span className="text-2xl font-light text-slate-900">
             ₹{product.price.toLocaleString('en-IN')}
           </span>
           {hasDiscount && (
-            <span className="text-base text-slate-400 line-through">
-              ₹{product.oldPrice!.toLocaleString('en-IN')}
-            </span>
-          )}
-          {hasDiscount && (
-            <span className="text-xs font-medium bg-[#8A5A6A]/10 text-[#8A5A6A] px-2 py-0.5 rounded-sm">
-              {discountPercent}% off
-            </span>
+            <>
+              <span className="text-base text-slate-400 line-through font-light">
+                ₹{product.oldPrice!.toLocaleString('en-IN')}
+              </span>
+              <span className="text-xs font-semibold bg-green-50 text-green-700 px-2 py-0.5 rounded">
+                {discountPct}% off
+              </span>
+            </>
           )}
         </div>
         <p className="text-[11px] text-slate-400 tracking-wide">
           Inclusive of all taxes · Free shipping on all orders
         </p>
-        {/* Single inline trust pill — Free Returns only; COD removed */}
-        <div className="flex items-center gap-1.5 mt-1">
-          <span className="flex items-center gap-1.5 text-[11px] tracking-[0.08em] text-slate-500">
-            <svg className="w-3.5 h-3.5 text-green-600" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-            </svg>
-            Free Returns
-          </span>
+        {/* Availability + Style Code */}
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-1 mt-1">
+          {isOutOfStock ? (
+            <span className="flex items-center gap-1 text-[11px] text-red-500">
+              <span className="w-1.5 h-1.5 rounded-full bg-red-500 inline-block" />
+              Out of Stock
+            </span>
+          ) : isLowStock ? (
+            <span className="flex items-center gap-1 text-[11px] text-amber-600">
+              <span className="w-1.5 h-1.5 rounded-full bg-amber-500 inline-block" />
+              Only {product.stock} left
+            </span>
+          ) : (
+            <span className="flex items-center gap-1 text-[11px] text-green-600">
+              <span className="w-1.5 h-1.5 rounded-full bg-green-500 inline-block" />
+              In Stock
+            </span>
+          )}
+          {(product.sku || product.styleCode) && (
+            <span className="text-[11px] text-slate-400">
+              Style: {product.styleCode ?? product.sku}
+            </span>
+          )}
         </div>
       </div>
 
-      {/* ── Stock status ── */}
-      {isOutOfStock && (
-        <div className="flex items-center gap-2 text-sm text-slate-500 bg-slate-50 border border-slate-200 px-4 py-3 rounded-sm">
-          <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z" />
-          </svg>
-          This item is currently out of stock.
-        </div>
-      )}
-      {isLowStock && !isOutOfStock && (
-        <div className="flex items-center gap-2 text-sm text-amber-700 bg-amber-50 border border-amber-200 px-4 py-3 rounded-sm">
-          <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z" />
-          </svg>
-          Only {product.stock} left in stock — order soon
-        </div>
-      )}
-
-      {/* ── Size selector — immediately below price ── */}
+      {/* ── Size selector ── */}
       {product.variants && product.variants.length > 0 && (
         <ProductVariantSelector
           variants={product.variants}
@@ -162,62 +153,66 @@ export default function ProductInfo({ product }: Props) {
       {/* ── Quantity ── */}
       {!isOutOfStock && (
         <div className="flex flex-col gap-2">
-          <label className="text-[11px] tracking-[0.15em] uppercase text-slate-500 font-medium">
+          <p className="text-[10px] tracking-[0.18em] uppercase text-slate-500 font-medium">
             Quantity
-          </label>
-          <QuantitySelector
-            value={quantity}
-            onChange={setQuantity}
-            max={product.stock}
-          />
+          </p>
+          <QuantitySelector value={quantity} onChange={setQuantity} max={product.stock} />
         </div>
       )}
 
-      {/* ── CTAs: Add to Cart / Buy Now / WhatsApp ── */}
-      <ProductActions product={product} quantity={quantity} selectedVariant={selectedVariant} />
+      {/* ── Pincode delivery checker ── */}
+      <PincodeChecker />
 
-      {/* ── Quick product attributes (fabric, occasion, fit, work, SKU) ── */}
-      {specs && Object.keys(specs).some((k) => (specs as Record<string, unknown>)[k]) && (
-        <div className="grid grid-cols-2 gap-x-6 gap-y-3 pt-6 border-t border-slate-100">
+      {/* ── Action buttons ── */}
+      <ProductActions
+        product={product}
+        quantity={quantity}
+        selectedVariant={selectedVariant}
+      />
+
+      {/* ── Quick spec pills ── */}
+      {specs && (
+        <div className="grid grid-cols-2 gap-x-6 gap-y-2.5 pt-4 border-t border-slate-100">
           {specs.fabric && (
-            <div className="flex flex-col gap-0.5">
-              <span className="text-[10px] tracking-[0.15em] uppercase text-slate-400">Fabric</span>
-              <span className="text-sm text-slate-700">{specs.fabric}</span>
+            <div>
+              <p className="text-[9px] tracking-[0.18em] uppercase text-slate-400 mb-0.5">Fabric</p>
+              <p className="text-sm text-slate-700 font-light">{specs.fabric}</p>
             </div>
           )}
           {specs.occasion && (
-            <div className="flex flex-col gap-0.5">
-              <span className="text-[10px] tracking-[0.15em] uppercase text-slate-400">Occasion</span>
-              <span className="text-sm text-slate-700">{specs.occasion}</span>
+            <div>
+              <p className="text-[9px] tracking-[0.18em] uppercase text-slate-400 mb-0.5">Occasion</p>
+              <p className="text-sm text-slate-700 font-light">
+                {Array.isArray(specs.occasion) ? specs.occasion.join(', ') : specs.occasion}
+              </p>
             </div>
           )}
           {specs.fit && (
-            <div className="flex flex-col gap-0.5">
-              <span className="text-[10px] tracking-[0.15em] uppercase text-slate-400">Fit</span>
-              <span className="text-sm text-slate-700">{specs.fit}</span>
+            <div>
+              <p className="text-[9px] tracking-[0.18em] uppercase text-slate-400 mb-0.5">Fit</p>
+              <p className="text-sm text-slate-700 font-light">{specs.fit}</p>
+            </div>
+          )}
+          {specs.neckline && (
+            <div>
+              <p className="text-[9px] tracking-[0.18em] uppercase text-slate-400 mb-0.5">Neckline</p>
+              <p className="text-sm text-slate-700 font-light">{specs.neckline}</p>
+            </div>
+          )}
+          {specs.sleeve && (
+            <div>
+              <p className="text-[9px] tracking-[0.18em] uppercase text-slate-400 mb-0.5">Sleeve</p>
+              <p className="text-sm text-slate-700 font-light">{specs.sleeve}</p>
             </div>
           )}
           {specs.work && (
-            <div className="flex flex-col gap-0.5">
-              <span className="text-[10px] tracking-[0.15em] uppercase text-slate-400">Craftsmanship</span>
-              <span className="text-sm text-slate-700">{specs.work}</span>
-            </div>
-          )}
-          {product.sku && (
-            <div className="flex flex-col gap-0.5">
-              <span className="text-[10px] tracking-[0.15em] uppercase text-slate-400">SKU</span>
-              <span className="text-sm text-slate-500 font-mono">{product.sku}</span>
-            </div>
-          )}
-          {product.category && (
-            <div className="flex flex-col gap-0.5">
-              <span className="text-[10px] tracking-[0.15em] uppercase text-slate-400">Category</span>
-              <span className="text-sm text-slate-700">{product.category}</span>
+            <div>
+              <p className="text-[9px] tracking-[0.18em] uppercase text-slate-400 mb-0.5">Work</p>
+              <p className="text-sm text-slate-700 font-light">{specs.work}</p>
             </div>
           )}
         </div>
       )}
-      {/* NO TrustBadges here — rendered once in page.tsx */}
     </div>
   );
 }
