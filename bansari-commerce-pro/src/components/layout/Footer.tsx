@@ -31,12 +31,13 @@ const TRUST_ITEMS = [
   "Quality Checked",
 ] as const;
 
+// COD removed — prepaid only
 const PAYMENT_METHODS = [
   "Visa",
   "Mastercard",
   "UPI",
   "Razorpay",
-  "Cash on Delivery",
+  "Net Banking",
 ] as const;
 
 export default function Footer() {
@@ -113,114 +114,131 @@ export default function Footer() {
         {/* ── Col 2: Shop ── */}
         <div>
           <p
-            className="uppercase tracking-[0.16em]"
+            className="bc-footer-heading"
             style={{
               fontSize: "var(--bc-text-xs)",
-              fontWeight: 500,
-              color: "var(--bc-text-gold)",
+              fontWeight: 600,
+              letterSpacing: "0.15em",
+              textTransform: "uppercase",
+              color: "var(--bc-text-inverse)",
+              opacity: 0.4,
               marginBottom: "var(--bc-space-5)",
             }}
           >
             Shop
           </p>
-          <ul className="bc-footer-list">
-            {SHOP_LINKS.map(({ label, href }) => (
-              <li key={label}>
-                <Link href={href} className="bc-footer-link">
-                  {label}
+          <ul style={{ display: "flex", flexDirection: "column", gap: "var(--bc-space-3)" }}>
+            {SHOP_LINKS.map((l) => (
+              <li key={l.label}>
+                <Link
+                  href={l.href}
+                  style={{
+                    fontSize: "var(--bc-text-sm)",
+                    color: "var(--bc-text-inverse)",
+                    opacity: 0.65,
+                    textDecoration: "none",
+                    transition: "opacity var(--bc-transition-base)",
+                  }}
+                  className="bc-footer-link"
+                >
+                  {l.label}
                 </Link>
               </li>
             ))}
           </ul>
         </div>
 
-        {/* ── Col 3: Customer Care ── */}
+        {/* ── Col 3: Policies ── */}
         <div>
           <p
-            className="uppercase tracking-[0.16em]"
+            className="bc-footer-heading"
             style={{
               fontSize: "var(--bc-text-xs)",
-              fontWeight: 500,
-              color: "var(--bc-text-gold)",
+              fontWeight: 600,
+              letterSpacing: "0.15em",
+              textTransform: "uppercase",
+              color: "var(--bc-text-inverse)",
+              opacity: 0.4,
               marginBottom: "var(--bc-space-5)",
             }}
           >
-            Customer Care
+            Support
           </p>
-          <ul className="bc-footer-list">
-            {POLICY_LINKS.map(({ label, href }) => (
-              <li key={label}>
-                <Link href={href} className="bc-footer-link">
-                  {label}
+          <ul style={{ display: "flex", flexDirection: "column", gap: "var(--bc-space-3)" }}>
+            {POLICY_LINKS.map((l) => (
+              <li key={l.label}>
+                <Link
+                  href={l.href}
+                  style={{
+                    fontSize: "var(--bc-text-sm)",
+                    color: "var(--bc-text-inverse)",
+                    opacity: 0.65,
+                    textDecoration: "none",
+                    transition: "opacity var(--bc-transition-base)",
+                  }}
+                  className="bc-footer-link"
+                >
+                  {l.label}
                 </Link>
               </li>
             ))}
           </ul>
         </div>
 
-        {/* ── Col 4: Contact ── */}
+        {/* ── Col 4: Contact + Trust ── */}
         <div>
           <p
-            className="uppercase tracking-[0.16em]"
+            className="bc-footer-heading"
             style={{
               fontSize: "var(--bc-text-xs)",
-              fontWeight: 500,
-              color: "var(--bc-text-gold)",
+              fontWeight: 600,
+              letterSpacing: "0.15em",
+              textTransform: "uppercase",
+              color: "var(--bc-text-inverse)",
+              opacity: 0.4,
               marginBottom: "var(--bc-space-5)",
             }}
           >
             Contact
           </p>
+          <ul style={{ display: "flex", flexDirection: "column", gap: "var(--bc-space-4)" }}>
+            <li className="flex items-start gap-2" style={{ fontSize: "var(--bc-text-sm)", opacity: 0.65 }}>
+              <MapPin size={14} className="mt-0.5 flex-shrink-0" />
+              <span>Surat, Gujarat, India</span>
+            </li>
+            <li style={{ fontSize: "var(--bc-text-sm)", opacity: 0.65 }}>
+              <a href="tel:+919876543210" className="flex items-center gap-2 hover:opacity-100 transition-opacity">
+                <Phone size={14} className="flex-shrink-0" />
+                +91 98765 43210
+              </a>
+            </li>
+            <li style={{ fontSize: "var(--bc-text-sm)", opacity: 0.65 }}>
+              <a href="mailto:hello@bansaricollection.in" className="flex items-center gap-2 hover:opacity-100 transition-opacity">
+                <Mail size={14} className="flex-shrink-0" />
+                hello@bansaricollection.in
+              </a>
+            </li>
+          </ul>
 
-          <div className="flex flex-col" style={{ gap: "var(--bc-space-5)" }}>
-            <div className="flex items-start" style={{ gap: "var(--bc-space-3)" }}>
-              <MapPin
-                size={15}
-                style={{
-                  color: "var(--bc-text-gold)",
-                  flexShrink: 0,
-                  marginTop: "0.2rem",
-                  opacity: 0.7,
-                }}
-              />
-              <address
-                className="not-italic"
-                style={{
-                  fontSize: "var(--bc-text-xs)",
-                  lineHeight: 1.75,
-                  color: "var(--bc-text-inverse)",
-                  opacity: 0.55,
-                }}
+          {/* Trust strip */}
+          <div
+            style={{
+              marginTop: "var(--bc-space-8)",
+              paddingTop: "var(--bc-space-6)",
+              borderTop: "1px solid rgba(255,255,255,0.08)",
+              display: "flex",
+              flexDirection: "column",
+              gap: "var(--bc-space-2)",
+            }}
+          >
+            {TRUST_ITEMS.map((t) => (
+              <span
+                key={t}
+                style={{ fontSize: "var(--bc-text-xs)", color: "var(--bc-text-inverse)", opacity: 0.45 }}
               >
-                GF-4, Aruma Park, Near Shilchar,
-                <br />
-                Bil, Vadodara, Gujarat — 391410
-              </address>
-            </div>
-
-            <a
-              href="tel:+918460192745"
-              className="bc-footer-link flex items-center"
-              style={{ gap: "var(--bc-space-3)" }}
-            >
-              <Phone
-                size={15}
-                style={{ color: "var(--bc-text-gold)", opacity: 0.7, flexShrink: 0 }}
-              />
-              <span style={{ fontSize: "var(--bc-text-xs)" }}>+91 84601 92745</span>
-            </a>
-
-            <a
-              href="mailto:support@bansaricollections.com"
-              className="bc-footer-link flex items-center"
-              style={{ gap: "var(--bc-space-3)" }}
-            >
-              <Mail
-                size={15}
-                style={{ color: "var(--bc-text-gold)", opacity: 0.7, flexShrink: 0 }}
-              />
-              <span style={{ fontSize: "var(--bc-text-xs)" }}>support@bansaricollections.com</span>
-            </a>
+                ✓ {t}
+              </span>
+            ))}
           </div>
         </div>
       </div>
@@ -228,139 +246,23 @@ export default function Footer() {
       {/* ── Bottom bar ── */}
       <div
         style={{
-          borderTop: "1px solid var(--bc-border-dark)",
+          borderTop: "1px solid rgba(255,255,255,0.06)",
+          paddingInline: "var(--bc-gutter)",
+          paddingBlock: "var(--bc-space-5)",
         }}
       >
         <div
-          className="mx-auto bc-footer-bottom"
-          style={{
-            maxWidth: "var(--bc-content-wide)",
-            paddingInline: "var(--bc-gutter)",
-            paddingBlock: "var(--bc-space-6)",
-          }}
+          className="mx-auto flex flex-col sm:flex-row items-center justify-between gap-3"
+          style={{ maxWidth: "var(--bc-content-wide)" }}
         >
-          {/* Copyright */}
-          <p
-            style={{
-              fontSize: "var(--bc-text-xs)",
-              color: "var(--bc-text-inverse)",
-              opacity: 0.4,
-            }}
-          >
-            &copy; {new Date().getFullYear()} Bansari Collections. All rights reserved.
+          <p style={{ fontSize: "var(--bc-text-xs)", opacity: 0.35 }}>
+            © {new Date().getFullYear()} Bansari Collections. All rights reserved.
           </p>
-
-          {/* Trust + Payment */}
-          <div className="flex flex-wrap items-center" style={{ gap: "var(--bc-space-6)" }}>
-            {/* Trust items */}
-            <div className="flex flex-wrap items-center" style={{ gap: "var(--bc-space-5)" }}>
-              {TRUST_ITEMS.map((item) => (
-                <span
-                  key={item}
-                  className="uppercase tracking-[0.1em]"
-                  style={{
-                    fontSize: "var(--bc-text-xs)",
-                    color: "var(--bc-text-inverse)",
-                    opacity: 0.45,
-                    fontWeight: 500,
-                  }}
-                >
-                  {item}
-                </span>
-              ))}
-            </div>
-
-            {/* Vertical separator */}
-            <span
-              aria-hidden="true"
-              style={{
-                display: "inline-block",
-                width: "1px",
-                height: "1rem",
-                backgroundColor: "var(--bc-border-dark)",
-              }}
-            />
-
-            {/* Payment methods */}
-            <div className="flex flex-wrap items-center" style={{ gap: "var(--bc-space-3)" }}>
-              {PAYMENT_METHODS.map((m) => (
-                <span
-                  key={m}
-                  style={{
-                    fontSize: "var(--bc-text-xs)",
-                    color: "var(--bc-text-inverse)",
-                    opacity: 0.35,
-                    border: "1px solid var(--bc-border-dark)",
-                    padding: "0.2rem 0.5rem",
-                    letterSpacing: "0.06em",
-                  }}
-                >
-                  {m}
-                </span>
-              ))}
-            </div>
-          </div>
+          <p style={{ fontSize: "var(--bc-text-xs)", opacity: 0.35 }}>
+            We accept: {PAYMENT_METHODS.join(" · ")} &nbsp;|&nbsp; Online Payment Only
+          </p>
         </div>
       </div>
-
-      <style>{`
-        .bc-footer-grid {
-          display: grid;
-          grid-template-columns: 1fr;
-          gap: var(--bc-space-12);
-        }
-        @media (min-width: 640px) {
-          .bc-footer-grid { grid-template-columns: repeat(2, 1fr); }
-        }
-        @media (min-width: 1024px) {
-          .bc-footer-grid {
-            grid-template-columns: 1.6fr 1fr 1.2fr 1.4fr;
-            gap: var(--bc-space-16);
-          }
-          .bc-footer-brand { grid-column: 1; }
-        }
-        .bc-footer-list {
-          list-style: none;
-          margin: 0;
-          padding: 0;
-          display: flex;
-          flex-direction: column;
-          gap: var(--bc-space-3);
-        }
-        .bc-footer-link {
-          font-size: var(--bc-text-xs);
-          color: var(--bc-text-inverse);
-          opacity: 0.55;
-          text-decoration: none;
-          transition: opacity var(--bc-transition-fast), color var(--bc-transition-fast);
-        }
-        .bc-footer-link:hover { opacity: 1; color: var(--bc-text-gold); }
-        .bc-social-link {
-          display: inline-flex;
-          align-items: center;
-          justify-content: center;
-          width: 2.25rem;
-          height: 2.25rem;
-          border: 1px solid var(--bc-border-dark);
-          color: var(--bc-text-inverse);
-          opacity: 0.6;
-          transition: opacity var(--bc-transition-fast), border-color var(--bc-transition-fast);
-        }
-        .bc-social-link:hover { opacity: 1; border-color: var(--bc-gold-warm); color: var(--bc-text-gold); }
-        .bc-footer-bottom {
-          display: flex;
-          flex-direction: column;
-          align-items: flex-start;
-          gap: var(--bc-space-4);
-        }
-        @media (min-width: 768px) {
-          .bc-footer-bottom {
-            flex-direction: row;
-            align-items: center;
-            justify-content: space-between;
-          }
-        }
-      `}</style>
     </footer>
   );
 }
