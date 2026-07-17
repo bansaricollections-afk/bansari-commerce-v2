@@ -4,22 +4,44 @@ import Image from "next/image";
 import Link from "next/link";
 
 /* ------------------------------------------------------------------
-   INSTAGRAM GALLERY — LUXURY EDITORIAL v2
+   INSTAGRAM GALLERY — LUXURY EDITORIAL v3
    Benchmark: Aza Fashions · Pernia's Pop-Up Shop social sections
 
    Handle: @bansari_collections  (with underscore)
+
+   Images: Unsplash ethnic fashion (free commercial use)
+   Local /instagram/*.jpg files removed — replaced with Unsplash
+   so tiles always render in production and in preview.
 ------------------------------------------------------------------ */
 
 const INSTAGRAM_URL = "https://instagram.com/bansari_collections";
 const INSTAGRAM_HANDLE = "@bansari_collections";
 
 const gallery = [
-  { src: "/instagram/1.jpg", alt: "Bansari customer in saree — festive occasion" },
-  { src: "/instagram/2.jpg", alt: "Bansari kurta set — contemporary styling" },
-  { src: "/instagram/3.jpg", alt: "Bansari anarkali — celebration look" },
-  { src: "/instagram/4.jpg", alt: "Bansari co-ord set — casual elegance" },
-  { src: "/instagram/5.jpg", alt: "Bansari ethnic — heritage detail" },
-  { src: "/instagram/6.jpg", alt: "Bansari collection — festive edit" },
+  {
+    src: "https://images.unsplash.com/photo-1610030469983-98e550d6193c?auto=format&fit=crop&w=600&q=80",
+    alt: "Bansari — crimson silk saree with gold zari border",
+  },
+  {
+    src: "https://images.unsplash.com/photo-1583391733956-3750e0ff4e8b?auto=format&fit=crop&w=600&q=80",
+    alt: "Bansari — ivory embroidered kurta set",
+  },
+  {
+    src: "https://images.unsplash.com/photo-1559563458-527698bf5295?auto=format&fit=crop&w=600&q=80",
+    alt: "Bansari — rose anarkali gown for festive occasion",
+  },
+  {
+    src: "https://images.unsplash.com/photo-1595777457583-95e059d581b8?auto=format&fit=crop&w=600&q=80",
+    alt: "Bansari — teal chanderi co-ord set",
+  },
+  {
+    src: "https://images.unsplash.com/photo-1619086303291-0ef7699e4b31?auto=format&fit=crop&w=600&q=80",
+    alt: "Bansari — ivory and gold bridal lehenga",
+  },
+  {
+    src: "https://images.unsplash.com/photo-1617627143750-d86bc21e42bb?auto=format&fit=crop&w=600&q=80",
+    alt: "Bansari — midnight blue georgette saree",
+  },
 ];
 
 export default function InstagramGallery() {
