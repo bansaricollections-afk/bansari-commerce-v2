@@ -21,15 +21,21 @@ export default function ProductActions({ product, quantity, selectedVariant }: P
   const inWishlist = isInWishlist(product.id);
   const isOutOfStock = product.stock === 0;
 
+  // Size selection is required when the product has variants (sizes)
+  const requiresSizeSelection =
+    Array.isArray((product as any).variants) &&
+    (product as any).variants.length > 0 &&
+    selectedVariant === null;
+
   const handleAddToCart = () => {
-    if (isOutOfStock) return;
+    if (isOutOfStock || requiresSizeSelection) return;
     addToCart({ product, quantity, variant: selectedVariant });
     setAddedToCart(true);
     setTimeout(() => setAddedToCart(false), 2500);
   };
 
   const handleBuyNow = () => {
-    if (isOutOfStock) return;
+    if (isOutOfStock || requiresSizeSelection) return;
     addToCart({ product, quantity, variant: selectedVariant });
     router.push('/checkout');
   };
@@ -54,14 +60,24 @@ export default function ProductActions({ product, quantity, selectedVariant }: P
 
   return (
     <div className="flex flex-col gap-3">
+      {/* Size selection required notice */}
+      {requiresSizeSelection && (
+        <p
+          role="alert"
+          className="text-xs font-medium tracking-wide text-red-500"
+        >
+          Please select a size.
+        </p>
+      )}
+
       {/* Primary CTAs */}
       <div className="flex gap-3">
         <button
           onClick={handleAddToCart}
-          disabled={isOutOfStock}
-          aria-label={isOutOfStock ? 'Out of stock' : 'Add to cart'}
+          disabled={isOutOfStock || requiresSizeSelection}
+          aria-label={isOutOfStock ? 'Out of stock' : requiresSizeSelection ? 'Select a size first' : 'Add to cart'}
           className={`flex-1 h-12 text-sm tracking-[0.12em] uppercase font-medium transition-all duration-200 rounded-sm ${
-            isOutOfStock
+            isOutOfStock || requiresSizeSelection
               ? 'bg-slate-100 text-slate-400 cursor-not-allowed'
               : addedToCart
               ? 'bg-green-700 text-white'
@@ -118,7 +134,12 @@ export default function ProductActions({ product, quantity, selectedVariant }: P
       {!isOutOfStock && (
         <button
           onClick={handleBuyNow}
-          className="w-full h-12 text-sm tracking-[0.12em] uppercase font-medium border border-slate-900 text-slate-900 hover:bg-slate-900 hover:text-white transition-all duration-200 rounded-sm"
+          disabled={requiresSizeSelection}
+          className={`w-full h-12 text-sm tracking-[0.12em] uppercase font-medium border rounded-sm transition-all duration-200 ${
+            requiresSizeSelection
+              ? 'border-slate-200 text-slate-400 cursor-not-allowed'
+              : 'border-slate-900 text-slate-900 hover:bg-slate-900 hover:text-white'
+          }`}
         >
           Buy Now
         </button>
@@ -154,9 +175,9 @@ export default function ProductActions({ product, quantity, selectedVariant }: P
           </button>
           <button
             onClick={handleAddToCart}
-            disabled={isOutOfStock}
+            disabled={isOutOfStock || requiresSizeSelection}
             className={`flex-1 h-12 text-sm tracking-[0.12em] uppercase font-medium rounded-sm transition-all duration-200 ${
-              isOutOfStock
+              isOutOfStock || requiresSizeSelection
                 ? 'bg-slate-100 text-slate-400 cursor-not-allowed'
                 : addedToCart
                 ? 'bg-green-700 text-white'
@@ -168,7 +189,12 @@ export default function ProductActions({ product, quantity, selectedVariant }: P
           {!isOutOfStock && (
             <button
               onClick={handleBuyNow}
-              className="flex-1 h-12 text-sm tracking-[0.12em] uppercase font-medium bg-[#8A5A6A] text-white rounded-sm"
+              disabled={requiresSizeSelection}
+              className={`flex-1 h-12 text-sm tracking-[0.12em] uppercase font-medium rounded-sm transition-all duration-200 ${
+                requiresSizeSelection
+                  ? 'bg-slate-300 text-slate-400 cursor-not-allowed'
+                  : 'bg-[#8A5A6A] text-white'
+              }`}
             >
               Buy Now
             </button>
