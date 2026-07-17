@@ -320,7 +320,14 @@ export async function POST(request: NextRequest) {
         p_quantity: li.quantity,
       });
       if (stockErr) {
-        rLog.warn('orders.create.stock_failed', stockErr, { orderId: order.id, productId: li.productId });
+        // warn() signature: (event, ctx?) — no error param.
+        // Merge error fields into ctx so they appear in the structured log entry.
+        rLog.warn('orders.create.stock_failed', {
+          orderId: order.id,
+          productId: li.productId,
+          errorCode: stockErr.code,
+          errorMessage: stockErr.message,
+        });
       }
     }
 
@@ -357,7 +364,12 @@ export async function POST(request: NextRequest) {
       });
       rLog.info('orders.create.email.sent', { orderId: order.id });
     } catch (emailErr) {
-      rLog.warn('orders.create.email.failed', emailErr, { orderId: order.id });
+      // warn() signature: (event, ctx?) — no error param.
+      // Merge error message into ctx.
+      rLog.warn('orders.create.email.failed', {
+        orderId: order.id,
+        errorMessage: emailErr instanceof Error ? emailErr.message : String(emailErr),
+      });
     }
 
     timer('info', { orderId: order.id, razorpayOrderId: razorpay_order_id });
