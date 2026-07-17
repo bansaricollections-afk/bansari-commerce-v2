@@ -263,7 +263,7 @@ export async function POST(request: NextRequest) {
     }));
 
     const { data: order, error: rpcErr } = await supabase
-      .rpc<'create_order_with_items', { Args: { p_order: typeof orderPayload; p_items: typeof itemsPayload }; Returns: DbOrderRow }>(
+      .rpc<DbOrderRow>(
         'create_order_with_items',
         { p_order: orderPayload, p_items: itemsPayload },
       )
