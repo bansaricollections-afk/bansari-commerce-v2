@@ -53,6 +53,8 @@ const PRODUCTS_TABLE = "products";
 const PRODUCT_IMAGES_BUCKET = "product-images";
 const PAGE_SIZE = 8;
 const LOW_STOCK_THRESHOLD = 5;
+const MAX_FILE_SIZE_BYTES = 5 * 1024 * 1024; // 5 MB
+const ALLOWED_MIME_TYPES = ["image/jpeg", "image/png", "image/webp", "image/gif"];
 
 // ─── Schemas ──────────────────────────────────────────────────────────────────
 
@@ -210,6 +212,25 @@ function slugify(value: string) {
     .trim()
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-+|-+$/g, "");
+}
+
+/**
+ * Build a safe, unique storage path for an uploaded image.
+ *
+ * Strategy:
+ *   1. Strip the extension from the original filename.
+ *   2. Slugify only the base name (no dots, no spaces).
+ *   3. Re-attach the lowercased extension.
+ *   4. Prefix with a timestamp so concurrent uploads never collide.
+ *
+ * Example: "My Photo.JPG" → "1720000000000-my-photo.jpg"
+ */
+function buildStoragePath(file: File): string {
+  const lastDot = file.name.lastIndexOf(".");
+  const rawBase = lastDot > 0 ? file.name.slice(0, lastDot) : file.name;
+  const ext = lastDot > 0 ? file.name.slice(lastDot + 1).toLowerCase() : "jpg";
+  const safeBase = slugify(rawBase) || "image";
+  return `${Date.now()}-${safeBase}.${ext}`;
 }
 
 function generateSku(category: string, name: string) {
@@ -413,18 +434,12 @@ function computeCompleteness(form: ProductFormState): number {
     if (typeof val === "boolean") return true;
     return false;
   }).length;
-  // images bonus
   const imageBonus = form.images.length > 0 ? 1 : 0;
   return Math.round(((filled + imageBonus) / (REQUIRED_FIELDS.length + 1)) * 100);
 }
 
-// ─── Design-system primitives (admin-only, no CSS variables) ──────────────────
+// ─── Design-system primitives ──────────────────────────────────────────────────
 
-/**
- * Label + input slot. Wires htmlFor, shows required asterisk, shows
- * field-level error. Uses hardcoded slate values — zero CSS variable
- * dependence.
- */
 function FormField({
   label,
   htmlFor,
@@ -479,7 +494,6 @@ function FormField({
   );
 }
 
-/** Reusable admin text input — h-11, white bg, slate border, brand focus ring */
 function AdminInput({
   id,
   type = "text",
@@ -535,7 +549,6 @@ function AdminInput({
   );
 }
 
-/** Reusable admin textarea — white bg, slate border, brand focus ring */
 function AdminTextarea({
   id,
   value,
@@ -575,7 +588,6 @@ function AdminTextarea({
   );
 }
 
-/** Reusable admin filter select — h-9, white bg, slate border */
 function FilterSelect({
   value,
   onChange,
@@ -599,7 +611,6 @@ function FilterSelect({
   );
 }
 
-/** Section wrapper with uppercase label + horizontal rule */
 function FormSection({
   title,
   children,
@@ -620,7 +631,6 @@ function FormSection({
   );
 }
 
-/** Toggle card — checked = brand tint, unchecked = white/slate */
 type ToggleFieldId = keyof Pick<
   ProductFormState,
   "featured" | "newArrival" | "bestSeller" | "active"
@@ -666,7 +676,6 @@ function ToggleCard({
   );
 }
 
-/** Product detail row (view-only sheet) */
 function Detail({ label, value }: { label: string; value: string }) {
   return (
     <div className="grid gap-1 rounded-lg border border-slate-200 bg-white p-3">
@@ -676,7 +685,6 @@ function Detail({ label, value }: { label: string; value: string }) {
   );
 }
 
-/** Completeness pill strip */
 function CompletenessBar({ pct }: { pct: number }) {
   const color =
     pct >= 90
@@ -811,7 +819,7 @@ export function ProductManagement() {
 
   const completeness = useMemo(() => computeCompleteness(form), [form]);
 
-  // ── Event handlers (business logic unchanged) ─────────────────────────────
+  // ── Event handlers ────────────────────────────────────────────────────────
 
   function resetFilters() {
     setPage(1);
@@ -835,7 +843,6 @@ export function ProductManagement() {
   function updateForm(id: keyof ProductFormState, value: string) {
     setForm((c) => ({ ...c, [id]: value }));
     setIsDirty(true);
-    // clear field error on change
     if (fieldErrors[id]) {
       setFieldErrors((e) => { const n = { ...e }; delete n[id]; return n; });
     }
@@ -874,30 +881,89 @@ export function ProductManagement() {
     setIsDirty(true);
   }
 
+  // ── Image upload ──────────────────────────────────────────────────────────
+  //
+  // Fix summary vs. original code:
+  //   1. buildStoragePath() correctly separates base name from extension so the
+  //      extension is never appended twice and slugify() never corrupts dots.
+  //   2. Client-side MIME type and file-size guards give immediate feedback
+  //      instead of letting Supabase return an opaque error after the network round-trip.
+  //   3. upload() now passes { upsert: false, cacheControl: '3600' } so re-uploads
+  //      of the same filename do not silently fail, and assets are CDN-cached.
+  //   4. getPublicUrl() result is verified: if the returned URL is empty the
+  //      caller gets a clear error instead of an empty-src <img>.
+  //   5. setUploading(false) is called in a finally block so the spinner always
+  //      clears even when an early return fires for one file in the loop.
+
   async function handleImageUpload(files: FileList | null) {
-    if (!files?.length) return;
-    setUploading(true);
-    const uploadedImages: ProductImage[] = [];
+    if (!files || files.length === 0) return;
+
+    // ── Client-side validation ──
     for (const file of Array.from(files)) {
-      const extension = file.name.split(".").pop() ?? "jpg";
-      const path = `${Date.now()}-${slugify(file.name)}.${extension}`;
-      const { error: uploadError } = await supabase.storage
-        .from(PRODUCT_IMAGES_BUCKET)
-        .upload(path, file);
-      if (uploadError) {
-        toast.error(uploadError.message);
-        setUploading(false);
+      if (!ALLOWED_MIME_TYPES.includes(file.type)) {
+        toast.error(`"${file.name}" is not a supported image type. Use JPG, PNG, or WebP.`);
         return;
       }
-      const { data } = supabase.storage
-        .from(PRODUCT_IMAGES_BUCKET)
-        .getPublicUrl(path);
-      uploadedImages.push({ url: data.publicUrl, alt: form.name || file.name });
+      if (file.size > MAX_FILE_SIZE_BYTES) {
+        toast.error(`"${file.name}" exceeds the 5 MB limit (${(file.size / 1024 / 1024).toFixed(1)} MB).`);
+        return;
+      }
     }
-    setForm((c) => ({ ...c, images: [...c.images, ...uploadedImages] }));
-    setUploading(false);
-    setIsDirty(true);
-    toast.success(`${uploadedImages.length} image${uploadedImages.length > 1 ? "s" : ""} uploaded.`);
+
+    setUploading(true);
+    const uploadedImages: ProductImage[] = [];
+
+    try {
+      for (const file of Array.from(files)) {
+        // Correct path: timestamp + slugified base + original extension (never doubled).
+        const path = buildStoragePath(file);
+
+        const { error: uploadError } = await supabase.storage
+          .from(PRODUCT_IMAGES_BUCKET)
+          .upload(path, file, {
+            cacheControl: "3600",
+            upsert: false,
+            contentType: file.type,
+          });
+
+        if (uploadError) {
+          // Provide the Supabase error message verbatim so the developer can
+          // immediately diagnose bucket-not-found, RLS, or size errors.
+          toast.error(`Upload failed for "${file.name}": ${uploadError.message}`);
+          return;
+        }
+
+        const { data: urlData } = supabase.storage
+          .from(PRODUCT_IMAGES_BUCKET)
+          .getPublicUrl(path);
+
+        if (!urlData.publicUrl) {
+          toast.error(`Could not generate public URL for "${file.name}". Ensure the bucket is set to public.`);
+          return;
+        }
+
+        uploadedImages.push({
+          url: urlData.publicUrl,
+          alt: form.name.trim() || file.name,
+        });
+      }
+
+      if (uploadedImages.length > 0) {
+        setForm((c) => ({ ...c, images: [...c.images, ...uploadedImages] }));
+        setIsDirty(true);
+        toast.success(
+          `${uploadedImages.length} image${
+            uploadedImages.length > 1 ? "s" : ""
+          } uploaded successfully.`
+        );
+      }
+    } finally {
+      setUploading(false);
+      // Reset the file input so the same file can be re-selected if needed.
+      if (fileInputRef.current) {
+        fileInputRef.current.value = "";
+      }
+    }
   }
 
   function removeImage(url: string) {
@@ -908,7 +974,6 @@ export function ProductManagement() {
   async function handleSubmit() {
     const result = prepareForm(form);
     if (!result.success) {
-      // surface all field errors
       const errors: FieldErrors = {};
       for (const issue of result.error.issues) {
         const key = issue.path[0] as keyof ProductFormState | undefined;
@@ -1002,7 +1067,6 @@ export function ProductManagement() {
 
       {/* ── Product table card ───────────────────────────────────────────── */}
       <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
-        {/* Card header */}
         <div className="border-b border-slate-200 px-6 py-4">
           <h2 className="text-base font-semibold text-slate-900">
             Product Catalog
@@ -1012,9 +1076,7 @@ export function ProductManagement() {
           </p>
         </div>
 
-        {/* Filters */}
         <div className="flex flex-wrap items-center gap-3 border-b border-slate-200 bg-slate-50 px-5 py-3">
-          {/* Search */}
           <label className="relative min-w-[200px] flex-1">
             <span className="sr-only">Search products</span>
             <Search className="absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-slate-400" />
@@ -1075,14 +1137,12 @@ export function ProductManagement() {
           </Button>
         </div>
 
-        {/* Error banner — hardcoded red values, no CSS variables */}
         {error ? (
           <div className="border-b border-red-200 bg-red-50 px-5 py-3 text-sm text-red-700">
             {error}
           </div>
         ) : null}
 
-        {/* Table */}
         <div className="overflow-x-auto">
           <Table>
             <TableHeader>
@@ -1241,7 +1301,6 @@ export function ProductManagement() {
           </Table>
         </div>
 
-        {/* Pagination */}
         <div className="flex flex-col gap-3 border-t border-slate-200 bg-slate-50/60 px-5 py-3 text-sm md:flex-row md:items-center md:justify-between">
           <p className="text-slate-500">
             Showing <span className="font-medium text-slate-700">{(page - 1) * PAGE_SIZE + 1}–{Math.min(page * PAGE_SIZE, filteredProducts.length)}</span> of{" "}
@@ -1275,12 +1334,7 @@ export function ProductManagement() {
         </div>
       </div>
 
-      {/* ══════════════════════════════════════════════════════════════════════
-          CREATE / EDIT PRODUCT DRAWER
-          Layout: sticky header (bg-white) + scrollable body (bg-slate-50)
-                  + sticky footer (bg-white)
-          All colors: hardcoded slate-* / white. Zero CSS variable references.
-      ══════════════════════════════════════════════════════════════════════ */}
+      {/* ── CREATE / EDIT PRODUCT DRAWER ── */}
       <Sheet open={formOpen} onOpenChange={handleDrawerOpenChange}>
         <SheetContent
           className={cn(
@@ -1291,7 +1345,7 @@ export function ProductManagement() {
             "flex h-screen flex-col overflow-hidden p-0"
           )}
         >
-          {/* ── Sticky header ── */}
+          {/* Sticky header */}
           <SheetHeader className="shrink-0 border-b border-slate-200 bg-white px-8 py-5">
             <div className="flex items-center justify-between gap-4">
               <div className="min-w-0 flex-1">
@@ -1310,69 +1364,101 @@ export function ProductManagement() {
                 </span>
               ) : null}
             </div>
-            {/* Completeness bar */}
             <div className="mt-3">
               <CompletenessBar pct={completeness} />
             </div>
           </SheetHeader>
 
-          {/* ── Scrollable form body ── */}
+          {/* Scrollable form body */}
           <div className="flex-1 overflow-y-auto bg-slate-50">
             <div className="space-y-8 px-8 py-7">
 
               {/* ── Section 1: Media ── */}
               <FormSection title="Media">
+                {/* Drop zone */}
                 <div
                   role="button"
                   tabIndex={0}
                   aria-label="Upload product images"
-                  onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
-                  onDragLeave={() => setDragOver(false)}
+                  onDragOver={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    setDragOver(true);
+                  }}
+                  onDragEnter={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    setDragOver(true);
+                  }}
+                  onDragLeave={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    setDragOver(false);
+                  }}
                   onDrop={(e) => {
                     e.preventDefault();
+                    e.stopPropagation();
                     setDragOver(false);
                     void handleImageUpload(e.dataTransfer.files);
                   }}
-                  onClick={() => fileInputRef.current?.click()}
+                  onClick={() => {
+                    if (!uploading) fileInputRef.current?.click();
+                  }}
                   onKeyDown={(e) => {
-                    if (e.key === "Enter" || e.key === " ") fileInputRef.current?.click();
+                    if ((e.key === "Enter" || e.key === " ") && !uploading) {
+                      fileInputRef.current?.click();
+                    }
                   }}
                   className={cn(
                     "flex cursor-pointer flex-col items-center justify-center gap-3",
                     "rounded-xl border-2 border-dashed px-6 py-10 text-center transition-colors",
+                    uploading && "pointer-events-none opacity-60",
                     dragOver
                       ? "border-[#8A5A6A] bg-[#8A5A6A]/5"
                       : "border-slate-300 bg-white hover:border-[#8A5A6A]/60 hover:bg-slate-50"
                   )}
                 >
                   {uploading ? (
-                    <Loader2 className="size-6 animate-spin text-slate-400" />
+                    <>
+                      <Loader2 className="size-6 animate-spin text-slate-400" />
+                      <p className="text-sm font-medium text-slate-700">Uploading…</p>
+                    </>
                   ) : (
-                    <ImagePlus className="size-6 text-slate-400" />
+                    <>
+                      <ImagePlus className="size-6 text-slate-400" />
+                      <div>
+                        <p className="text-sm font-medium text-slate-700">
+                          Drop images or click to upload
+                        </p>
+                        <p className="mt-0.5 text-xs text-slate-500">
+                          JPG, PNG, WebP — max 5 MB each
+                        </p>
+                      </div>
+                    </>
                   )}
-                  <div>
-                    <p className="text-sm font-medium text-slate-700">
-                      {uploading ? "Uploading…" : "Drop images or click to upload"}
-                    </p>
-                    <p className="mt-0.5 text-xs text-slate-500">
-                      JPG, PNG, WebP — max 5 MB each
-                    </p>
-                  </div>
                 </div>
+
+                {/* Hidden file input — reset value after each upload so the
+                    same file can be selected again without re-opening the picker */}
                 <input
                   ref={fileInputRef}
                   type="file"
-                  accept="image/*"
+                  accept="image/jpeg,image/png,image/webp,image/gif"
                   multiple
                   className="sr-only"
-                  onChange={(e) => void handleImageUpload(e.target.files)}
+                  onChange={(e) => {
+                    void handleImageUpload(e.target.files);
+                  }}
                 />
 
                 {/* Image thumbnails */}
                 {form.images.length > 0 ? (
                   <div className="grid grid-cols-3 gap-3 sm:grid-cols-4 md:grid-cols-5">
                     {form.images.map((img, i) => (
-                      <div key={img.url} className="group relative aspect-square overflow-hidden rounded-lg border border-slate-200 bg-slate-100">
+                      <div
+                        key={img.url}
+                        className="group relative aspect-square overflow-hidden rounded-lg border border-slate-200 bg-slate-100"
+                      >
                         <Image
                           src={img.url}
                           alt={img.alt}
@@ -1701,100 +1787,13 @@ export function ProductManagement() {
             </div>
           </div>
 
-          {/* ── Sticky footer ── */}
+          {/* Sticky footer */}
           <SheetFooter className="shrink-0 border-t border-slate-200 bg-white px-8 py-5">
             <div className="flex w-full items-center justify-between gap-4">
               <Button
                 type="button"
                 variant="outline"
                 onClick={() => handleDrawerOpenChange(false)}
-                className="border-slate-300 text-slate-700"
-              >
-                Cancel
-              </Button>
-              <Button
-                type="button"
-                onClick={() => void handleSubmit()}
-                disabled={saving || uploading}
-                className="min-w-[120px]"
-              >
-                {saving ? (
-                  <>
-                    <Loader2 className="size-4 animate-spin" />
-                    Saving…
-                  </>
-                ) : drawerMode === "create" ? (
-                  <>
-                    <CheckCircle2 className="size-4" />
-                    Create Product
-                  </>
-                ) : (
-                  <>
-                    <CheckCircle2 className="size-4" />
-                    Save Changes
-                  </>
-                )}
-              </Button>
-            </div>
-          </SheetFooter>
-        </SheetContent>
-      </Sheet>
-
-      {/* ── View details sheet ─────────────────────────────────────────────── */}
-      {detailsProduct ? (
-        <Sheet open={!!detailsProduct} onOpenChange={(open) => { if (!open) setDetailsProduct(null); }}>
-          <SheetContent className="w-full overflow-y-auto md:max-w-[560px]">
-            <SheetHeader className="mb-6">
-              <SheetTitle>{detailsProduct.name}</SheetTitle>
-              <SheetDescription>{detailsProduct.sku}</SheetDescription>
-            </SheetHeader>
-            {detailsProduct.images[0]?.url ? (
-              <div className="relative mb-6 aspect-square w-full overflow-hidden rounded-xl border border-slate-200 bg-slate-100">
-                <Image
-                  src={detailsProduct.images[0].url}
-                  alt={detailsProduct.images[0].alt}
-                  fill
-                  sizes="560px"
-                  className="object-cover"
-                />
-              </div>
-            ) : null}
-            <dl className="grid gap-2">
-              <Detail label="Category" value={detailsProduct.category} />
-              <Detail label="Collection" value={detailsProduct.collection} />
-              <Detail label="Brand" value={detailsProduct.brand} />
-              <Detail label="Fabric" value={detailsProduct.fabric} />
-              <Detail label="Color" value={detailsProduct.color} />
-              <Detail label="Sizes" value={detailsProduct.sizes.join(", ")} />
-              <Detail label="Price" value={formatCurrency(detailsProduct.price)} />
-              {detailsProduct.comparePrice ? (
-                <Detail label="Compare Price" value={formatCurrency(detailsProduct.comparePrice)} />
-              ) : null}
-              <Detail label="Stock" value={`${detailsProduct.stock} units`} />
-              <Detail label="HSN" value={detailsProduct.hsn} />
-              <Detail label="GST" value={`${detailsProduct.gst}%`} />
-              <Detail label="SEO Title" value={detailsProduct.seoTitle} />
-              <Detail label="SEO Description" value={detailsProduct.seoDescription} />
-            </dl>
-          </SheetContent>
-        </Sheet>
-      ) : null}
-
-      {/* ── Delete confirmation dialog ──────────────────────────────────────── */}
-      {deleteProduct ? (
-        <Dialog open={!!deleteProduct} onOpenChange={(open) => { if (!open) setDeleteProduct(null); }}>
-          <DialogContent className="sm:max-w-md">
-            <DialogHeader>
-              <DialogTitle>Delete product?</DialogTitle>
-              <DialogDescription>
-                <strong>{deleteProduct.name}</strong> ({deleteProduct.sku}) will be permanently removed from the catalog. This action cannot be undone.
-              </DialogDescription>
-            </DialogHeader>
-            <DialogFooter className="flex-col-reverse gap-2 sm:flex-row">
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => setDeleteProduct(null)}
                 disabled={saving}
                 className="border-slate-300"
               >
@@ -1802,26 +1801,95 @@ export function ProductManagement() {
               </Button>
               <Button
                 type="button"
-                variant="destructive"
-                onClick={() => void handleDelete()}
-                disabled={saving}
+                onClick={() => void handleSubmit()}
+                disabled={saving || uploading}
+                className="min-w-[140px] bg-[#8A5A6A] text-white hover:bg-[#7a4a5a]"
               >
                 {saving ? (
                   <>
                     <Loader2 className="size-4 animate-spin" />
-                    Deleting…
+                    Saving…
                   </>
+                ) : drawerMode === "create" ? (
+                  "Create Product"
                 ) : (
-                  <>
-                    <Trash2 className="size-4" />
-                    Delete Product
-                  </>
+                  "Save Changes"
                 )}
               </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
-      ) : null}
+            </div>
+          </SheetFooter>
+        </SheetContent>
+      </Sheet>
+
+      {/* ── PRODUCT DETAILS SHEET ── */}
+      <Sheet open={!!detailsProduct} onOpenChange={(open) => { if (!open) setDetailsProduct(null); }}>
+        <SheetContent className="w-full md:max-w-[560px] overflow-y-auto">
+          {detailsProduct ? (
+            <>
+              <SheetHeader className="mb-6">
+                <SheetTitle>{detailsProduct.name}</SheetTitle>
+                <SheetDescription>{detailsProduct.sku}</SheetDescription>
+              </SheetHeader>
+              {detailsProduct.images[0]?.url ? (
+                <div className="relative mb-6 aspect-square w-full overflow-hidden rounded-xl border border-slate-200 bg-slate-100">
+                  <Image
+                    src={detailsProduct.images[0].url}
+                    alt={detailsProduct.images[0].alt}
+                    fill
+                    className="object-cover"
+                  />
+                </div>
+              ) : null}
+              <dl className="grid gap-3">
+                <Detail label="Category" value={detailsProduct.category} />
+                <Detail label="Collection" value={detailsProduct.collection} />
+                <Detail label="Brand" value={detailsProduct.brand} />
+                <Detail label="Fabric" value={detailsProduct.fabric} />
+                <Detail label="Color" value={detailsProduct.color} />
+                <Detail label="Sizes" value={detailsProduct.sizes.join(", ")} />
+                <Detail label="Price" value={formatCurrency(detailsProduct.price)} />
+                <Detail label="Stock" value={`${detailsProduct.stock} units`} />
+                <Detail label="HSN" value={detailsProduct.hsn} />
+                <Detail label="GST" value={`${detailsProduct.gst}%`} />
+                <Detail label="Description" value={detailsProduct.description} />
+                <Detail label="SEO Title" value={detailsProduct.seoTitle} />
+                <Detail label="SEO Description" value={detailsProduct.seoDescription} />
+              </dl>
+            </>
+          ) : null}
+        </SheetContent>
+      </Sheet>
+
+      {/* ── DELETE CONFIRMATION DIALOG ── */}
+      <Dialog open={!!deleteProduct} onOpenChange={(open) => { if (!open) setDeleteProduct(null); }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Delete product?</DialogTitle>
+            <DialogDescription>
+              <strong>{deleteProduct?.name}</strong> will be permanently removed from the catalog. This action cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setDeleteProduct(null)}
+              disabled={saving}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              variant="destructive"
+              onClick={() => void handleDelete()}
+              disabled={saving}
+            >
+              {saving ? <Loader2 className="size-4 animate-spin" /> : null}
+              Delete
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
