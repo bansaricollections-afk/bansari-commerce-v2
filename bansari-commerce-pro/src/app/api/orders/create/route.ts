@@ -295,6 +295,16 @@ export async function POST(request: NextRequest) {
       return apiError(requestId, 'DB_ERROR', rpcErr.message, 500);
     }
 
+    if (!order) {
+      rLog.error('orders.create.rpc_returned_null');
+      return apiError(
+        requestId,
+        'DB_ERROR',
+        'Order creation returned no order.',
+        500
+      );
+    }
+
     rLog.info('orders.create.inserted', {
       orderId: order.id,
       orderNumber,
