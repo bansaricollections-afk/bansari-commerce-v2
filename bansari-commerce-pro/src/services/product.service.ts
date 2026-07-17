@@ -25,6 +25,7 @@ export type Product = {
   subCategory?: string;
   collection?: string;
   badge?: string;
+  /** Mapped from compare_price (snake_case DB column). */
   oldPrice?: number;
   discount?: number;
   currency?: string;
@@ -33,10 +34,15 @@ export type Product = {
   featured?: boolean;
   newArrival?: boolean;
   bestSeller?: boolean;
+  /** Flat sizes array from DB e.g. ["S","M","L"]. */
+  sizes?: string[];
+  /** Synthesised from sizes[] for ProductVariantSelector. */
   variants?: any[];
   specifications?: any;
   seo?: any;
   reviews?: any[];
+  color?: string;
+  fabric?: string;
 };
 
 export type CartItem = {
@@ -57,10 +63,65 @@ export type CartValidationResult =
   | { valid: false; errors: string[] };
 
 // ---------------------------------------------------------------------------
-// Shared select clause
+// Shared select clause — every field consumed by any storefront component
 // ---------------------------------------------------------------------------
 
-const PRODUCT_SELECT = 'id, name, slug, price, stock, active, images, category' as const;
+const PRODUCT_SELECT =
+  'id, name, slug, price, stock, active, images, category, featured, new_arrival, best_seller, description, sizes, compare_price, seo_title, seo_description, sku, collection, fabric, color, rating, review_count, specifications' as const;
+
+// ---------------------------------------------------------------------------
+// mapRow — normalises a raw Supabase row into the Product shape
+// ---------------------------------------------------------------------------
+
+function mapRow(row: Record<string, any>): Product {
+  // Build variants[] from flat sizes[] so ProductVariantSelector receives data
+  const rawSizes: unknown = row['sizes'];
+  let sizes: string[] = [];
+  if (Array.isArray(rawSizes)) {
+    sizes = rawSizes.filter((s): s is string => typeof s === 'string' && s.trim().length > 0);
+  } else if (typeof rawSizes === 'string' && rawSizes.trim().length > 0) {
+    sizes = rawSizes.split(',').map((s) => s.trim()).filter(Boolean);
+  }
+
+  const variants =
+    sizes.length > 0
+      ? sizes.map((size) => ({
+          id: `${row['id']}-${size}`,
+          color: row['color'] ?? '',
+          colorCode: '',
+          size,
+          stock: typeof row['stock'] === 'number' ? row['stock'] : 0,
+        }))
+      : undefined;
+
+  return {
+    id: row['id'],
+    name: row['name'],
+    slug: row['slug'] ?? '',
+    price: row['price'],
+    stock: row['stock'] ?? 0,
+    active: row['active'] ?? false,
+    images: row['images'] ?? [],
+    category: row['category'] ?? undefined,
+    featured: row['featured'] ?? false,
+    newArrival: row['new_arrival'] ?? false,
+    bestSeller: row['best_seller'] ?? false,
+    description: row['description'] ?? undefined,
+    sizes,
+    variants,
+    sku: row['sku'] ?? undefined,
+    collection: row['collection'] ?? undefined,
+    fabric: row['fabric'] ?? undefined,
+    color: row['color'] ?? undefined,
+    rating: row['rating'] ?? undefined,
+    reviewCount: row['review_count'] ?? undefined,
+    specifications: row['specifications'] ?? undefined,
+    seo_title: row['seo_title'] ?? undefined,
+    seo_description: row['seo_description'] ?? undefined,
+    // compare_price DB column → oldPrice camelCase used by ProductCard / ProductInfo
+    oldPrice: row['compare_price'] ?? undefined,
+  };
+}
 
 // ---------------------------------------------------------------------------
 // getProductById
@@ -80,7 +141,7 @@ export async function getProductById(id: number): Promise<Product | null> {
     .maybeSingle();
 
   if (error) throw new Error(error.message);
-  return data as Product | null;
+  return data ? mapRow(data) : null;
 }
 
 // ---------------------------------------------------------------------------
@@ -101,7 +162,7 @@ export async function getProducts(): Promise<Product[]> {
     .order('created_at', { ascending: false });
 
   if (error) throw new Error(error.message);
-  return (data ?? []) as Product[];
+  return (data ?? []).map(mapRow);
 }
 
 // ---------------------------------------------------------------------------
@@ -123,7 +184,7 @@ export async function getFeaturedProducts(): Promise<Product[]> {
     .order('created_at', { ascending: false });
 
   if (error) throw new Error(error.message);
-  return (data ?? []) as Product[];
+  return (data ?? []).map(mapRow);
 }
 
 // ---------------------------------------------------------------------------
@@ -154,7 +215,7 @@ export async function getRelatedProducts(
     .limit(limit);
 
   if (error) throw new Error(error.message);
-  return (data ?? []) as Product[];
+  return (data ?? []).map(mapRow);
 }
 
 // ---------------------------------------------------------------------------
@@ -180,7 +241,7 @@ export async function validateCartItems(
   const lineItems: LineItem[] = [];
 
   for (let i = 0; i < items.length; i++) {
-    const item = items[i];
+    const item = items[i]!;
     const product = products[i];
 
     if (!product) {

@@ -2,6 +2,8 @@ import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 
 import { getProductById } from '@/services/product.service';
+import Header from '@/components/layout/Header';
+import Footer from '@/components/layout/Footer';
 
 import CompleteLook from '@/components/product/CompleteLook';
 import DeliveryCard from '@/components/product/DeliveryCard';
@@ -11,6 +13,8 @@ import ProductInfo from '@/components/product/ProductInfo';
 import RecentlyViewed from '@/components/product/RecentlyViewed';
 import TrustBadges from '@/components/product/TrustBadges';
 import WhatsAppShare from '@/components/product/WhatsAppShare';
+
+export const dynamic = 'force-dynamic';
 
 const SITE_URL =
   process.env.NEXT_PUBLIC_SITE_URL ?? 'https://www.bansaricollection.in';
@@ -165,50 +169,56 @@ export default async function ProductPage({ params }: Props) {
   };
 
   return (
-    <main className="min-h-screen bg-[#FFFDF9]">
-      <script
-        type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(productSchema) }}
-      />
-      <script
-        type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbSchema) }}
-      />
+    <>
+      <Header />
+      <div className="pb-16 lg:pb-0">
+        <main className="min-h-screen bg-[#FFFDF9]">
+          <script
+            type="application/ld+json"
+            dangerouslySetInnerHTML={{ __html: JSON.stringify(productSchema) }}
+          />
+          <script
+            type="application/ld+json"
+            dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbSchema) }}
+          />
 
-      <section className="mx-auto max-w-7xl px-6 py-14">
-        <div className="grid gap-16 lg:grid-cols-2">
-          <ProductGallery product={product} />
-          <ProductInfo product={product} />
-        </div>
-      </section>
+          <section className="mx-auto max-w-7xl px-6 py-14">
+            <div className="grid gap-16 lg:grid-cols-2">
+              <ProductGallery product={product} />
+              <ProductInfo product={product} />
+            </div>
+          </section>
 
-      <section className="mx-auto max-w-7xl px-6">
-        <TrustBadges />
-      </section>
+          <section className="mx-auto max-w-7xl px-6">
+            <TrustBadges />
+          </section>
 
-      <section className="mx-auto max-w-7xl px-6">
-        <WhatsAppShare
-          productName={product.name}
-          productUrl={canonicalUrl}
-          price={product.price}
-        />
-      </section>
+          <section className="mx-auto max-w-7xl px-6">
+            <WhatsAppShare
+              productName={product.name}
+              productUrl={canonicalUrl}
+              price={product.price}
+            />
+          </section>
 
-      <section className="mx-auto max-w-7xl px-6">
-        <DeliveryCard />
-      </section>
+          <section className="mx-auto max-w-7xl px-6">
+            <DeliveryCard />
+          </section>
 
-      <section className="mx-auto max-w-7xl px-6 py-16">
-        <ProductAccordion product={product} />
-      </section>
+          <section className="mx-auto max-w-7xl px-6 py-16">
+            <ProductAccordion product={product} />
+          </section>
 
-      <section className="mx-auto max-w-7xl px-6">
-        <CompleteLook product={product} />
-      </section>
+          <section className="mx-auto max-w-7xl px-6">
+            <CompleteLook product={product} />
+          </section>
 
-      <section className="mx-auto max-w-7xl px-6 pb-24">
-        <RecentlyViewed />
-      </section>
-    </main>
+          <section className="mx-auto max-w-7xl px-6 pb-24">
+            <RecentlyViewed />
+          </section>
+        </main>
+      </div>
+      <Footer />
+    </>
   );
 }
