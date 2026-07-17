@@ -1,14 +1,42 @@
+"use client";
+
 import Link from "next/link";
+import { useState, useEffect } from "react";
 
 import ProductCard from "@/components/product/ProductCard";
-import { getFeaturedProducts } from "@/services/product.service";
+import { getNewArrivals, getFeaturedProducts } from "@/services/product.service";
 
-export default async function FeaturedProducts() {
-  const featuredProducts = (await getFeaturedProducts()).slice(0, 4);
+/* ---------------------------------------------------------------
+   TABS: New Collection | Best Sellers
+   - New Collection = getNewArrivals() (is_new = true, ordered by created_at desc)
+   - Best Sellers   = getFeaturedProducts() (is_featured = true)
+   - Both fall back gracefully with an empty state + link to /shop
+--------------------------------------------------------------- */
+
+type Tab = "new" | "featured";
+
+export default function FeaturedProducts() {
+  const [activeTab, setActiveTab] = useState<Tab>("new");
+  const [products, setProducts] = useState<Awaited<ReturnType<typeof getFeaturedProducts>>>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    setLoading(true);
+    const fetcher = activeTab === "new" ? getNewArrivals : getFeaturedProducts;
+    fetcher()
+      .then((data) => setProducts(data.slice(0, 4)))
+      .catch(() => setProducts([]))
+      .finally(() => setLoading(false));
+  }, [activeTab]);
+
+  const tabs: { key: Tab; label: string }[] = [
+    { key: "new", label: "New Collection" },
+    { key: "featured", label: "Best Sellers" },
+  ];
 
   return (
     <section
-      aria-label="The House Edit — featured products"
+      aria-label="Featured products"
       style={{
         backgroundColor: "var(--bc-surface-cream)",
         paddingBlock: "var(--bc-section-padding)",
@@ -22,11 +50,10 @@ export default async function FeaturedProducts() {
           paddingInline: "var(--bc-gutter)",
         }}
       >
-
-        {/* ── Editorial header — left-aligned ── */}
+        {/* ── Editorial header ── */}
         <div
           style={{
-            marginBottom: "var(--bc-space-16)",
+            marginBottom: "var(--bc-space-10)",
             borderBottom: "1px solid var(--bc-border-soft)",
             paddingBottom: "var(--bc-space-6)",
           }}
@@ -42,9 +69,8 @@ export default async function FeaturedProducts() {
               marginBottom: "var(--bc-space-3)",
             }}
           >
-            New Arrivals
+            The House Edit
           </p>
-
           <h2
             style={{
               fontFamily: "var(--font-playfair), serif",
@@ -56,9 +82,8 @@ export default async function FeaturedProducts() {
               marginBottom: "var(--bc-space-3)",
             }}
           >
-            The House Edit
+            {activeTab === "new" ? "New Collection" : "Best Sellers"}
           </h2>
-
           <p
             style={{
               fontFamily: "var(--font-inter), sans-serif",
@@ -68,16 +93,90 @@ export default async function FeaturedProducts() {
               maxWidth: "48ch",
             }}
           >
-            The finest of the season, considered and placed here.
+            {activeTab === "new"
+              ? "Fresh arrivals — the latest pieces from our newest collection."
+              : "The finest of the season, considered and placed here."}
           </p>
         </div>
 
-        {/* ── Product rail ── */}
-        {featuredProducts.length > 0 ? (
-          <div
-            className="grid gap-x-5 gap-y-16 sm:grid-cols-2 lg:grid-cols-4"
-          >
-            {featuredProducts.map((product, index) => (
+        {/* ── Tab strip ── */}
+        <div
+          role="tablist"
+          aria-label="Product collection tabs"
+          style={{
+            display: "flex",
+            gap: "var(--bc-space-2)",
+            marginBottom: "var(--bc-space-10)",
+          }}
+        >
+          {tabs.map(({ key, label }) => (
+            <button
+              key={key}
+              role="tab"
+              aria-selected={activeTab === key}
+              onClick={() => setActiveTab(key)}
+              style={{
+                fontFamily: "var(--font-inter), sans-serif",
+                fontSize: "var(--bc-text-xs)",
+                fontWeight: 500,
+                letterSpacing: "0.14em",
+                textTransform: "uppercase",
+                padding: "0.5rem 1.25rem",
+                borderRadius: "var(--bc-radius-full)",
+                border: activeTab === key
+                  ? "1px solid var(--bc-brand-mauve)"
+                  : "1px solid var(--bc-border-soft)",
+                backgroundColor: activeTab === key
+                  ? "var(--bc-brand-mauve)"
+                  : "transparent",
+                color: activeTab === key
+                  ? "#fff"
+                  : "var(--bc-text-muted)",
+                cursor: "pointer",
+                transition: "all 200ms ease",
+              }}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+
+        {/* ── Product grid ── */}
+        {loading ? (
+          <div className="grid gap-x-5 gap-y-16 sm:grid-cols-2 lg:grid-cols-4">
+            {Array.from({ length: 4 }).map((_, i) => (
+              <div key={i} className="animate-pulse">
+                <div
+                  style={{
+                    backgroundColor: "var(--bc-border-soft)",
+                    borderRadius: "var(--bc-radius-lg)",
+                    aspectRatio: "3/4",
+                    marginBottom: "var(--bc-space-4)",
+                  }}
+                />
+                <div
+                  style={{
+                    height: "1rem",
+                    width: "60%",
+                    backgroundColor: "var(--bc-border-soft)",
+                    borderRadius: "4px",
+                    marginBottom: "var(--bc-space-2)",
+                  }}
+                />
+                <div
+                  style={{
+                    height: "0.75rem",
+                    width: "35%",
+                    backgroundColor: "var(--bc-border-soft)",
+                    borderRadius: "4px",
+                  }}
+                />
+              </div>
+            ))}
+          </div>
+        ) : products.length > 0 ? (
+          <div className="grid gap-x-5 gap-y-16 sm:grid-cols-2 lg:grid-cols-4">
+            {products.map((product, index) => (
               <ProductCard
                 key={product.id}
                 product={product}
@@ -101,7 +200,9 @@ export default async function FeaturedProducts() {
                 marginBottom: "var(--bc-space-3)",
               }}
             >
-              The edit is being prepared.
+              {activeTab === "new"
+                ? "New arrivals are on their way."
+                : "The edit is being prepared."}
             </p>
             <p
               style={{
@@ -114,7 +215,7 @@ export default async function FeaturedProducts() {
               New pieces will appear here shortly.
             </p>
             <Link
-              href="/shop"
+              href={activeTab === "new" ? "/new-arrivals" : "/shop"}
               style={{
                 fontFamily: "var(--font-inter), sans-serif",
                 fontSize: "var(--bc-text-xs)",
@@ -142,7 +243,7 @@ export default async function FeaturedProducts() {
           }}
         >
           <Link
-            href="/shop"
+            href={activeTab === "new" ? "/new-arrivals" : "/shop"}
             style={{
               fontFamily: "var(--font-inter), sans-serif",
               fontSize: "var(--bc-text-xs)",
@@ -155,10 +256,9 @@ export default async function FeaturedProducts() {
               transition: "color var(--bc-transition-base)",
             }}
           >
-            View the full edit →
+            {activeTab === "new" ? "View all new arrivals →" : "View the full edit →"}
           </Link>
         </div>
-
       </div>
     </section>
   );
