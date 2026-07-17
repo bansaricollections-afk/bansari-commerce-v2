@@ -7,19 +7,11 @@ import Link from "next/link";
    INSTAGRAM GALLERY — LUXURY EDITORIAL v2
    Benchmark: Aza Fashions · Pernia's Pop-Up Shop social sections
 
-   Changes from v1
-   ───────────────
-   - rounded-3xl REMOVED → tiles are flush rectangles (no radius)
-   - group-hover:scale-110 REMOVED → scale(1.025) over 700ms ease-out
-   - Centered heading with tracking-[5px] + font-bold REMOVED
-   - Now: left-aligned eyebrow + editorial H2 at --bc-text-xl
-   - H2 copy: 'As Worn' — editorial, not descriptive
-   - Follow CTA: ghost pill with mauve border, no background flash
-   - All hardcoded gray/color values → --bc-* tokens
-   - Tiles: square aspect ratio preserved
-   - 3-col desktop / 2-col mobile grid preserved
-   - No radius on tile wrapper — matches zero-radius language of hero & category grid
+   Handle: @bansari_collections  (with underscore)
 ------------------------------------------------------------------ */
+
+const INSTAGRAM_URL = "https://instagram.com/bansari_collections";
+const INSTAGRAM_HANDLE = "@bansari_collections";
 
 const gallery = [
   { src: "/instagram/1.jpg", alt: "Bansari customer in saree — festive occasion" },
@@ -73,7 +65,7 @@ export default function InstagramGallery() {
                 marginBottom: "var(--bc-space-2)",
               }}
             >
-              @bansaricollections
+              {INSTAGRAM_HANDLE}
             </p>
             <h2
               style={{
@@ -91,7 +83,7 @@ export default function InstagramGallery() {
 
           {/* Follow link — desktop, inline with heading */}
           <Link
-            href="https://instagram.com/bansaricollections"
+            href={INSTAGRAM_URL}
             target="_blank"
             rel="noopener noreferrer"
             aria-label="Follow Bansari Collections on Instagram"
@@ -121,7 +113,7 @@ export default function InstagramGallery() {
         <div className="grid grid-cols-2 gap-px md:grid-cols-3">
           {gallery.map(({ src, alt }, index) => (
             <Link
-              href="https://instagram.com/bansaricollections"
+              href={INSTAGRAM_URL}
               target="_blank"
               rel="noopener noreferrer"
               key={index}

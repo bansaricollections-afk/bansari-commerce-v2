@@ -4,7 +4,7 @@ import Image from "next/image";
 import Link from "next/link";
 
 /* -----------------------------------------------------------------------
-   HERO — LUXURY EDITORIAL v2
+   HERO — LUXURY EDITORIAL v3
    Benchmark: 40% Massimo Dutti · 20% COS · 30% Aza Fashions · 10% Pernia's
 
    Desktop composition
@@ -18,13 +18,17 @@ import Link from "next/link";
    Mobile
    ─────────────────────────────────────────────────────────────────────
    Image first (full viewport width, 65vw tall) → text below.
-   No hero image cropping — object-position: center top preserves the face.
+   No hero image cropping — object-position: center center preserves drape.
 
-   Scroll cue
+   Image
    ─────────────────────────────────────────────────────────────────────
-   Animated downward chevron at viewport bottom-center. Reduced-motion safe.
-   Fades out after 4 s scroll using CSS animation (no JS scroll listener).
+   Premium ethnic fashion editorial. Rich crimson silk saree with gold zari.
+   Sourced from Unsplash (free to use commercially).
+   next.config must have images.remotePatterns allowing images.unsplash.com
 ----------------------------------------------------------------------- */
+
+const HERO_IMAGE =
+  "https://images.unsplash.com/photo-1610030469983-98e550d6193c?auto=format&fit=crop&w=1400&q=90";
 
 export default function Hero() {
   return (
@@ -94,8 +98,8 @@ export default function Hero() {
         {/* ── RIGHT: IMAGE ── */}
         <div className="bc-hero__image-wrap" aria-hidden="true">
           <Image
-            src="/hero/hero.png"
-            alt="Bansari Collections — curated ethnic wear"
+            src={HERO_IMAGE}
+            alt="Bansari Collections — premium ethnic saree in rich crimson and gold zari"
             fill
             priority
             sizes="(max-width: 768px) 100vw, 55vw"
@@ -139,7 +143,7 @@ export default function Hero() {
           flex-direction: column;
           justify-content: center;
           padding: clamp(3rem, 6vw, 6rem) clamp(1.5rem, 5vw, 5rem);
-          padding-top: clamp(5rem, 10vw, 8rem); /* clear nav */
+          padding-top: clamp(5rem, 10vw, 8rem);
           order: 2;
           max-width: 640px;
         }
@@ -161,13 +165,12 @@ export default function Hero() {
           .bc-hero__image-wrap {
             order: 2;
             min-height: 100svh;
-            /* Bleed to right viewport edge beyond the container */
             margin-right: calc(-1 * ((100vw - 100%) / 2));
           }
         }
         .bc-hero__image {
           object-fit: cover;
-          object-position: center top;
+          object-position: center center;
         }
         .bc-hero__image-gradient {
           position: absolute;
