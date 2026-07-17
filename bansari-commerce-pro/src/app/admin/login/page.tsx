@@ -1,45 +1,54 @@
-"use client";
+'use client';
 
-import { useState } from "react";
-import { useRouter } from "next/navigation";
-
-import { signInAdmin } from "@/services/auth.service";
+import { useState } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
+import { signInAdmin } from '@/services/auth.service';
 
 export default function AdminLoginPage() {
-  const router = useRouter();
+  const router       = useRouter();
+  const searchParams = useSearchParams();
 
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-
-  const [loading, setLoading] = useState(false);
-
-  const [error, setError] = useState("");
+  const [email,    setEmail]    = useState('');
+  const [password, setPassword] = useState('');
+  const [loading,  setLoading]  = useState(false);
+  const [error,    setError]    = useState(() => {
+    const e = searchParams.get('error');
+    if (e === 'not_admin') return 'Your account does not have administrator access.';
+    return '';
+  });
 
   async function handleLogin() {
-    setError("");
+    setError('');
 
     if (!email || !password) {
-      setError("Email and password are required.");
+      setError('Email and password are required.');
       return;
     }
 
     try {
       setLoading(true);
-
       await signInAdmin(email, password);
 
-      router.push("/admin");
+      // Preserve the originally requested admin page if provided.
+      const next = searchParams.get('next');
+      const destination =
+        next &&
+        next.startsWith('/admin') &&
+        !next.startsWith('/admin/login')
+          ? next
+          : '/admin';
+
+      router.push(destination);
       router.refresh();
     } catch (err) {
-      const message =
-        err instanceof Error
-          ? err.message
-          : "Unable to sign in.";
-
-      setError(message);
+      setError(err instanceof Error ? err.message : 'Unable to sign in.');
     } finally {
       setLoading(false);
     }
+  }
+
+  function handleKeyDown(e: React.KeyboardEvent) {
+    if (e.key === 'Enter') handleLogin();
   }
 
   return (
@@ -56,6 +65,7 @@ export default function AdminLoginPage() {
             autoComplete="email"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
+            onKeyDown={handleKeyDown}
             className="w-full rounded-xl border p-4 outline-none focus:border-[#8A5A6A]"
           />
 
@@ -65,11 +75,12 @@ export default function AdminLoginPage() {
             autoComplete="current-password"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
+            onKeyDown={handleKeyDown}
             className="w-full rounded-xl border p-4 outline-none focus:border-[#8A5A6A]"
           />
 
           {error && (
-            <p className="text-sm text-red-600">
+            <p role="alert" className="text-sm text-red-600">
               {error}
             </p>
           )}
@@ -80,7 +91,7 @@ export default function AdminLoginPage() {
             disabled={loading}
             className="w-full rounded-xl bg-[#8A5A6A] py-4 font-semibold text-white transition hover:bg-[#734757] disabled:cursor-not-allowed disabled:opacity-50"
           >
-            {loading ? "Signing In..." : "Sign In"}
+            {loading ? 'Signing In…' : 'Sign In'}
           </button>
         </div>
       </div>
