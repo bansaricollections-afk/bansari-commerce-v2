@@ -262,16 +262,18 @@ export async function POST(request: NextRequest) {
       line_total:   li.lineTotal,
     }));
 
-    // .overrideTypes<T>() is the correct API in @supabase/supabase-js v2.x when no
-    // generated Database type is wired to the client. It replaces the .returns<T>()
-    // approach and requires no generics on .rpc() itself.
+    // In @supabase/postgrest-js (ships with supabase-js v2.x), .overrideTypes<T>()
+    // returns PostgrestBuilder<T> — the base class — which does NOT expose .single().
+    // .single() lives on PostgrestTransformBuilder (the subclass returned by .rpc()).
+    // Correct chain: .rpc(...).single() first (still on TransformBuilder),
+    // then .overrideTypes<DbOrderRow>() on the resulting PostgrestBuilder.
     const { data: order, error: rpcErr } = await supabase
       .rpc(
         'create_order_with_items',
         { p_order: orderPayload, p_items: itemsPayload },
       )
-      .overrideTypes<DbOrderRow>()
-      .single();
+      .single()
+      .overrideTypes<DbOrderRow>();
 
     if (rpcErr) {
       if (rpcErr.code === '23505') {
