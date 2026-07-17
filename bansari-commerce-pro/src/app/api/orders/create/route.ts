@@ -262,12 +262,15 @@ export async function POST(request: NextRequest) {
       line_total:   li.lineTotal,
     }));
 
+    // .overrideTypes<T>() is the correct API in @supabase/supabase-js v2.x when no
+    // generated Database type is wired to the client. It replaces the .returns<T>()
+    // approach and requires no generics on .rpc() itself.
     const { data: order, error: rpcErr } = await supabase
-      .rpc<DbOrderRow>(
+      .rpc(
         'create_order_with_items',
         { p_order: orderPayload, p_items: itemsPayload },
       )
-      .returns<DbOrderRow>()
+      .overrideTypes<DbOrderRow>()
       .single();
 
     if (rpcErr) {
