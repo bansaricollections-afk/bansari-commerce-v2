@@ -6,13 +6,11 @@ import Header from '@/components/layout/Header';
 import Footer from '@/components/layout/Footer';
 
 import CompleteLook from '@/components/product/CompleteLook';
-import DeliveryCard from '@/components/product/DeliveryCard';
 import ProductAccordion from '@/components/product/ProductAccordion';
 import ProductGallery from '@/components/product/ProductGallery';
 import ProductInfo from '@/components/product/ProductInfo';
 import RecentlyViewed from '@/components/product/RecentlyViewed';
 import TrustBadges from '@/components/product/TrustBadges';
-import WhatsAppShare from '@/components/product/WhatsAppShare';
 
 export const dynamic = 'force-dynamic';
 
@@ -33,7 +31,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 
   const canonicalUrl = `${SITE_URL}/product/${id}`;
 
-   return {
+  return {
     title: `${product.seo_title || product.name} | Bansari Collections`,
     description:
       product.seo_description ||
@@ -182,6 +180,7 @@ export default async function ProductPage({ params }: Props) {
             dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbSchema) }}
           />
 
+          {/* ── Hero: images + purchase panel ── */}
           <section className="mx-auto max-w-7xl px-6 py-14">
             <div className="grid gap-16 lg:grid-cols-2">
               <ProductGallery product={product} />
@@ -189,30 +188,42 @@ export default async function ProductPage({ params }: Props) {
             </div>
           </section>
 
-          <section className="mx-auto max-w-7xl px-6">
-            <TrustBadges />
+          {/* ── Product Description ── prominent, full-width */}
+          <section
+            id="description"
+            className="mx-auto max-w-7xl px-6 py-12 border-t border-slate-100"
+          >
+            <h2 className="text-[11px] tracking-[0.25em] uppercase font-medium text-slate-400 mb-6">
+              Product Description
+            </h2>
+            {product.description ? (
+              <p className="text-base text-slate-700 leading-[1.85] max-w-3xl font-light">
+                {product.description}
+              </p>
+            ) : (
+              <p className="text-sm text-slate-400 italic">No description available.</p>
+            )}
           </section>
 
-          <section className="mx-auto max-w-7xl px-6">
-            <WhatsAppShare
-              productName={product.name}
-              productUrl={canonicalUrl}
-              price={product.price}
-            />
-          </section>
-
-          <section className="mx-auto max-w-7xl px-6">
-            <DeliveryCard />
-          </section>
-
-          <section className="mx-auto max-w-7xl px-6 py-16">
+          {/* ── Accordion: Product Details, Care, Size Guide, Shipping, Returns ── */}
+          <section className="mx-auto max-w-7xl px-6 pb-12">
             <ProductAccordion product={product} />
           </section>
 
+          {/* ── Single trust section ── */}
+          <section
+            aria-label="Why shop with us"
+            className="mx-auto max-w-7xl px-6 py-10 border-t border-slate-100"
+          >
+            <TrustBadges />
+          </section>
+
+          {/* ── Complete the look ── */}
           <section className="mx-auto max-w-7xl px-6">
             <CompleteLook product={product} />
           </section>
 
+          {/* ── Recently viewed ── */}
           <section className="mx-auto max-w-7xl px-6 pb-24">
             <RecentlyViewed />
           </section>

@@ -8,7 +8,9 @@ import type { Product } from '@/types/product';
 import ProductActions from './ProductActions';
 import ProductVariantSelector from './ProductVariantSelector';
 import QuantitySelector from './QuantitySelector';
-import TrustBadges from './TrustBadges';
+
+// TrustBadges intentionally NOT imported here.
+// The single trust section is rendered once in page.tsx, below the accordion.
 
 interface Props {
   product: Product;
@@ -62,7 +64,7 @@ export default function ProductInfo({ product }: Props) {
 
   return (
     <div className="flex flex-col gap-7">
-      {/* Breadcrumb */}
+      {/* ── Breadcrumb ── */}
       <nav aria-label="Breadcrumb">
         <ol className="flex items-center gap-1.5 text-[11px] tracking-[0.12em] uppercase text-slate-400">
           <li><Link href="/" className="hover:text-[#8A5A6A] transition-colors">Home</Link></li>
@@ -84,7 +86,7 @@ export default function ProductInfo({ product }: Props) {
         </ol>
       </nav>
 
-      {/* Collection & Title */}
+      {/* ── Collection label + Product name ── */}
       <div className="flex flex-col gap-2.5">
         {product.collection && (
           <p className="text-[11px] tracking-[0.2em] uppercase text-[#8A5A6A] font-medium">
@@ -99,7 +101,7 @@ export default function ProductInfo({ product }: Props) {
         )}
       </div>
 
-      {/* Price */}
+      {/* ── Price ── */}
       <div className="flex flex-col gap-1.5 pb-6 border-b border-slate-100">
         <div className="flex items-baseline gap-3">
           <span className="text-2xl font-light text-slate-900">
@@ -119,14 +121,8 @@ export default function ProductInfo({ product }: Props) {
         <p className="text-[11px] text-slate-400 tracking-wide">
           Inclusive of all taxes · Free shipping on all orders
         </p>
-        <div className="flex items-center gap-3 mt-1">
-          <span className="flex items-center gap-1.5 text-[11px] tracking-[0.08em] text-slate-500">
-            <svg className="w-3.5 h-3.5 text-green-600" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-            </svg>
-            Cash on Delivery
-          </span>
-          <span className="text-slate-200">|</span>
+        {/* Single inline trust pill — Free Returns only; COD removed */}
+        <div className="flex items-center gap-1.5 mt-1">
           <span className="flex items-center gap-1.5 text-[11px] tracking-[0.08em] text-slate-500">
             <svg className="w-3.5 h-3.5 text-green-600" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
@@ -136,13 +132,13 @@ export default function ProductInfo({ product }: Props) {
         </div>
       </div>
 
-      {/* Stock status */}
+      {/* ── Stock status ── */}
       {isOutOfStock && (
         <div className="flex items-center gap-2 text-sm text-slate-500 bg-slate-50 border border-slate-200 px-4 py-3 rounded-sm">
           <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z" />
           </svg>
-          This item is currently out of stock. Join the waitlist below.
+          This item is currently out of stock.
         </div>
       )}
       {isLowStock && !isOutOfStock && (
@@ -154,7 +150,7 @@ export default function ProductInfo({ product }: Props) {
         </div>
       )}
 
-      {/* Variant selector */}
+      {/* ── Size selector — immediately below price ── */}
       {product.variants && product.variants.length > 0 && (
         <ProductVariantSelector
           variants={product.variants}
@@ -163,7 +159,7 @@ export default function ProductInfo({ product }: Props) {
         />
       )}
 
-      {/* Quantity */}
+      {/* ── Quantity ── */}
       {!isOutOfStock && (
         <div className="flex flex-col gap-2">
           <label className="text-[11px] tracking-[0.15em] uppercase text-slate-500 font-medium">
@@ -177,10 +173,10 @@ export default function ProductInfo({ product }: Props) {
         </div>
       )}
 
-      {/* CTA actions */}
+      {/* ── CTAs: Add to Cart / Buy Now / WhatsApp ── */}
       <ProductActions product={product} quantity={quantity} selectedVariant={selectedVariant} />
 
-      {/* Product attributes */}
+      {/* ── Quick product attributes (fabric, occasion, fit, work, SKU) ── */}
       {specs && Object.keys(specs).some((k) => (specs as Record<string, unknown>)[k]) && (
         <div className="grid grid-cols-2 gap-x-6 gap-y-3 pt-6 border-t border-slate-100">
           {specs.fabric && (
@@ -221,9 +217,7 @@ export default function ProductInfo({ product }: Props) {
           )}
         </div>
       )}
-
-      {/* Trust badges */}
-      <TrustBadges />
+      {/* NO TrustBadges here — rendered once in page.tsx */}
     </div>
   );
 }

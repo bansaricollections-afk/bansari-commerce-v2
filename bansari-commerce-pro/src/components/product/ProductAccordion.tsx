@@ -63,29 +63,43 @@ function AccordionSection({
 }
 
 export default function ProductAccordion({ product }: Props) {
-  const [openId, setOpenId] = useState<string | null>('description');
+  // Description is now the prominent section in page.tsx.
+  // Accordion starts open on Product Details by default.
+  const [openId, setOpenId] = useState<string | null>('fabric');
   const specs = product.specifications;
 
   const toggle = (id: string) => setOpenId((prev) => (prev === id ? null : id));
 
   const items: AccordionItem[] = [
-    product.description
-      ? {
-          id: 'description',
-          label: 'Description',
-          content: <p>{product.description}</p>,
-        }
-      : null,
-    specs?.fabric || specs?.care
+    // ── Product Details (fabric, occasion, fit, work) ──────────────────────
+    (specs?.fabric || specs?.care || specs?.occasion || specs?.fit || specs?.work)
       ? {
           id: 'fabric',
-          label: 'Fabric & Care',
+          label: 'Product Details & Care',
           content: (
             <div className="space-y-3">
               {specs?.fabric && (
                 <div>
                   <span className="text-[10px] tracking-[0.15em] uppercase text-slate-400 block mb-1">Material</span>
                   <p>{specs.fabric}</p>
+                </div>
+              )}
+              {specs?.occasion && (
+                <div>
+                  <span className="text-[10px] tracking-[0.15em] uppercase text-slate-400 block mb-1">Occasion</span>
+                  <p>{specs.occasion}</p>
+                </div>
+              )}
+              {specs?.fit && (
+                <div>
+                  <span className="text-[10px] tracking-[0.15em] uppercase text-slate-400 block mb-1">Fit</span>
+                  <p>{specs.fit}</p>
+                </div>
+              )}
+              {specs?.work && (
+                <div>
+                  <span className="text-[10px] tracking-[0.15em] uppercase text-slate-400 block mb-1">Craftsmanship</span>
+                  <p>{specs.work}</p>
                 </div>
               )}
               {specs?.care && (
@@ -98,13 +112,8 @@ export default function ProductAccordion({ product }: Props) {
           ),
         }
       : null,
-    specs?.work
-      ? {
-          id: 'work',
-          label: 'Work & Craftsmanship',
-          content: <p>{specs.work}</p>,
-        }
-      : null,
+
+    // ── Size Guide ─────────────────────────────────────────────────────────
     {
       id: 'size',
       label: 'Size Guide',
@@ -134,6 +143,8 @@ export default function ProductAccordion({ product }: Props) {
         </div>
       ),
     },
+
+    // ── Shipping & Delivery — COD removed ──────────────────────────────────
     {
       id: 'shipping',
       label: 'Shipping & Delivery',
@@ -142,11 +153,12 @@ export default function ProductAccordion({ product }: Props) {
           <li className="flex items-start gap-2"><span className="text-green-600 mt-0.5">✓</span>Free shipping across India on all orders</li>
           <li className="flex items-start gap-2"><span className="text-green-600 mt-0.5">✓</span>Metro cities: 3–5 business days</li>
           <li className="flex items-start gap-2"><span className="text-green-600 mt-0.5">✓</span>Rest of India: 5–7 business days</li>
-          <li className="flex items-start gap-2"><span className="text-green-600 mt-0.5">✓</span>Cash on Delivery available nationwide</li>
           <li className="flex items-start gap-2"><span className="text-green-600 mt-0.5">✓</span>Tracking link sent via SMS and email</li>
         </ul>
       ),
     },
+
+    // ── Returns & Exchanges ─────────────────────────────────────────────────
     {
       id: 'returns',
       label: 'Returns & Exchanges',
