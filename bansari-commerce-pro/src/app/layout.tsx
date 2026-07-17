@@ -102,7 +102,7 @@ const organizationSchema = {
   },
   sameAs: [
     'https://www.instagram.com/bansari_collections',
-    'https://www.facebook.com/BansariCollection',
+    'https://www.facebook.com/BansariCollections',
     'https://www.pinterest.com/BansariCollections',
   ],
 };
@@ -137,7 +137,7 @@ const localBusinessSchema = {
   ],
   sameAs: [
     'https://www.instagram.com/bansari_collections',
-    'https://www.facebook.com/BansariCollection',
+    'https://www.facebook.com/BansariCollections',
     'https://www.pinterest.com/BansariCollections',
   ],
 };

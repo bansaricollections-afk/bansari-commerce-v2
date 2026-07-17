@@ -63,9 +63,9 @@ const nextConfig: NextConfig = {
               "script-src 'self' 'unsafe-inline' https://checkout.razorpay.com https://api.razorpay.com",
               "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
               "font-src 'self' https://fonts.gstatic.com",
-              // Supabase and Razorpay API calls
-              `connect-src 'self' https://*.supabase.co wss://*.supabase.co https://api.razorpay.com`,
-              // Images: Supabase storage + external CDNs
+              // Supabase, Razorpay and WhatsApp API calls
+              `connect-src 'self' https://*.supabase.co wss://*.supabase.co https://api.razorpay.com https://wa.me`,
+              // Images: Supabase storage + Unsplash + Shopify CDN
               "img-src 'self' data: blob: https://*.supabase.co https://images.unsplash.com https://cdn.shopify.com",
               // Razorpay payment iframe
               "frame-src https://api.razorpay.com https://checkout.razorpay.com",
