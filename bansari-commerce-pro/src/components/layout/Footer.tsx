@@ -102,7 +102,7 @@ export default function Footer() {
               <FaInstagram size={16} />
             </a>
             <a
-              href="https://facebook.com/BansariCollection"
+              href="https://facebook.com/BansariCollections"
               target="_blank"
               rel="noopener noreferrer"
               aria-label="Bansari Collections on Facebook"
