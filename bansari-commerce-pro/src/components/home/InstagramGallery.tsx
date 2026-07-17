@@ -4,14 +4,14 @@ import Image from "next/image";
 import Link from "next/link";
 
 /* ------------------------------------------------------------------
-   INSTAGRAM GALLERY — LUXURY EDITORIAL v3
+   INSTAGRAM GALLERY — LUXURY EDITORIAL v4
    Benchmark: Aza Fashions · Pernia's Pop-Up Shop social sections
 
    Handle: @bansari_collections  (with underscore)
 
    Images: Unsplash ethnic fashion (free commercial use)
-   Local /instagram/*.jpg files removed — replaced with Unsplash
-   so tiles always render in production and in preview.
+   unoptimized={true} — bypasses /_next/image optimizer to avoid
+   CORS/CSP issues in preview and staging environments.
 ------------------------------------------------------------------ */
 
 const INSTAGRAM_URL = "https://instagram.com/bansari_collections";
@@ -61,8 +61,7 @@ export default function InstagramGallery() {
           paddingInline: "var(--bc-gutter)",
         }}
       >
-
-        {/* ── Header: left-aligned, editorial ── */}
+        {/* ── Header ── */}
         <div
           style={{
             marginBottom: "var(--bc-space-10)",
@@ -103,7 +102,6 @@ export default function InstagramGallery() {
             </h2>
           </div>
 
-          {/* Follow link — desktop, inline with heading */}
           <Link
             href={INSTAGRAM_URL}
             target="_blank"
@@ -156,6 +154,7 @@ export default function InstagramGallery() {
                   src={src}
                   alt={alt}
                   fill
+                  unoptimized
                   sizes="(min-width: 768px) 33vw, 50vw"
                   className="object-cover"
                 />
@@ -163,7 +162,6 @@ export default function InstagramGallery() {
             </Link>
           ))}
         </div>
-
       </div>
 
       <style>{`
