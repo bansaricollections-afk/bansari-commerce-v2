@@ -166,6 +166,29 @@ export async function getProducts(): Promise<Product[]> {
 }
 
 // ---------------------------------------------------------------------------
+// getNewArrivals
+// ---------------------------------------------------------------------------
+
+/**
+ * Fetch active products where new_arrival = true, newest first.
+ * Used by the "New Collection" tab in FeaturedProducts home component
+ * (sliced to 4 by the caller).
+ */
+export async function getNewArrivals(): Promise<Product[]> {
+  const supabase = createServiceRoleClient();
+
+  const { data, error } = await supabase
+    .from('products')
+    .select(PRODUCT_SELECT)
+    .eq('active', true)
+    .eq('new_arrival', true)
+    .order('created_at', { ascending: false });
+
+  if (error) throw new Error(error.message);
+  return (data ?? []).map(mapRow);
+}
+
+// ---------------------------------------------------------------------------
 // getFeaturedProducts
 // ---------------------------------------------------------------------------
 
