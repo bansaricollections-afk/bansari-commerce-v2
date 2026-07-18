@@ -7,10 +7,10 @@
 import { NextRequest } from 'next/server';
 import { FulfillmentService } from '@/services/fulfillment.service';
 import { apiSuccess, apiError } from '@/lib/api-response';
-import { getRequestId } from '@/lib/request-id';
+import { generateRequestId } from '@/lib/request-id';
 
-export async function GET(req: NextRequest) {
-  const requestId = getRequestId(req);
+export async function GET(_req: NextRequest) {
+  const requestId = generateRequestId();
   try {
     const metrics = await FulfillmentService.getMetrics();
     return apiSuccess({ metrics });

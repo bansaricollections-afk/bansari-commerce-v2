@@ -4,7 +4,8 @@
  */
 import { type NextRequest, NextResponse } from 'next/server';
 import { requireAdminSession } from '@/lib/auth/requireAdmin';
-import { successResponse, errorResponse } from '@/lib/api-response';
+import { apiSuccess, apiError } from '@/lib/api-response';
+import { generateRequestId } from '@/lib/request-id';
 import { OrderV2Service } from '@/services/order-v2.service';
 import type { OrderV2SearchFilters } from '@/types/order-v2';
 
@@ -12,6 +13,7 @@ export async function GET(request: NextRequest) {
   const auth = await requireAdminSession(request);
   if (auth instanceof NextResponse) return auth;
 
+  const requestId = generateRequestId();
   try {
     const sp = request.nextUrl.searchParams;
     const filters: OrderV2SearchFilters = {
@@ -32,9 +34,9 @@ export async function GET(request: NextRequest) {
     };
 
     const result = await OrderV2Service.search(filters);
-    return successResponse(result);
+    return apiSuccess({ ...result });
   } catch (err) {
     const msg = err instanceof Error ? err.message : 'Internal server error';
-    return errorResponse(msg, 500);
+    return apiError(requestId, 'INTERNAL', msg, 500);
   }
 }

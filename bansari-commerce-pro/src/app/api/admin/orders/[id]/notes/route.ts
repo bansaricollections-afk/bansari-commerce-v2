@@ -13,7 +13,8 @@
  */
 import { type NextRequest, NextResponse } from 'next/server';
 import { requireAdminSession } from '@/lib/auth/requireAdmin';
-import { successResponse, errorResponse } from '@/lib/api-response';
+import { apiSuccess, apiError } from '@/lib/api-response';
+import { generateRequestId } from '@/lib/request-id';
 import { OrderV2Service } from '@/services/order-v2.service';
 import { OrderError } from '@/lib/order-errors';
 import type { UpdateOrderNotesPayload } from '@/types/order-v2';
@@ -24,23 +25,25 @@ export async function PATCH(request: NextRequest, { params }: Params) {
   const auth = await requireAdminSession(request);
   if (auth instanceof NextResponse) return auth;
 
+  const requestId = generateRequestId();
   const { id } = await params;
 
   let body: Partial<UpdateOrderNotesPayload>;
   try {
     body = (await request.json()) as Partial<UpdateOrderNotesPayload>;
   } catch {
-    return errorResponse('Invalid JSON body', 400);
+    return apiError(requestId, 'BAD_REQUEST', 'Invalid JSON body', 400);
   }
 
-  // At least one note field must be provided
   const hasAny =
     'internalNotes' in body ||
     'customerNotes' in body ||
     'packingNotes'  in body;
 
   if (!hasAny) {
-    return errorResponse(
+    return apiError(
+      requestId,
+      'BAD_REQUEST',
       'At least one of internalNotes, customerNotes, or packingNotes must be provided',
       400
     );
@@ -48,12 +51,11 @@ export async function PATCH(request: NextRequest, { params }: Params) {
 
   try {
     const order = await OrderV2Service.updateNotes(id, body as UpdateOrderNotesPayload);
-    return successResponse(order);
+    return apiSuccess({ order });
   } catch (err) {
-    if (err instanceof OrderError && err.code === 'NOT_FOUND') {
-      return errorResponse(err.message, 404);
-    }
+    if (err instanceof OrderError && err.code === 'NOT_FOUND')
+      return apiError(requestId, 'NOT_FOUND', err.message, 404);
     const msg = err instanceof Error ? err.message : 'Internal server error';
-    return errorResponse(msg, 500);
+    return apiError(requestId, 'INTERNAL', msg, 500);
   }
 }

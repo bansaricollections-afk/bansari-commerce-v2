@@ -6,13 +6,13 @@
 import { NextRequest } from 'next/server';
 import { FulfillmentService } from '@/services/fulfillment.service';
 import { apiSuccess, apiError } from '@/lib/api-response';
-import { getRequestId } from '@/lib/request-id';
+import { generateRequestId } from '@/lib/request-id';
 
 export async function GET(
   req: NextRequest,
   { params }: { params: Promise<{ orderId: string }> }
 ) {
-  const requestId = getRequestId(req);
+  const requestId = generateRequestId();
   try {
     const { orderId } = await params;
     const transactions = await FulfillmentService.getTransactionsForOrder(orderId);

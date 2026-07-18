@@ -7,16 +7,21 @@
 import { NextRequest } from 'next/server';
 import { FulfillmentService } from '@/services/fulfillment.service';
 import { apiSuccess, apiError } from '@/lib/api-response';
-import { getRequestId } from '@/lib/request-id';
+import { generateRequestId } from '@/lib/request-id';
 import type { InventoryMovementType } from '@/types/inventory-transaction';
 
 export async function POST(
   req: NextRequest,
   { params }: { params: Promise<{ variantId: string }> }
 ) {
-  const requestId = getRequestId(req);
+  const requestId = generateRequestId();
   try {
-    const { variantId } = await params;
+    const { variantId: variantIdStr } = await params;
+    const variantId = Number(variantIdStr);
+    if (!Number.isFinite(variantId) || variantId <= 0) {
+      return apiError(requestId, 'VALIDATION', 'variantId must be a positive integer', 400);
+    }
+
     const body = await req.json() as {
       quantity: number;
       movementType: InventoryMovementType;
