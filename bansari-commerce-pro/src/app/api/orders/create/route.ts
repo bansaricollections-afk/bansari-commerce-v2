@@ -278,7 +278,8 @@ export async function POST(request: NextRequest) {
       { p_order: orderPayload, p_items: itemsPayload },
     );
     const rpcErr = rpcResult.error;
-    const rows = rpcResult.data as unknown as DbOrderRow[] | null;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const rows = (rpcResult.data as any) as DbOrderRow[] | null;
 
     if (rpcErr) {
       if (rpcErr.code === '23505') {
