@@ -10,7 +10,7 @@ const log = createLogger({ service: 'admin.products.tags' });
 
 type RouteContext = { params: Promise<{ id: string }> };
 
-// ─── GET /api/admin/products/[id]/tags ───────────────────────────────────────
+// ─── GET /api/admin/products/[id]/tags ──────────────────────────────────────────
 export async function GET(request: NextRequest, context: RouteContext) {
   const requestId = generateRequestId();
   const auth = await requireAdminSession(request);
@@ -38,7 +38,7 @@ export async function GET(request: NextRequest, context: RouteContext) {
   }
 }
 
-// ─── POST /api/admin/products/[id]/tags ──────────────────────────────────────
+// ─── POST /api/admin/products/[id]/tags ─────────────────────────────────────────
 // Body: { tagIds: number[] }
 export async function POST(request: NextRequest, context: RouteContext) {
   const requestId = generateRequestId();
@@ -67,7 +67,8 @@ export async function POST(request: NextRequest, context: RouteContext) {
     return apiError(requestId, 'INVALID_FIELD', 'tagIds must contain valid positive integers', 400);
 
   try {
-    await ProductV2Service.attachTags(productId, validTagIds);
+    // addTag upserts one tag at a time; run in parallel
+    await Promise.all(validTagIds.map((tagId) => ProductV2Service.addTag(productId, tagId)));
 
     const sb = createServiceRoleClient();
     await sb.from('admin_audit_log').insert({
