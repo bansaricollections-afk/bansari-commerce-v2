@@ -20,11 +20,8 @@ import { LowStockProducts } from '@/components/admin/LowStockProducts';
 import { QuickActionCard } from '@/components/admin/QuickActionCard';
 import { RecentOrders } from '@/components/admin/RecentOrders';
 import { getProductionMetrics } from '@/lib/metrics';
-import { requireAdminPage } from '@/lib/auth/requireAdmin';
 
 export default async function AdminDashboardPage() {
-  await requireAdminPage();
-
   let metrics;
   try {
     metrics = await getProductionMetrics();

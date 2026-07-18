@@ -35,7 +35,7 @@ export default function OrderStatusSelect({
     startTransition(async () => {
       try {
         const response = await fetch(
-          "/api/admin/orders/status",
+          "/api/orders/status",
           {
             method: "POST",
             headers: {
