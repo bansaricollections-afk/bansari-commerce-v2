@@ -32,13 +32,13 @@ import type {
   FulfillmentStatus,
   ShipOrderPayload,
   CancelOrderPayload,
-  RefundPayload,
   ReturnPayload,
   ExchangePayload,
   AddTimelineNotePayload,
   UpdateOrderNotesPayload,
   GenerateDocumentPayload,
 } from '@/types/order-v2';
+import type { RefundPayload } from '@/types/order-v2-extensions';
 
 const log = createLogger({ service: 'order-v2.service' });
 
