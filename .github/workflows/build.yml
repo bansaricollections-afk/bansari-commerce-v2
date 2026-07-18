@@ -2,17 +2,22 @@
 # Bansari Commerce Pro — CI Build & Type Check
 # ============================================================
 #
-# Runs on every push and pull_request.
-# Exits non-zero immediately if any step fails.
+# Triggers: push and pull_request on every branch.
+# Fails immediately if any step exits non-zero.
 #
-# Secrets required (set in repo Settings → Secrets → Actions):
-#   NEXT_PUBLIC_SUPABASE_URL       — your Supabase project URL
-#   NEXT_PUBLIC_SUPABASE_ANON_KEY  — your Supabase anon key
-#   SUPABASE_SERVICE_ROLE_KEY      — your Supabase service-role key
+# Required repository secrets (Settings → Secrets → Actions):
+#   NEXT_PUBLIC_SUPABASE_URL       — Supabase project URL
+#   NEXT_PUBLIC_SUPABASE_ANON_KEY  — Supabase anon key
+#   SUPABASE_SERVICE_ROLE_KEY      — Supabase service-role key
 #
-# If secrets are not yet configured the workflow injects safe dummy
-# values so the Next.js compiler does not crash on missing env vars
-# (the app will still fail at *runtime* without real values).
+# Optional secrets (workflow still passes without them,
+# but the running app will behave incorrectly at runtime):
+#   NEXTAUTH_SECRET
+#   NEXTAUTH_URL
+#
+# The workflow does NOT inject placeholder values.
+# If a required secret is missing the env-guard step aborts
+# the run with a clear error message before any build starts.
 # ============================================================
 
 name: Build & Type Check
@@ -23,9 +28,17 @@ on:
   pull_request:
     branches: ['**']
 
+# ── Concurrency ────────────────────────────────────────────────
+# One run per branch at a time.
+# A new push cancels any in-progress run on the same ref so
+# runners are never wasted on superseded commits.
+concurrency:
+  group: build-${{ github.ref }}
+  cancel-in-progress: true
+
 defaults:
   run:
-    # All commands run inside the Next.js app sub-directory.
+    # All commands execute inside the Next.js sub-directory.
     working-directory: bansari-commerce-pro
 
 jobs:
@@ -33,9 +46,14 @@ jobs:
     name: Next.js build + tsc --noEmit
     runs-on: ubuntu-latest
 
+    # ── Hard wall-clock limit ──────────────────────────────────
+    # Kills the job if it runs longer than 15 minutes.
+    # Prevents runaway Turbopack workers from burning quota.
+    timeout-minutes: 15
+
     # ── Node version ───────────────────────────────────────────
     # No .nvmrc and no engines field in package.json.
-    # Node 22 is the current Active LTS as of 2025-10-29.
+    # Node 22 is the current Active LTS.
     strategy:
       matrix:
         node-version: ['22']
@@ -53,76 +71,101 @@ jobs:
           cache: 'npm'
           cache-dependency-path: bansari-commerce-pro/package-lock.json
 
-      # ── 3. Print versions ────────────────────────────────────
-      - name: Print tool versions
+      # ── 3. Guard: fail immediately if required secrets absent ─
+      #
+      # Placeholder values produce builds that compile but silently
+      # misbehave at runtime and mask real configuration errors.
+      # This step aborts with a descriptive error message before
+      # any npm install or build work is attempted.
+      - name: Verify required environment secrets
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
         run: |
-          echo "========================================="
-          echo "Node  : $(node --version)"
-          echo "npm   : $(npm --version)"
-          echo "Next.js: $(node -e "console.log(require('./node_modules/next/package.json').version)" 2>/dev/null || node -e "console.log(require('./package.json').dependencies.next)")"
-          echo "TypeScript: $(npx tsc --version)"
-          echo "========================================="
+          missing=()
+          [ -z "$NEXT_PUBLIC_SUPABASE_URL" ]      && missing+=("NEXT_PUBLIC_SUPABASE_URL")
+          [ -z "$NEXT_PUBLIC_SUPABASE_ANON_KEY" ] && missing+=("NEXT_PUBLIC_SUPABASE_ANON_KEY")
+          [ -z "$SUPABASE_SERVICE_ROLE_KEY" ]     && missing+=("SUPABASE_SERVICE_ROLE_KEY")
+
+          if [ ${#missing[@]} -gt 0 ]; then
+            echo "::error::Required secrets are not configured in this repository."
+            echo "::error::Missing: ${missing[*]}"
+            echo ""
+            echo "Add them at: Settings → Secrets and variables → Actions"
+            exit 1
+          fi
+
+          echo "✓ All required secrets are present."
 
       # ── 4. Install dependencies ──────────────────────────────
       - name: Install dependencies (npm ci)
         run: npm ci
 
-      # ── 5. Print installed Next.js + TS versions ─────────────
-      #    (run after install so node_modules exists)
+      # ── 5. Print installed versions ──────────────────────────
       - name: Print installed package versions
         run: |
           echo "========================================="
-          echo "Node      : $(node --version)"
-          echo "npm       : $(npm --version)"
-          echo "Next.js   : $(node -e "console.log(require('./node_modules/next/package.json').version)")"
-          echo "TypeScript: $(node -e "console.log(require('./node_modules/typescript/package.json').version)")"
+          echo "Node       : $(node --version)"
+          echo "npm        : $(npm --version)"
+          echo "Next.js    : $(node -e "console.log(require('./node_modules/next/package.json').version)")"
+          echo "TypeScript : $(node -e "console.log(require('./node_modules/typescript/package.json').version)")"
           echo "========================================="
 
-      # ── 6. npm run build ─────────────────────────────────────
+      # ── 6. Lint ──────────────────────────────────────────────
       #
-      # Next.js reads env vars at build time for anything referenced
-      # via process.env.NEXT_PUBLIC_* in Client Components.
-      # We supply the real secrets from repo Secrets when available,
-      # and fall back to safe placeholder strings so the compiler
-      # does not abort on a missing env check.
+      # Only runs when a "lint" script exists in package.json.
+      # Uses `jq` (pre-installed on ubuntu-latest) to check.
+      # Failures are surfaced as a distinct step so they are
+      # clearly separated from build and type errors in the log.
+      - name: Lint (npm run lint)
+        run: |
+          if jq -e '.scripts.lint' package.json > /dev/null 2>&1; then
+            echo "✓ lint script found — running npm run lint"
+            npm run lint
+          else
+            echo "⚠ No lint script in package.json — skipping."
+          fi
+
+      # ── 7. Build ─────────────────────────────────────────────
       #
       # NEXT_TELEMETRY_DISABLED=1  suppresses telemetry pings.
-      # CI=true                    makes Next.js treat warnings as
-      #                            errors (stricter gate).
+      # CI=true                    makes Next.js treat warnings
+      #                            as errors (stricter gate).
       - name: Build (npm run build)
         env:
           CI: 'true'
           NEXT_TELEMETRY_DISABLED: '1'
-          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL || 'https://placeholder.supabase.co' }}
-          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'placeholder-anon-key' }}
-          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY || 'placeholder-service-role-key' }}
-          NEXTAUTH_SECRET: ${{ secrets.NEXTAUTH_SECRET || 'placeholder-nextauth-secret-32chars-long' }}
-          NEXTAUTH_URL: ${{ secrets.NEXTAUTH_URL || 'http://localhost:3000' }}
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          NEXTAUTH_SECRET: ${{ secrets.NEXTAUTH_SECRET }}
+          NEXTAUTH_URL: ${{ secrets.NEXTAUTH_URL }}
         run: npm run build
 
-      # ── 7. Type check (npx tsc --noEmit) ─────────────────────
+      # ── 8. TypeScript type check ─────────────────────────────
       #
-      # Runs independently of the build so type errors are always
-      # surfaced even when Next.js build succeeds (Next.js 16 may
-      # defer some type errors via Turbopack incremental mode).
+      # Runs after build so Turbopack's incremental cache is warm,
+      # but independently so type errors always surface even when
+      # Next.js 16 defers them via Turbopack incremental mode.
       - name: TypeScript type check (npx tsc --noEmit)
         run: npx tsc --noEmit
 
-      # ── 8. Upload build output as artifact ───────────────────
+      # ── 9. Upload build artifacts (failure only) ─────────────
       #
-      # Uploads .next/ on BOTH success and failure so you can
-      # inspect Webpack/Turbopack output, trace files, and the
-      # build manifest for debugging.
-      - name: Upload build artifacts
-        if: always()
+      # Artifacts are uploaded ONLY when the job has failed.
+      # On green runs the artifact step is skipped entirely,
+      # saving storage quota and keeping the summary clean.
+      # On failure the .next/ directory and build.log are
+      # uploaded so the exact Turbopack trace and error output
+      # is available for offline inspection.
+      - name: Upload build artifacts (on failure)
+        if: failure()
         uses: actions/upload-artifact@v4
         with:
-          name: nextjs-build-${{ github.sha }}
+          name: nextjs-build-failure-${{ github.sha }}
           path: |
             bansari-commerce-pro/.next/
             bansari-commerce-pro/build.log
-          # Retain for 7 days (free tier limit)
           retention-days: 7
-          # Don't fail the workflow if .next/ was never created
-          # (e.g. the build itself failed before producing output)
           if-no-files-found: warn
