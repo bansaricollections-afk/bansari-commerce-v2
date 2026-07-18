@@ -9,48 +9,64 @@ import type { CreateProductV2Payload, ProductSearchFilters } from '@/types/produ
 
 const log = createLogger({ service: 'admin.products' });
 
-// ─── GET /api/admin/products ──────────────────────────────────────────────────
-// Query params:
-//   q, category, collection, featured, newArrival, bestSeller, active,
-//   minPrice, maxPrice, minStock, maxStock, tags,
-//   page (0-based), pageSize (default 20), sortBy, sortDir
-// ─────────────────────────────────────────────────────────────────────────────
+// ─── GET /api/admin/products ────────────────────────────────────────────────────
+// Query params (all optional):
+//   q          → filters.query
+//   categoryId → filters.categoryId
+//   categorySlug → filters.categorySlug
+//   collectionId → filters.collectionId
+//   collectionSlug → filters.collectionSlug
+//   featured, newArrival, bestSeller, active (booleans)
+//   tags       → comma-separated string slugs
+//   minPrice, maxPrice
+//   page (0-based), limit (default 20)
+//   orderBy    → created_at | display_order | price | name
+//   ascending  → true | false
+// ──────────────────────────────────────────────────────────────────
 export async function GET(request: NextRequest) {
   const requestId = generateRequestId();
   const auth = await requireAdminSession(request);
   if (auth instanceof NextResponse) return auth;
 
-  const { searchParams } = new URL(request.url);
+  const sp = new URL(request.url).searchParams;
 
   const filters: ProductSearchFilters = {};
-  if (searchParams.get('q'))            filters.query        = searchParams.get('q')!;
-  if (searchParams.get('category'))     filters.category     = searchParams.get('category')!;
-  if (searchParams.get('collection'))   filters.collection   = searchParams.get('collection')!;
-  if (searchParams.get('featured'))     filters.featured     = searchParams.get('featured') === 'true';
-  if (searchParams.get('newArrival'))   filters.newArrival   = searchParams.get('newArrival') === 'true';
-  if (searchParams.get('bestSeller'))   filters.bestSeller   = searchParams.get('bestSeller') === 'true';
-  if (searchParams.get('active') !== null && searchParams.get('active') !== '') {
-    filters.active = searchParams.get('active') === 'true';
+
+  if (sp.get('q'))              filters.query         = sp.get('q')!;
+  if (sp.get('categoryId'))     filters.categoryId    = Number(sp.get('categoryId'));
+  if (sp.get('categorySlug'))   filters.categorySlug  = sp.get('categorySlug')!;
+  if (sp.get('collectionId'))   filters.collectionId  = Number(sp.get('collectionId'));
+  if (sp.get('collectionSlug')) filters.collectionSlug = sp.get('collectionSlug')!;
+  if (sp.get('featured'))       filters.featured      = sp.get('featured') === 'true';
+  if (sp.get('newArrival'))     filters.newArrival    = sp.get('newArrival') === 'true';
+  if (sp.get('bestSeller'))     filters.bestSeller    = sp.get('bestSeller') === 'true';
+  if (sp.get('active') !== null && sp.get('active') !== '') {
+    filters.active = sp.get('active') === 'true';
   }
-  if (searchParams.get('minPrice'))     filters.minPrice     = Number(searchParams.get('minPrice'));
-  if (searchParams.get('maxPrice'))     filters.maxPrice     = Number(searchParams.get('maxPrice'));
-  if (searchParams.get('minStock'))     filters.minStock     = Number(searchParams.get('minStock'));
-  if (searchParams.get('maxStock'))     filters.maxStock     = Number(searchParams.get('maxStock'));
-  if (searchParams.get('tags'))         filters.tags         = searchParams.get('tags')!.split(',').map((t) => t.trim()).filter(Boolean);
+  if (sp.get('minPrice'))       filters.minPrice      = Number(sp.get('minPrice'));
+  if (sp.get('maxPrice'))       filters.maxPrice      = Number(sp.get('maxPrice'));
+  if (sp.get('tags'))           filters.tags          = sp.get('tags')!.split(',').map((t) => t.trim()).filter(Boolean);
 
-  const page     = Math.max(0, Number(searchParams.get('page') ?? 0));
-  const pageSize = Math.min(100, Math.max(1, Number(searchParams.get('pageSize') ?? 20)));
-  filters.page     = page;
-  filters.pageSize = pageSize;
+  const page  = Math.max(0, Number(sp.get('page')  ?? 0));
+  const limit = Math.min(100, Math.max(1, Number(sp.get('limit') ?? sp.get('pageSize') ?? 20)));
+  filters.page  = page;
+  filters.limit = limit;
 
-  const sortBy  = (searchParams.get('sortBy')  ?? 'created_at') as ProductSearchFilters['sortBy'];
-  const sortDir = (searchParams.get('sortDir') ?? 'desc')       as ProductSearchFilters['sortDir'];
-  filters.sortBy  = sortBy;
-  filters.sortDir = sortDir;
+  const orderBy = sp.get('orderBy') as ProductSearchFilters['orderBy'] | null;
+  if (orderBy) filters.orderBy = orderBy;
+
+  if (sp.get('ascending') !== null && sp.get('ascending') !== '') {
+    filters.ascending = sp.get('ascending') === 'true';
+  }
+
+  // sortDir=desc/asc convenience alias
+  if (!filters.ascending && sp.get('sortDir')) {
+    filters.ascending = sp.get('sortDir') === 'asc';
+  }
 
   try {
     const result = await ProductV2Service.search(filters);
-    log.info('admin.products.list.ok', { page, pageSize, total: result.total, requestId });
+    log.info('admin.products.list.ok', { page, limit, total: result.total, requestId });
     return NextResponse.json({ success: true, requestId, ...result });
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Unknown error';
@@ -59,7 +75,7 @@ export async function GET(request: NextRequest) {
   }
 }
 
-// ─── POST /api/admin/products ─────────────────────────────────────────────────
+// ─── POST /api/admin/products ────────────────────────────────────────────────────
 export async function POST(request: NextRequest) {
   const requestId = generateRequestId();
   const auth = await requireAdminSession(request);
@@ -76,11 +92,9 @@ export async function POST(request: NextRequest) {
   try {
     const payload = body as CreateProductV2Payload;
     payload.created_by = userId;
-    payload.updated_by = userId;
 
     const product = await ProductV2Service.create(payload);
 
-    // Admin audit log
     const sb = createServiceRoleClient();
     await sb.from('admin_audit_log').insert({
       action: 'product_create',
