@@ -1,0 +1,128 @@
+# ============================================================
+# Bansari Commerce Pro — CI Build & Type Check
+# ============================================================
+#
+# Runs on every push and pull_request.
+# Exits non-zero immediately if any step fails.
+#
+# Secrets required (set in repo Settings → Secrets → Actions):
+#   NEXT_PUBLIC_SUPABASE_URL       — your Supabase project URL
+#   NEXT_PUBLIC_SUPABASE_ANON_KEY  — your Supabase anon key
+#   SUPABASE_SERVICE_ROLE_KEY      — your Supabase service-role key
+#
+# If secrets are not yet configured the workflow injects safe dummy
+# values so the Next.js compiler does not crash on missing env vars
+# (the app will still fail at *runtime* without real values).
+# ============================================================
+
+name: Build & Type Check
+
+on:
+  push:
+    branches: ['**']
+  pull_request:
+    branches: ['**']
+
+defaults:
+  run:
+    # All commands run inside the Next.js app sub-directory.
+    working-directory: bansari-commerce-pro
+
+jobs:
+  build:
+    name: Next.js build + tsc --noEmit
+    runs-on: ubuntu-latest
+
+    # ── Node version ───────────────────────────────────────────
+    # No .nvmrc and no engines field in package.json.
+    # Node 22 is the current Active LTS as of 2025-10-29.
+    strategy:
+      matrix:
+        node-version: ['22']
+
+    steps:
+      # ── 1. Checkout ──────────────────────────────────────────
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # ── 2. Setup Node ────────────────────────────────────────
+      - name: Setup Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: 'npm'
+          cache-dependency-path: bansari-commerce-pro/package-lock.json
+
+      # ── 3. Print versions ────────────────────────────────────
+      - name: Print tool versions
+        run: |
+          echo "========================================="
+          echo "Node  : $(node --version)"
+          echo "npm   : $(npm --version)"
+          echo "Next.js: $(node -e "console.log(require('./node_modules/next/package.json').version)" 2>/dev/null || node -e "console.log(require('./package.json').dependencies.next)")"
+          echo "TypeScript: $(npx tsc --version)"
+          echo "========================================="
+
+      # ── 4. Install dependencies ──────────────────────────────
+      - name: Install dependencies (npm ci)
+        run: npm ci
+
+      # ── 5. Print installed Next.js + TS versions ─────────────
+      #    (run after install so node_modules exists)
+      - name: Print installed package versions
+        run: |
+          echo "========================================="
+          echo "Node      : $(node --version)"
+          echo "npm       : $(npm --version)"
+          echo "Next.js   : $(node -e "console.log(require('./node_modules/next/package.json').version)")"
+          echo "TypeScript: $(node -e "console.log(require('./node_modules/typescript/package.json').version)")"
+          echo "========================================="
+
+      # ── 6. npm run build ─────────────────────────────────────
+      #
+      # Next.js reads env vars at build time for anything referenced
+      # via process.env.NEXT_PUBLIC_* in Client Components.
+      # We supply the real secrets from repo Secrets when available,
+      # and fall back to safe placeholder strings so the compiler
+      # does not abort on a missing env check.
+      #
+      # NEXT_TELEMETRY_DISABLED=1  suppresses telemetry pings.
+      # CI=true                    makes Next.js treat warnings as
+      #                            errors (stricter gate).
+      - name: Build (npm run build)
+        env:
+          CI: 'true'
+          NEXT_TELEMETRY_DISABLED: '1'
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL || 'https://placeholder.supabase.co' }}
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'placeholder-anon-key' }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY || 'placeholder-service-role-key' }}
+          NEXTAUTH_SECRET: ${{ secrets.NEXTAUTH_SECRET || 'placeholder-nextauth-secret-32chars-long' }}
+          NEXTAUTH_URL: ${{ secrets.NEXTAUTH_URL || 'http://localhost:3000' }}
+        run: npm run build
+
+      # ── 7. Type check (npx tsc --noEmit) ─────────────────────
+      #
+      # Runs independently of the build so type errors are always
+      # surfaced even when Next.js build succeeds (Next.js 16 may
+      # defer some type errors via Turbopack incremental mode).
+      - name: TypeScript type check (npx tsc --noEmit)
+        run: npx tsc --noEmit
+
+      # ── 8. Upload build output as artifact ───────────────────
+      #
+      # Uploads .next/ on BOTH success and failure so you can
+      # inspect Webpack/Turbopack output, trace files, and the
+      # build manifest for debugging.
+      - name: Upload build artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: nextjs-build-${{ github.sha }}
+          path: |
+            bansari-commerce-pro/.next/
+            bansari-commerce-pro/build.log
+          # Retain for 7 days (free tier limit)
+          retention-days: 7
+          # Don't fail the workflow if .next/ was never created
+          # (e.g. the build itself failed before producing output)
+          if-no-files-found: warn
