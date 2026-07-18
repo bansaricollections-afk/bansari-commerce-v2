@@ -197,7 +197,7 @@ async function assembleProduct(
 ): Promise<ProductV2> {
   const sb = createServiceRoleClient();
 
-  const attributeMap: MapProductV2Options['attributeMap'] = options.withAttributes
+  const attributeMap: MapProductV2Options['attributeMap'] | undefined = options.withAttributes
     ? await fetchAttributeMap(row)
     : undefined;
 
