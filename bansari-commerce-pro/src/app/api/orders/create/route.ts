@@ -19,9 +19,11 @@ const log = createLogger({ service: 'orders.create' });
  *
  * NOTE: create_order_with_items is a RETURNS TABLE (SETOF) Postgres function.
  * In @supabase/postgrest-js 2.110.x, .rpc() for a SETOF function types the
- * result as an array. Use .overrideTypes<DbOrderRow[]>() (array generic) and
- * extract rows[0]. Do NOT use .single() (absent on PostgrestBuilder) and do
- * NOT use overrideTypes<DbOrderRow> (produces the type-mismatch sentinel union).
+ * result as an array. Use .overrideTypes<DbOrderRow[], { merge: false }>()
+ * so the inferred type is completely replaced (no sentinel union). Do NOT use
+ * .single() (absent on PostgrestBuilder) and do NOT use overrideTypes<DbOrderRow>
+ * or overrideTypes<DbOrderRow[]> without { merge: false } (both produce the
+ * type-mismatch sentinel union that breaks rows[0] indexing).
  */
 interface DbOrderRow {
   id: string;
@@ -268,16 +270,14 @@ export async function POST(request: NextRequest) {
     }));
 
     // create_order_with_items is RETURNS TABLE (SETOF), so postgrest-js 2.110.x
-    // types the result as an array. Use overrideTypes<DbOrderRow[]>() (array
-    // generic) and extract rows[0]. Do NOT use .single() — it is not on
-    // PostgrestBuilder — and do NOT use overrideTypes<DbOrderRow> (produces
-    // the type-mismatch sentinel union that broke this build).
+    // types the result as an array. { merge: false } fully replaces the inferred
+    // type with DbOrderRow[] — no sentinel union, rows[0] is valid.
     const { data: rows, error: rpcErr } = await supabase
       .rpc(
         'create_order_with_items',
         { p_order: orderPayload, p_items: itemsPayload },
       )
-      .overrideTypes<DbOrderRow[]>();
+      .overrideTypes<DbOrderRow[], { merge: false }>();
 
     if (rpcErr) {
       if (rpcErr.code === '23505') {
