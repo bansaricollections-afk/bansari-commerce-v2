@@ -54,12 +54,12 @@ import { cn } from "@/lib/utils";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
-const PRODUCTS_TABLE = "products";
 const PRODUCT_IMAGES_BUCKET = "product-images";
 const PAGE_SIZE = 12;
 const LOW_STOCK_THRESHOLD = 5;
 const MAX_FILE_SIZE_BYTES = 5 * 1024 * 1024;
 const ALLOWED_MIME_TYPES = ["image/jpeg", "image/png", "image/webp", "image/gif"];
+const SEARCH_DEBOUNCE_MS = 350;
 
 // ─── Schemas ──────────────────────────────────────────────────────────────────
 
@@ -102,7 +102,6 @@ const productFormSchema = z.object({
 
 type ProductImage = z.infer<typeof imageSchema>;
 type ValidProductForm = z.infer<typeof productFormSchema>;
-type DbProductRecord = Record<string, unknown>;
 
 type Product = {
   id: number;
@@ -159,17 +158,92 @@ type ProductFormState = {
   images: ProductImage[];
 };
 
+type ApiProductPayload = {
+  name: string;
+  sku: string;
+  slug: string;
+  category: string;
+  collection: string;
+  brand: string;
+  fabric: string;
+  color: string;
+  sizes: string[];
+  price: number;
+  compare_price?: number | null;
+  cost?: number | null;
+  stock: number;
+  hsn: string;
+  gst: number;
+  description: string;
+  seo_title: string;
+  seo_description: string;
+  featured: boolean;
+  new_arrival: boolean;
+  best_seller: boolean;
+  active: boolean;
+  images: ProductImage[];
+};
+
 type FieldErrors = Partial<Record<keyof ProductFormState, string>>;
 type ToggleFieldId = keyof Pick<ProductFormState, "featured" | "newArrival" | "bestSeller" | "active">;
+
+// ─── API response shapes ───────────────────────────────────────────────────────
+
+type ApiProductRecord = {
+  id: number;
+  name: string;
+  sku: string;
+  slug: string;
+  category: string;
+  collection: string;
+  brand?: string;
+  fabric?: string;
+  color?: string;
+  sizes?: string[] | string;
+  price: number;
+  compare_price?: number | null;
+  cost?: number | null;
+  stock: number;
+  hsn?: string;
+  gst?: number;
+  description?: string;
+  seo_title?: string;
+  seo_description?: string;
+  featured?: boolean;
+  new_arrival?: boolean;
+  best_seller?: boolean;
+  active?: boolean;
+  images?: unknown;
+  created_at?: string;
+  updated_at?: string;
+};
+
+type ApiListResponse = {
+  success: boolean;
+  data: ApiProductRecord[];
+  total: number;
+  page: number;
+  pageSize: number;
+};
+
+type ApiSingleResponse = {
+  success: boolean;
+  data: ApiProductRecord;
+};
+
+type ApiErrorResponse = {
+  success: false;
+  error: { code: string; message: string };
+};
 
 // ─── Wizard steps ─────────────────────────────────────────────────────────────
 
 const STEPS = [
-  { id: 0, label: "Media",      short: "Media",    icon: Camera,      fields: [] as (keyof ProductFormState)[] },
-  { id: 1, label: "Basic Info", short: "Info",     icon: Tag,         fields: ["name","slug","sku","category","collection","brand","fabric","color","sizes"] as (keyof ProductFormState)[] },
-  { id: 2, label: "Pricing",    short: "Price",    icon: DollarSign,  fields: ["price","stock","hsn"] as (keyof ProductFormState)[] },
-  { id: 3, label: "Content",    short: "Content",  icon: FileText,    fields: ["description","seoTitle","seoDescription"] as (keyof ProductFormState)[] },
-  { id: 4, label: "Visibility", short: "Publish",  icon: Settings2,   fields: [] as (keyof ProductFormState)[] },
+  { id: 0, label: "Media",      short: "Media",   icon: Camera,     fields: [] as (keyof ProductFormState)[] },
+  { id: 1, label: "Basic Info", short: "Info",    icon: Tag,        fields: ["name","slug","sku","category","collection","brand","fabric","color","sizes"] as (keyof ProductFormState)[] },
+  { id: 2, label: "Pricing",    short: "Price",   icon: DollarSign, fields: ["price","stock","hsn"] as (keyof ProductFormState)[] },
+  { id: 3, label: "Content",    short: "Content", icon: FileText,   fields: ["description","seoTitle","seoDescription"] as (keyof ProductFormState)[] },
+  { id: 4, label: "Visibility", short: "Publish", icon: Settings2,  fields: [] as (keyof ProductFormState)[] },
 ] as const;
 
 // ─── Defaults ─────────────────────────────────────────────────────────────────
@@ -210,36 +284,13 @@ function generateSku(category: string, name: string) {
   return `BC-${categoryCode}-${nameCode}-${Date.now().toString().slice(-6)}`;
 }
 
-function getString(row: DbProductRecord, key: string, fallback = "") {
-  const value = row[key];
-  if (typeof value === "string") return value;
-  if (typeof value === "number" || typeof value === "boolean") return String(value);
-  return fallback;
-}
-function getNumber(row: DbProductRecord, key: string, fallback = 0) {
-  const value = row[key];
-  if (typeof value === "number" && Number.isFinite(value)) return value;
-  if (typeof value === "string") { const p = Number(value); return Number.isFinite(p) ? p : fallback; }
-  return fallback;
-}
-function getOptionalNumber(row: DbProductRecord, key: string) {
-  const value = row[key];
-  if (value === null || value === undefined || value === "") return undefined;
-  const parsed = Number(value);
-  return Number.isFinite(parsed) ? parsed : undefined;
-}
-function getBoolean(row: DbProductRecord, key: string, fallback = false) {
-  const value = row[key];
-  if (typeof value === "boolean") return value;
-  if (typeof value === "string") return value === "true";
-  return fallback;
-}
-function parseSizes(value: unknown) {
+function parseSizes(value: unknown): string[] {
   if (Array.isArray(value)) return value.filter((i): i is string => typeof i === "string").filter(Boolean);
   if (typeof value === "string") return value.split(",").map((i) => i.trim()).filter(Boolean);
   return [];
 }
-function parseImages(value: unknown) {
+
+function parseImages(value: unknown): ProductImage[] {
   if (!Array.isArray(value)) return [];
   return value.flatMap((item) => {
     if (!item || typeof item !== "object") return [];
@@ -249,48 +300,70 @@ function parseImages(value: unknown) {
     return [{ url, alt: typeof alt === "string" && alt ? alt : "Product image" }];
   });
 }
-function mapProduct(row: DbProductRecord): Product {
+
+function mapApiProduct(row: ApiProductRecord): Product {
   return {
-    id: getNumber(row, "id"), name: getString(row, "name"), sku: getString(row, "sku"),
-    slug: getString(row, "slug"), category: getString(row, "category"),
-    collection: getString(row, "collection"), brand: getString(row, "brand", "Bansari Collections"),
-    fabric: getString(row, "fabric"), color: getString(row, "color"),
-    sizes: parseSizes(row.sizes), price: getNumber(row, "price"),
-    comparePrice: getOptionalNumber(row, "compare_price"), cost: getOptionalNumber(row, "cost"),
-    stock: getNumber(row, "stock"), hsn: getString(row, "hsn"), gst: getNumber(row, "gst", 5),
-    description: getString(row, "description"), seoTitle: getString(row, "seo_title"),
-    seoDescription: getString(row, "seo_description"), featured: getBoolean(row, "featured"),
-    newArrival: getBoolean(row, "new_arrival"), bestSeller: getBoolean(row, "best_seller"),
-    active: getBoolean(row, "active", true), images: parseImages(row.images),
-    createdAt: getString(row, "created_at", undefined), updatedAt: getString(row, "updated_at", undefined),
+    id: row.id,
+    name: row.name ?? "",
+    sku: row.sku ?? "",
+    slug: row.slug ?? "",
+    category: row.category ?? "",
+    collection: row.collection ?? "",
+    brand: row.brand ?? "Bansari Collections",
+    fabric: row.fabric ?? "",
+    color: row.color ?? "",
+    sizes: parseSizes(row.sizes),
+    price: row.price ?? 0,
+    comparePrice: row.compare_price ?? undefined,
+    cost: row.cost ?? undefined,
+    stock: row.stock ?? 0,
+    hsn: row.hsn ?? "",
+    gst: row.gst ?? 5,
+    description: row.description ?? "",
+    seoTitle: row.seo_title ?? "",
+    seoDescription: row.seo_description ?? "",
+    featured: row.featured ?? false,
+    newArrival: row.new_arrival ?? false,
+    bestSeller: row.best_seller ?? false,
+    active: row.active ?? true,
+    images: parseImages(row.images),
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
   };
 }
+
 function productToForm(product: Product): ProductFormState {
   return {
     name: product.name, sku: product.sku, slug: product.slug,
     category: product.category, collection: product.collection, brand: product.brand,
     fabric: product.fabric, color: product.color, sizes: product.sizes.join(", "),
-    price: String(product.price), comparePrice: product.comparePrice ? String(product.comparePrice) : "",
-    cost: product.cost ? String(product.cost) : "", stock: String(product.stock),
+    price: String(product.price),
+    comparePrice: product.comparePrice != null ? String(product.comparePrice) : "",
+    cost: product.cost != null ? String(product.cost) : "",
+    stock: String(product.stock),
     hsn: product.hsn, gst: String(product.gst), description: product.description,
     seoTitle: product.seoTitle, seoDescription: product.seoDescription,
     featured: product.featured, newArrival: product.newArrival,
     bestSeller: product.bestSeller, active: product.active, images: product.images,
   };
 }
-function toPayload(product: ValidProductForm): DbProductRecord {
+
+function toApiPayload(data: ValidProductForm): ApiProductPayload {
   return {
-    name: product.name, sku: product.sku, slug: product.slug,
-    category: product.category, collection: product.collection, brand: product.brand,
-    fabric: product.fabric, color: product.color, sizes: product.sizes,
-    price: product.price, compare_price: product.comparePrice ?? null,
-    cost: product.cost ?? null, stock: product.stock, hsn: product.hsn,
-    gst: product.gst, description: product.description, seo_title: product.seoTitle,
-    seo_description: product.seoDescription, featured: product.featured,
-    new_arrival: product.newArrival, best_seller: product.bestSeller,
-    active: product.active, images: product.images, updated_at: new Date().toISOString(),
+    name: data.name, sku: data.sku, slug: data.slug,
+    category: data.category, collection: data.collection, brand: data.brand,
+    fabric: data.fabric, color: data.color, sizes: data.sizes,
+    price: data.price,
+    compare_price: data.comparePrice ?? null,
+    cost: data.cost ?? null,
+    stock: data.stock, hsn: data.hsn, gst: data.gst,
+    description: data.description, seo_title: data.seoTitle,
+    seo_description: data.seoDescription, featured: data.featured,
+    new_arrival: data.newArrival, best_seller: data.bestSeller,
+    active: data.active, images: data.images,
   };
 }
+
 function prepareForm(form: ProductFormState) {
   return productFormSchema.safeParse({
     ...form,
@@ -299,9 +372,11 @@ function prepareForm(form: ProductFormState) {
     cost: form.cost ? Number(form.cost) : undefined,
   });
 }
+
 function formatCurrency(value: number) {
   return new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR", maximumFractionDigits: 0 }).format(value);
 }
+
 function computeCompleteness(form: ProductFormState): number {
   const filled = REQUIRED_FIELDS.filter((key) => {
     const val = form[key];
@@ -311,6 +386,36 @@ function computeCompleteness(form: ProductFormState): number {
   }).length;
   const imageBonus = form.images.length > 0 ? 1 : 0;
   return Math.round(((filled + imageBonus) / (REQUIRED_FIELDS.length + 1)) * 100);
+}
+
+// ─── API helpers ───────────────────────────────────────────────────────────────
+
+function getErrorMessage(body: ApiErrorResponse): string {
+  return body?.error?.message ?? "An unexpected error occurred.";
+}
+
+const STATUS_MESSAGES: Record<number, string> = {
+  400: "Bad request — check your input.",
+  401: "Not authenticated. Please log in again.",
+  403: "You don't have permission to do that.",
+  404: "Product not found.",
+  409: "A product with this SKU or slug already exists.",
+  422: "Validation failed — check all required fields.",
+  500: "Server error — please try again.",
+};
+
+async function apiFetch<T>(
+  url: string,
+  options?: RequestInit,
+  signal?: AbortSignal,
+): Promise<T> {
+  const res = await fetch(url, { ...options, signal, headers: { "Content-Type": "application/json", ...options?.headers } });
+  const json = (await res.json()) as T | ApiErrorResponse;
+  if (!res.ok) {
+    const errBody = json as ApiErrorResponse;
+    throw new Error(getErrorMessage(errBody) || STATUS_MESSAGES[res.status] || `HTTP ${res.status}`);
+  }
+  return json as T;
 }
 
 // ─── Design primitives ────────────────────────────────────────────────────────
@@ -557,6 +662,7 @@ function StepMedia({ form, fieldErrors, uploading, dragOver, fileInputRef, onDra
   onClick: () => void; onKeyDown: (e: React.KeyboardEvent) => void;
   onRemove: (url: string) => void;
 }) {
+  void fieldErrors;
   return (
     <div className="space-y-5">
       <div>
@@ -863,7 +969,7 @@ function StepVisibility({ form, onToggle }: {
   );
 }
 
-// ─── Wizard Form Shell ────────────────────────────────────────────────────────
+// ─── Wizard Step Bar ──────────────────────────────────────────────────────────
 
 function WizardStepBar({ step, maxStep, onStep }: { step: number; maxStep: number; onStep: (s: number) => void }) {
   return (
@@ -897,18 +1003,23 @@ function WizardStepBar({ step, maxStep, onStep }: { step: number; maxStep: numbe
 // ─── Main Component ───────────────────────────────────────────────────────────
 
 export default function ProductManagement() {
+  // Supabase client — only used for Storage (image upload). No DB calls.
   const supabase = createClient();
 
-  // list state
+  // ── Product list state ────────────────────────────────────────────────────────
   const [products, setProducts] = useState<Product[]>([]);
+  const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(0);
-  const [hasMore, setHasMore] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
   const [filterCategory, setFilterCategory] = useState("");
   const [filterStatus, setFilterStatus] = useState("");
 
-  // sheet
+  // ── Catalog state (categories derived from products) ──────────────────────────
+  const [catalogCategories, setCatalogCategories] = useState<string[]>([]);
+
+  // ── Sheet state ───────────────────────────────────────────────────────────────
   const [sheetOpen, setSheetOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [form, setForm] = useState<ProductFormState>(emptyForm);
@@ -920,61 +1031,79 @@ export default function ProductManagement() {
   const [dragOver, setDragOver] = useState(false);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
-  // view dialog
+  // ── Dialog state ──────────────────────────────────────────────────────────────
   const [viewProduct, setViewProduct] = useState<Product | null>(null);
-
-  // delete dialog
   const [deleteProduct, setDeleteProduct] = useState<Product | null>(null);
   const [deleting, setDeleting] = useState(false);
 
-  // ── Load products ────────────────────────────────────────────────────────────
+  // ── Abort controller ref for stale-request cancellation ───────────────────────
+  const listAbortRef = useRef<AbortController | null>(null);
 
+  // ── Debounce search ───────────────────────────────────────────────────────────
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedSearch(searchQuery), SEARCH_DEBOUNCE_MS);
+    return () => clearTimeout(t);
+  }, [searchQuery]);
+
+  // ── Load products via Admin API ───────────────────────────────────────────────
   const loadProducts = useCallback(async (pageIndex = 0) => {
+    // Cancel any in-flight request
+    listAbortRef.current?.abort();
+    const controller = new AbortController();
+    listAbortRef.current = controller;
+
     setLoading(true);
     try {
-      let query = supabase
-        .from(PRODUCTS_TABLE)
-        .select("*", { count: "exact" })
-        .order("created_at", { ascending: false })
-        .range(pageIndex * PAGE_SIZE, (pageIndex + 1) * PAGE_SIZE - 1);
+      const params = new URLSearchParams();
+      params.set("page", String(pageIndex));
+      params.set("pageSize", String(PAGE_SIZE));
+      params.set("sortBy", "created_at");
+      params.set("sortDir", "desc");
+      if (debouncedSearch.trim()) params.set("q", debouncedSearch.trim());
+      if (filterCategory) params.set("category", filterCategory);
+      if (filterStatus === "active") params.set("active", "true");
+      if (filterStatus === "inactive") params.set("active", "false");
+      if (filterStatus === "low") { params.set("minStock", "1"); params.set("maxStock", String(LOW_STOCK_THRESHOLD)); }
+      if (filterStatus === "out") { params.set("minStock", "0"); params.set("maxStock", "0"); }
 
-      if (searchQuery.trim()) query = query.ilike("name", `%${searchQuery.trim()}%`);
-      if (filterCategory) query = query.eq("category", filterCategory);
-      if (filterStatus === "active") query = query.eq("active", true);
-      if (filterStatus === "inactive") query = query.eq("active", false);
-      if (filterStatus === "low") query = query.lte("stock", LOW_STOCK_THRESHOLD).gt("stock", 0);
-      if (filterStatus === "out") query = query.eq("stock", 0);
+      const res = await apiFetch<ApiListResponse>(
+        `/api/admin/products?${params.toString()}`,
+        { method: "GET" },
+        controller.signal,
+      );
 
-      const { data, error, count } = await query;
-      if (error) throw error;
-      const mapped = (data ?? []).map((row) => mapProduct(row as DbProductRecord));
+      const mapped = (res.data ?? []).map(mapApiProduct);
       setProducts(pageIndex === 0 ? mapped : (prev) => [...prev, ...mapped]);
-      setHasMore((count ?? 0) > (pageIndex + 1) * PAGE_SIZE);
+      setTotal(res.total ?? 0);
       setPage(pageIndex);
+
+      // Derive categories for filter dropdown
+      if (pageIndex === 0) {
+        setCatalogCategories((prev) => {
+          const set = new Set([...prev, ...mapped.map((p) => p.category).filter(Boolean)]);
+          return Array.from(set).sort();
+        });
+      }
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Failed to load products");
+      if ((err as Error).name === "AbortError") return;
+      const msg = err instanceof Error ? err.message : "Failed to load products";
+      toast.error(msg);
     } finally {
       setLoading(false);
     }
-  }, [supabase, searchQuery, filterCategory, filterStatus]);
+  }, [debouncedSearch, filterCategory, filterStatus]);
 
   useEffect(() => { void loadProducts(0); }, [loadProducts]);
 
-  // ── Categories derived from loaded products ──────────────────────────────────
+  const hasMore = useMemo(() => total > (page + 1) * PAGE_SIZE, [total, page]);
 
-  const categories = useMemo(() => {
-    const cats = new Set(products.map((p) => p.category).filter(Boolean));
-    return Array.from(cats).sort();
-  }, [products]);
-
-  // ── Stats ────────────────────────────────────────────────────────────────────
-
+  // ── Stats (derived from current page — accurate for visible products) ──────────
   const stats = useMemo(() => ({
-    total: products.length,
+    total,
     active: products.filter((p) => p.active).length,
     lowStock: products.filter((p) => p.stock > 0 && p.stock <= LOW_STOCK_THRESHOLD).length,
     outOfStock: products.filter((p) => p.stock === 0).length,
-  }), [products]);
+  }), [products, total]);
 
   // ── Form helpers ──────────────────────────────────────────────────────────────
 
@@ -995,7 +1124,7 @@ export default function ProductManagement() {
     setForm((prev) => ({ ...prev, sku: generateSku(prev.category, prev.name) }));
   }, []);
 
-  // ── Image upload ──────────────────────────────────────────────────────────────
+  // ── Image upload — Supabase Storage (stays client-side per spec) ──────────────
 
   const uploadFiles = useCallback(async (files: FileList | File[]) => {
     const list = Array.from(files);
@@ -1077,7 +1206,7 @@ export default function ProductManagement() {
     if (wizardStep > 0) setWizardStep((s) => s - 1);
   }, [wizardStep]);
 
-  // ── Save ──────────────────────────────────────────────────────────────────────
+  // ── Save — POST /api/admin/products or PUT /api/admin/products/[id] ───────────
 
   const handleSave = useCallback(async () => {
     const parsed = prepareForm(form);
@@ -1088,7 +1217,6 @@ export default function ProductManagement() {
         if (!errors[key]) errors[key] = issue.message;
       }
       setFieldErrors(errors);
-      // jump to first step with an error
       for (const stepDef of STEPS) {
         if (stepDef.fields.some((f) => errors[f])) {
           setWizardStep(stepDef.id);
@@ -1098,44 +1226,55 @@ export default function ProductManagement() {
       toast.error("Please fix the highlighted fields.");
       return;
     }
+
     setSaving(true);
     try {
-      const payload = toPayload(parsed.data);
+      const payload = toApiPayload(parsed.data);
+
       if (editingProduct) {
-        const { error } = await supabase.from(PRODUCTS_TABLE).update(payload).eq("id", editingProduct.id);
-        if (error) throw error;
+        await apiFetch<ApiSingleResponse>(
+          `/api/admin/products/${editingProduct.id}`,
+          { method: "PUT", body: JSON.stringify(payload) },
+        );
         toast.success("Product updated successfully.");
       } else {
-        const { error } = await supabase.from(PRODUCTS_TABLE).insert({ ...payload, created_at: new Date().toISOString() });
-        if (error) throw error;
+        await apiFetch<ApiSingleResponse>(
+          `/api/admin/products`,
+          { method: "POST", body: JSON.stringify(payload) },
+        );
         toast.success("Product created successfully.");
       }
+
       setSheetOpen(false);
       void loadProducts(0);
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Failed to save product");
+      const msg = err instanceof Error ? err.message : "Failed to save product";
+      toast.error(msg);
     } finally {
       setSaving(false);
     }
-  }, [form, editingProduct, supabase, loadProducts]);
+  }, [form, editingProduct, loadProducts]);
 
-  // ── Delete ────────────────────────────────────────────────────────────────────
+  // ── Delete — DELETE /api/admin/products/[id] ──────────────────────────────────
 
   const handleDelete = useCallback(async () => {
     if (!deleteProduct) return;
     setDeleting(true);
     try {
-      const { error } = await supabase.from(PRODUCTS_TABLE).delete().eq("id", deleteProduct.id);
-      if (error) throw error;
+      await apiFetch<{ success: boolean }>(
+        `/api/admin/products/${deleteProduct.id}`,
+        { method: "DELETE" },
+      );
       toast.success(`"${deleteProduct.name}" deleted.`);
       setDeleteProduct(null);
       void loadProducts(0);
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Failed to delete product");
+      const msg = err instanceof Error ? err.message : "Failed to delete product";
+      toast.error(msg);
     } finally {
       setDeleting(false);
     }
-  }, [deleteProduct, supabase, loadProducts]);
+  }, [deleteProduct, loadProducts]);
 
   // ── Completeness ──────────────────────────────────────────────────────────────
 
@@ -1179,7 +1318,7 @@ export default function ProductManagement() {
         </div>
         <FilterSelect value={filterCategory} onChange={setFilterCategory} aria-label="Filter by category">
           <option value="">All categories</option>
-          {categories.map((c) => <option key={c} value={c}>{c}</option>)}
+          {catalogCategories.map((c) => <option key={c} value={c}>{c}</option>)}
         </FilterSelect>
         <FilterSelect value={filterStatus} onChange={setFilterStatus} aria-label="Filter by status">
           <option value="">All status</option>
@@ -1230,7 +1369,7 @@ export default function ProductManagement() {
         </>
       )}
 
-      {/* ── Add / Edit Sheet ─────────────────────────────────────────────────── */}
+      {/* ── Add / Edit Sheet ──────────────────────────────────────────────────── */}
       <Sheet open={sheetOpen} onOpenChange={(open) => { if (!open && !saving) setSheetOpen(false); }}>
         <SheetContent
           side="right"
@@ -1314,7 +1453,7 @@ export default function ProductManagement() {
         </SheetContent>
       </Sheet>
 
-      {/* ── View Dialog ──────────────────────────────────────────────────────── */}
+      {/* ── View Dialog ───────────────────────────────────────────────────────── */}
       <Dialog open={!!viewProduct} onOpenChange={(open) => { if (!open) setViewProduct(null); }}>
         <DialogContent className="max-h-[90vh] max-w-2xl overflow-y-auto">
           {viewProduct && (
@@ -1344,7 +1483,7 @@ export default function ProductManagement() {
                 </div>
               )}
 
-              {/* Details grid */}
+              {/* Details */}
               <dl className="grid grid-cols-2 gap-2 sm:grid-cols-3">
                 <Detail label="Category" value={viewProduct.category} />
                 <Detail label="Collection" value={viewProduct.collection} />
@@ -1398,7 +1537,7 @@ export default function ProductManagement() {
             </DialogTitle>
             <DialogDescription>
               Are you sure you want to permanently delete{" "}
-              <strong className="text-slate-900">"{deleteProduct?.name}"</strong>?{" "}
+              <strong className="text-slate-900">&quot;{deleteProduct?.name}&quot;</strong>?{" "}
               This cannot be undone.
             </DialogDescription>
           </DialogHeader>
