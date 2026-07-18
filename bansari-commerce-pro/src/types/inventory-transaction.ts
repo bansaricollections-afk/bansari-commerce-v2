@@ -1,6 +1,11 @@
 /**
  * Inventory Transaction Types
- * Every movement against product_variants stock is recorded here.
+ *
+ * Schema facts (source of truth: migrations):
+ *   - inventory_transactions.variant_id → bigint (PostgreSQL) → number (TypeScript)
+ *   - inventory_transactions.order_id   → uuid   → string
+ *   - product_variants.id               → bigint → number
+ *   - order_items has NO variant_id column; variant is resolved via product_id
  */
 
 export type InventoryMovementType =
@@ -16,7 +21,7 @@ export type InventoryMovementType =
 
 export interface InventoryTransaction {
   id:               string;
-  variantId:        string;
+  variantId:        number;          // bigint in DB — always a number in TS
   orderId:          string | null;
   movementType:     InventoryMovementType;
   quantity:         number;
@@ -31,10 +36,10 @@ export interface InventoryTransaction {
   createdAt:        string;
 }
 
-/** Raw DB row shape */
+/** Raw DB row shape — variant_id comes back as number from Supabase JS client */
 export interface DbInventoryTransactionRow {
   id:                string;
-  variant_id:        string;
+  variant_id:        number;         // bigint → number
   order_id:          string | null;
   movement_type:     InventoryMovementType;
   quantity:          number;
@@ -58,12 +63,15 @@ export interface FulfillmentMetrics {
   returnsAwaiting:      number;
 }
 
-/** Payload for a manual stock adjustment from admin */
+/**
+ * Payload for a manual stock adjustment from admin.
+ * variantId is a number (bigint PK on product_variants).
+ */
 export interface ManualAdjustmentPayload {
-  variantId:   string;
-  quantity:    number;            // positive = add, negative = remove
+  variantId:    number;              // bigint PK
+  quantity:     number;              // positive = add, negative = remove
   movementType: InventoryMovementType;
-  reason:      string;
-  actorId?:    string | null;
-  actorName?:  string | null;
+  reason:       string;
+  actorId?:     string | null;
+  actorName?:   string | null;
 }
