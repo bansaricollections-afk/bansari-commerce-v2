@@ -1,8 +1,15 @@
 import type { NextConfig } from 'next';
+import crypto from 'crypto';
 
 const nextConfig: NextConfig = {
   compress: true,
   poweredByHeader: false,
+
+  // Force a unique build ID on every deploy so Turbopack never reuses
+  // stale cached chunks from a previous build (e.g. old column references).
+  generateBuildId: async () => {
+    return crypto.randomBytes(8).toString('hex');
+  },
 
   images: {
     remotePatterns: [
