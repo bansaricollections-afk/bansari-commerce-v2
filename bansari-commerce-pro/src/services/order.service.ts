@@ -232,6 +232,13 @@ function generateOrderNumber(): string {
  * browser checkout — best-effort, non-fatal on failure).
  *
  * Email: sent after stock deduction, non-fatal on failure.
+ *
+ * RPC chain note (postgrest-js 2.110.x):
+ *   supabase.rpc() returns PostgrestBuilder when the Postgres function is NOT
+ *   SETOF. PostgrestBuilder has .overrideTypes<T, { merge: false }>() but does
+ *   NOT have .single() (which lives on PostgrestTransformBuilder). Use
+ *   .overrideTypes<Order, { merge: false }>() as the terminal call and the
+ *   returned data will be typed as Order | null.
  */
 export async function recoverOrderFromWebhook(
   payment: RazorpayPaymentEntity
@@ -320,12 +327,15 @@ export async function recoverOrderFromWebhook(
       }));
 
       // --- Atomic RPC call — identical to browser checkout path ---
+      // .overrideTypes<Order, { merge: false }>() is the correct terminal call
+      // on PostgrestBuilder (the return of .rpc() for non-SETOF functions).
+      // .single() does NOT exist on PostgrestBuilder in postgrest-js 2.110.x.
       const { data: order, error: rpcErr } = await supabase
         .rpc('create_order_with_items', {
           p_order: orderPayload,
           p_items: itemsPayload,
         })
-        .single();
+        .overrideTypes<Order, { merge: false }>();
 
       if (rpcErr) {
         // 23505: concurrent webhook delivery already won the race.
@@ -344,8 +354,12 @@ export async function recoverOrderFromWebhook(
 
       if (!order) return { recovered: false, error: 'RPC returned no data.' };
 
-      const orderData = order as Order;
-      rLog.info('recovery.order.created', { orderId: orderData.id, orderNumber, userId: resolvedUserId as string | undefined });
+      // order is now typed as Order — no cast needed.
+      rLog.info('recovery.order.created', {
+        orderId: order.id,
+        orderNumber,
+        userId: resolvedUserId ?? undefined,
+      });
 
       // --- Decrement stock (best-effort, outside the RPC transaction) ---
       for (const li of lineItems) {
@@ -354,7 +368,7 @@ export async function recoverOrderFromWebhook(
           p_quantity:   li.quantity,
         });
         if (stockErr) {
-          rLog.warn('recovery.stock.decrement_failed', { error: stockErr, orderId: orderData.id, productId: li.productId });
+          rLog.warn('recovery.stock.decrement_failed', { error: stockErr, orderId: order.id, productId: li.productId });
         }
       }
 
@@ -365,19 +379,19 @@ export async function recoverOrderFromWebhook(
 
       try {
         await sendOrderConfirmationEmail({
-          orderNumber:     orderData.order_number,
-          customerName:    orderData.customer_name,
-          customerEmail:   orderData.customer_email ?? undefined,
+          orderNumber:     order.order_number,
+          customerName:    order.customer_name,
+          customerEmail:   order.customer_email ?? undefined,
           items: lineItems.map((li) => ({
             product_name: li.productName,
             quantity: li.quantity,
             unit_price: li.unitPrice,
             line_total: li.lineTotal,
           })) as unknown as OrderItem[],
-          subtotal:    Number(orderData.subtotal),
-          shippingFee: Number(orderData.shipping_fee),
-          discount:    Number(orderData.discount),
-          grandTotal:  Number(orderData.grand_total),
+          subtotal:    Number(order.subtotal),
+          shippingFee: Number(order.shipping_fee),
+          discount:    Number(order.discount),
+          grandTotal:  Number(order.grand_total),
           shippingAddress: {
             addressLine1: typedPending.shipping_address_line1,
             city:         typedPending.shipping_city,
@@ -385,12 +399,12 @@ export async function recoverOrderFromWebhook(
             postalCode:   typedPending.shipping_postal_code,
           },
         });
-        rLog.info('recovery.email.sent', { orderId: orderData.id });
+        rLog.info('recovery.email.sent', { orderId: order.id });
       } catch (emailErr) {
-        rLog.warn('recovery.email.failed', { error: emailErr, orderId: orderData.id });
+        rLog.warn('recovery.email.failed', { error: emailErr, orderId: order.id });
       }
 
-      return { recovered: true, orderId: orderData.id };
+      return { recovered: true, orderId: order.id };
     }
 
     // -----------------------------------------------------------------------
@@ -442,12 +456,14 @@ export async function recoverOrderFromWebhook(
       paid_at:                   now,
     };
 
+    // Same fix as Priority 1: use .overrideTypes<Order, { merge: false }>()
+    // instead of .single() which does not exist on PostgrestBuilder.
     const { data: partialOrder, error: partialErr } = await supabase
       .rpc('create_order_with_items', {
         p_order: partialOrderPayload,
         p_items: [],
       })
-      .single();
+      .overrideTypes<Order, { merge: false }>();
 
     if (partialErr) {
       if (partialErr.code === '23505') {
@@ -462,16 +478,16 @@ export async function recoverOrderFromWebhook(
       return { recovered: false, error: partialErr.message };
     }
 
-    const partialOrderData = partialOrder as Order;
+    // partialOrder is now typed as Order | null — no cast needed.
     rLog.warn('recovery.partial.created', {
-      orderId: partialOrderData?.id,
+      orderId: partialOrder?.id,
       note: 'MISSING shipping address and items. Admin must follow up.',
     });
 
     try {
       if (customerEmail !== 'unknown@bansaricollections.com') {
         await sendOrderConfirmationEmail({
-          orderNumber:  partialOrderData?.order_number ?? orderNumber,
+          orderNumber:  partialOrder?.order_number ?? orderNumber,
           customerName,
           customerEmail,
           items:        [],
@@ -491,7 +507,7 @@ export async function recoverOrderFromWebhook(
       rLog.warn('recovery.partial.email_failed', { error: emailErr });
     }
 
-    return { recovered: true, orderId: partialOrderData?.id };
+    return { recovered: true, orderId: partialOrder?.id };
 
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
