@@ -60,6 +60,16 @@ const PRODUCT_V2_SELECT = `
 // PRIVATE HELPERS
 // ============================================================
 
+/**
+ * Shape returned by Supabase for each product_tags row when joined with tags.
+ * The client always returns the related side as an array even for FK relations,
+ * so we type it that way and pick the first element.
+ */
+type ProductTagJoinRow = {
+  product_id: number;
+  tags: { id: number; name: string; slug: string }[] | null;
+};
+
 /** Fetch variants, images, tags for a set of product IDs in parallel (no N+1). */
 async function fetchRelations(productIds: number[]) {
   if (productIds.length === 0)
@@ -85,8 +95,8 @@ async function fetchRelations(productIds: number[]) {
   ]);
 
   if (variantsRes.error) throw new ProductError(variantsRes.error.message, 'INTERNAL');
-  if (imagesRes.error) throw new ProductError(imagesRes.error.message, 'INTERNAL');
-  if (tagsRes.error) throw new ProductError(tagsRes.error.message, 'INTERNAL');
+  if (imagesRes.error)   throw new ProductError(imagesRes.error.message,   'INTERNAL');
+  if (tagsRes.error)     throw new ProductError(tagsRes.error.message,     'INTERNAL');
 
   const variantsByProduct: Record<number, DbProductVariant[]> = {};
   for (const v of (variantsRes.data ?? []) as DbProductVariant[]) {
@@ -100,12 +110,19 @@ async function fetchRelations(productIds: number[]) {
     imagesByProduct[img.product_id]!.push(img);
   }
 
+  // Supabase returns the joined side as an array even for a FK many-to-one join,
+  // so we cast through `unknown` to avoid the GenericStringError overlap error,
+  // then pick [0] from the tags array for each row.
   const tagsByProduct: Record<number, DbTag[]> = {};
-  for (const row of tagsRes.data ?? []) {
-    const pid = (row as { product_id: number }).product_id;
-    const tag = (row as { tags: DbTag | null }).tags;
+  for (const raw of tagsRes.data ?? []) {
+    const row = raw as unknown as ProductTagJoinRow;
+    const pid = row.product_id;
+    const tagArr = row.tags;
     if (!tagsByProduct[pid]) tagsByProduct[pid] = [];
-    if (tag) tagsByProduct[pid]!.push(tag);
+    // tags is an array; each product_tags row has exactly one linked tag
+    if (tagArr && tagArr.length > 0) {
+      tagsByProduct[pid]!.push(tagArr[0] as DbTag);
+    }
   }
 
   return { variantsByProduct, imagesByProduct, tagsByProduct };
@@ -164,14 +181,14 @@ async function assembleProduct(
   if (szRes.error)  throw new ProductError(szRes.error.message,  'INTERNAL');
 
   return mapProductV2(row, {
-    variants:      options?.variants,
-    images:        options?.images,
-    tags:          options?.tags,
+    variants:       options?.variants,
+    images:         options?.images,
+    tags:           options?.tags,
     attributeMap,
-    categoryRef:   catRes.data as DbCategory | null,
+    categoryRef:    catRes.data as DbCategory | null,
     subcategoryRef: subRes.data as DbSubcategory | null,
-    collectionRef: colRes.data as DbCollection | null,
-    sizeChart:     szRes.data as DbSizeChart | null,
+    collectionRef:  colRes.data as DbCollection | null,
+    sizeChart:      szRes.data as DbSizeChart | null,
   });
 }
 
@@ -180,9 +197,9 @@ async function assembleProduct(
 // ============================================================
 
 export const ProductV2Service = {
-  // ─────────────────────────────────────────────────────────
+  // ────────────────────────────────────────────────────────
   // SEARCH / LIST
-  // ─────────────────────────────────────────────────────────
+  // ────────────────────────────────────────────────────────
 
   /**
    * Paginated product search supporting all admin filters.
@@ -219,14 +236,14 @@ export const ProductV2Service = {
       );
     }
     // Category filter (text OR FK)
-    if (filters.category) query = query.eq('category', filters.category);
-    if (filters.categoryId) query = query.eq('category_id', filters.categoryId);
+    if (filters.category)     query = query.eq('category',    filters.category);
+    if (filters.categoryId)   query = query.eq('category_id', filters.categoryId);
     if (filters.categorySlug) {
       const { data: cat } = await sb.from('categories').select('id').eq('slug', filters.categorySlug).maybeSingle();
       if (cat) query = query.eq('category_id', cat.id);
     }
     // Collection
-    if (filters.collection) query = query.eq('collection', filters.collection);
+    if (filters.collection)   query = query.eq('collection',    filters.collection);
     if (filters.collectionId) query = query.eq('collection_id', filters.collectionId);
     // Booleans
     if (filters.featured   !== undefined) query = query.eq('featured',    filters.featured);
@@ -243,7 +260,7 @@ export const ProductV2Service = {
     const { data, error, count } = await query;
     if (error) throw new ProductError(error.message, 'INTERNAL');
 
-    const rows = (data ?? []) as DbProductV2Row[];
+    const rows = (data as unknown as DbProductV2Row[]) ?? [];
     const ids  = rows.map((r) => r.id);
     const { variantsByProduct, imagesByProduct, tagsByProduct } = await fetchRelations(ids);
 
@@ -260,9 +277,9 @@ export const ProductV2Service = {
     return { data: products, total: count ?? 0, page, pageSize };
   },
 
-  // ─────────────────────────────────────────────────────────
+  // ────────────────────────────────────────────────────────
   // GET BY ID
-  // ─────────────────────────────────────────────────────────
+  // ────────────────────────────────────────────────────────
 
   async getById(
     id: number,
@@ -279,7 +296,7 @@ export const ProductV2Service = {
     if (error) throw new ProductError(error.message, 'INTERNAL');
     if (!data) return null;
 
-    const row = data as DbProductV2Row;
+    const row = data as unknown as DbProductV2Row;
     const { variantsByProduct, imagesByProduct, tagsByProduct } = await fetchRelations([row.id]);
 
     return assembleProduct(row, {
@@ -290,9 +307,9 @@ export const ProductV2Service = {
     });
   },
 
-  // ─────────────────────────────────────────────────────────
+  // ────────────────────────────────────────────────────────
   // CREATE
-  // ─────────────────────────────────────────────────────────
+  // ────────────────────────────────────────────────────────
 
   async create(payload: CreateProductV2Payload): Promise<ProductV2> {
     const sb = createServiceRoleClient();
@@ -382,13 +399,13 @@ export const ProductV2Service = {
 
     if (error) throw new ProductError(error.message, 'INTERNAL');
 
-    const row = data as DbProductV2Row;
+    const row = data as unknown as DbProductV2Row;
     return assembleProduct(row, { variants: [], images: [], tags: [] });
   },
 
-  // ─────────────────────────────────────────────────────────
+  // ────────────────────────────────────────────────────────
   // UPDATE
-  // ─────────────────────────────────────────────────────────
+  // ────────────────────────────────────────────────────────
 
   async update(id: number, payload: UpdateProductV2Payload): Promise<ProductV2> {
     const sb = createServiceRoleClient();
@@ -446,7 +463,7 @@ export const ProductV2Service = {
 
     if (error) throw new ProductError(error.message, 'INTERNAL');
 
-    const row = data as DbProductV2Row;
+    const row = data as unknown as DbProductV2Row;
     const { variantsByProduct, imagesByProduct, tagsByProduct } = await fetchRelations([row.id]);
     return assembleProduct(row, {
       variants: variantsByProduct[row.id] ?? [],
@@ -455,9 +472,9 @@ export const ProductV2Service = {
     });
   },
 
-  // ─────────────────────────────────────────────────────────
+  // ────────────────────────────────────────────────────────
   // VARIANTS
-  // ─────────────────────────────────────────────────────────
+  // ────────────────────────────────────────────────────────
 
   async addVariant(payload: CreateVariantPayload): Promise<ProductVariantV2> {
     const sb = createServiceRoleClient();
@@ -535,9 +552,9 @@ export const ProductV2Service = {
     if (error) throw new ProductError(error.message, 'INTERNAL');
   },
 
-  // ─────────────────────────────────────────────────────────
+  // ────────────────────────────────────────────────────────
   // IMAGES
-  // ─────────────────────────────────────────────────────────
+  // ────────────────────────────────────────────────────────
 
   async addImage(payload: CreateImagePayload): Promise<ProductImageV2> {
     const sb = createServiceRoleClient();
@@ -565,13 +582,12 @@ export const ProductV2Service = {
     if (error) throw new ProductError(error.message, 'INTERNAL');
   },
 
-  // ─────────────────────────────────────────────────────────
+  // ────────────────────────────────────────────────────────
   // TAGS
-  // ─────────────────────────────────────────────────────────
+  // ────────────────────────────────────────────────────────
 
   async addTag(productId: number, tagId: number): Promise<void> {
     const sb = createServiceRoleClient();
-    // Upsert — safe to call even if already linked
     const { error } = await sb
       .from('product_tags')
       .upsert({ product_id: productId, tag_id: tagId }, { onConflict: 'product_id,tag_id' });
