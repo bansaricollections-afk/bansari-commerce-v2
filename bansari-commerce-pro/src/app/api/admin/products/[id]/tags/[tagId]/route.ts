@@ -27,7 +27,7 @@ export async function DELETE(request: NextRequest, context: RouteContext) {
     return apiError(requestId, 'INVALID_PARAM', 'tagId must be a positive integer', 400);
 
   try {
-    await ProductV2Service.detachTag(productId, tagId);
+    await ProductV2Service.removeTag(productId, tagId);
 
     const sb = createServiceRoleClient();
     await sb.from('admin_audit_log').insert({
