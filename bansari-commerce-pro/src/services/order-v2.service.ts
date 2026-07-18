@@ -139,6 +139,14 @@ async function appendTimeline(
   }
 }
 
+/**
+ * Fetches a single order row or throws.
+ *
+ * Supabase infers the return type of a partial SELECT string as
+ * `GenericStringError` rather than the concrete row type, so we
+ * cast through `unknown` first — the TypeScript-approved pattern
+ * when the compiler sees no structural overlap between two types.
+ */
 async function getOrderRowOrThrow(id: string): Promise<DbOrderV2Row> {
   const sb = createServiceRoleClient();
   const { data, error } = await sb
@@ -148,7 +156,7 @@ async function getOrderRowOrThrow(id: string): Promise<DbOrderV2Row> {
     .maybeSingle();
   if (error) throw new OrderError(error.message, 'INTERNAL');
   if (!data)  throw new OrderError(`Order ${id} not found.`, 'NOT_FOUND');
-  return data as DbOrderV2Row;
+  return data as unknown as DbOrderV2Row;
 }
 
 // ============================================================
@@ -194,7 +202,7 @@ export const OrderV2Service = {
     const { data, error, count } = await query;
     if (error) throw new OrderError(error.message, 'INTERNAL');
 
-    const rows = (data ?? []) as DbOrderV2Row[];
+    const rows = (data as unknown as DbOrderV2Row[]) ?? [];
     const ids  = rows.map((r) => r.id);
     const { itemsByOrder, timelineByOrder, shipmentsByOrder } = await fetchOrderRelations(ids);
 
@@ -223,7 +231,7 @@ export const OrderV2Service = {
     if (error) throw new OrderError(error.message, 'INTERNAL');
     if (!data)  return null;
 
-    const row = data as DbOrderV2Row;
+    const row = data as unknown as DbOrderV2Row;
     const { itemsByOrder, timelineByOrder, shipmentsByOrder } = await fetchOrderRelations([row.id]);
     return mapOrderV2(row, {
       items:     itemsByOrder[row.id],
@@ -257,7 +265,6 @@ export const OrderV2Service = {
       .single();
     if (error) throw new OrderError(error.message, 'INTERNAL');
 
-    // Keep reservation in place (confirmed = reserved)
     await appendTimeline(orderId, 'order_confirmed', {
       previousStatus: from,
       newStatus:      'confirmed',
@@ -265,7 +272,7 @@ export const OrderV2Service = {
       actorName:      opts?.actorName,
     });
 
-    return mapOrderV2(data as DbOrderV2Row);
+    return mapOrderV2(data as unknown as DbOrderV2Row);
   },
 
   // ──────────────────────────────────────────────────────
@@ -313,7 +320,7 @@ export const OrderV2Service = {
       reason:    opts?.reason,
     });
 
-    return mapOrderV2(data as DbOrderV2Row);
+    return mapOrderV2(data as unknown as DbOrderV2Row);
   },
 
   // ──────────────────────────────────────────────────────
@@ -352,7 +359,7 @@ export const OrderV2Service = {
       actorName:      opts?.actorName,
     });
 
-    return mapOrderV2(data as DbOrderV2Row);
+    return mapOrderV2(data as unknown as DbOrderV2Row);
   },
 
   // ──────────────────────────────────────────────────────
@@ -416,7 +423,7 @@ export const OrderV2Service = {
       },
     });
 
-    return mapOrderV2(data as DbOrderV2Row);
+    return mapOrderV2(data as unknown as DbOrderV2Row);
   },
 
   // ──────────────────────────────────────────────────────
@@ -454,7 +461,6 @@ export const OrderV2Service = {
       .single();
     if (error) throw new OrderError(error.message, 'INTERNAL');
 
-    // ✅ Convert reservation → permanent sale (best-effort, logged)
     await FulfillmentService.finaliseSaleForOrder(orderId, opts);
 
     await appendTimeline(orderId, 'delivered', {
@@ -464,7 +470,7 @@ export const OrderV2Service = {
       actorName:      opts?.actorName,
     });
 
-    return mapOrderV2(data as DbOrderV2Row);
+    return mapOrderV2(data as unknown as DbOrderV2Row);
   },
 
   // ──────────────────────────────────────────────────────
@@ -500,7 +506,6 @@ export const OrderV2Service = {
       .single();
     if (error) throw new OrderError(error.message, 'INTERNAL');
 
-    // ✅ Release inventory reservation through FulfillmentService
     await FulfillmentService.releaseForOrder(orderId, {
       actorId:   payload.actorId,
       actorName: payload.actorName,
@@ -515,7 +520,7 @@ export const OrderV2Service = {
       reason:         payload.reason,
     });
 
-    return mapOrderV2(data as DbOrderV2Row);
+    return mapOrderV2(data as unknown as DbOrderV2Row);
   },
 
   // ──────────────────────────────────────────────────────
@@ -555,7 +560,6 @@ export const OrderV2Service = {
       .single();
     if (error) throw new OrderError(error.message, 'INTERNAL');
 
-    // ✅ Configurable: restore inventory on refund (only when restoreInventory flag is set)
     if (payload.restoreInventory) {
       await FulfillmentService.restoreStockForOrder(orderId, 'refund', {
         actorId:   payload.actorId,
@@ -578,7 +582,7 @@ export const OrderV2Service = {
       },
     });
 
-    return mapOrderV2(data as DbOrderV2Row);
+    return mapOrderV2(data as unknown as DbOrderV2Row);
   },
 
   // ──────────────────────────────────────────────────────
@@ -608,7 +612,6 @@ export const OrderV2Service = {
       .single();
     if (error) throw new OrderError(error.message, 'INTERNAL');
 
-    // ✅ Restore inventory — item is physically coming back to warehouse
     await FulfillmentService.restoreStockForOrder(orderId, 'return', {
       actorId:   payload.actorId,
       actorName: payload.actorName,
@@ -623,7 +626,7 @@ export const OrderV2Service = {
       reason:         payload.reason,
     });
 
-    return mapOrderV2(data as DbOrderV2Row);
+    return mapOrderV2(data as unknown as DbOrderV2Row);
   },
 
   // ──────────────────────────────────────────────────────
@@ -658,7 +661,7 @@ export const OrderV2Service = {
       reason:         payload.reason,
     });
 
-    return mapOrderV2(data as DbOrderV2Row);
+    return mapOrderV2(data as unknown as DbOrderV2Row);
   },
 
   // ──────────────────────────────────────────────────────
@@ -682,7 +685,7 @@ export const OrderV2Service = {
     if (error) throw new OrderError(error.message, 'INTERNAL');
 
     void row;
-    return mapOrderV2(data as DbOrderV2Row);
+    return mapOrderV2(data as unknown as DbOrderV2Row);
   },
 
   // ──────────────────────────────────────────────────────
