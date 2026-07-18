@@ -11,7 +11,7 @@ const log = createLogger({ service: 'admin.products.images' });
 
 type RouteContext = { params: Promise<{ id: string }> };
 
-// ─── GET /api/admin/products/[id]/images ─────────────────────────────────────
+// ─── GET /api/admin/products/[id]/images ─────────────────────────────────────────
 export async function GET(request: NextRequest, context: RouteContext) {
   const requestId = generateRequestId();
   const auth = await requireAdminSession(request);
@@ -39,7 +39,7 @@ export async function GET(request: NextRequest, context: RouteContext) {
   }
 }
 
-// ─── POST /api/admin/products/[id]/images ────────────────────────────────────
+// ─── POST /api/admin/products/[id]/images ────────────────────────────────────────
 export async function POST(request: NextRequest, context: RouteContext) {
   const requestId = generateRequestId();
   const auth = await requireAdminSession(request);
@@ -60,7 +60,7 @@ export async function POST(request: NextRequest, context: RouteContext) {
 
   try {
     const payload = body as Omit<CreateImagePayload, 'product_id'>;
-    const image = await ProductV2Service.addImage(productId, payload as CreateImagePayload);
+    const image = await ProductV2Service.addImage({ ...payload, product_id: productId } as CreateImagePayload);
 
     const sb = createServiceRoleClient();
     await sb.from('admin_audit_log').insert({
