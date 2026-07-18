@@ -73,7 +73,7 @@ export async function DELETE(request: NextRequest, context: RouteContext) {
     return apiError(requestId, 'INVALID_PARAM', 'imageId must be a positive integer', 400);
 
   try {
-    await ProductV2Service.removeImage(imageId);
+    await ProductV2Service.deleteImage(imageId);
 
     const sb = createServiceRoleClient();
     await sb.from('admin_audit_log').insert({
