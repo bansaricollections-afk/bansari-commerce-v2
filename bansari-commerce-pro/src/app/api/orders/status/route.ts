@@ -10,6 +10,7 @@ import { createServiceRoleClient } from '@/lib/supabase/service';
 import { generateRequestId } from '@/lib/request-id';
 import { createLogger } from '@/lib/logger';
 import { apiError } from '@/lib/api-response';
+import { requireAdminSession } from '@/lib/auth/requireAdmin';
 
 const log = createLogger({ service: 'orders.status' });
 
@@ -21,6 +22,9 @@ function isValidOrderStatus(value: unknown): value is OrderStatus {
 }
 
 export async function POST(request: NextRequest) {
+  const auth = await requireAdminSession(request);
+  if (auth instanceof NextResponse) return auth;
+
   const requestId = generateRequestId();
   const rLog = log.child({ requestId });
 
