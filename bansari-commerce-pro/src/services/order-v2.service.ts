@@ -8,12 +8,13 @@
  *   - All DB writes use service-role client
  *   - No business logic is duplicated from product-v2.service
  *   - Every mutating action appends an immutable timeline entry
- *   - Inventory reserve/release goes through product_variants.reserved_stock
+ *   - Inventory reserve/release goes through FulfillmentService (all RPCs)
  */
 import { createServiceRoleClient } from '@/lib/supabase/service';
 import { createLogger } from '@/lib/logger';
 import { OrderError, assertValidTransition } from '@/lib/order-errors';
 import { mapOrderV2, mapOrderItemV2, mapOrderTimeline, mapOrderShipment } from '@/lib/order-mapper';
+import { FulfillmentService } from '@/services/fulfillment.service';
 import type {
   OrderV2,
   OrderItemV2,
@@ -134,7 +135,6 @@ async function appendTimeline(
     created_at:      new Date().toISOString(),
   });
   if (error) {
-    // Timeline write failure must NOT break the main operation — log and continue
     log.error('order.timeline.write_failed', error, { orderId, event });
   }
 }
@@ -257,6 +257,7 @@ export const OrderV2Service = {
       .single();
     if (error) throw new OrderError(error.message, 'INTERNAL');
 
+    // Keep reservation in place (confirmed = reserved)
     await appendTimeline(orderId, 'order_confirmed', {
       previousStatus: from,
       newStatus:      'confirmed',
@@ -268,7 +269,7 @@ export const OrderV2Service = {
   },
 
   // ──────────────────────────────────────────────────────
-  // UPDATE STATUS (generic — used for processing, packed, etc.)
+  // UPDATE STATUS (generic)
   // ──────────────────────────────────────────────────────
 
   async updateStatus(
@@ -286,7 +287,6 @@ export const OrderV2Service = {
       updated_at:      new Date().toISOString(),
     };
 
-    // Sync legacy order_status for backward compat
     const legacyMap: Partial<Record<OrderV2Status, string>> = {
       confirmed:    'processing',
       processing:   'processing',
@@ -369,7 +369,6 @@ export const OrderV2Service = {
     const sb  = createServiceRoleClient();
     const now = new Date().toISOString();
 
-    // Insert shipment record
     await sb.from('order_shipments').insert({
       order_id:    orderId,
       courier_name: payload.courierName,
@@ -411,8 +410,8 @@ export const OrderV2Service = {
       actorId:        payload.actorId,
       actorName:      payload.actorName,
       metadata: {
-        courier:   payload.courierName,
-        awb:       payload.awbNumber,
+        courier:     payload.courierName,
+        awb:         payload.awbNumber,
         trackingUrl: payload.trackingUrl,
       },
     });
@@ -421,7 +420,7 @@ export const OrderV2Service = {
   },
 
   // ──────────────────────────────────────────────────────
-  // DELIVER
+  // DELIVER — converts reservation → permanent sale
   // ──────────────────────────────────────────────────────
 
   async deliver(
@@ -434,7 +433,6 @@ export const OrderV2Service = {
     const sb  = createServiceRoleClient();
     const now = new Date().toISOString();
 
-    // Update latest shipment record to delivered
     await sb
       .from('order_shipments')
       .update({ status: 'delivered', delivered_at: now, updated_at: now })
@@ -456,6 +454,9 @@ export const OrderV2Service = {
       .single();
     if (error) throw new OrderError(error.message, 'INTERNAL');
 
+    // ✅ Convert reservation → permanent sale (best-effort, logged)
+    await FulfillmentService.finaliseSaleForOrder(orderId, opts);
+
     await appendTimeline(orderId, 'delivered', {
       previousStatus: row.order_v2_status,
       newStatus:      'delivered',
@@ -467,7 +468,7 @@ export const OrderV2Service = {
   },
 
   // ──────────────────────────────────────────────────────
-  // CANCEL
+  // CANCEL — releases reservation
   // ──────────────────────────────────────────────────────
 
   async cancel(orderId: string, payload: CancelOrderPayload): Promise<OrderV2> {
@@ -487,8 +488,8 @@ export const OrderV2Service = {
       updated_at:         now,
     };
     if (payload.refundAmount !== undefined) {
-      updatePayload.refund_amount      = payload.refundAmount;
-      updatePayload.refund_requested   = true;
+      updatePayload.refund_amount    = payload.refundAmount;
+      updatePayload.refund_requested = true;
     }
 
     const { data, error } = await sb
@@ -499,8 +500,12 @@ export const OrderV2Service = {
       .single();
     if (error) throw new OrderError(error.message, 'INTERNAL');
 
-    // Release any reserved inventory
-    await this.releaseInventory(orderId);
+    // ✅ Release inventory reservation through FulfillmentService
+    await FulfillmentService.releaseForOrder(orderId, {
+      actorId:   payload.actorId,
+      actorName: payload.actorName,
+      reason:    payload.reason,
+    });
 
     await appendTimeline(orderId, 'cancelled', {
       previousStatus: row.order_v2_status,
@@ -514,7 +519,7 @@ export const OrderV2Service = {
   },
 
   // ──────────────────────────────────────────────────────
-  // REFUND
+  // REFUND — optionally restores inventory
   // ──────────────────────────────────────────────────────
 
   async refund(orderId: string, payload: RefundPayload): Promise<OrderV2> {
@@ -550,20 +555,34 @@ export const OrderV2Service = {
       .single();
     if (error) throw new OrderError(error.message, 'INTERNAL');
 
+    // ✅ Configurable: restore inventory on refund (only when restoreInventory flag is set)
+    if (payload.restoreInventory) {
+      await FulfillmentService.restoreStockForOrder(orderId, 'refund', {
+        actorId:   payload.actorId,
+        actorName: payload.actorName,
+        reason:    payload.reason,
+      });
+    }
+
     await appendTimeline(orderId, 'refund_processed', {
       previousStatus: row.order_v2_status,
       newStatus,
       actorId:   payload.actorId,
       actorName: payload.actorName,
       reason:    payload.reason,
-      metadata:  { amount: payload.amount, reference: payload.reference, partial: isPartial },
+      metadata:  {
+        amount:            payload.amount,
+        reference:         payload.reference,
+        partial:           isPartial,
+        restoreInventory:  payload.restoreInventory ?? false,
+      },
     });
 
     return mapOrderV2(data as DbOrderV2Row);
   },
 
   // ──────────────────────────────────────────────────────
-  // RETURN
+  // RETURN — restores inventory when goods received back
   // ──────────────────────────────────────────────────────
 
   async requestReturn(orderId: string, payload: ReturnPayload): Promise<OrderV2> {
@@ -588,6 +607,13 @@ export const OrderV2Service = {
       .select(ORDER_V2_SELECT)
       .single();
     if (error) throw new OrderError(error.message, 'INTERNAL');
+
+    // ✅ Restore inventory — item is physically coming back to warehouse
+    await FulfillmentService.restoreStockForOrder(orderId, 'return', {
+      actorId:   payload.actorId,
+      actorName: payload.actorName,
+      reason:    payload.reason,
+    });
 
     await appendTimeline(orderId, 'return_requested', {
       previousStatus: row.order_v2_status,
@@ -636,56 +662,6 @@ export const OrderV2Service = {
   },
 
   // ──────────────────────────────────────────────────────
-  // INVENTORY RESERVE / RELEASE
-  // ──────────────────────────────────────────────────────
-
-  /**
-   * Reserve inventory for all variant line items in an order.
-   * Increments product_variants.reserved_stock.
-   * Best-effort: logs failures but does not throw.
-   */
-  async reserveInventory(orderId: string): Promise<void> {
-    const sb = createServiceRoleClient();
-    const { data: items, error } = await sb
-      .from('order_items')
-      .select('variant_id, quantity')
-      .eq('order_id', orderId)
-      .not('variant_id', 'is', null);
-    if (error) { log.error('order.reserve.fetch_failed', error, { orderId }); return; }
-
-    for (const item of items ?? []) {
-      const { error: rpcErr } = await sb.rpc('increment_variant_reserved_stock', {
-        p_variant_id: item.variant_id,
-        p_quantity:   item.quantity,
-      });
-      if (rpcErr) log.warn('order.reserve.failed', { orderId, variantId: item.variant_id, error: rpcErr });
-    }
-  },
-
-  /**
-   * Release reserved inventory for cancelled/returned orders.
-   * Decrements product_variants.reserved_stock.
-   * Best-effort: logs failures but does not throw.
-   */
-  async releaseInventory(orderId: string): Promise<void> {
-    const sb = createServiceRoleClient();
-    const { data: items, error } = await sb
-      .from('order_items')
-      .select('variant_id, quantity')
-      .eq('order_id', orderId)
-      .not('variant_id', 'is', null);
-    if (error) { log.error('order.release.fetch_failed', error, { orderId }); return; }
-
-    for (const item of items ?? []) {
-      const { error: rpcErr } = await sb.rpc('decrement_variant_reserved_stock', {
-        p_variant_id: item.variant_id,
-        p_quantity:   item.quantity,
-      });
-      if (rpcErr) log.warn('order.release.failed', { orderId, variantId: item.variant_id, error: rpcErr });
-    }
-  },
-
-  // ──────────────────────────────────────────────────────
   // NOTES
   // ──────────────────────────────────────────────────────
 
@@ -705,7 +681,7 @@ export const OrderV2Service = {
       .single();
     if (error) throw new OrderError(error.message, 'INTERNAL');
 
-    void row; // suppress unused warning
+    void row;
     return mapOrderV2(data as DbOrderV2Row);
   },
 
@@ -717,7 +693,6 @@ export const OrderV2Service = {
     orderId: string,
     payload: AddTimelineNotePayload
   ): Promise<OrderTimelineEntry> {
-    // Ensure order exists
     await getOrderRowOrThrow(orderId);
 
     const sb  = createServiceRoleClient();
@@ -741,7 +716,7 @@ export const OrderV2Service = {
   },
 
   // ──────────────────────────────────────────────────────
-  // GENERATE DOCUMENTS (invoice / packing slip)
+  // GENERATE DOCUMENTS
   // ──────────────────────────────────────────────────────
 
   async generateDocument(
@@ -753,7 +728,6 @@ export const OrderV2Service = {
     const sb  = createServiceRoleClient();
     const now = new Date().toISOString();
 
-    // Call DB function to get the sequenced number
     const fnName = payload.type === 'invoice'
       ? 'generate_invoice_number'
       : 'generate_packing_slip_number';
@@ -816,7 +790,19 @@ export const OrderV2Service = {
     if (error) throw new OrderError(error.message, 'INTERNAL');
     return ((data ?? []) as DbOrderShipmentRow[]).map(mapOrderShipment);
   },
+
+  // ──────────────────────────────────────────────────────
+  // LEGACY STUBS (delegated to FulfillmentService)
+  // Kept for backward-compat; callers should prefer FulfillmentService directly
+  // ──────────────────────────────────────────────────────
+
+  async reserveInventory(orderId: string): Promise<void> {
+    return FulfillmentService.reserveForOrder(orderId);
+  },
+
+  async releaseInventory(orderId: string): Promise<void> {
+    return FulfillmentService.releaseForOrder(orderId);
+  },
 };
 
-// Re-export types consumed by API routes
 export type { OrderV2, OrderItemV2, OrderTimelineEntry, OrderShipment, OrderV2SearchResult };
