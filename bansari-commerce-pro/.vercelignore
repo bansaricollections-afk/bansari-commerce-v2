@@ -1,0 +1,4 @@
+# Never upload the local build cache to Vercel.
+# Vercel runs its own clean build — local .next chunks must never
+# override it, especially stale Turbopack SSR chunks.
+.next
