@@ -34,7 +34,6 @@ import type {
   UpdateVariantPayload,
   CreateImagePayload,
   ProductSearchFilters,
-  ProductSearchResult,
   DbProductV2Row,
   DbProductVariant,
   DbProductImage,
@@ -239,16 +238,15 @@ async function assembleProduct(
 // ============================================================
 // SERVICE-LEVEL SEARCH FILTERS
 //
-// ProductSearchFilters (in types/product-v2.ts) is the
-// storefront-facing interface. The admin search method accepts
-// additional admin-only parameters defined here.
+// ProductSearchFilters (in types/product-v2.ts) is the base interface
+// that covers all filter fields including the legacy text `category`
+// and `collection` columns.  AdminSearchFilters extends it with the
+// admin-only pagination / sorting parameters that have no meaning in
+// the storefront-facing API.
 // ============================================================
 
 interface AdminSearchFilters extends ProductSearchFilters {
-  /** Legacy text category column */
-  category?: string;
-  /** Legacy text collection column */
-  collection?: string;
+  /** Free-text search across name, sku, slug, description. */
   q?: string;
   minStock?: number;
   maxStock?: number;
