@@ -11,7 +11,7 @@ const log = createLogger({ service: 'admin.products.variants' });
 
 type RouteContext = { params: Promise<{ id: string }> };
 
-// ─── GET /api/admin/products/[id]/variants ────────────────────────────────────
+// ─── GET /api/admin/products/[id]/variants ────────────────────────────────────────
 export async function GET(request: NextRequest, context: RouteContext) {
   const requestId = generateRequestId();
   const auth = await requireAdminSession(request);
@@ -39,7 +39,7 @@ export async function GET(request: NextRequest, context: RouteContext) {
   }
 }
 
-// ─── POST /api/admin/products/[id]/variants ───────────────────────────────────
+// ─── POST /api/admin/products/[id]/variants ───────────────────────────────────────
 export async function POST(request: NextRequest, context: RouteContext) {
   const requestId = generateRequestId();
   const auth = await requireAdminSession(request);
@@ -60,7 +60,7 @@ export async function POST(request: NextRequest, context: RouteContext) {
 
   try {
     const payload = body as Omit<CreateVariantPayload, 'product_id'>;
-    const variant = await ProductV2Service.addVariant(productId, payload as CreateVariantPayload);
+    const variant = await ProductV2Service.addVariant({ ...payload, product_id: productId } as CreateVariantPayload);
 
     const sb = createServiceRoleClient();
     await sb.from('admin_audit_log').insert({
