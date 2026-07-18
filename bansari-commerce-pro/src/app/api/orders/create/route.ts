@@ -16,6 +16,12 @@ const log = createLogger({ service: 'orders.create' });
 /**
  * Shape returned by the create_order_with_items RPC.
  * Mirrors the `orders` table columns that are read after insert.
+ *
+ * NOTE: create_order_with_items is a RETURNS TABLE (SETOF) Postgres function.
+ * In @supabase/postgrest-js 2.110.x, .rpc() for a SETOF function types the
+ * result as an array. Use .overrideTypes<DbOrderRow[]>() (array generic) and
+ * extract rows[0]. Do NOT use .single() (absent on PostgrestBuilder) and do
+ * NOT use overrideTypes<DbOrderRow> (produces the type-mismatch sentinel union).
  */
 interface DbOrderRow {
   id: string;
@@ -261,18 +267,17 @@ export async function POST(request: NextRequest) {
       line_total:   li.lineTotal,
     }));
 
-    // In @supabase/postgrest-js (ships with supabase-js v2.x), .overrideTypes<T>()
-    // returns PostgrestBuilder<T> — the base class — which does NOT expose .single().
-    // .single() lives on PostgrestTransformBuilder (the subclass returned by .rpc()).
-    // Correct chain: .rpc(...).single() first (still on TransformBuilder),
-    // then .overrideTypes<DbOrderRow>() on the resulting PostgrestBuilder.
-    const { data: order, error: rpcErr } = await supabase
+    // create_order_with_items is RETURNS TABLE (SETOF), so postgrest-js 2.110.x
+    // types the result as an array. Use overrideTypes<DbOrderRow[]>() (array
+    // generic) and extract rows[0]. Do NOT use .single() — it is not on
+    // PostgrestBuilder — and do NOT use overrideTypes<DbOrderRow> (produces
+    // the type-mismatch sentinel union that broke this build).
+    const { data: rows, error: rpcErr } = await supabase
       .rpc(
         'create_order_with_items',
         { p_order: orderPayload, p_items: itemsPayload },
       )
-      .single()
-      .overrideTypes<DbOrderRow>();
+      .overrideTypes<DbOrderRow[]>();
 
     if (rpcErr) {
       if (rpcErr.code === '23505') {
@@ -293,6 +298,8 @@ export async function POST(request: NextRequest) {
       rLog.error('orders.create.rpc_failed', rpcErr);
       return apiError(requestId, 'DB_ERROR', rpcErr.message, 500);
     }
+
+    const order = rows?.[0] ?? null;
 
     if (!order) {
       rLog.error('orders.create.rpc_returned_null');
@@ -319,8 +326,6 @@ export async function POST(request: NextRequest) {
         p_quantity: li.quantity,
       });
       if (stockErr) {
-        // warn() signature: (event, ctx?) — no error param.
-        // Merge error fields into ctx so they appear in the structured log entry.
         rLog.warn('orders.create.stock_failed', {
           orderId: order.id,
           productId: li.productId,
@@ -368,8 +373,6 @@ export async function POST(request: NextRequest) {
       });
       rLog.info('orders.create.email.sent', { orderId: order.id });
     } catch (emailErr) {
-      // warn() signature: (event, ctx?) — no error param.
-      // Merge error message into ctx.
       rLog.warn('orders.create.email.failed', {
         orderId: order.id,
         errorMessage: emailErr instanceof Error ? emailErr.message : String(emailErr),

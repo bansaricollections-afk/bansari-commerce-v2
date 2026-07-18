@@ -234,11 +234,13 @@ function generateOrderNumber(): string {
  * Email: sent after stock deduction, non-fatal on failure.
  *
  * RPC chain note (postgrest-js 2.110.x):
- *   supabase.rpc() returns PostgrestBuilder when the Postgres function is NOT
- *   SETOF. PostgrestBuilder has .overrideTypes<T, { merge: false }>() but does
- *   NOT have .single() (which lives on PostgrestTransformBuilder). Use
- *   .overrideTypes<Order, { merge: false }>() as the terminal call and the
- *   returned data will be typed as Order | null.
+ *   create_order_with_items is a SETOF / RETURNS TABLE function, so
+ *   supabase.rpc() types the result as an array. Use
+ *   .overrideTypes<Order[]>() (array generic) and extract the first
+ *   element with rows?.[0] ?? null. Do NOT use .single() — it does not
+ *   exist on PostgrestBuilder (the return type of .rpc() in this version),
+ *   and do NOT use overrideTypes<Order> (non-array) — that produces the
+ *   type-mismatch sentinel union that caused this build failure.
  */
 export async function recoverOrderFromWebhook(
   payment: RazorpayPaymentEntity
@@ -327,15 +329,16 @@ export async function recoverOrderFromWebhook(
       }));
 
       // --- Atomic RPC call — identical to browser checkout path ---
-      // .overrideTypes<Order, { merge: false }>() is the correct terminal call
-      // on PostgrestBuilder (the return of .rpc() for non-SETOF functions).
-      // .single() does NOT exist on PostgrestBuilder in postgrest-js 2.110.x.
-      const { data: order, error: rpcErr } = await supabase
+      // create_order_with_items is RETURNS TABLE (SETOF), so the RPC result
+      // is typed as an array. Use overrideTypes<Order[]>() and extract [0].
+      // Do NOT use .single() (not on PostgrestBuilder in postgrest-js 2.110.x)
+      // and do NOT use overrideTypes<Order> (produces the sentinel union error).
+      const { data: rows, error: rpcErr } = await supabase
         .rpc('create_order_with_items', {
           p_order: orderPayload,
           p_items: itemsPayload,
         })
-        .overrideTypes<Order, { merge: false }>();
+        .overrideTypes<Order[]>();
 
       if (rpcErr) {
         // 23505: concurrent webhook delivery already won the race.
@@ -352,6 +355,7 @@ export async function recoverOrderFromWebhook(
         return { recovered: false, error: rpcErr.message };
       }
 
+      const order = rows?.[0] ?? null;
       if (!order) return { recovered: false, error: 'RPC returned no data.' };
 
       // order is now typed as Order — no cast needed.
@@ -456,14 +460,13 @@ export async function recoverOrderFromWebhook(
       paid_at:                   now,
     };
 
-    // Same fix as Priority 1: use .overrideTypes<Order, { merge: false }>()
-    // instead of .single() which does not exist on PostgrestBuilder.
-    const { data: partialOrder, error: partialErr } = await supabase
+    // Same fix as Priority 1: overrideTypes<Order[]>() for SETOF RPC, extract [0].
+    const { data: partialRows, error: partialErr } = await supabase
       .rpc('create_order_with_items', {
         p_order: partialOrderPayload,
         p_items: [],
       })
-      .overrideTypes<Order, { merge: false }>();
+      .overrideTypes<Order[]>();
 
     if (partialErr) {
       if (partialErr.code === '23505') {
@@ -477,6 +480,8 @@ export async function recoverOrderFromWebhook(
       rLog.error('recovery.partial.rpc.failed', { error: partialErr });
       return { recovered: false, error: partialErr.message };
     }
+
+    const partialOrder = partialRows?.[0] ?? null;
 
     // partialOrder is now typed as Order | null — no cast needed.
     rLog.warn('recovery.partial.created', {
