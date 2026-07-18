@@ -544,9 +544,14 @@ export type CreateImagePayload = {
 // ============================================================
 
 export interface ProductSearchFilters {
+  /** Full-text query (name, sku, slug, description) */
   query?: string;
+  /** Legacy text category column */
+  category?: string;
   categoryId?: number;
   categorySlug?: string;
+  /** Legacy text collection column */
+  collection?: string;
   collectionId?: number;
   collectionSlug?: string;
   featured?: boolean;

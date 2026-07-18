@@ -179,31 +179,40 @@ export function mapProductImage(row: DbProductImage): ProductImageV2 {
 }
 
 // ============================================================
+// PRODUCT V2 OPTIONS — explicitly exported so callers have a
+// stable, readable type rather than relying on Parameters<>.
+// ============================================================
+
+export interface MapProductV2Options {
+  variants?: DbProductVariant[];
+  /** Normalized product_images rows (from the product_images table). */
+  productImages?: DbProductImage[];
+  tags?: DbTag[];
+  categoryRef?: DbCategory | null;
+  subcategoryRef?: DbSubcategory | null;
+  collectionRef?: DbCollection | null;
+  attributeMap?: Partial<{
+    fabric: DbAttributeOption | null;
+    color: DbAttributeOption | null;
+    occasion: DbAttributeOption | null;
+    pattern: DbAttributeOption | null;
+    fit: DbAttributeOption | null;
+    sleeve: DbAttributeOption | null;
+    neck: DbAttributeOption | null;
+    work: DbAttributeOption | null;
+    length: DbAttributeOption | null;
+  }>;
+  sizeChart?: DbSizeChart | null;
+  withAttributes?: boolean;
+}
+
+// ============================================================
 // PRODUCT V2 (full)
 // ============================================================
 
 export function mapProductV2(
   row: DbProductV2Row,
-  options?: {
-    variants?: DbProductVariant[];
-    productImages?: DbProductImage[];
-    tags?: DbTag[];
-    categoryRef?: DbCategory | null;
-    subcategoryRef?: DbSubcategory | null;
-    collectionRef?: DbCollection | null;
-    attributeMap?: Partial<{
-      fabric: DbAttributeOption | null;
-      color: DbAttributeOption | null;
-      occasion: DbAttributeOption | null;
-      pattern: DbAttributeOption | null;
-      fit: DbAttributeOption | null;
-      sleeve: DbAttributeOption | null;
-      neck: DbAttributeOption | null;
-      work: DbAttributeOption | null;
-      length: DbAttributeOption | null;
-    }>;
-    sizeChart?: DbSizeChart | null;
-  }
+  options?: MapProductV2Options
 ): ProductV2 {
   const mappedVariants = (options?.variants ?? []).map(mapVariant);
   const mappedImages = sortImages(
