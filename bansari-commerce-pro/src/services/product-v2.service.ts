@@ -70,7 +70,12 @@ type ProductTagJoinRow = {
   tags: { id: number; name: string; slug: string }[] | null;
 };
 
-type AttributeMap = MapProductV2Options['attributeMap'];
+/**
+ * MapProductV2Options['attributeMap'] is an optional property, so its index-access
+ * type is Partial<{...}> without | undefined under exactOptionalPropertyTypes.
+ * We add | undefined explicitly so the ternary false-branch (undefined) is valid.
+ */
+type AttributeMap = MapProductV2Options['attributeMap'] | undefined;
 
 /**
  * Fetch all attribute option rows for a product in parallel.
@@ -78,7 +83,7 @@ type AttributeMap = MapProductV2Options['attributeMap'];
 async function fetchAttributeMap(
   row: DbProductV2Row,
   sb: ReturnType<typeof createServiceRoleClient>
-): Promise<AttributeMap> {
+): Promise<MapProductV2Options['attributeMap']> {
   const fetchAttr = (table: string, id: number) =>
     sb.from(table).select('id,name,slug,display_order,active').eq('id', id).maybeSingle()
       .then((r) => r.data as DbAttributeOption | null);
