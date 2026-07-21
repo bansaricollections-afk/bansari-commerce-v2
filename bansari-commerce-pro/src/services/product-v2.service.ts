@@ -12,10 +12,17 @@
  *   - Uniqueness checks run BEFORE insert/update
  */
 import { createServiceRoleClient } from '@/lib/supabase/service';
-import { mapProductV2, mapVariant, mapProductImage } from '@/lib/product-mapper';
-import type { MapProductV2Options } from '@/lib/product-mapper';
+import {
+  mapProductV2,
+  mapVariant,
+  mapProductImage,
+} from '@/lib/product-mapper';
 import { ProductError } from '@/lib/product-errors';
-import { validateProductPayload, validateVariantPayload, validateVariantSkuUniqueness } from '@/lib/product-validation';
+import {
+  validateProductPayload,
+  validateVariantPayload,
+  validateVariantSkuUniqueness,
+} from '@/lib/product-validation';
 import type {
   ProductV2,
   ProductVariantV2,
@@ -26,6 +33,7 @@ import type {
   UpdateVariantPayload,
   CreateImagePayload,
   ProductSearchFilters,
+  ProductSearchResult,
   DbProductV2Row,
   DbProductVariant,
   DbProductImage,
@@ -36,6 +44,7 @@ import type {
   DbAttributeOption,
   DbSizeChart,
 } from '@/types/product-v2';
+import type { MapProductV2Options } from '@/lib/product-mapper';
 
 // ============================================================
 // SELECT CLAUSE (all product columns needed by mapper)
@@ -62,48 +71,12 @@ const PRODUCT_V2_SELECT = `
 
 /**
  * Shape returned by Supabase for each product_tags row when joined with tags.
- * The client always returns the related side as an array even for FK relations,
- * so we type it that way and pick the first element.
+ * The client always returns the related side as an array even for FK relations.
  */
 type ProductTagJoinRow = {
   product_id: number;
   tags: { id: number; name: string; slug: string }[] | null;
 };
-
-/**
- * MapProductV2Options['attributeMap'] is an optional property, so its index-access
- * type is Partial<{...}> without | undefined under exactOptionalPropertyTypes.
- * We add | undefined explicitly so the ternary false-branch (undefined) is valid.
- */
-type AttributeMap = MapProductV2Options['attributeMap'] | undefined;
-
-/**
- * Fetch all attribute option rows for a product in parallel.
- */
-async function fetchAttributeMap(
-  row: DbProductV2Row,
-  sb: ReturnType<typeof createServiceRoleClient>
-): Promise<MapProductV2Options['attributeMap']> {
-  const fetchAttr = (table: string, id: number) =>
-    sb.from(table).select('id,name,slug,display_order,active').eq('id', id).maybeSingle()
-      .then((r) => r.data as DbAttributeOption | null);
-  const fetchColor = (id: number) =>
-    sb.from('attr_color').select('id,name,slug,display_order,active,hex').eq('id', id).maybeSingle()
-      .then((r) => r.data as DbAttributeOption | null);
-
-  const [fabric, color, occasion, pattern, fit, sleeve, neck, work, length] = await Promise.all([
-    row.attr_fabric_id   ? fetchAttr('attr_fabric',   row.attr_fabric_id)   : Promise.resolve(null),
-    row.attr_color_id    ? fetchColor(row.attr_color_id)                     : Promise.resolve(null),
-    row.attr_occasion_id ? fetchAttr('attr_occasion', row.attr_occasion_id) : Promise.resolve(null),
-    row.attr_pattern_id  ? fetchAttr('attr_pattern',  row.attr_pattern_id)  : Promise.resolve(null),
-    row.attr_fit_id      ? fetchAttr('attr_fit',      row.attr_fit_id)      : Promise.resolve(null),
-    row.attr_sleeve_id   ? fetchAttr('attr_sleeve',   row.attr_sleeve_id)   : Promise.resolve(null),
-    row.attr_neck_id     ? fetchAttr('attr_neck',     row.attr_neck_id)     : Promise.resolve(null),
-    row.attr_work_id     ? fetchAttr('attr_work',     row.attr_work_id)     : Promise.resolve(null),
-    row.attr_length_id   ? fetchAttr('attr_length',   row.attr_length_id)   : Promise.resolve(null),
-  ]);
-  return { fabric, color, occasion, pattern, fit, sleeve, neck, work, length };
-}
 
 /** Fetch variants, images, tags for a set of product IDs in parallel (no N+1). */
 async function fetchRelations(productIds: number[]) {
@@ -145,16 +118,12 @@ async function fetchRelations(productIds: number[]) {
     imagesByProduct[img.product_id]!.push(img);
   }
 
-  // Supabase returns the joined side as an array even for a FK many-to-one join,
-  // so we cast through `unknown` to avoid the GenericStringError overlap error,
-  // then pick [0] from the tags array for each row.
   const tagsByProduct: Record<number, DbTag[]> = {};
   for (const raw of tagsRes.data ?? []) {
     const row = raw as unknown as ProductTagJoinRow;
     const pid = row.product_id;
     const tagArr = row.tags;
     if (!tagsByProduct[pid]) tagsByProduct[pid] = [];
-    // tags is an array; each product_tags row has exactly one linked tag
     if (tagArr && tagArr.length > 0) {
       tagsByProduct[pid]!.push(tagArr[0] as DbTag);
     }
@@ -168,19 +137,50 @@ async function assembleProduct(
   row: DbProductV2Row,
   options?: {
     variants?: DbProductVariant[];
-    productImages?: DbProductImage[];
+    images?: DbProductImage[];
     tags?: DbTag[];
     withAttributes?: boolean;
   }
 ): Promise<ProductV2> {
   const sb = createServiceRoleClient();
 
-  const attributeMap: AttributeMap =
-    options?.withAttributes
-      ? await fetchAttributeMap(row, sb)
-      : undefined;
+  let attributeMap: MapProductV2Options['attributeMap'] | undefined = undefined;
 
-  // Fetch category / subcategory / collection / size-chart refs in parallel
+  if (options?.withAttributes) {
+    const attrFetches: Promise<DbAttributeOption | null>[] = [
+      row.attr_fabric_id
+        ? sb.from('attr_fabric').select('id,name,slug,display_order,active').eq('id', row.attr_fabric_id).maybeSingle().then((r) => r.data as DbAttributeOption | null)
+        : Promise.resolve(null),
+      row.attr_color_id
+        ? sb.from('attr_color').select('id,name,slug,display_order,active,hex').eq('id', row.attr_color_id).maybeSingle().then((r) => r.data as DbAttributeOption | null)
+        : Promise.resolve(null),
+      row.attr_occasion_id
+        ? sb.from('attr_occasion').select('id,name,slug,display_order,active').eq('id', row.attr_occasion_id).maybeSingle().then((r) => r.data as DbAttributeOption | null)
+        : Promise.resolve(null),
+      row.attr_pattern_id
+        ? sb.from('attr_pattern').select('id,name,slug,display_order,active').eq('id', row.attr_pattern_id).maybeSingle().then((r) => r.data as DbAttributeOption | null)
+        : Promise.resolve(null),
+      row.attr_fit_id
+        ? sb.from('attr_fit').select('id,name,slug,display_order,active').eq('id', row.attr_fit_id).maybeSingle().then((r) => r.data as DbAttributeOption | null)
+        : Promise.resolve(null),
+      row.attr_sleeve_id
+        ? sb.from('attr_sleeve').select('id,name,slug,display_order,active').eq('id', row.attr_sleeve_id).maybeSingle().then((r) => r.data as DbAttributeOption | null)
+        : Promise.resolve(null),
+      row.attr_neck_id
+        ? sb.from('attr_neck').select('id,name,slug,display_order,active').eq('id', row.attr_neck_id).maybeSingle().then((r) => r.data as DbAttributeOption | null)
+        : Promise.resolve(null),
+      row.attr_work_id
+        ? sb.from('attr_work').select('id,name,slug,display_order,active').eq('id', row.attr_work_id).maybeSingle().then((r) => r.data as DbAttributeOption | null)
+        : Promise.resolve(null),
+      row.attr_length_id
+        ? sb.from('attr_length').select('id,name,slug,display_order,active').eq('id', row.attr_length_id).maybeSingle().then((r) => r.data as DbAttributeOption | null)
+        : Promise.resolve(null),
+    ];
+    const [fabric, color, occasion, pattern, fit, sleeve, neck, work, length] =
+      await Promise.all(attrFetches);
+    attributeMap = { fabric, color, occasion, pattern, fit, sleeve, neck, work, length };
+  }
+
   const [catRes, subRes, colRes, szRes] = await Promise.all([
     row.category_id
       ? sb.from('categories').select('id,name,slug,description,display_order,active,created_at,updated_at').eq('id', row.category_id).maybeSingle()
@@ -203,7 +203,7 @@ async function assembleProduct(
 
   return mapProductV2(row, {
     variants:       options?.variants,
-    productImages:  options?.productImages,
+    productImages:  options?.images,
     tags:           options?.tags,
     attributeMap,
     categoryRef:    catRes.data as DbCategory | null,
@@ -224,59 +224,71 @@ export const ProductV2Service = {
 
   /**
    * Paginated product search supporting all admin filters.
-   * Returns { data, total, page, pageSize } to match the API route contract.
+   * Returns ProductSearchResult to match the current interface contract.
    */
-  async search(filters: ProductSearchFilters & {
-    q?: string;
-    minStock?: number;
-    maxStock?: number;
-    sortBy?: string;
-    sortDir?: 'asc' | 'desc';
-    page?: number;
-    pageSize?: number;
-  }): Promise<{ data: ProductV2[]; total: number; page: number; pageSize: number }> {
+  async search(
+    filters: ProductSearchFilters & {
+      minStock?: number;
+      maxStock?: number;
+    }
+  ): Promise<ProductSearchResult> {
     const sb = createServiceRoleClient();
 
-    const page     = Math.max(0, filters.page ?? 0);
-    const pageSize = Math.min(100, Math.max(1, filters.pageSize ?? 20));
-    const sortBy   = filters.sortBy  ?? 'created_at';
-    const sortDir  = filters.sortDir ?? 'desc';
-    const from     = page * pageSize;
-    const to       = from + pageSize - 1;
+    const page      = Math.max(0, filters.page ?? 0);
+    const limit     = Math.min(100, Math.max(1, filters.limit ?? 20));
+    const orderBy   = filters.orderBy  ?? 'created_at';
+    const ascending = filters.ascending ?? false;
+    const from      = page * limit;
+    const to        = from + limit - 1;
 
     let query = sb
       .from('products')
       .select(PRODUCT_V2_SELECT, { count: 'exact' })
       .range(from, to)
-      .order(sortBy, { ascending: sortDir === 'asc' });
+      .order(orderBy, { ascending });
 
     // Text search
-    if (filters.q) {
+    if (filters.query) {
       query = query.or(
-        `name.ilike.%${filters.q}%,sku.ilike.%${filters.q}%,slug.ilike.%${filters.q}%,description.ilike.%${filters.q}%`
+        `name.ilike.%${filters.query}%,sku.ilike.%${filters.query}%,slug.ilike.%${filters.query}%,description.ilike.%${filters.query}%`
       );
     }
-    // Category filter
+
+    // Category filter (text OR FK)
+    if (filters.category)     query = query.eq('category', filters.category);
     if (filters.categoryId)   query = query.eq('category_id', filters.categoryId);
     if (filters.categorySlug) {
-      const { data: cat } = await sb.from('categories').select('id').eq('slug', filters.categorySlug).maybeSingle();
-      if (cat) query = query.eq('category_id', cat.id);
+      const { data: cat } = await sb
+        .from('categories')
+        .select('id')
+        .eq('slug', filters.categorySlug)
+        .maybeSingle();
+      if (cat) query = query.eq('category_id', (cat as { id: number }).id);
     }
+
     // Collection
+    if (filters.collection)   query = query.eq('collection',    filters.collection);
     if (filters.collectionId) query = query.eq('collection_id', filters.collectionId);
     if (filters.collectionSlug) {
-      const { data: col } = await sb.from('collections').select('id').eq('slug', filters.collectionSlug).maybeSingle();
-      if (col) query = query.eq('collection_id', col.id);
+      const { data: col } = await sb
+        .from('collections')
+        .select('id')
+        .eq('slug', filters.collectionSlug)
+        .maybeSingle();
+      if (col) query = query.eq('collection_id', (col as { id: number }).id);
     }
+
     // Booleans
-    if (filters.featured   !== undefined) query = query.eq('featured',    filters.featured);
-    if (filters.newArrival !== undefined) query = query.eq('new_arrival', filters.newArrival);
-    if (filters.bestSeller !== undefined) query = query.eq('best_seller', filters.bestSeller);
-    if (filters.active     !== undefined) query = query.eq('active',      filters.active);
+    if (filters.featured    !== undefined) query = query.eq('featured',    filters.featured);
+    if (filters.newArrival  !== undefined) query = query.eq('new_arrival', filters.newArrival);
+    if (filters.bestSeller  !== undefined) query = query.eq('best_seller', filters.bestSeller);
+    if (filters.active      !== undefined) query = query.eq('active',      filters.active);
+
     // Price
     if (filters.minPrice !== undefined) query = query.gte('price', filters.minPrice);
     if (filters.maxPrice !== undefined) query = query.lte('price', filters.maxPrice);
-    // Stock
+
+    // Stock (extended, not in base interface)
     if (filters.minStock !== undefined) query = query.gte('stock', filters.minStock);
     if (filters.maxStock !== undefined) query = query.lte('stock', filters.maxStock);
 
@@ -290,14 +302,17 @@ export const ProductV2Service = {
     const products = await Promise.all(
       rows.map((row) =>
         assembleProduct(row, {
-          variants:      variantsByProduct[row.id] ?? [],
-          productImages: imagesByProduct[row.id]   ?? [],
-          tags:          tagsByProduct[row.id]     ?? [],
+          variants: variantsByProduct[row.id] ?? [],
+          images:   imagesByProduct[row.id]   ?? [],
+          tags:     tagsByProduct[row.id]     ?? [],
         })
       )
     );
 
-    return { data: products, total: count ?? 0, page, pageSize };
+    const total      = count ?? 0;
+    const totalPages = Math.ceil(total / limit);
+
+    return { products, total, page, limit, totalPages };
   },
 
   // ────────────────────────────────────────────────────────
@@ -324,8 +339,38 @@ export const ProductV2Service = {
 
     return assembleProduct(row, {
       variants:       variantsByProduct[row.id] ?? [],
-      productImages:  imagesByProduct[row.id]   ?? [],
-      tags:           tagsByProduct[row.id]      ?? [],
+      images:         imagesByProduct[row.id]   ?? [],
+      tags:           tagsByProduct[row.id]     ?? [],
+      withAttributes: options?.withAttributes,
+    });
+  },
+
+  // ────────────────────────────────────────────────────────
+  // GET BY SLUG
+  // ────────────────────────────────────────────────────────
+
+  async getBySlug(
+    slug: string,
+    options?: { withAttributes?: boolean }
+  ): Promise<ProductV2 | null> {
+    const sb = createServiceRoleClient();
+
+    const { data, error } = await sb
+      .from('products')
+      .select(PRODUCT_V2_SELECT)
+      .eq('slug', slug)
+      .maybeSingle();
+
+    if (error) throw new ProductError(error.message, 'INTERNAL');
+    if (!data) return null;
+
+    const row = data as unknown as DbProductV2Row;
+    const { variantsByProduct, imagesByProduct, tagsByProduct } = await fetchRelations([row.id]);
+
+    return assembleProduct(row, {
+      variants:       variantsByProduct[row.id] ?? [],
+      images:         imagesByProduct[row.id]   ?? [],
+      tags:           tagsByProduct[row.id]     ?? [],
       withAttributes: options?.withAttributes,
     });
   },
@@ -340,7 +385,9 @@ export const ProductV2Service = {
     // Validate
     const validationErrors = validateProductPayload(payload);
     if (validationErrors.length > 0) {
-      throw new ProductError(validationErrors[0]!.message, 'INTERNAL');
+      throw new ProductError(validationErrors[0]!.message, validationErrors[0]!.code, {
+        field: validationErrors[0]!.field,
+      });
     }
 
     // Uniqueness checks
@@ -348,8 +395,8 @@ export const ProductV2Service = {
       sb.from('products').select('id').eq('sku', payload.sku).maybeSingle(),
       sb.from('products').select('id').eq('slug', payload.slug).maybeSingle(),
     ]);
-    if (skuCheck.data)  throw new ProductError(`SKU "${payload.sku}" already exists.`,   'SKU_DUPLICATE');
-    if (slugCheck.data) throw new ProductError(`Slug "${payload.slug}" already exists.`, 'SLUG_DUPLICATE');
+    if (skuCheck.data)  throw new ProductError(`SKU "${payload.sku}" already exists.`,   'SKU_DUPLICATE',  { field: 'sku' });
+    if (slugCheck.data) throw new ProductError(`Slug "${payload.slug}" already exists.`, 'SLUG_DUPLICATE', { field: 'slug' });
 
     const now = new Date().toISOString();
 
@@ -423,7 +470,7 @@ export const ProductV2Service = {
     if (error) throw new ProductError(error.message, 'INTERNAL');
 
     const row = data as unknown as DbProductV2Row;
-    return assembleProduct(row, { variants: [], productImages: [], tags: [] });
+    return assembleProduct(row, { variants: [], images: [], tags: [] });
   },
 
   // ────────────────────────────────────────────────────────
@@ -434,22 +481,38 @@ export const ProductV2Service = {
     const sb = createServiceRoleClient();
 
     // Check product exists
-    const { data: existing } = await sb.from('products').select('id,sku,slug').eq('id', id).maybeSingle();
-    if (!existing) throw new ProductError(`Product ${id} not found.`, 'REF_INVALID');
+    const { data: existing } = await sb
+      .from('products')
+      .select('id,sku,slug')
+      .eq('id', id)
+      .maybeSingle();
+    if (!existing) throw new ProductError(`Product ${id} not found.`, 'INTERNAL');
+
+    const existingRow = existing as { sku: string; slug: string };
 
     // Uniqueness checks (only if changing sku / slug)
-    if (payload.sku && payload.sku !== (existing as { sku: string }).sku) {
-      const { data: dup } = await sb.from('products').select('id').eq('sku', payload.sku).neq('id', id).maybeSingle();
-      if (dup) throw new ProductError(`SKU "${payload.sku}" already exists.`, 'SKU_DUPLICATE');
+    if (payload.sku && payload.sku !== existingRow.sku) {
+      const { data: dup } = await sb
+        .from('products')
+        .select('id')
+        .eq('sku', payload.sku)
+        .neq('id', id)
+        .maybeSingle();
+      if (dup) throw new ProductError(`SKU "${payload.sku}" already exists.`, 'SKU_DUPLICATE', { field: 'sku' });
     }
-    if (payload.slug && payload.slug !== (existing as { slug: string }).slug) {
-      const { data: dup } = await sb.from('products').select('id').eq('slug', payload.slug).neq('id', id).maybeSingle();
-      if (dup) throw new ProductError(`Slug "${payload.slug}" already exists.`, 'SLUG_DUPLICATE');
+    if (payload.slug && payload.slug !== existingRow.slug) {
+      const { data: dup } = await sb
+        .from('products')
+        .select('id')
+        .eq('slug', payload.slug)
+        .neq('id', id)
+        .maybeSingle();
+      if (dup) throw new ProductError(`Slug "${payload.slug}" already exists.`, 'SLUG_DUPLICATE', { field: 'slug' });
     }
 
     // Build update object — only include fields present in payload
     const updateRow: Record<string, unknown> = { updated_at: new Date().toISOString() };
-    const map: Record<string, string> = {
+    const fieldMap: Record<string, string> = {
       name: 'name', slug: 'slug', sku: 'sku', description: 'description',
       short_description: 'short_description', brand: 'brand', brand_name: 'brand_name',
       category: 'category', category_id: 'category_id', subcategory_id: 'subcategory_id',
@@ -473,7 +536,7 @@ export const ProductV2Service = {
       active: 'active', display_order: 'display_order',
       updated_by: 'updated_by',
     };
-    for (const [key, col] of Object.entries(map)) {
+    for (const [key, col] of Object.entries(fieldMap)) {
       if (key in payload) updateRow[col] = (payload as Record<string, unknown>)[key];
     }
 
@@ -489,9 +552,9 @@ export const ProductV2Service = {
     const row = data as unknown as DbProductV2Row;
     const { variantsByProduct, imagesByProduct, tagsByProduct } = await fetchRelations([row.id]);
     return assembleProduct(row, {
-      variants:      variantsByProduct[row.id] ?? [],
-      productImages: imagesByProduct[row.id]   ?? [],
-      tags:          tagsByProduct[row.id]      ?? [],
+      variants: variantsByProduct[row.id] ?? [],
+      images:   imagesByProduct[row.id]   ?? [],
+      tags:     tagsByProduct[row.id]     ?? [],
     });
   },
 
@@ -503,11 +566,30 @@ export const ProductV2Service = {
     const sb = createServiceRoleClient();
 
     const errors = validateVariantPayload(payload);
-    if (errors.length > 0) throw new ProductError(errors[0]!.message, 'INTERNAL');
+    if (errors.length > 0) {
+      throw new ProductError(errors[0]!.message, errors[0]!.code, { field: errors[0]!.field });
+    }
 
-    // Variant SKU uniqueness (local batch check — single SKU)
-    const skuErrors = validateVariantSkuUniqueness([{ sku: payload.sku }]);
-    if (skuErrors.length > 0) throw new ProductError(skuErrors[0]!.message, 'SKU_DUPLICATE');
+    // Variant SKU uniqueness (DB-level check)
+    const { data: dupVariant } = await sb
+      .from('product_variants')
+      .select('id')
+      .eq('sku', payload.sku)
+      .maybeSingle();
+    if (dupVariant) {
+      throw new ProductError(
+        `Variant SKU "${payload.sku}" already exists.`,
+        'SKU_DUPLICATE',
+        { field: 'sku' }
+      );
+    }
+
+    // Local batch uniqueness check (single-item list is a no-op but keeps
+    // the call consistent with validateVariantSkuUniqueness signature)
+    const dupErrors = validateVariantSkuUniqueness([{ sku: payload.sku }]);
+    if (dupErrors.length > 0) {
+      throw new ProductError(dupErrors[0]!.message, dupErrors[0]!.code, { field: dupErrors[0]!.field });
+    }
 
     const now = new Date().toISOString();
     const { data, error } = await sb
@@ -544,9 +626,19 @@ export const ProductV2Service = {
     const sb = createServiceRoleClient();
 
     if (payload.sku) {
-      // Local format check only — DB unique constraint handles cross-row uniqueness
-      const skuErrors = validateVariantSkuUniqueness([{ sku: payload.sku }]);
-      if (skuErrors.length > 0) throw new ProductError(skuErrors[0]!.message, 'SKU_DUPLICATE');
+      const { data: dupVariant } = await sb
+        .from('product_variants')
+        .select('id')
+        .eq('sku', payload.sku)
+        .neq('id', variantId)
+        .maybeSingle();
+      if (dupVariant) {
+        throw new ProductError(
+          `Variant SKU "${payload.sku}" already exists.`,
+          'SKU_DUPLICATE',
+          { field: 'sku' }
+        );
+      }
     }
 
     const updateRow: Record<string, unknown> = { updated_at: new Date().toISOString() };
@@ -589,8 +681,8 @@ export const ProductV2Service = {
         product_id:  payload.product_id,
         image_type:  payload.image_type,
         url:         payload.url,
-        alt:         payload.alt         ?? null,
-        sort_order:  payload.sort_order  ?? 0,
+        alt:         payload.alt        ?? null,
+        sort_order:  payload.sort_order ?? 0,
         created_at:  new Date().toISOString(),
       })
       .select('*')
