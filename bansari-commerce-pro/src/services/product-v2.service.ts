@@ -36,6 +36,7 @@ import type {
   DbAttributeOption,
   DbSizeChart,
 } from '@/types/product-v2';
+import type { SupabaseClient } from '@supabase/supabase-js';
 
 // ============================================================
 // SELECT CLAUSE (all product columns needed by mapper)
@@ -69,6 +70,32 @@ type ProductTagJoinRow = {
   product_id: number;
   tags: { id: number; name: string; slug: string }[] | null;
 };
+
+/**
+ * Fetch all attribute option rows for a product in parallel.
+ * Extracted so assembleProduct can use a const + ternary instead of a
+ * let + if block, guaranteeing initialisation under strictNullChecks.
+ */
+async function fetchAttributeMap(
+  row: DbProductV2Row,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  sb: SupabaseClient<any>
+): Promise<MapProductV2Options['attributeMap']> {
+  const attrFetches: Promise<DbAttributeOption | null>[] = [
+    row.attr_fabric_id   ? sb.from('attr_fabric').select('id,name,slug,display_order,active').eq('id', row.attr_fabric_id).maybeSingle().then((r: { data: DbAttributeOption | null }) => r.data)   : Promise.resolve(null),
+    row.attr_color_id    ? sb.from('attr_color').select('id,name,slug,display_order,active,hex').eq('id', row.attr_color_id).maybeSingle().then((r: { data: DbAttributeOption | null }) => r.data)    : Promise.resolve(null),
+    row.attr_occasion_id ? sb.from('attr_occasion').select('id,name,slug,display_order,active').eq('id', row.attr_occasion_id).maybeSingle().then((r: { data: DbAttributeOption | null }) => r.data) : Promise.resolve(null),
+    row.attr_pattern_id  ? sb.from('attr_pattern').select('id,name,slug,display_order,active').eq('id', row.attr_pattern_id).maybeSingle().then((r: { data: DbAttributeOption | null }) => r.data)  : Promise.resolve(null),
+    row.attr_fit_id      ? sb.from('attr_fit').select('id,name,slug,display_order,active').eq('id', row.attr_fit_id).maybeSingle().then((r: { data: DbAttributeOption | null }) => r.data)          : Promise.resolve(null),
+    row.attr_sleeve_id   ? sb.from('attr_sleeve').select('id,name,slug,display_order,active').eq('id', row.attr_sleeve_id).maybeSingle().then((r: { data: DbAttributeOption | null }) => r.data)   : Promise.resolve(null),
+    row.attr_neck_id     ? sb.from('attr_neck').select('id,name,slug,display_order,active').eq('id', row.attr_neck_id).maybeSingle().then((r: { data: DbAttributeOption | null }) => r.data)        : Promise.resolve(null),
+    row.attr_work_id     ? sb.from('attr_work').select('id,name,slug,display_order,active').eq('id', row.attr_work_id).maybeSingle().then((r: { data: DbAttributeOption | null }) => r.data)        : Promise.resolve(null),
+    row.attr_length_id   ? sb.from('attr_length').select('id,name,slug,display_order,active').eq('id', row.attr_length_id).maybeSingle().then((r: { data: DbAttributeOption | null }) => r.data)   : Promise.resolve(null),
+  ];
+  const [fabric, color, occasion, pattern, fit, sleeve, neck, work, length] =
+    await Promise.all(attrFetches);
+  return { fabric, color, occasion, pattern, fit, sleeve, neck, work, length };
+}
 
 /** Fetch variants, images, tags for a set of product IDs in parallel (no N+1). */
 async function fetchRelations(productIds: number[]) {
@@ -140,24 +167,13 @@ async function assembleProduct(
 ): Promise<ProductV2> {
   const sb = createServiceRoleClient();
 
-  // MapProductV2Options is exported from product-mapper — use it directly.
-  let attributeMap: MapProductV2Options['attributeMap'];
-
-  if (options?.withAttributes) {
-    const attrFetches: Promise<DbAttributeOption | null>[] = [
-      row.attr_fabric_id   ? sb.from('attr_fabric').select('id,name,slug,display_order,active').eq('id', row.attr_fabric_id).maybeSingle().then((r) => r.data as DbAttributeOption | null)   : Promise.resolve(null),
-      row.attr_color_id    ? sb.from('attr_color').select('id,name,slug,display_order,active,hex').eq('id', row.attr_color_id).maybeSingle().then((r) => r.data as DbAttributeOption | null)    : Promise.resolve(null),
-      row.attr_occasion_id ? sb.from('attr_occasion').select('id,name,slug,display_order,active').eq('id', row.attr_occasion_id).maybeSingle().then((r) => r.data as DbAttributeOption | null) : Promise.resolve(null),
-      row.attr_pattern_id  ? sb.from('attr_pattern').select('id,name,slug,display_order,active').eq('id', row.attr_pattern_id).maybeSingle().then((r) => r.data as DbAttributeOption | null)  : Promise.resolve(null),
-      row.attr_fit_id      ? sb.from('attr_fit').select('id,name,slug,display_order,active').eq('id', row.attr_fit_id).maybeSingle().then((r) => r.data as DbAttributeOption | null)          : Promise.resolve(null),
-      row.attr_sleeve_id   ? sb.from('attr_sleeve').select('id,name,slug,display_order,active').eq('id', row.attr_sleeve_id).maybeSingle().then((r) => r.data as DbAttributeOption | null)   : Promise.resolve(null),
-      row.attr_neck_id     ? sb.from('attr_neck').select('id,name,slug,display_order,active').eq('id', row.attr_neck_id).maybeSingle().then((r) => r.data as DbAttributeOption | null)        : Promise.resolve(null),
-      row.attr_work_id     ? sb.from('attr_work').select('id,name,slug,display_order,active').eq('id', row.attr_work_id).maybeSingle().then((r) => r.data as DbAttributeOption | null)        : Promise.resolve(null),
-      row.attr_length_id   ? sb.from('attr_length').select('id,name,slug,display_order,active').eq('id', row.attr_length_id).maybeSingle().then((r) => r.data as DbAttributeOption | null)   : Promise.resolve(null),
-    ];
-    const [fabric, color, occasion, pattern, fit, sleeve, neck, work, length] = await Promise.all(attrFetches);
-    attributeMap = { fabric, color, occasion, pattern, fit, sleeve, neck, work, length };
-  }
+  // const + ternary guarantees attributeMap is always initialised.
+  // `let` without an initialiser would be a definite-assignment error
+  // under strictNullChecks when withAttributes is false.
+  const attributeMap: MapProductV2Options['attributeMap'] | undefined =
+    options?.withAttributes
+      ? await fetchAttributeMap(row, sb)
+      : undefined;
 
   // Fetch category / subcategory / collection / size-chart refs in parallel
   const [catRes, subRes, colRes, szRes] = await Promise.all([
