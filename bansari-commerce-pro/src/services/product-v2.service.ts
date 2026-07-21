@@ -13,7 +13,6 @@
  */
 import { createServiceRoleClient } from '@/lib/supabase/service';
 import { mapProductV2, mapVariant, mapProductImage } from '@/lib/product-mapper';
-import type { MapProductV2Options } from '@/lib/product-mapper';
 import { ProductError } from '@/lib/product-errors';
 import { validateProductPayload, validateVariantPayload, validateVariantSkuUniqueness } from '@/lib/product-validation';
 import type {
@@ -36,7 +35,6 @@ import type {
   DbAttributeOption,
   DbSizeChart,
 } from '@/types/product-v2';
-import type { SupabaseClient } from '@supabase/supabase-js';
 
 // ============================================================
 // SELECT CLAUSE (all product columns needed by mapper)
@@ -71,29 +69,34 @@ type ProductTagJoinRow = {
   tags: { id: number; name: string; slug: string }[] | null;
 };
 
+type AttributeMap = NonNullable<Parameters<typeof mapProductV2>[1]>['attributeMap'];
+
 /**
  * Fetch all attribute option rows for a product in parallel.
- * Extracted so assembleProduct can use a const + ternary instead of a
- * let + if block, guaranteeing initialisation under strictNullChecks.
  */
 async function fetchAttributeMap(
   row: DbProductV2Row,
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  sb: SupabaseClient<any>
-): Promise<MapProductV2Options['attributeMap']> {
-  const attrFetches: Promise<DbAttributeOption | null>[] = [
-    row.attr_fabric_id   ? sb.from('attr_fabric').select('id,name,slug,display_order,active').eq('id', row.attr_fabric_id).maybeSingle().then((r: { data: DbAttributeOption | null }) => r.data)   : Promise.resolve(null),
-    row.attr_color_id    ? sb.from('attr_color').select('id,name,slug,display_order,active,hex').eq('id', row.attr_color_id).maybeSingle().then((r: { data: DbAttributeOption | null }) => r.data)    : Promise.resolve(null),
-    row.attr_occasion_id ? sb.from('attr_occasion').select('id,name,slug,display_order,active').eq('id', row.attr_occasion_id).maybeSingle().then((r: { data: DbAttributeOption | null }) => r.data) : Promise.resolve(null),
-    row.attr_pattern_id  ? sb.from('attr_pattern').select('id,name,slug,display_order,active').eq('id', row.attr_pattern_id).maybeSingle().then((r: { data: DbAttributeOption | null }) => r.data)  : Promise.resolve(null),
-    row.attr_fit_id      ? sb.from('attr_fit').select('id,name,slug,display_order,active').eq('id', row.attr_fit_id).maybeSingle().then((r: { data: DbAttributeOption | null }) => r.data)          : Promise.resolve(null),
-    row.attr_sleeve_id   ? sb.from('attr_sleeve').select('id,name,slug,display_order,active').eq('id', row.attr_sleeve_id).maybeSingle().then((r: { data: DbAttributeOption | null }) => r.data)   : Promise.resolve(null),
-    row.attr_neck_id     ? sb.from('attr_neck').select('id,name,slug,display_order,active').eq('id', row.attr_neck_id).maybeSingle().then((r: { data: DbAttributeOption | null }) => r.data)        : Promise.resolve(null),
-    row.attr_work_id     ? sb.from('attr_work').select('id,name,slug,display_order,active').eq('id', row.attr_work_id).maybeSingle().then((r: { data: DbAttributeOption | null }) => r.data)        : Promise.resolve(null),
-    row.attr_length_id   ? sb.from('attr_length').select('id,name,slug,display_order,active').eq('id', row.attr_length_id).maybeSingle().then((r: { data: DbAttributeOption | null }) => r.data)   : Promise.resolve(null),
-  ];
-  const [fabric, color, occasion, pattern, fit, sleeve, neck, work, length] =
-    await Promise.all(attrFetches);
+  sb: ReturnType<typeof createServiceRoleClient>
+): Promise<AttributeMap> {
+  const fetch = (table: string, id: number) =>
+    sb.from(table).select('id,name,slug,display_order,active').eq('id', id).maybeSingle()
+      .then((r) => r.data as DbAttributeOption | null);
+  const fetchColor = (id: number) =>
+    sb.from('attr_color').select('id,name,slug,display_order,active,hex').eq('id', id).maybeSingle()
+      .then((r) => r.data as DbAttributeOption | null);
+
+  const [fabric, color, occasion, pattern, fit, sleeve, neck, work, length] = await Promise.all([
+    row.attr_fabric_id   ? fetch('attr_fabric',   row.attr_fabric_id)   : Promise.resolve(null),
+    row.attr_color_id    ? fetchColor(row.attr_color_id)                 : Promise.resolve(null),
+    row.attr_occasion_id ? fetch('attr_occasion', row.attr_occasion_id) : Promise.resolve(null),
+    row.attr_pattern_id  ? fetch('attr_pattern',  row.attr_pattern_id)  : Promise.resolve(null),
+    row.attr_fit_id      ? fetch('attr_fit',      row.attr_fit_id)      : Promise.resolve(null),
+    row.attr_sleeve_id   ? fetch('attr_sleeve',   row.attr_sleeve_id)   : Promise.resolve(null),
+    row.attr_neck_id     ? fetch('attr_neck',     row.attr_neck_id)     : Promise.resolve(null),
+    row.attr_work_id     ? fetch('attr_work',     row.attr_work_id)     : Promise.resolve(null),
+    row.attr_length_id   ? fetch('attr_length',   row.attr_length_id)   : Promise.resolve(null),
+  ]);
   return { fabric, color, occasion, pattern, fit, sleeve, neck, work, length };
 }
 
@@ -167,10 +170,7 @@ async function assembleProduct(
 ): Promise<ProductV2> {
   const sb = createServiceRoleClient();
 
-  // const + ternary guarantees attributeMap is always initialised.
-  // `let` without an initialiser would be a definite-assignment error
-  // under strictNullChecks when withAttributes is false.
-  const attributeMap: MapProductV2Options['attributeMap'] | undefined =
+  const attributeMap: AttributeMap | undefined =
     options?.withAttributes
       ? await fetchAttributeMap(row, sb)
       : undefined;
@@ -251,16 +251,18 @@ export const ProductV2Service = {
         `name.ilike.%${filters.q}%,sku.ilike.%${filters.q}%,slug.ilike.%${filters.q}%,description.ilike.%${filters.q}%`
       );
     }
-    // Category filter (text OR FK)
-    if (filters.category)     query = query.eq('category',    filters.category);
+    // Category filter
     if (filters.categoryId)   query = query.eq('category_id', filters.categoryId);
     if (filters.categorySlug) {
       const { data: cat } = await sb.from('categories').select('id').eq('slug', filters.categorySlug).maybeSingle();
       if (cat) query = query.eq('category_id', cat.id);
     }
     // Collection
-    if (filters.collection)   query = query.eq('collection',    filters.collection);
     if (filters.collectionId) query = query.eq('collection_id', filters.collectionId);
+    if (filters.collectionSlug) {
+      const { data: col } = await sb.from('collections').select('id').eq('slug', filters.collectionSlug).maybeSingle();
+      if (col) query = query.eq('collection_id', col.id);
+    }
     // Booleans
     if (filters.featured   !== undefined) query = query.eq('featured',    filters.featured);
     if (filters.newArrival !== undefined) query = query.eq('new_arrival', filters.newArrival);
@@ -333,7 +335,7 @@ export const ProductV2Service = {
     // Validate
     const validationErrors = validateProductPayload(payload);
     if (validationErrors.length > 0) {
-      throw new ProductError(validationErrors[0]!.message, 'VALIDATION');
+      throw new ProductError(validationErrors[0]!.message, 'INTERNAL');
     }
 
     // Uniqueness checks
@@ -341,8 +343,8 @@ export const ProductV2Service = {
       sb.from('products').select('id').eq('sku', payload.sku).maybeSingle(),
       sb.from('products').select('id').eq('slug', payload.slug).maybeSingle(),
     ]);
-    if (skuCheck.data)  throw new ProductError(`SKU "${payload.sku}" already exists.`,   'DUPLICATE_SKU');
-    if (slugCheck.data) throw new ProductError(`Slug "${payload.slug}" already exists.`, 'DUPLICATE_SLUG');
+    if (skuCheck.data)  throw new ProductError(`SKU "${payload.sku}" already exists.`,   'SKU_DUPLICATE');
+    if (slugCheck.data) throw new ProductError(`Slug "${payload.slug}" already exists.`, 'SLUG_DUPLICATE');
 
     const now = new Date().toISOString();
 
@@ -428,16 +430,16 @@ export const ProductV2Service = {
 
     // Check product exists
     const { data: existing } = await sb.from('products').select('id,sku,slug').eq('id', id).maybeSingle();
-    if (!existing) throw new ProductError(`Product ${id} not found.`, 'NOT_FOUND');
+    if (!existing) throw new ProductError(`Product ${id} not found.`, 'REF_INVALID');
 
     // Uniqueness checks (only if changing sku / slug)
     if (payload.sku && payload.sku !== (existing as { sku: string }).sku) {
       const { data: dup } = await sb.from('products').select('id').eq('sku', payload.sku).neq('id', id).maybeSingle();
-      if (dup) throw new ProductError(`SKU "${payload.sku}" already exists.`, 'DUPLICATE_SKU');
+      if (dup) throw new ProductError(`SKU "${payload.sku}" already exists.`, 'SKU_DUPLICATE');
     }
     if (payload.slug && payload.slug !== (existing as { slug: string }).slug) {
       const { data: dup } = await sb.from('products').select('id').eq('slug', payload.slug).neq('id', id).maybeSingle();
-      if (dup) throw new ProductError(`Slug "${payload.slug}" already exists.`, 'DUPLICATE_SLUG');
+      if (dup) throw new ProductError(`Slug "${payload.slug}" already exists.`, 'SLUG_DUPLICATE');
     }
 
     // Build update object — only include fields present in payload
@@ -496,11 +498,11 @@ export const ProductV2Service = {
     const sb = createServiceRoleClient();
 
     const errors = validateVariantPayload(payload);
-    if (errors.length > 0) throw new ProductError(errors[0]!.message, 'VALIDATION');
+    if (errors.length > 0) throw new ProductError(errors[0]!.message, 'INTERNAL');
 
     // Variant SKU uniqueness
-    const dupError = await validateVariantSkuUniqueness(payload.sku);
-    if (dupError) throw new ProductError(dupError, 'DUPLICATE_SKU');
+    const dupErrors = await validateVariantSkuUniqueness(payload.sku);
+    if (dupErrors.length > 0) throw new ProductError(dupErrors[0]!.message, 'SKU_DUPLICATE');
 
     const now = new Date().toISOString();
     const { data, error } = await sb
@@ -537,8 +539,8 @@ export const ProductV2Service = {
     const sb = createServiceRoleClient();
 
     if (payload.sku) {
-      const dupError = await validateVariantSkuUniqueness(payload.sku, variantId);
-      if (dupError) throw new ProductError(dupError, 'DUPLICATE_SKU');
+      const dupErrors = await validateVariantSkuUniqueness(payload.sku, variantId);
+      if (dupErrors.length > 0) throw new ProductError(dupErrors[0]!.message, 'SKU_DUPLICATE');
     }
 
     const updateRow: Record<string, unknown> = { updated_at: new Date().toISOString() };
