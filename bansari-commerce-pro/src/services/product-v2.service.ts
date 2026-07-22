@@ -147,38 +147,45 @@ async function assembleProduct(
   let attributeMap: MapProductV2Options['attributeMap'] | undefined = undefined;
 
   if (options?.withAttributes) {
-    const attrFetches: Promise<DbAttributeOption | null>[] = [
-      row.attr_fabric_id
-        ? sb.from('attr_fabric').select('id,name,slug,display_order,active').eq('id', row.attr_fabric_id).maybeSingle().then((r) => r.data as DbAttributeOption | null)
-        : Promise.resolve(null),
-      row.attr_color_id
-        ? sb.from('attr_color').select('id,name,slug,display_order,active,hex').eq('id', row.attr_color_id).maybeSingle().then((r) => r.data as DbAttributeOption | null)
-        : Promise.resolve(null),
-      row.attr_occasion_id
-        ? sb.from('attr_occasion').select('id,name,slug,display_order,active').eq('id', row.attr_occasion_id).maybeSingle().then((r) => r.data as DbAttributeOption | null)
-        : Promise.resolve(null),
-      row.attr_pattern_id
-        ? sb.from('attr_pattern').select('id,name,slug,display_order,active').eq('id', row.attr_pattern_id).maybeSingle().then((r) => r.data as DbAttributeOption | null)
-        : Promise.resolve(null),
-      row.attr_fit_id
-        ? sb.from('attr_fit').select('id,name,slug,display_order,active').eq('id', row.attr_fit_id).maybeSingle().then((r) => r.data as DbAttributeOption | null)
-        : Promise.resolve(null),
-      row.attr_sleeve_id
-        ? sb.from('attr_sleeve').select('id,name,slug,display_order,active').eq('id', row.attr_sleeve_id).maybeSingle().then((r) => r.data as DbAttributeOption | null)
-        : Promise.resolve(null),
-      row.attr_neck_id
-        ? sb.from('attr_neck').select('id,name,slug,display_order,active').eq('id', row.attr_neck_id).maybeSingle().then((r) => r.data as DbAttributeOption | null)
-        : Promise.resolve(null),
-      row.attr_work_id
-        ? sb.from('attr_work').select('id,name,slug,display_order,active').eq('id', row.attr_work_id).maybeSingle().then((r) => r.data as DbAttributeOption | null)
-        : Promise.resolve(null),
-      row.attr_length_id
-        ? sb.from('attr_length').select('id,name,slug,display_order,active').eq('id', row.attr_length_id).maybeSingle().then((r) => r.data as DbAttributeOption | null)
-        : Promise.resolve(null),
-    ];
-    const [fabric, color, occasion, pattern, fit, sleeve, neck, work, length] =
-      await Promise.all(attrFetches);
-    attributeMap = { fabric, color, occasion, pattern, fit, sleeve, neck, work, length };
+    const fabricRes   = row.attr_fabric_id
+      ? await sb.from('attr_fabric').select('id,name,slug,display_order,active').eq('id', row.attr_fabric_id).maybeSingle()
+      : null;
+    const colorRes    = row.attr_color_id
+      ? await sb.from('attr_color').select('id,name,slug,display_order,active,hex').eq('id', row.attr_color_id).maybeSingle()
+      : null;
+    const occasionRes = row.attr_occasion_id
+      ? await sb.from('attr_occasion').select('id,name,slug,display_order,active').eq('id', row.attr_occasion_id).maybeSingle()
+      : null;
+    const patternRes  = row.attr_pattern_id
+      ? await sb.from('attr_pattern').select('id,name,slug,display_order,active').eq('id', row.attr_pattern_id).maybeSingle()
+      : null;
+    const fitRes      = row.attr_fit_id
+      ? await sb.from('attr_fit').select('id,name,slug,display_order,active').eq('id', row.attr_fit_id).maybeSingle()
+      : null;
+    const sleeveRes   = row.attr_sleeve_id
+      ? await sb.from('attr_sleeve').select('id,name,slug,display_order,active').eq('id', row.attr_sleeve_id).maybeSingle()
+      : null;
+    const neckRes     = row.attr_neck_id
+      ? await sb.from('attr_neck').select('id,name,slug,display_order,active').eq('id', row.attr_neck_id).maybeSingle()
+      : null;
+    const workRes     = row.attr_work_id
+      ? await sb.from('attr_work').select('id,name,slug,display_order,active').eq('id', row.attr_work_id).maybeSingle()
+      : null;
+    const lengthRes   = row.attr_length_id
+      ? await sb.from('attr_length').select('id,name,slug,display_order,active').eq('id', row.attr_length_id).maybeSingle()
+      : null;
+
+    attributeMap = {
+      fabric:   fabricRes   ? (fabricRes.data   as DbAttributeOption | null) : null,
+      color:    colorRes    ? (colorRes.data     as DbAttributeOption | null) : null,
+      occasion: occasionRes ? (occasionRes.data  as DbAttributeOption | null) : null,
+      pattern:  patternRes  ? (patternRes.data   as DbAttributeOption | null) : null,
+      fit:      fitRes      ? (fitRes.data       as DbAttributeOption | null) : null,
+      sleeve:   sleeveRes   ? (sleeveRes.data    as DbAttributeOption | null) : null,
+      neck:     neckRes     ? (neckRes.data      as DbAttributeOption | null) : null,
+      work:     workRes     ? (workRes.data      as DbAttributeOption | null) : null,
+      length:   lengthRes   ? (lengthRes.data    as DbAttributeOption | null) : null,
+    };
   }
 
   const [catRes, subRes, colRes, szRes] = await Promise.all([
