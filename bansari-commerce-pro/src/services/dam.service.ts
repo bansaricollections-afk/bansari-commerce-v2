@@ -1,12 +1,25 @@
 // Sprint 13 — DAMService
-// Delta only — reuses existing supabase client pattern from product-v2.service.ts
+// REPAIR Step 3: Verified createClient pattern matches existing project (server.ts)
+// REPAIR RC#5: UploadAssetInput.file typed as Blob to avoid DOM File dependency
+// Delta only
 
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type {
   DAMAsset,
-  UploadAssetInput,
   ListAssetsInput,
 } from '@/types/dam';
+
+// File-like input — compatible with Node 18 File, FormData Blob, and DOM File
+export interface UploadAssetInput {
+  file: Blob & { name: string; type: string; size: number };
+  tenantId: string;
+  organizationId?: string;
+  folderId?: string;
+  assetType: string;
+  altText?: string;
+  title?: string;
+  uploadedBy: string;
+}
 
 export class DAMService {
   constructor(private readonly sb: SupabaseClient) {}
@@ -14,7 +27,8 @@ export class DAMService {
   async uploadAsset(input: UploadAssetInput): Promise<DAMAsset> {
     const { file, tenantId, organizationId, folderId, assetType, altText, title, uploadedBy } = input;
 
-    const ext = file.name.split('.').pop() ?? 'bin';
+    const nameParts = file.name.split('.');
+    const ext = nameParts.length > 1 ? nameParts.pop() : 'bin';
     const safeFilename = `${tenantId}/${Date.now()}-${crypto.randomUUID()}.${ext}`;
 
     const { error: storageError } = await this.sb.storage
@@ -115,18 +129,18 @@ export class DAMService {
   }
 
   async updateAsset(id: string, updates: Partial<DAMAsset>): Promise<DAMAsset> {
-    const allowed = {
-      title: updates.title,
-      alt_text: updates.alt_text,
-      description: updates.description,
-      folder_id: updates.folder_id,
-      asset_type: updates.asset_type,
-      status: updates.status,
-      is_public: updates.is_public,
-      expires_at: updates.expires_at,
-      metadata: updates.metadata,
+    const allowed: Record<string, unknown> = {
       updated_at: new Date().toISOString(),
     };
+    if (updates.title !== undefined) allowed.title = updates.title;
+    if (updates.alt_text !== undefined) allowed.alt_text = updates.alt_text;
+    if (updates.description !== undefined) allowed.description = updates.description;
+    if (updates.folder_id !== undefined) allowed.folder_id = updates.folder_id;
+    if (updates.asset_type !== undefined) allowed.asset_type = updates.asset_type;
+    if (updates.status !== undefined) allowed.status = updates.status;
+    if (updates.is_public !== undefined) allowed.is_public = updates.is_public;
+    if (updates.expires_at !== undefined) allowed.expires_at = updates.expires_at;
+    if (updates.metadata !== undefined) allowed.metadata = updates.metadata;
 
     const { data, error } = await this.sb
       .from('dam_assets')
@@ -143,23 +157,22 @@ export class DAMService {
     const asset = await this.getAsset(id);
     if (!asset) throw new Error('Asset not found');
 
-    // Delete from storage
     await this.sb.storage.from(asset.storage_bucket).remove([asset.storage_path]);
 
     const { error } = await this.sb.from('dam_assets').delete().eq('id', id);
     if (error) throw new Error(`Delete asset failed: ${error.message}`);
   }
 
-  async createAsset(input: Partial<DAMAsset> & { uploadedBy: string; tenantId: string }): Promise<DAMAsset> {
+  async createAsset(input: Record<string, unknown> & { uploadedBy: string; tenantId: string }): Promise<DAMAsset> {
     const { data, error } = await this.sb
       .from('dam_assets')
       .insert({
         ...input,
         tenant_id: input.tenantId,
         uploaded_by: input.uploadedBy,
-        status: input.status ?? 'pending',
+        status: (input.status as string) ?? 'pending',
         version: 1,
-        metadata: input.metadata ?? {},
+        metadata: (input.metadata as Record<string, unknown>) ?? {},
       })
       .select()
       .single();
@@ -167,7 +180,13 @@ export class DAMService {
     return data as DAMAsset;
   }
 
-  async logUsage(assetId: string, tenantId: string, contextType: string, contextId: string, usedBy: string): Promise<void> {
+  async logUsage(
+    assetId: string,
+    tenantId: string,
+    contextType: string,
+    contextId: string,
+    usedBy: string,
+  ): Promise<void> {
     await this.sb.from('dam_usage').insert({
       asset_id: assetId,
       tenant_id: tenantId,
@@ -177,7 +196,13 @@ export class DAMService {
     });
   }
 
-  async auditLog(tenantId: string, action: string, actorId: string, details: Record<string, unknown>, assetId?: string): Promise<void> {
+  async auditLog(
+    tenantId: string,
+    action: string,
+    actorId: string,
+    details: Record<string, unknown>,
+    assetId?: string,
+  ): Promise<void> {
     await this.sb.from('dam_audit').insert({
       asset_id: assetId ?? null,
       tenant_id: tenantId,

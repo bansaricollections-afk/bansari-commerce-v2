@@ -1,4 +1,5 @@
 // Sprint 13 — SimilarityService
+// REPAIR RC#6: Fix multi-column onConflict string
 // Delta only
 
 import type { SupabaseClient } from '@supabase/supabase-js';
@@ -34,10 +35,14 @@ export class SimilarityService {
   }
 
   async saveSimilarity(input: Omit<DAMSimilarity, 'id' | 'created_at'>): Promise<void> {
-    const { error } = await this.sb
+    // REPAIR RC#6: Replace multi-column onConflict string with delete-then-insert
+    await this.sb
       .from('dam_similarity')
-      .upsert(input, { onConflict: 'asset_id,similar_asset_id' });
+      .delete()
+      .eq('asset_id', input.asset_id)
+      .eq('similar_asset_id', input.similar_asset_id);
 
+    const { error } = await this.sb.from('dam_similarity').insert(input);
     if (error) throw new Error(`Save similarity failed: ${error.message}`);
   }
 

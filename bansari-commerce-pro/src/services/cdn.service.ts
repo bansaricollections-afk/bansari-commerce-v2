@@ -1,8 +1,18 @@
 // Sprint 13 — CDNService
-// Delta only — uses Supabase Storage transform API
+// REPAIR Step 1: Replaced illegal conditional type cast with TransformOptions import
+// Delta only — no architecture change
 
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type { CDNTransformOptions, DAMDerivative } from '@/types/dam';
+
+// Supabase Storage getPublicUrl transform options (matches @supabase/storage-js TransformOptions)
+interface StorageTransformOptions {
+  width?: number;
+  height?: number;
+  resize?: 'cover' | 'contain' | 'fill';
+  format?: 'origin' | 'avif' | 'webp';
+  quality?: number;
+}
 
 export class CDNService {
   constructor(private readonly sb: SupabaseClient) {}
@@ -15,18 +25,22 @@ export class CDNService {
       .single();
 
     if (!asset) throw new Error('Asset not found');
+    const a = asset as { storage_path: string; storage_bucket: string };
 
-    const transformOptions: Record<string, unknown> = {};
-    if (options.width) transformOptions.width = options.width;
-    if (options.height) transformOptions.height = options.height;
-    if (options.format) transformOptions.format = options.format;
-    if (options.quality) transformOptions.quality = options.quality;
+    // REPAIR: Build a plain StorageTransformOptions object — no conditional type cast
+    const transform: StorageTransformOptions = {};
+    if (options.width) transform.width = options.width;
+    if (options.height) transform.height = options.height;
+    if (options.quality) transform.quality = options.quality;
+    // Map CDNTransformOptions format to Supabase Storage format subset
+    if (options.format === 'avif') transform.format = 'avif';
+    else if (options.format === 'webp') transform.format = 'webp';
+    // jpeg/png not supported by Supabase transform — serve origin
+    if (options.fit) transform.resize = options.fit;
 
-    const { data } = await this.sb.storage
-      .from((asset as { storage_path: string; storage_bucket: string }).storage_bucket)
-      .getPublicUrl((asset as { storage_path: string; storage_bucket: string }).storage_path, {
-        transform: transformOptions as Parameters<ReturnType<typeof this.sb.storage.from>['getPublicUrl']>[1] extends undefined ? never : NonNullable<Parameters<ReturnType<typeof this.sb.storage.from>['getPublicUrl']>[1]>['transform'],
-      });
+    const { data } = this.sb.storage
+      .from(a.storage_bucket)
+      .getPublicUrl(a.storage_path, { transform });
 
     return data.publicUrl;
   }
@@ -50,7 +64,6 @@ export class CDNService {
   }
 
   async invalidateCache(assetId: string): Promise<void> {
-    // Mark derivatives as stale — CDN edge invalidation is handled at infrastructure level
     await this.sb
       .from('dam_derivatives')
       .delete()
@@ -86,6 +99,6 @@ export class CDNService {
     if (format) query = query.eq('format', format);
 
     const { data } = await query.single();
-    return data as DAMDerivative | null;
+    return (data as DAMDerivative) ?? null;
   }
 }

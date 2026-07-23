@@ -1,4 +1,5 @@
 // Sprint 13 — Enterprise DAM Types
+// REPAIR: Removed UploadAssetInput from here (moved to dam.service.ts to avoid File DOM dependency)
 // Delta only — no existing types modified
 
 export type DAMAssetType =
@@ -274,17 +275,6 @@ export interface DAMAuditLog {
 }
 
 // Service input types
-export interface UploadAssetInput {
-  file: File;
-  tenantId: string;
-  organizationId?: string;
-  folderId?: string;
-  assetType: string;
-  altText?: string;
-  title?: string;
-  uploadedBy: string;
-}
-
 export interface ListAssetsInput {
   tenantId: string;
   folderId?: string;
