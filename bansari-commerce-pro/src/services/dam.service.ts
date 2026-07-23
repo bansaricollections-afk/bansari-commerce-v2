@@ -1,402 +1,189 @@
 // Sprint 13 — DAMService
-// Enterprise Digital Asset Management — core CRUD & orchestration
-// DELTA ONLY — reuses existing supabase client pattern
+// Delta only — reuses existing supabase client pattern from product-v2.service.ts
 
-import { createClient } from '@supabase/supabase-js';
+import type { SupabaseClient } from '@supabase/supabase-js';
 import type {
   DAMAsset,
-  DAMAssetVersion,
-  DAMTag,
-  DAMAuditLog,
-  UploadAssetRequest,
-  AssetListParams,
-  DAMStorageStats,
-  DAMAssetType,
-  DAMAssetStatus,
+  UploadAssetInput,
+  ListAssetsInput,
 } from '@/types/dam';
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!,
-);
-
 export class DAMService {
-  // ── Asset CRUD ─────────────────────────────────────────────
+  constructor(private readonly sb: SupabaseClient) {}
 
-  static async createAsset(
-    tenantId: string,
-    uploadedBy: string,
-    req: UploadAssetRequest,
-    storagePath: string,
-    mimeType: string,
-    fileSize: number,
-    organizationId?: string,
-  ): Promise<DAMAsset> {
-    const { data, error } = await supabase
+  async uploadAsset(input: UploadAssetInput): Promise<DAMAsset> {
+    const { file, tenantId, organizationId, folderId, assetType, altText, title, uploadedBy } = input;
+
+    const ext = file.name.split('.').pop() ?? 'bin';
+    const safeFilename = `${tenantId}/${Date.now()}-${crypto.randomUUID()}.${ext}`;
+
+    const { error: storageError } = await this.sb.storage
+      .from('dam-assets')
+      .upload(safeFilename, file, { contentType: file.type, upsert: false });
+
+    if (storageError) throw new Error(`Storage upload failed: ${storageError.message}`);
+
+    const { data: urlData } = this.sb.storage.from('dam-assets').getPublicUrl(safeFilename);
+
+    const { data, error } = await this.sb
       .from('dam_assets')
       .insert({
         tenant_id: tenantId,
         organization_id: organizationId ?? null,
-        name: req.name,
-        original_filename: req.name,
-        asset_type: req.asset_type,
-        mime_type: mimeType,
-        file_size: fileSize,
-        storage_path: storagePath,
+        folder_id: folderId ?? null,
+        asset_type: assetType,
+        title: title ?? null,
+        alt_text: altText ?? null,
+        filename: safeFilename,
+        original_filename: file.name,
+        mime_type: file.type,
+        file_size: file.size,
+        storage_path: safeFilename,
         storage_bucket: 'dam-assets',
-        folder_path: req.folder_path ?? '/',
-        alt_text: req.alt_text ?? null,
-        caption: req.caption ?? null,
-        description: req.description ?? null,
+        public_url: urlData.publicUrl,
+        status: 'pending',
+        is_public: false,
         uploaded_by: uploadedBy,
-        status: 'pending' as DAMAssetStatus,
+        version: 1,
+        metadata: {},
       })
       .select()
       .single();
 
-    if (error) throw new Error(`DAMService.createAsset: ${error.message}`);
-
-    await this.writeAudit(tenantId, 'asset.created', uploadedBy, null, null, { id: data.id, name: data.name });
+    if (error) throw new Error(`DB insert failed: ${error.message}`);
     return data as DAMAsset;
   }
 
-  static async getAsset(tenantId: string, assetId: string): Promise<DAMAsset | null> {
-    const { data, error } = await supabase
+  async listAssets(input: ListAssetsInput): Promise<{ data: DAMAsset[]; total: number }> {
+    const { tenantId, folderId, collectionId, assetType, tags, search, status, page = 1, limit = 24 } = input;
+    const offset = (page - 1) * limit;
+
+    let query = this.sb
+      .from('dam_assets')
+      .select('*', { count: 'exact' })
+      .eq('tenant_id', tenantId)
+      .order('created_at', { ascending: false })
+      .range(offset, offset + limit - 1);
+
+    if (folderId) query = query.eq('folder_id', folderId);
+    if (assetType) query = query.eq('asset_type', assetType);
+    if (status) query = query.eq('status', status);
+    if (search) query = query.ilike('title', `%${search}%`);
+
+    if (collectionId) {
+      const { data: caRows } = await this.sb
+        .from('dam_collection_assets')
+        .select('asset_id')
+        .eq('collection_id', collectionId);
+      const ids = (caRows ?? []).map((r: { asset_id: string }) => r.asset_id);
+      if (!ids.length) return { data: [], total: 0 };
+      query = query.in('id', ids);
+    }
+
+    if (tags?.length) {
+      const { data: tagRows } = await this.sb
+        .from('dam_tags')
+        .select('id')
+        .eq('tenant_id', tenantId)
+        .in('slug', tags);
+      const tagIds = (tagRows ?? []).map((r: { id: string }) => r.id);
+      if (tagIds.length) {
+        const { data: atRows } = await this.sb
+          .from('dam_asset_tags')
+          .select('asset_id')
+          .in('tag_id', tagIds);
+        const assetIds = (atRows ?? []).map((r: { asset_id: string }) => r.asset_id);
+        if (!assetIds.length) return { data: [], total: 0 };
+        query = query.in('id', assetIds);
+      }
+    }
+
+    const { data, error, count } = await query;
+    if (error) throw new Error(`List assets failed: ${error.message}`);
+
+    return { data: (data ?? []) as DAMAsset[], total: count ?? 0 };
+  }
+
+  async getAsset(id: string): Promise<DAMAsset | null> {
+    const { data, error } = await this.sb
       .from('dam_assets')
       .select('*')
-      .eq('tenant_id', tenantId)
-      .eq('id', assetId)
+      .eq('id', id)
       .single();
-
     if (error) return null;
     return data as DAMAsset;
   }
 
-  static async listAssets(params: AssetListParams): Promise<{ assets: DAMAsset[]; total: number }> {
-    const page = params.page ?? 1;
-    const perPage = Math.min(params.per_page ?? 50, 100);
-    const from = (page - 1) * perPage;
+  async updateAsset(id: string, updates: Partial<DAMAsset>): Promise<DAMAsset> {
+    const allowed = {
+      title: updates.title,
+      alt_text: updates.alt_text,
+      description: updates.description,
+      folder_id: updates.folder_id,
+      asset_type: updates.asset_type,
+      status: updates.status,
+      is_public: updates.is_public,
+      expires_at: updates.expires_at,
+      metadata: updates.metadata,
+      updated_at: new Date().toISOString(),
+    };
 
-    let query = supabase
+    const { data, error } = await this.sb
       .from('dam_assets')
-      .select('*', { count: 'exact' })
-      .eq('tenant_id', params.tenant_id)
-      .range(from, from + perPage - 1)
-      .order(params.order_by ?? 'created_at', { ascending: params.order === 'asc' });
-
-    if (params.asset_type) query = query.eq('asset_type', params.asset_type);
-    if (params.status) query = query.eq('status', params.status);
-    if (params.folder_path) query = query.eq('folder_path', params.folder_path);
-    if (params.search) query = query.ilike('name', `%${params.search}%`);
-
-    const { data, error, count } = await query;
-    if (error) throw new Error(`DAMService.listAssets: ${error.message}`);
-
-    return { assets: (data ?? []) as DAMAsset[], total: count ?? 0 };
-  }
-
-  static async updateAsset(
-    tenantId: string,
-    assetId: string,
-    actorId: string,
-    updates: Partial<Pick<DAMAsset, 'name' | 'alt_text' | 'caption' | 'description' | 'folder_path' | 'status' | 'cdn_url' | 'public_url' | 'quality_score' | 'ai_processed'>>,
-  ): Promise<DAMAsset> {
-    const old = await this.getAsset(tenantId, assetId);
-
-    const { data, error } = await supabase
-      .from('dam_assets')
-      .update({ ...updates, updated_at: new Date().toISOString() })
-      .eq('tenant_id', tenantId)
-      .eq('id', assetId)
+      .update(allowed)
+      .eq('id', id)
       .select()
       .single();
 
-    if (error) throw new Error(`DAMService.updateAsset: ${error.message}`);
-
-    await this.writeAudit(tenantId, 'asset.updated', actorId, null, old, data);
+    if (error) throw new Error(`Update asset failed: ${error.message}`);
     return data as DAMAsset;
   }
 
-  static async deleteAsset(tenantId: string, assetId: string, actorId: string): Promise<void> {
-    const asset = await this.getAsset(tenantId, assetId);
-    if (!asset) return;
+  async deleteAsset(id: string): Promise<void> {
+    const asset = await this.getAsset(id);
+    if (!asset) throw new Error('Asset not found');
 
-    // Soft-delete: archive
-    await this.updateAsset(tenantId, assetId, actorId, { status: 'archived' });
-    await this.writeAudit(tenantId, 'asset.archived', actorId, assetId, null, null);
+    // Delete from storage
+    await this.sb.storage.from(asset.storage_bucket).remove([asset.storage_path]);
+
+    const { error } = await this.sb.from('dam_assets').delete().eq('id', id);
+    if (error) throw new Error(`Delete asset failed: ${error.message}`);
   }
 
-  static async hardDeleteAsset(tenantId: string, assetId: string, actorId: string): Promise<void> {
-    const { error } = await supabase
+  async createAsset(input: Partial<DAMAsset> & { uploadedBy: string; tenantId: string }): Promise<DAMAsset> {
+    const { data, error } = await this.sb
       .from('dam_assets')
-      .delete()
-      .eq('tenant_id', tenantId)
-      .eq('id', assetId);
-
-    if (error) throw new Error(`DAMService.hardDeleteAsset: ${error.message}`);
-    await this.writeAudit(tenantId, 'asset.deleted', actorId, assetId, null, null);
-  }
-
-  // ── Versions ────────────────────────────────────────────────
-
-  static async createVersion(
-    tenantId: string,
-    assetId: string,
-    createdBy: string,
-    storagePath: string,
-    fileSize: number,
-    changeNote?: string,
-  ): Promise<DAMAssetVersion> {
-    // Unset current flag on existing versions
-    await supabase
-      .from('dam_asset_versions')
-      .update({ is_current: false })
-      .eq('asset_id', assetId);
-
-    const { data: latest } = await supabase
-      .from('dam_asset_versions')
-      .select('version_number')
-      .eq('asset_id', assetId)
-      .order('version_number', { ascending: false })
-      .limit(1)
-      .single();
-
-    const nextVersion = ((latest as { version_number: number } | null)?.version_number ?? 0) + 1;
-
-    const { data, error } = await supabase
-      .from('dam_asset_versions')
       .insert({
-        asset_id: assetId,
-        tenant_id: tenantId,
-        version_number: nextVersion,
-        storage_path: storagePath,
-        file_size: fileSize,
-        change_note: changeNote ?? null,
-        is_current: true,
-        created_by: createdBy,
+        ...input,
+        tenant_id: input.tenantId,
+        uploaded_by: input.uploadedBy,
+        status: input.status ?? 'pending',
+        version: 1,
+        metadata: input.metadata ?? {},
       })
       .select()
       .single();
-
-    if (error) throw new Error(`DAMService.createVersion: ${error.message}`);
-    return data as DAMAssetVersion;
+    if (error) throw new Error(`Create asset failed: ${error.message}`);
+    return data as DAMAsset;
   }
 
-  static async listVersions(tenantId: string, assetId: string): Promise<DAMAssetVersion[]> {
-    const { data, error } = await supabase
-      .from('dam_asset_versions')
-      .select('*')
-      .eq('tenant_id', tenantId)
-      .eq('asset_id', assetId)
-      .order('version_number', { ascending: false });
-
-    if (error) throw new Error(`DAMService.listVersions: ${error.message}`);
-    return (data ?? []) as DAMAssetVersion[];
-  }
-
-  static async restoreVersion(
-    tenantId: string,
-    assetId: string,
-    versionId: string,
-    actorId: string,
-  ): Promise<DAMAssetVersion> {
-    await supabase
-      .from('dam_asset_versions')
-      .update({ is_current: false })
-      .eq('asset_id', assetId);
-
-    const { data, error } = await supabase
-      .from('dam_asset_versions')
-      .update({ is_current: true })
-      .eq('id', versionId)
-      .eq('tenant_id', tenantId)
-      .select()
-      .single();
-
-    if (error) throw new Error(`DAMService.restoreVersion: ${error.message}`);
-    await this.writeAudit(tenantId, 'asset.version_restored', actorId, assetId, null, { version_id: versionId });
-    return data as DAMAssetVersion;
-  }
-
-  // ── Tags ────────────────────────────────────────────────────
-
-  static async upsertTag(
-    tenantId: string,
-    name: string,
-    isAiGenerated = false,
-    color?: string,
-  ): Promise<DAMTag> {
-    const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, '-');
-
-    const { data, error } = await supabase
-      .from('dam_tags')
-      .upsert({ tenant_id: tenantId, name, slug, color: color ?? null, is_ai_generated: isAiGenerated }, { onConflict: 'tenant_id,slug' })
-      .select()
-      .single();
-
-    if (error) throw new Error(`DAMService.upsertTag: ${error.message}`);
-    return data as DAMTag;
-  }
-
-  static async addTagToAsset(tenantId: string, assetId: string, tagId: string, addedBy: string): Promise<void> {
-    const { error } = await supabase
-      .from('dam_asset_tags')
-      .upsert({ asset_id: assetId, tag_id: tagId, tenant_id: tenantId, added_by: addedBy }, { onConflict: 'asset_id,tag_id' });
-
-    if (error) throw new Error(`DAMService.addTagToAsset: ${error.message}`);
-
-    // Increment usage_count
-    await supabase.rpc('increment_dam_tag_usage', { p_tag_id: tagId }).throwOnError();
-  }
-
-  static async removeTagFromAsset(tenantId: string, assetId: string, tagId: string): Promise<void> {
-    await supabase
-      .from('dam_asset_tags')
-      .delete()
-      .eq('tenant_id', tenantId)
-      .eq('asset_id', assetId)
-      .eq('tag_id', tagId);
-  }
-
-  static async listTags(tenantId: string, search?: string): Promise<DAMTag[]> {
-    let query = supabase
-      .from('dam_tags')
-      .select('*')
-      .eq('tenant_id', tenantId)
-      .order('usage_count', { ascending: false })
-      .limit(200);
-
-    if (search) query = query.ilike('name', `%${search}%`);
-
-    const { data, error } = await query;
-    if (error) throw new Error(`DAMService.listTags: ${error.message}`);
-    return (data ?? []) as DAMTag[];
-  }
-
-  // ── Storage Stats ───────────────────────────────────────────
-
-  static async getStorageStats(tenantId: string): Promise<DAMStorageStats> {
-    const { data, error } = await supabase
-      .from('dam_assets')
-      .select('asset_type, file_size, status')
-      .eq('tenant_id', tenantId)
-      .neq('status', 'archived');
-
-    if (error) throw new Error(`DAMService.getStorageStats: ${error.message}`);
-
-    const rows = (data ?? []) as { asset_type: DAMAssetType; file_size: number; status: string }[];
-    const byType = {} as DAMStorageStats['by_type'];
-    let totalSize = 0;
-
-    for (const row of rows) {
-      const t = row.asset_type;
-      if (!byType[t]) byType[t] = { count: 0, size: 0 };
-      byType[t].count += 1;
-      byType[t].size += row.file_size;
-      totalSize += row.file_size;
-    }
-
-    const { count: dupCount } = await supabase
-      .from('dam_similarity')
-      .select('id', { count: 'exact', head: true })
-      .eq('tenant_id', tenantId)
-      .eq('is_duplicate', true);
-
-    const { count: pendingCount } = await supabase
-      .from('dam_processing_jobs')
-      .select('id', { count: 'exact', head: true })
-      .eq('tenant_id', tenantId)
-      .in('status', ['queued', 'running']);
-
-    return {
-      tenant_id: tenantId,
-      total_assets: rows.length,
-      total_size_bytes: totalSize,
-      by_type: byType,
-      duplicates_count: dupCount ?? 0,
-      pending_processing: pendingCount ?? 0,
-      cdn_hit_ratio: 0, // populated by CDNService metrics
-    };
-  }
-
-  // ── Audit ───────────────────────────────────────────────────
-
-  static async writeAudit(
-    tenantId: string,
-    action: string,
-    actorId: string,
-    assetId: string | null,
-    oldValue: Record<string, unknown> | null,
-    newValue: Record<string, unknown> | null,
-    actorEmail?: string,
-  ): Promise<void> {
-    await supabase.from('dam_audit').insert({
-      tenant_id: tenantId,
+  async logUsage(assetId: string, tenantId: string, contextType: string, contextId: string, usedBy: string): Promise<void> {
+    await this.sb.from('dam_usage').insert({
       asset_id: assetId,
-      action,
-      actor_id: actorId,
-      actor_email: actorEmail ?? null,
-      old_value: oldValue,
-      new_value: newValue,
+      tenant_id: tenantId,
+      context_type: contextType,
+      context_id: contextId,
+      used_by: usedBy,
     });
   }
 
-  static async listAuditLogs(
-    tenantId: string,
-    assetId?: string,
-    limit = 50,
-  ): Promise<DAMAuditLog[]> {
-    let query = supabase
-      .from('dam_audit')
-      .select('*')
-      .eq('tenant_id', tenantId)
-      .order('created_at', { ascending: false })
-      .limit(limit);
-
-    if (assetId) query = query.eq('asset_id', assetId);
-
-    const { data, error } = await query;
-    if (error) throw new Error(`DAMService.listAuditLogs: ${error.message}`);
-    return (data ?? []) as DAMAuditLog[];
-  }
-
-  // ── Folder Management ───────────────────────────────────────
-
-  static async listFolders(tenantId: string): Promise<string[]> {
-    const { data, error } = await supabase
-      .from('dam_assets')
-      .select('folder_path')
-      .eq('tenant_id', tenantId)
-      .neq('status', 'archived');
-
-    if (error) throw new Error(`DAMService.listFolders: ${error.message}`);
-
-    const folders = new Set<string>();
-    for (const row of (data ?? []) as { folder_path: string }[]) {
-      const parts = row.folder_path.split('/').filter(Boolean);
-      let path = '/';
-      folders.add(path);
-      for (const part of parts) {
-        path = `${path}${part}/`;
-        folders.add(path);
-      }
-    }
-    return Array.from(folders).sort();
-  }
-
-  static async moveAssetsToFolder(
-    tenantId: string,
-    assetIds: string[],
-    targetFolder: string,
-    actorId: string,
-  ): Promise<void> {
-    const { error } = await supabase
-      .from('dam_assets')
-      .update({ folder_path: targetFolder, updated_at: new Date().toISOString() })
-      .eq('tenant_id', tenantId)
-      .in('id', assetIds);
-
-    if (error) throw new Error(`DAMService.moveAssetsToFolder: ${error.message}`);
-    await this.writeAudit(tenantId, 'asset.moved', actorId, null, null, { asset_ids: assetIds, target_folder: targetFolder });
+  async auditLog(tenantId: string, action: string, actorId: string, details: Record<string, unknown>, assetId?: string): Promise<void> {
+    await this.sb.from('dam_audit').insert({
+      asset_id: assetId ?? null,
+      tenant_id: tenantId,
+      action,
+      actor_id: actorId,
+      details,
+    });
   }
 }
