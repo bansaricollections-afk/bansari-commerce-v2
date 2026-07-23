@@ -1,5 +1,5 @@
-// Sprint 13 — Enterprise DAM Type System
-// DELTA ONLY — no existing types modified
+// Sprint 13 — Enterprise Digital Asset Management Types
+// DELTA ONLY — zero modifications to existing types
 
 export type AssetType =
   | 'image'
@@ -18,17 +18,35 @@ export type AssetType =
   | '3d_model'
   | 'ar_asset';
 
-export type AssetStatus = 'pending' | 'processing' | 'active' | 'archived' | 'rejected' | 'expired';
-export type ProcessingStatus = 'queued' | 'processing' | 'completed' | 'failed' | 'skipped';
-export type RightsLicenseType = 'royalty_free' | 'rights_managed' | 'creative_commons' | 'proprietary' | 'public_domain';
-export type CollectionType = 'manual' | 'smart' | 'album';
-export type DerivativeType = 'thumbnail' | 'webp' | 'avif' | 'responsive' | 'watermarked' | 'bg_removed' | 'super_resolution';
+export type AssetStatus =
+  | 'pending'
+  | 'processing'
+  | 'active'
+  | 'archived'
+  | 'deleted'
+  | 'expired'
+  | 'rejected';
+
+export type ProcessingStatus =
+  | 'queued'
+  | 'processing'
+  | 'completed'
+  | 'failed'
+  | 'skipped';
+
+export type LicenseType =
+  | 'royalty_free'
+  | 'rights_managed'
+  | 'creative_commons'
+  | 'proprietary'
+  | 'public_domain'
+  | 'editorial';
 
 export interface DAMAsset {
   id: string;
   tenant_id: string;
-  organization_id: string;
-  created_by: string;
+  organization_id: string | null;
+  folder_id: string | null;
   name: string;
   original_filename: string;
   asset_type: AssetType;
@@ -36,36 +54,22 @@ export interface DAMAsset {
   file_size: number;
   width: number | null;
   height: number | null;
-  duration_seconds: number | null;
+  duration: number | null;
   storage_path: string;
-  storage_bucket: string;
   public_url: string | null;
   cdn_url: string | null;
-  folder_path: string;
+  thumbnail_url: string | null;
   status: AssetStatus;
   version: number;
-  checksum_md5: string;
-  checksum_sha256: string;
-  is_public: boolean;
+  checksum: string;
   alt_text: string | null;
   caption: string | null;
   description: string | null;
-  custom_metadata: Record<string, unknown>;
-  pim_product_ids: string[];
-  storefront_ids: string[];
-  campaign_ids: string[];
-  quality_score: number | null;
-  dominant_colors: string[];
-  color_palette: string[];
-  has_watermark: boolean;
-  is_nsfw: boolean;
-  ocr_text: string | null;
-  ai_tags: string[];
-  ai_caption: string | null;
-  embedding_vector: number[] | null;
-  duplicate_of: string | null;
-  expires_at: string | null;
+  uploaded_by: string;
+  approved_by: string | null;
+  approved_at: string | null;
   published_at: string | null;
+  expires_at: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -74,31 +78,37 @@ export interface DAMAssetVersion {
   id: string;
   asset_id: string;
   tenant_id: string;
-  organization_id: string;
   version_number: number;
   storage_path: string;
   file_size: number;
-  checksum_md5: string;
-  change_note: string | null;
+  checksum: string;
+  change_notes: string | null;
   created_by: string;
-  approved_by: string | null;
-  approved_at: string | null;
-  approval_status: 'pending' | 'approved' | 'rejected';
   created_at: string;
+}
+
+export interface DAMFolder {
+  id: string;
+  tenant_id: string;
+  organization_id: string | null;
+  parent_id: string | null;
+  name: string;
+  path: string;
+  description: string | null;
+  created_by: string;
+  created_at: string;
+  updated_at: string;
 }
 
 export interface DAMCollection {
   id: string;
   tenant_id: string;
-  organization_id: string;
+  organization_id: string | null;
   name: string;
-  slug: string;
   description: string | null;
-  collection_type: CollectionType;
+  is_smart: boolean;
   smart_rules: SmartCollectionRule[] | null;
   cover_asset_id: string | null;
-  is_public: boolean;
-  sort_order: number;
   created_by: string;
   created_at: string;
   updated_at: string;
@@ -106,8 +116,8 @@ export interface DAMCollection {
 
 export interface SmartCollectionRule {
   field: string;
-  operator: 'equals' | 'contains' | 'starts_with' | 'greater_than' | 'less_than' | 'in';
-  value: string | number | string[];
+  operator: 'equals' | 'contains' | 'starts_with' | 'in' | 'gt' | 'lt';
+  value: string | string[] | number;
 }
 
 export interface DAMCollectionAsset {
@@ -122,12 +132,10 @@ export interface DAMCollectionAsset {
 export interface DAMTag {
   id: string;
   tenant_id: string;
-  organization_id: string;
   name: string;
   slug: string;
   color: string | null;
   is_ai_generated: boolean;
-  usage_count: number;
   created_at: string;
 }
 
@@ -135,101 +143,144 @@ export interface DAMAssetTag {
   asset_id: string;
   tag_id: string;
   confidence: number | null;
-  is_ai_generated: boolean;
+  source: 'manual' | 'ai' | 'import';
   created_at: string;
+}
+
+export interface DAMMetadata {
+  id: string;
+  asset_id: string;
+  tenant_id: string;
+  key: string;
+  value: string;
+  data_type: 'string' | 'number' | 'boolean' | 'json' | 'date';
+  created_at: string;
+  updated_at: string;
 }
 
 export interface DAMAIAnalysis {
   id: string;
   asset_id: string;
   tenant_id: string;
-  analysis_type: 'auto_tag' | 'object_detection' | 'face_detection' | 'brand_detection' | 'ocr' | 'nsfw' | 'color' | 'caption' | 'similarity' | 'watermark' | 'quality';
-  provider: string;
-  result: Record<string, unknown>;
-  confidence: number | null;
-  processing_time_ms: number | null;
-  model_version: string | null;
+  dominant_colors: string[] | null;
+  color_palette: ColorPaletteEntry[] | null;
+  ai_tags: AITag[] | null;
+  objects_detected: DetectedObject[] | null;
+  faces_detected: number | null;
+  ocr_text: string | null;
+  caption: string | null;
+  quality_score: number | null;
+  nsfw_score: number | null;
+  watermark_detected: boolean | null;
+  brand_detected: string[] | null;
+  embedding: number[] | null;
+  analysis_model: string | null;
+  analyzed_at: string;
   created_at: string;
+}
+
+export interface ColorPaletteEntry {
+  hex: string;
+  rgb: { r: number; g: number; b: number };
+  percentage: number;
+  name: string | null;
+}
+
+export interface AITag {
+  label: string;
+  confidence: number;
+  category: string | null;
+}
+
+export interface DetectedObject {
+  label: string;
+  confidence: number;
+  bounding_box: { x: number; y: number; width: number; height: number } | null;
 }
 
 export interface DAMRights {
   id: string;
   asset_id: string;
   tenant_id: string;
-  organization_id: string;
-  license_type: RightsLicenseType;
+  license_type: LicenseType;
   copyright_holder: string | null;
   copyright_year: number | null;
   attribution_required: boolean;
   attribution_text: string | null;
-  usage_rights: string[];
-  restricted_uses: string[];
-  geographic_restrictions: string[];
-  brand_restrictions: string[];
-  marketplace_restrictions: string[];
-  license_url: string | null;
+  usage_rights: string[] | null;
+  geographic_restrictions: string[] | null;
+  brand_restrictions: string[] | null;
+  marketplace_restrictions: string[] | null;
   valid_from: string | null;
-  expires_at: string | null;
-  created_by: string;
+  valid_until: string | null;
+  license_url: string | null;
+  notes: string | null;
   created_at: string;
   updated_at: string;
-}
-
-export interface DAMProcessingJob {
-  id: string;
-  asset_id: string;
-  tenant_id: string;
-  job_type: 'background_removal' | 'auto_crop' | 'enhance' | 'compress' | 'super_resolution' | 'webp_convert' | 'avif_convert' | 'thumbnail' | 'color_analysis' | 'ai_tagging' | 'caption' | 'embedding' | 'watermark_detect' | 'nsfw_detect' | 'ocr' | 'duplicate_check' | 'virus_scan';
-  status: ProcessingStatus;
-  priority: number;
-  attempts: number;
-  max_attempts: number;
-  params: Record<string, unknown>;
-  result: Record<string, unknown> | null;
-  error_message: string | null;
-  started_at: string | null;
-  completed_at: string | null;
-  created_at: string;
-}
-
-export interface DAMDerivative {
-  id: string;
-  asset_id: string;
-  tenant_id: string;
-  derivative_type: DerivativeType;
-  storage_path: string;
-  cdn_url: string | null;
-  width: number | null;
-  height: number | null;
-  file_size: number;
-  mime_type: string;
-  quality: number | null;
-  transform_params: Record<string, unknown>;
-  cache_control: string;
-  is_valid: boolean;
-  created_at: string;
-  expires_at: string | null;
-}
-
-export interface DAMSimilarity {
-  asset_id: string;
-  similar_asset_id: string;
-  tenant_id: string;
-  similarity_score: number;
-  is_duplicate: boolean;
-  computed_at: string;
 }
 
 export interface DAMUsage {
   id: string;
   asset_id: string;
   tenant_id: string;
-  organization_id: string;
-  usage_context: 'product' | 'storefront' | 'cms' | 'campaign' | 'marketplace' | 'email' | 'social' | 'api';
-  entity_type: string;
-  entity_id: string;
+  context_type: 'product' | 'category' | 'cms' | 'banner' | 'email' | 'social' | 'other';
+  context_id: string | null;
+  context_name: string | null;
   used_by: string;
   used_at: string;
+}
+
+export interface DAMProcessingJob {
+  id: string;
+  asset_id: string;
+  tenant_id: string;
+  job_type:
+    | 'thumbnail'
+    | 'webp_convert'
+    | 'avif_convert'
+    | 'background_removal'
+    | 'ai_analysis'
+    | 'ocr'
+    | 'compression'
+    | 'super_resolution'
+    | 'watermark_detection'
+    | 'nsfw_detection'
+    | 'similarity_embedding'
+    | 'duplicate_detection'
+    | 'virus_scan';
+  status: ProcessingStatus;
+  priority: number;
+  attempts: number;
+  max_attempts: number;
+  result: Record<string, unknown> | null;
+  error_message: string | null;
+  started_at: string | null;
+  completed_at: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface DAMDerivative {
+  id: string;
+  asset_id: string;
+  tenant_id: string;
+  derivative_type: 'thumbnail' | 'webp' | 'avif' | 'resized' | 'cropped' | 'bg_removed' | 'watermarked';
+  width: number | null;
+  height: number | null;
+  format: string;
+  file_size: number;
+  storage_path: string;
+  cdn_url: string | null;
+  transform_params: Record<string, unknown> | null;
+  created_at: string;
+}
+
+export interface DAMSimilarity {
+  asset_id: string;
+  similar_asset_id: string;
+  similarity_score: number;
+  is_duplicate: boolean;
+  created_at: string;
 }
 
 export interface DAMDownloadLog {
@@ -239,10 +290,8 @@ export interface DAMDownloadLog {
   downloaded_by: string | null;
   ip_address: string | null;
   user_agent: string | null;
-  download_type: 'original' | 'derivative' | 'cdn';
   derivative_type: string | null;
-  bytes_transferred: number;
-  created_at: string;
+  downloaded_at: string;
 }
 
 export interface DAMAuditLog {
@@ -250,103 +299,86 @@ export interface DAMAuditLog {
   asset_id: string | null;
   tenant_id: string;
   actor_id: string;
-  action: string;
+  action:
+    | 'upload'
+    | 'update'
+    | 'delete'
+    | 'restore'
+    | 'download'
+    | 'approve'
+    | 'reject'
+    | 'publish'
+    | 'unpublish'
+    | 'rights_update'
+    | 'version_create'
+    | 'version_restore';
   entity_type: string;
   entity_id: string;
-  old_values: Record<string, unknown> | null;
-  new_values: Record<string, unknown> | null;
+  changes: Record<string, unknown> | null;
   ip_address: string | null;
+  user_agent: string | null;
   created_at: string;
 }
 
-// DTO types
-export interface CreateAssetDTO {
+// ---- Request / Response DTOs ----
+
+export interface UploadAssetInput {
   name: string;
   asset_type: AssetType;
-  folder_path?: string;
+  folder_id?: string;
   alt_text?: string;
   caption?: string;
   description?: string;
-  custom_metadata?: Record<string, unknown>;
-  is_public?: boolean;
-  expires_at?: string;
   tags?: string[];
+  metadata?: Record<string, string>;
 }
 
-export interface UpdateAssetDTO {
+export interface UpdateAssetInput {
   name?: string;
   alt_text?: string;
   caption?: string;
   description?: string;
-  folder_path?: string;
-  custom_metadata?: Record<string, unknown>;
-  is_public?: boolean;
-  expires_at?: string;
+  folder_id?: string;
   status?: AssetStatus;
+  expires_at?: string;
 }
 
-export interface AssetListParams {
+export interface ListAssetsQuery {
   tenant_id: string;
-  organization_id?: string;
+  folder_id?: string;
   asset_type?: AssetType;
   status?: AssetStatus;
-  folder_path?: string;
-  tags?: string[];
+  tag_ids?: string[];
+  collection_id?: string;
   search?: string;
   page?: number;
   limit?: number;
-  sort_by?: 'created_at' | 'updated_at' | 'name' | 'file_size' | 'quality_score';
+  sort_by?: 'created_at' | 'name' | 'file_size' | 'updated_at';
   sort_order?: 'asc' | 'desc';
 }
 
-export interface CDNTransformParams {
+export interface AssetTransformOptions {
   width?: number;
   height?: number;
-  quality?: number;
   format?: 'webp' | 'avif' | 'jpeg' | 'png';
+  quality?: number;
   fit?: 'cover' | 'contain' | 'fill' | 'inside' | 'outside';
-  blur?: number;
-  sharpen?: boolean;
-  watermark?: boolean;
+  crop?: { x: number; y: number; width: number; height: number };
 }
 
-export interface SignedUrlOptions {
-  expiresIn?: number; // seconds
-  transform?: CDNTransformParams;
+export interface CDNSignedUrlOptions {
+  expires_in_seconds?: number;
+  transform?: AssetTransformOptions;
   download?: boolean;
 }
 
-export interface AIProcessingResult {
-  tags: Array<{ label: string; confidence: number }>;
-  objects: Array<{ label: string; confidence: number; bbox?: number[] }>;
-  faces: number;
-  brands: string[];
-  ocr_text: string | null;
-  caption: string | null;
-  dominant_colors: string[];
-  color_palette: string[];
-  quality_score: number;
-  has_watermark: boolean;
-  is_nsfw: boolean;
-  embedding: number[];
-}
-
-export interface DuplicateCheckResult {
-  is_duplicate: boolean;
-  duplicate_of: string | null;
-  similarity_score: number;
-  similar_assets: Array<{ asset_id: string; score: number }>;
-}
-
-export interface StorageUploadResult {
-  storage_path: string;
-  storage_bucket: string;
-  public_url: string | null;
-  file_size: number;
-  checksum_md5: string;
-  checksum_sha256: string;
-  mime_type: string;
-  width: number | null;
-  height: number | null;
-  duration_seconds: number | null;
+export interface DAMStats {
+  total_assets: number;
+  total_size_bytes: number;
+  assets_by_type: Record<string, number>;
+  storage_used_percent: number;
+  processing_queue_depth: number;
+  duplicate_count: number;
+  expired_count: number;
+  cdn_hit_ratio: number;
 }
