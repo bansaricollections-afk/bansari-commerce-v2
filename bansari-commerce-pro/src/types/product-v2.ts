@@ -464,14 +464,16 @@ export type CreateProductV2Payload = {
   price: number;
   compare_price?: number;
   cost?: number;
+  stock?: number;
   hsn: string;
   hsn_code?: string;
   gst: number;
   country_of_origin?: string;
   manufacturer?: string;
   care_instructions?: string;
-  fabric: string;
-  color: string;
+  fabric?: string;
+  color?: string;
+  sizes?: string[];
   pattern_text?: string;
   occasion_text?: string;
   work_type?: string;
@@ -491,23 +493,28 @@ export type CreateProductV2Payload = {
   attr_work_id?: number;
   attr_length_id?: number;
   size_chart_id?: number;
-  seo_title: string;
-  seo_description: string;
-  seo_keywords?: string;
-  canonical_url?: string;
   featured?: boolean;
   new_arrival?: boolean;
   best_seller?: boolean;
   active?: boolean;
   display_order?: number;
-  sizes?: string[];
+  seo_title?: string;
+  seo_description?: string;
+  seo_keywords?: string;
+  canonical_url?: string;
   images?: { url?: string; alt?: string; type?: string }[];
+  tag_ids?: number[];
   created_by?: string;
+  updated_by?: string;
 };
 
 export type UpdateProductV2Payload = Partial<CreateProductV2Payload> & {
   updated_by?: string;
 };
+
+// ============================================================
+// VARIANT PAYLOADS
+// ============================================================
 
 export type CreateVariantPayload = {
   product_id: number;
@@ -518,8 +525,7 @@ export type CreateVariantPayload = {
   mrp: number;
   selling_price: number;
   cost?: number;
-  stock: number;
-  reserved_stock?: number;
+  stock?: number;
   weight_grams?: number;
   length_cm?: number;
   width_cm?: number;
@@ -531,73 +537,39 @@ export type CreateVariantPayload = {
 
 export type UpdateVariantPayload = Partial<Omit<CreateVariantPayload, 'product_id'>>;
 
-export type CreateImagePayload = {
-  product_id: number;
-  image_type: ProductImageType;
-  url: string;
-  alt?: string;
-  sort_order?: number;
-};
-
 // ============================================================
-// SEARCH / FILTER
+// QUERY / FILTER TYPES
 // ============================================================
 
-export interface ProductSearchFilters {
-  /** Full-text query (name, sku, slug, description) */
-  query?: string;
-  /** Legacy text category column */
-  category?: string;
+export interface ProductV2Filters {
+  search?: string;
   categoryId?: number;
-  categorySlug?: string;
-  /** Legacy text collection column */
-  collection?: string;
+  subcategoryId?: number;
   collectionId?: number;
-  collectionSlug?: string;
+  active?: boolean;
   featured?: boolean;
   newArrival?: boolean;
   bestSeller?: boolean;
-  active?: boolean;
-  tags?: string[];
   minPrice?: number;
   maxPrice?: number;
+  attrFabricId?: number;
+  attrColorId?: number;
+  attrOccasionId?: number;
+  attrPatternId?: number;
+  attrFitId?: number;
+  attrSleeveId?: number;
+  attrNeckId?: number;
+  attrWorkId?: number;
+  attrLengthId?: number;
   page?: number;
-  limit?: number;
-  orderBy?: 'created_at' | 'display_order' | 'price' | 'name';
-  ascending?: boolean;
+  pageSize?: number;
+  sortBy?: 'name' | 'price' | 'created_at' | 'display_order' | 'stock';
+  sortDir?: 'asc' | 'desc';
 }
 
-export interface ProductSearchResult {
-  products: ProductV2[];
+export interface ProductV2ListResult {
+  data: ProductV2[];
   total: number;
   page: number;
-  limit: number;
-  totalPages: number;
+  pageSize: number;
 }
-
-// ============================================================
-// VALIDATION
-// ============================================================
-
-export interface ProductValidationError {
-  field: string;
-  message: string;
-  code: ProductErrorCode;
-}
-
-export type ProductErrorCode =
-  | 'SLUG_REQUIRED'
-  | 'SLUG_DUPLICATE'
-  | 'SKU_REQUIRED'
-  | 'SKU_DUPLICATE'
-  | 'NAME_REQUIRED'
-  | 'CATEGORY_REQUIRED'
-  | 'PRICE_INVALID'
-  | 'MRP_BELOW_SELLING'
-  | 'STOCK_NEGATIVE'
-  | 'RESERVED_EXCEEDS_STOCK'
-  | 'IMAGE_PRIMARY_REQUIRED'
-  | 'IMAGE_DUPLICATE_URL'
-  | 'VARIANT_DUPLICATE_SKU'
-  | 'REF_INVALID'
-  | 'INTERNAL';
