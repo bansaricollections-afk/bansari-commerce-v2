@@ -1,38 +1,44 @@
-// Sprint 13 — /api/rights
 import { NextRequest, NextResponse } from 'next/server';
-import { RightsService } from '@/services/rights.service';
 import { createClient } from '@/lib/supabase/server';
+import { RightsService } from '@/services/rights.service';
 
 export async function GET(req: NextRequest) {
   try {
     const supabase = await createClient();
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    const tenantId = req.headers.get('x-tenant-id');
-    if (!tenantId) return NextResponse.json({ error: 'x-tenant-id required' }, { status: 400 });
-    const assetId = req.nextUrl.searchParams.get('asset_id');
-    if (!assetId) {
-      const expiring = await RightsService.listExpiring(tenantId);
-      return NextResponse.json({ expiring });
-    }
-    const rights = await RightsService.getRights(tenantId, assetId);
-    return NextResponse.json({ rights });
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    if (authError || !user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+
+    const { searchParams } = new URL(req.url);
+    const tenantId = searchParams.get('tenant_id');
+    const assetId = searchParams.get('asset_id') ?? undefined;
+    const page = parseInt(searchParams.get('page') ?? '1');
+    const limit = parseInt(searchParams.get('limit') ?? '20');
+
+    if (!tenantId) return NextResponse.json({ error: 'tenant_id required' }, { status: 400 });
+
+    const rightsService = new RightsService(supabase);
+    const result = await rightsService.listRights({ tenantId, assetId, page, limit });
+
+    return NextResponse.json(result);
   } catch (err) {
-    return NextResponse.json({ error: String(err) }, { status: 500 });
+    console.error('[GET /api/rights]', err);
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }
 
-export async function PUT(req: NextRequest) {
+export async function POST(req: NextRequest) {
   try {
     const supabase = await createClient();
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    const tenantId = req.headers.get('x-tenant-id');
-    if (!tenantId) return NextResponse.json({ error: 'x-tenant-id required' }, { status: 400 });
-    const { asset_id, ...rights } = await req.json();
-    const result = await RightsService.upsertRights(tenantId, asset_id, rights);
-    return NextResponse.json({ rights: result });
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    if (authError || !user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+
+    const body = await req.json();
+    const rightsService = new RightsService(supabase);
+    const rights = await rightsService.createRights({ ...body, createdBy: user.id });
+
+    return NextResponse.json(rights, { status: 201 });
   } catch (err) {
-    return NextResponse.json({ error: String(err) }, { status: 500 });
+    console.error('[POST /api/rights]', err);
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }

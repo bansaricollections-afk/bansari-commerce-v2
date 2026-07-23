@@ -1,35 +1,54 @@
-// Sprint 13 — /api/processing — Job queue management
 import { NextRequest, NextResponse } from 'next/server';
-import { AssetProcessingService } from '@/services/asset-processing.service';
 import { createClient } from '@/lib/supabase/server';
-import type { DAMProcessingJob } from '@/types/dam';
+import { AssetProcessingService } from '@/services/asset-processing.service';
 
 export async function GET(req: NextRequest) {
   try {
     const supabase = await createClient();
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    const tenantId = req.headers.get('x-tenant-id');
-    if (!tenantId) return NextResponse.json({ error: 'x-tenant-id required' }, { status: 400 });
-    const status = req.nextUrl.searchParams.get('status') as DAMProcessingJob['status'] | null;
-    const jobs = await AssetProcessingService.listJobs(tenantId, status ?? undefined);
-    return NextResponse.json({ jobs });
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    if (authError || !user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+
+    const { searchParams } = new URL(req.url);
+    const tenantId = searchParams.get('tenant_id');
+    const status = searchParams.get('status') ?? undefined;
+    const page = parseInt(searchParams.get('page') ?? '1');
+    const limit = parseInt(searchParams.get('limit') ?? '20');
+
+    if (!tenantId) return NextResponse.json({ error: 'tenant_id required' }, { status: 400 });
+
+    const processingService = new AssetProcessingService(supabase);
+    const jobs = await processingService.listJobs({ tenantId, status, page, limit });
+
+    return NextResponse.json(jobs);
   } catch (err) {
-    return NextResponse.json({ error: String(err) }, { status: 500 });
+    console.error('[GET /api/processing]', err);
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }
 
 export async function POST(req: NextRequest) {
   try {
     const supabase = await createClient();
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    const tenantId = req.headers.get('x-tenant-id');
-    if (!tenantId) return NextResponse.json({ error: 'x-tenant-id required' }, { status: 400 });
-    const { asset_id, job_type, priority } = await req.json();
-    const job = await AssetProcessingService.enqueueJob(tenantId, asset_id, job_type, priority ?? 5);
-    return NextResponse.json({ job }, { status: 201 });
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    if (authError || !user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+
+    const body = await req.json();
+    const { assetId, tenantId, operations } = body as {
+      assetId: string;
+      tenantId: string;
+      operations: string[];
+    };
+
+    if (!assetId || !tenantId || !operations?.length) {
+      return NextResponse.json({ error: 'assetId, tenantId and operations are required' }, { status: 400 });
+    }
+
+    const processingService = new AssetProcessingService(supabase);
+    const job = await processingService.enqueueProcessing(assetId, tenantId, operations);
+
+    return NextResponse.json(job, { status: 201 });
   } catch (err) {
-    return NextResponse.json({ error: String(err) }, { status: 500 });
+    console.error('[POST /api/processing]', err);
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }
