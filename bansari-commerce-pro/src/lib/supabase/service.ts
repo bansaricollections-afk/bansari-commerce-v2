@@ -1,32 +1,30 @@
-import { createClient as createSupabaseClient } from "@supabase/supabase-js";
-
 /**
- * Service-role Supabase client for trusted server-side writes only.
+ * src/lib/supabase/service.ts
  *
- * `orders`/`order_items` RLS defines exactly one policy each (customers
- * may SELECT their own rows) and no INSERT/UPDATE/DELETE policy for any
- * role, and no GRANT statements exist either. This is deliberate — writes
- * are only ever meant to happen through this client, from trusted
- * server-side code, which uses the service_role key and therefore bypasses
- * RLS entirely.
+ * Creates a Supabase client that authenticates with the service-role
+ * secret key, bypassing Row-Level Security.  Use ONLY in trusted
+ * server-side contexts (Server Actions, API Routes, background jobs).
  *
- * NEVER import this into a Client Component or anything that ships to the
- * browser — the service_role key must never be exposed client-side.
+ * Never import this module in Client Components or expose it to the
+ * browser bundle.
+ *
+ * Uses @supabase/supabase-js ^2.110 (no cookie handling needed).
  */
+
+import { createClient as createSupabaseClient } from '@supabase/supabase-js';
+
 export function createServiceRoleClient() {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-
-  if (!url || !serviceRoleKey) {
-    throw new Error(
-      "Missing Supabase service-role configuration: NEXT_PUBLIC_SUPABASE_URL and/or SUPABASE_SERVICE_ROLE_KEY."
-    );
-  }
-
-  return createSupabaseClient(url, serviceRoleKey, {
-    auth: {
-      autoRefreshToken: false,
-      persistSession: false,
-    },
-  });
+  return createSupabaseClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!,
+    {
+      auth: {
+        // Disable session persistence — the service-role key is a static
+        // secret that never needs to be refreshed or stored in cookies.
+        persistSession: false,
+        autoRefreshToken: false,
+        detectSessionInUrl: false,
+      },
+    }
+  );
 }
