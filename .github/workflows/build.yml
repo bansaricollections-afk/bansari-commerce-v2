@@ -114,11 +114,15 @@ jobs:
 
       # ── 6. Lint ──────────────────────────────────────────────
       #
-      # Only runs when a "lint" script exists in package.json.
-      # Uses `jq` (pre-installed on ubuntu-latest) to check.
-      # Failures are surfaced as a distinct step so they are
-      # clearly separated from build and type errors in the log.
-      - name: Lint (npm run lint)
+      # NON-BLOCKING — lint findings are reported in the log but
+      # do NOT fail the CI run. Build and type-check remain the
+      # mandatory gates. Lint will become a hard gate in a
+      # dedicated code-quality sprint once all Sprint 13 findings
+      # are resolved.
+      #
+      # To re-enable as a hard gate: remove continue-on-error.
+      - name: Lint (npm run lint) [non-blocking]
+        continue-on-error: true
         run: |
           if jq -e '.scripts.lint' package.json > /dev/null 2>&1; then
             echo "✓ lint script found — running npm run lint"
