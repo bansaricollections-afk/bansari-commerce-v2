@@ -4,6 +4,13 @@ import { AdminHeader } from '@/components/admin/AdminHeader';
 import { AdminSidebar } from '@/components/admin/AdminSidebar';
 import { requireAdminPage } from '@/lib/auth/requireAdmin';
 
+// Prevent Next.js from attempting a static prerender of any /admin/* segment.
+// This layout calls headers() — a Dynamic API — to detect /admin/login.
+// During build-time prerender, headers() returns an empty store, which causes
+// isLoginPage to evaluate false and requireAdminPage() to execute with no
+// valid request context, crashing the build when Supabase env vars are absent.
+export const dynamic = 'force-dynamic';
+
 export const metadata: Metadata = {
   title: 'Admin Dashboard | Bansari Commerce Pro',
   description: 'Bansari Commerce Pro Administration Panel',
