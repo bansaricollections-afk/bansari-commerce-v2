@@ -3,7 +3,7 @@
 import { useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import { adjustStockAction } from '@/app/actions/inventory.actions';
-import type { AdjustmentReason } from '@/types/inventory';
+import type { AdjustmentReason } from '@/services/inventory.service';
 
 const REASONS: { value: AdjustmentReason; label: string; desc: string }[] = [
   { value: 'cycle_count',       label: 'Cycle Count',        desc: 'Physical count correction' },

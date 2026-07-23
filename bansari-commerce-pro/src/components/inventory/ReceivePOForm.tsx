@@ -3,7 +3,7 @@
 import { useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import { receivePurchaseOrderAction } from '@/app/actions/inventory.actions';
-import type { PurchaseOrder } from '@/types/inventory';
+import type { PurchaseOrder } from '@/services/inventory.service';
 
 interface Props {
   po: PurchaseOrder;
