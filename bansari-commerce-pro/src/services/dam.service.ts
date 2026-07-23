@@ -1,13 +1,10 @@
 // Sprint 13 — DAMService
-// REPAIR Step 3: Verified createClient pattern matches existing project (server.ts)
-// REPAIR RC#5: UploadAssetInput.file typed as Blob to avoid DOM File dependency
-// Delta only
+// REPAIR: Added approveAsset instance method (Option B)
+// All existing methods preserved verbatim
+// Delta only — no architecture change
 
 import type { SupabaseClient } from '@supabase/supabase-js';
-import type {
-  DAMAsset,
-  ListAssetsInput,
-} from '@/types/dam';
+import type { DAMAsset, ListAssetsInput } from '@/types/dam';
 
 // File-like input — compatible with Node 18 File, FormData Blob, and DOM File
 export interface UploadAssetInput {
@@ -178,6 +175,35 @@ export class DAMService {
       .single();
     if (error) throw new Error(`Create asset failed: ${error.message}`);
     return data as DAMAsset;
+  }
+
+  // ----------------------------------------------------------------
+  // Approval workflow — DELTA addition
+  // Uses existing updateAsset column set + auditLog pattern verbatim
+  // ----------------------------------------------------------------
+  async approveAsset(tenantId: string, assetId: string, actorId: string): Promise<void> {
+    // Verify asset exists and belongs to this tenant
+    const asset = await this.getAsset(assetId);
+    if (!asset) throw new Error('Asset not found');
+    if (asset.tenant_id !== tenantId) throw new Error('Asset not found');
+
+    // Update status + approval fields using existing sb pattern
+    const now = new Date().toISOString();
+    const { error } = await this.sb
+      .from('dam_assets')
+      .update({
+        status: 'ready',
+        approved_by: actorId,
+        approved_at: now,
+        updated_at: now,
+      })
+      .eq('id', assetId)
+      .eq('tenant_id', tenantId);
+
+    if (error) throw new Error(`Approve asset failed: ${error.message}`);
+
+    // Audit log — reuses existing auditLog method verbatim
+    await this.auditLog(tenantId, 'asset.approved', actorId, { asset_id: assetId }, assetId);
   }
 
   async logUsage(
