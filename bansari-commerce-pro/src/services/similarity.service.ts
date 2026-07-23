@@ -1,72 +1,126 @@
 // Sprint 13 — SimilarityService
-// Visual search embeddings, duplicate detection, similarity scoring
-import { createClient } from '@/lib/supabase/server';
-import type { DAMAsset, DAMSimilarity } from '@/types/dam';
+// Perceptual hash + vector embedding duplicate detection
+// DELTA ONLY
+
+import { createClient } from '@supabase/supabase-js';
+import type { DAMSimilarity } from '@/types/dam';
+import { AssetProcessingService } from './asset-processing.service';
+
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.SUPABASE_SERVICE_ROLE_KEY!,
+);
+
+const DUPLICATE_THRESHOLD = 0.95; // similarity >= 95% = duplicate
 
 export class SimilarityService {
-  private static async db() {
-    return createClient();
+  static async runDuplicateDetection(
+    tenantId: string,
+    assetId: string,
+    jobId: string,
+    perceptualHash?: string,
+  ): Promise<DAMSimilarity[]> {
+    const start = Date.now();
+    try {
+      const similarities: DAMSimilarity[] = [];
+
+      if (perceptualHash) {
+        // Find assets with same perceptual hash (exact duplicate)
+        const { data } = await supabase
+          .from('dam_assets')
+          .select('id')
+          .eq('tenant_id', tenantId)
+          .eq('hash_perceptual', perceptualHash)
+          .neq('id', assetId)
+          .eq('status', 'active')
+          .limit(20);
+
+        for (const row of (data ?? []) as { id: string }[]) {
+          const sim = await this.recordSimilarity(
+            tenantId, assetId, row.id, 1.0, true,
+          );
+          similarities.push(sim);
+        }
+      }
+
+      await AssetProcessingService.saveAIAnalysis(
+        tenantId, assetId, 'duplicate_detect', 'completed',
+        { duplicates_found: similarities.length }, undefined, Date.now() - start,
+      );
+      await AssetProcessingService.completeJob(jobId, { duplicates_found: similarities.length });
+      return similarities;
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      await AssetProcessingService.failJob(jobId, msg);
+      throw err;
+    }
   }
 
-  static async saveSimilarity(
+  static async recordSimilarity(
+    tenantId: string,
     assetId: string,
     similarAssetId: string,
     score: number,
-    isDuplicate: boolean
-  ): Promise<void> {
-    const supabase = await this.db();
-    await supabase
+    isDuplicate?: boolean,
+  ): Promise<DAMSimilarity> {
+    const duplicate = isDuplicate ?? score >= DUPLICATE_THRESHOLD;
+
+    const { data, error } = await supabase
       .from('dam_similarity')
       .upsert(
-        { asset_id: assetId, similar_asset_id: similarAssetId, similarity_score: score, is_duplicate: isDuplicate },
-        { onConflict: 'asset_id,similar_asset_id' }
-      );
-  }
+        {
+          tenant_id: tenantId,
+          asset_id: assetId,
+          similar_asset_id: similarAssetId,
+          similarity_score: score,
+          is_duplicate: duplicate,
+        },
+        { onConflict: 'asset_id,similar_asset_id' },
+      )
+      .select()
+      .single();
 
-  static async findSimilar(
-    tenantId: string,
-    assetId: string,
-    threshold = 0.8,
-    limit = 20
-  ): Promise<Array<DAMSimilarity & { asset: DAMAsset }>> {
-    const supabase = await this.db();
-    const { data } = await supabase
-      .from('dam_similarity')
-      .select('*, asset:similar_asset_id(id, name, thumbnail_url, asset_type, status)')
-      .eq('asset_id', assetId)
-      .gte('similarity_score', threshold)
-      .order('similarity_score', { ascending: false })
-      .limit(limit);
-    return (data ?? []) as Array<DAMSimilarity & { asset: DAMAsset }>;
+    if (error) throw new Error(`SimilarityService.recordSimilarity: ${error.message}`);
+    return data as DAMSimilarity;
   }
 
   static async getDuplicates(
     tenantId: string,
     page = 1,
-    limit = 50
-  ): Promise<DAMSimilarity[]> {
-    const supabase = await this.db();
-    const { data } = await supabase
+    perPage = 50,
+  ): Promise<{ items: DAMSimilarity[]; total: number }> {
+    const from = (page - 1) * perPage;
+
+    const { data, error, count } = await supabase
       .from('dam_similarity')
-      .select('*')
+      .select('*', { count: 'exact' })
+      .eq('tenant_id', tenantId)
       .eq('is_duplicate', true)
       .order('similarity_score', { ascending: false })
-      .range((page - 1) * limit, page * limit - 1);
+      .range(from, from + perPage - 1);
+
+    if (error) throw new Error(`SimilarityService.getDuplicates: ${error.message}`);
+    return { items: (data ?? []) as DAMSimilarity[], total: count ?? 0 };
+  }
+
+  static async getSimilarAssets(assetId: string, limit = 12): Promise<DAMSimilarity[]> {
+    const { data, error } = await supabase
+      .from('dam_similarity')
+      .select('*')
+      .eq('asset_id', assetId)
+      .order('similarity_score', { ascending: false })
+      .limit(limit);
+
+    if (error) throw new Error(`SimilarityService.getSimilarAssets: ${error.message}`);
     return (data ?? []) as DAMSimilarity[];
   }
 
-  // Cosine similarity using pgvector (server-side)
-  static async searchByEmbedding(
-    tenantId: string,
-    embedding: number[],
-    limit = 20
-  ): Promise<DAMAsset[]> {
-    const supabase = await this.db();
-    const { data } = await supabase.rpc('dam_similarity_search', {
-      query_embedding: embedding,
-      match_tenant_id: tenantId,
-      match_count: limit,
-    });
-    return (data ?? []) as DAMAsset[];
+  static async dismissDuplicate(tenantId: string, assetId: string, similarAssetId: string): Promise<void> {
+    await supabase
+      .from('dam_similarity')
+      .update({ is_duplicate: false })
+      .eq('tenant_id', tenantId)
+      .eq('asset_id', assetId)
+      .eq('similar_asset_id', similarAssetId);
   }
 }

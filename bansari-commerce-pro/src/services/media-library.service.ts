@@ -1,128 +1,136 @@
 // Sprint 13 — MediaLibraryService
-// Unified facade: tag management, metadata, usage tracking, search
-import { createClient } from '@/lib/supabase/server';
-import type { DAMAsset, DAMMetadata, DAMTag, DAMUsage } from '@/types/dam';
+// High-level orchestration: upload, search, usage tracking
+// Reuses DAMService, CDNService, AssetProcessingService, RightsService
+// DELTA ONLY
+
+import { createClient } from '@supabase/supabase-js';
+import { DAMService } from './dam.service';
+import { CDNService } from './cdn.service';
+import { AssetProcessingService } from './asset-processing.service';
+import { RightsService } from './rights.service';
+import type { DAMAsset, UploadAssetRequest, AssetListParams, DAMUsage } from '@/types/dam';
+
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.SUPABASE_SERVICE_ROLE_KEY!,
+);
+
+const DAM_BUCKET = 'dam-assets';
 
 export class MediaLibraryService {
-  private static async db() {
-    return createClient();
-  }
-
-  // ---- Tags ----
-
-  static async createTag(tenantId: string, name: string, color?: string): Promise<DAMTag> {
-    const supabase = await this.db();
-    const slug = name.toLowerCase().replace(/\s+/g, '-');
-    const { data, error } = await supabase
-      .from('dam_tags')
-      .upsert({ tenant_id: tenantId, name, slug, color: color ?? null, is_ai_generated: false }, { onConflict: 'tenant_id,slug' })
-      .select()
-      .single();
-    if (error) throw new Error(`MediaLibraryService.createTag: ${error.message}`);
-    return data as DAMTag;
-  }
-
-  static async listTags(tenantId: string): Promise<DAMTag[]> {
-    const supabase = await this.db();
-    const { data } = await supabase
-      .from('dam_tags')
-      .select('*')
-      .eq('tenant_id', tenantId)
-      .order('name');
-    return (data ?? []) as DAMTag[];
-  }
-
-  static async tagAsset(
-    assetId: string,
-    tagId: string,
-    source: 'manual' | 'ai' | 'import' = 'manual'
-  ): Promise<void> {
-    const supabase = await this.db();
-    await supabase
-      .from('dam_asset_tags')
-      .upsert({ asset_id: assetId, tag_id: tagId, source }, { onConflict: 'asset_id,tag_id' });
-  }
-
-  static async untagAsset(assetId: string, tagId: string): Promise<void> {
-    const supabase = await this.db();
-    await supabase.from('dam_asset_tags').delete().eq('asset_id', assetId).eq('tag_id', tagId);
-  }
-
-  // ---- Metadata ----
-
-  static async setMetadata(
+  /**
+   * Full upload pipeline:
+   * 1. Upload file to Supabase Storage
+   * 2. Create dam_assets record
+   * 3. Set public URL
+   * 4. Enqueue default AI processing jobs
+   * 5. Optionally set default rights
+   */
+  static async uploadAsset(
     tenantId: string,
-    assetId: string,
-    key: string,
-    value: string,
-    dataType: DAMMetadata['data_type'] = 'string'
-  ): Promise<void> {
-    const supabase = await this.db();
-    await supabase
-      .from('dam_metadata')
-      .upsert(
-        { tenant_id: tenantId, asset_id: assetId, key, value, data_type: dataType },
-        { onConflict: 'asset_id,key' }
-      );
-  }
+    uploadedBy: string,
+    file: Buffer,
+    fileName: string,
+    mimeType: string,
+    req: UploadAssetRequest,
+    organizationId?: string,
+  ): Promise<DAMAsset> {
+    // 1. Storage path: tenants/{tenantId}/{folder}/{timestamp}_{filename}
+    const safeName = fileName.replace(/[^a-zA-Z0-9._-]/g, '_');
+    const folder = (req.folder_path ?? '/').replace(/^\//, '');
+    const storagePath = `tenants/${tenantId}/${folder ? folder + '/' : ''}${Date.now()}_${safeName}`;
 
-  static async getMetadata(tenantId: string, assetId: string): Promise<DAMMetadata[]> {
-    const supabase = await this.db();
-    const { data } = await supabase
-      .from('dam_metadata')
-      .select('*')
-      .eq('tenant_id', tenantId)
-      .eq('asset_id', assetId);
-    return (data ?? []) as DAMMetadata[];
-  }
+    const { error: uploadError } = await supabase.storage
+      .from(DAM_BUCKET)
+      .upload(storagePath, file, { contentType: mimeType, upsert: false });
 
-  // ---- Usage Tracking ----
+    if (uploadError) throw new Error(`MediaLibraryService.uploadAsset storage: ${uploadError.message}`);
 
-  static async recordUsage(
-    tenantId: string,
-    assetId: string,
-    usedBy: string,
-    contextType: DAMUsage['context_type'],
-    contextId?: string,
-    contextName?: string
-  ): Promise<void> {
-    const supabase = await this.db();
-    await supabase.from('dam_usage').insert({
-      tenant_id: tenantId,
-      asset_id: assetId,
-      used_by: usedBy,
-      context_type: contextType,
-      context_id: contextId ?? null,
-      context_name: contextName ?? null,
+    // 2. Create record
+    const asset = await DAMService.createAsset(
+      tenantId, uploadedBy, req, storagePath, mimeType, file.length, organizationId,
+    );
+
+    // 3. Set public URL
+    const publicUrl = CDNService.getPublicUrl(storagePath, DAM_BUCKET);
+    const updated = await DAMService.updateAsset(tenantId, asset.id, uploadedBy, {
+      public_url: publicUrl,
+      status: 'active',
     });
-  }
 
-  static async getUsage(tenantId: string, assetId: string): Promise<DAMUsage[]> {
-    const supabase = await this.db();
-    const { data } = await supabase
-      .from('dam_usage')
-      .select('*')
-      .eq('tenant_id', tenantId)
-      .eq('asset_id', assetId)
-      .order('used_at', { ascending: false });
-    return (data ?? []) as DAMUsage[];
-  }
+    // 4. Enqueue processing
+    if (req.auto_process !== false) {
+      await AssetProcessingService.enqueueDefaultJobs(tenantId, asset.id, mimeType);
+    }
 
-  // ---- Full-text search ----
+    // 5. Default rights
+    await RightsService.setRights(tenantId, asset.id, {
+      rights_type: 'proprietary',
+      license_name: null,
+      license_url: null,
+      copyright_holder: null,
+      attribution_required: false,
+      attribution_text: null,
+      expires_at: null,
+      geographic_restrictions: [],
+      channel_restrictions: [],
+      brand_restrictions: [],
+      marketplace_allowed: true,
+      storefront_allowed: true,
+      notes: null,
+    });
+
+    return updated;
+  }
 
   static async searchAssets(
     tenantId: string,
     query: string,
-    limit = 50
-  ): Promise<DAMAsset[]> {
-    const supabase = await this.db();
-    const { data } = await supabase
-      .from('dam_assets')
+    params: Omit<AssetListParams, 'tenant_id' | 'search'> = {},
+  ): Promise<{ assets: DAMAsset[]; total: number }> {
+    return DAMService.listAssets({ ...params, tenant_id: tenantId, search: query });
+  }
+
+  static async getAssetWithSignedUrl(
+    tenantId: string,
+    assetId: string,
+    downloadedBy: string,
+    ttl = 3600,
+  ): Promise<{ asset: DAMAsset; signedUrl: string } | null> {
+    const asset = await DAMService.getAsset(tenantId, assetId);
+    if (!asset) return null;
+
+    const signedUrl = await CDNService.createSignedUrl(
+      asset.storage_path,
+      asset.storage_bucket,
+      { expires_in: ttl },
+    );
+
+    await CDNService.logDownload(tenantId, assetId, downloadedBy);
+    return { asset, signedUrl };
+  }
+
+  static async bulkTagAssets(
+    tenantId: string,
+    assetIds: string[],
+    tagName: string,
+    actorId: string,
+  ): Promise<void> {
+    const tag = await DAMService.upsertTag(tenantId, tagName, false);
+    await Promise.all(
+      assetIds.map((id) => DAMService.addTagToAsset(tenantId, id, tag.id, actorId)),
+    );
+  }
+
+  static async getUsageReport(tenantId: string, assetId: string): Promise<DAMUsage[]> {
+    const { data, error } = await supabase
+      .from('dam_usage')
       .select('*')
       .eq('tenant_id', tenantId)
-      .neq('status', 'deleted')
-      .textSearch('name', query)
-      .limit(limit);
-    return (data ?? []) as DAMAsset[];
+      .eq('asset_id', assetId)
+      .order('created_at', { ascending: false });
+
+    if (error) throw new Error(`MediaLibraryService.getUsageReport: ${error.message}`);
+    return (data ?? []) as DAMUsage[];
   }
 }
