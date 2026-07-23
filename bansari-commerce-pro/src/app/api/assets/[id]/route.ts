@@ -1,10 +1,15 @@
+// Sprint 13 — /api/assets/[id]
+// REPAIR RC#4: Use inline params type compatible with Next.js 16 RouteHandlerContext
+// Delta only
+
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { DAMService } from '@/services/dam.service';
 
-type Params = { params: Promise<{ id: string }> };
-
-export async function GET(_req: NextRequest, { params }: Params) {
+export async function GET(
+  _req: NextRequest,
+  { params }: { params: Promise<{ id: string }> },
+) {
   try {
     const { id } = await params;
     const supabase = await createClient();
@@ -22,7 +27,10 @@ export async function GET(_req: NextRequest, { params }: Params) {
   }
 }
 
-export async function PATCH(req: NextRequest, { params }: Params) {
+export async function PATCH(
+  req: NextRequest,
+  { params }: { params: Promise<{ id: string }> },
+) {
   try {
     const { id } = await params;
     const supabase = await createClient();
@@ -40,7 +48,10 @@ export async function PATCH(req: NextRequest, { params }: Params) {
   }
 }
 
-export async function DELETE(_req: NextRequest, { params }: Params) {
+export async function DELETE(
+  _req: NextRequest,
+  { params }: { params: Promise<{ id: string }> },
+) {
   try {
     const { id } = await params;
     const supabase = await createClient();

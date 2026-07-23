@@ -1,4 +1,5 @@
 // Sprint 13 — AssetProcessingService
+// REPAIR Step 2 (RC#6): Fix multi-column onConflict strings
 // Delta only
 
 import type { SupabaseClient } from '@supabase/supabase-js';
@@ -103,7 +104,15 @@ export class AssetProcessingService {
     confidence?: number,
     modelVersion?: string,
   ): Promise<void> {
-    const { error } = await this.sb.from('dam_ai_analysis').upsert({
+    // REPAIR RC#6: Use insert with ignoreDuplicates instead of multi-column onConflict string
+    // The unique constraint is on (asset_id, operation) — we delete existing and re-insert
+    await this.sb
+      .from('dam_ai_analysis')
+      .delete()
+      .eq('asset_id', assetId)
+      .eq('operation', operation);
+
+    const { error } = await this.sb.from('dam_ai_analysis').insert({
       asset_id: assetId,
       tenant_id: tenantId,
       operation,
@@ -112,7 +121,7 @@ export class AssetProcessingService {
       confidence: confidence ?? null,
       model_version: modelVersion ?? null,
       processed_at: new Date().toISOString(),
-    }, { onConflict: 'asset_id,operation' });
+    });
 
     if (error) throw new Error(`Save AI analysis failed: ${error.message}`);
   }
