@@ -6,9 +6,9 @@
 # Fails immediately if any step exits non-zero.
 #
 # Required repository secrets (Settings → Secrets → Actions):
-#   NEXT_PUBLIC_SUPABASE_URL       — Supabase project URL
-#   NEXT_PUBLIC_SUPABASE_ANON_KEY  — Supabase anon key
-#   SUPABASE_SERVICE_ROLE_KEY      — Supabase service-role key
+#   NEXT_PUBLIC_SUPABASE_URL       — https://pgpirjzgrvrfbxnampoa.supabase.co
+#   NEXT_PUBLIC_SUPABASE_ANON_KEY  — eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBncGlyanpncnZyZmJ4bmFtcG9hIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODI5Mjk4ODksImV4cCI6MjA5ODUwNTg4OX0.6iJxAMAUSiaUXtu6VOCg9NSgAexP1n902kft8IM6kL4
+#   SUPABASE_SERVICE_ROLE_KEY      — eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBncGlyanpncnZyZmJ4bmFtcG9hIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc4MjkyOTg4OSwiZXhwIjoyMDk4NTA1ODg5fQ.g0jZ2i7Fn7vxvQ0xKwtn5-a4hZ8w2igCVKfAk5xyPp8
 #
 # Optional secrets (workflow still passes without them,
 # but the running app will behave incorrectly at runtime):
