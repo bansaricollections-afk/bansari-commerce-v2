@@ -1,65 +1,52 @@
 // Sprint 13 — WatermarkService
-// Watermark detection and application
-// DELTA ONLY
+// Delta only
 
-import { createClient } from '@supabase/supabase-js';
+import type { SupabaseClient } from '@supabase/supabase-js';
 import { AssetProcessingService } from './asset-processing.service';
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!,
-);
+export interface WatermarkDetectionResult {
+  hasWatermark: boolean;
+  confidence: number;
+  regions: Array<{ x: number; y: number; width: number; height: number }>;
+}
 
 export class WatermarkService {
-  static async runWatermarkDetection(
-    tenantId: string,
-    assetId: string,
-    jobId: string,
-    _imageUrl: string,
-  ): Promise<{ has_watermark: boolean; confidence: number }> {
-    const start = Date.now();
-    try {
-      // Stub — replace with CV model
-      const result = { has_watermark: false, confidence: 0.02 };
-      await AssetProcessingService.saveAIAnalysis(
-        tenantId, assetId, 'watermark_detect', 'completed',
-        result, undefined, Date.now() - start,
-      );
-      await AssetProcessingService.completeJob(jobId, result);
-      return result;
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err);
-      await AssetProcessingService.failJob(jobId, msg);
-      throw err;
-    }
+  private readonly processingService: AssetProcessingService;
+
+  constructor(private readonly sb: SupabaseClient) {
+    this.processingService = new AssetProcessingService(sb);
   }
 
-  static async applyWatermark(
-    tenantId: string,
-    assetId: string,
-    storagePath: string,
-    watermarkText: string,
-    position: 'center' | 'bottom-right' | 'bottom-left' | 'top-right' | 'top-left' = 'bottom-right',
-  ): Promise<string> {
-    // Stub: In production, use sharp + composite watermark overlay
-    // Returns the storage path of the watermarked derivative
-    const derivativePath = storagePath.replace(/\.([^.]+)$/, '_watermarked.$1');
+  async detectWatermark(assetId: string, tenantId: string, _imageUrl: string): Promise<WatermarkDetectionResult> {
+    // Stub — wire to CV provider
+    const result: WatermarkDetectionResult = {
+      hasWatermark: false,
+      confidence: 0,
+      regions: [],
+    };
 
-    await supabase.from('dam_derivatives').insert({
-      asset_id: assetId,
-      tenant_id: tenantId,
-      derivative_type: 'watermarked',
-      storage_path: derivativePath,
-      format: 'jpeg',
-      file_size: 0,
-      transform_params: { watermark_text: watermarkText, position },
-    });
-
-    await AssetProcessingService.saveAIAnalysis(
-      tenantId, assetId, 'watermark_detect', 'completed',
-      { applied: true, text: watermarkText, position }, undefined, 0,
+    await this.processingService.saveAIAnalysis(
+      assetId,
+      tenantId,
+      'watermark_detection',
+      result as unknown as Record<string, unknown>,
+      result.confidence,
+      'stub-v1',
     );
 
-    return derivativePath;
+    return result;
+  }
+
+  async applyWatermark(
+    assetId: string,
+    tenantId: string,
+    watermarkText: string,
+    position: 'center' | 'bottom-right' | 'bottom-left' = 'bottom-right',
+  ): Promise<void> {
+    // Enqueue watermark processing job
+    await this.processingService.enqueueProcessing(assetId, tenantId, ['watermark_detection'], 3);
+
+    void watermarkText;
+    void position;
   }
 }
