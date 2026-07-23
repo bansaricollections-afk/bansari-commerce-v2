@@ -526,6 +526,7 @@ export type CreateVariantPayload = {
   selling_price: number;
   cost?: number;
   stock?: number;
+  reserved_stock?: number;
   weight_grams?: number;
   length_cm?: number;
   width_cm?: number;
@@ -573,3 +574,83 @@ export interface ProductV2ListResult {
   page: number;
   pageSize: number;
 }
+
+// ============================================================
+// IMAGE PAYLOAD
+// Restored from commit 22ea7b8 — was dropped during HEAD refactor.
+// ============================================================
+
+export type CreateImagePayload = {
+  product_id: number;
+  image_type: ProductImageType;
+  url: string;
+  alt?: string;
+  sort_order?: number;
+};
+
+// ============================================================
+// SEARCH / FILTER  (consumer-facing API contracts)
+// Restored from commit 22ea7b8 — was dropped during HEAD refactor.
+// ProductV2Filters (above) is the internal admin filter; ProductSearchFilters
+// is the public-facing storefront contract. Both are valid and distinct.
+// ============================================================
+
+export interface ProductSearchFilters {
+  /** Full-text query (name, sku, slug, description) */
+  query?: string;
+  /** Legacy text category column */
+  category?: string;
+  categoryId?: number;
+  categorySlug?: string;
+  /** Legacy text collection column */
+  collection?: string;
+  collectionId?: number;
+  collectionSlug?: string;
+  featured?: boolean;
+  newArrival?: boolean;
+  bestSeller?: boolean;
+  active?: boolean;
+  tags?: string[];
+  minPrice?: number;
+  maxPrice?: number;
+  page?: number;
+  limit?: number;
+  orderBy?: 'created_at' | 'display_order' | 'price' | 'name';
+  ascending?: boolean;
+}
+
+export interface ProductSearchResult {
+  products: ProductV2[];
+  total: number;
+  page: number;
+  limit: number;
+  totalPages: number;
+}
+
+// ============================================================
+// VALIDATION
+// Restored from commit 22ea7b8 — was dropped during HEAD refactor.
+// ============================================================
+
+export interface ProductValidationError {
+  field: string;
+  message: string;
+  code: ProductErrorCode;
+}
+
+export type ProductErrorCode =
+  | 'SLUG_REQUIRED'
+  | 'SLUG_DUPLICATE'
+  | 'SKU_REQUIRED'
+  | 'SKU_DUPLICATE'
+  | 'NAME_REQUIRED'
+  | 'CATEGORY_REQUIRED'
+  | 'PRICE_INVALID'
+  | 'MRP_BELOW_SELLING'
+  | 'STOCK_NEGATIVE'
+  | 'RESERVED_EXCEEDS_STOCK'
+  | 'IMAGE_PRIMARY_REQUIRED'
+  | 'IMAGE_DUPLICATE_URL'
+  | 'VARIANT_DUPLICATE_SKU'
+  | 'REF_INVALID'
+  | 'INTERNAL';
