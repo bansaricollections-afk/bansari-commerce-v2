@@ -1,7 +1,7 @@
 'use client';
 
 import { useRouter, useSearchParams, usePathname } from 'next/navigation';
-import type { Warehouse } from '@/types/inventory';
+import type { Warehouse } from '@/services/inventory.service';
 
 interface Props {
   warehouses: Warehouse[];
