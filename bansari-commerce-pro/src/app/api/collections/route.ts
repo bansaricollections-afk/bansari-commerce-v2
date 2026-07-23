@@ -1,35 +1,43 @@
-// Sprint 13 — /api/collections
 import { NextRequest, NextResponse } from 'next/server';
-import { CollectionService } from '@/services/collection.service';
 import { createClient } from '@/lib/supabase/server';
+import { CollectionService } from '@/services/collection.service';
 
 export async function GET(req: NextRequest) {
   try {
     const supabase = await createClient();
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    const tenantId = req.headers.get('x-tenant-id');
-    if (!tenantId) return NextResponse.json({ error: 'x-tenant-id required' }, { status: 400 });
-    const collections = await CollectionService.listCollections(tenantId);
-    return NextResponse.json({ collections });
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    if (authError || !user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+
+    const { searchParams } = new URL(req.url);
+    const tenantId = searchParams.get('tenant_id');
+    const page = parseInt(searchParams.get('page') ?? '1');
+    const limit = parseInt(searchParams.get('limit') ?? '20');
+
+    if (!tenantId) return NextResponse.json({ error: 'tenant_id required' }, { status: 400 });
+
+    const collectionService = new CollectionService(supabase);
+    const result = await collectionService.listCollections({ tenantId, page, limit });
+
+    return NextResponse.json(result);
   } catch (err) {
-    return NextResponse.json({ error: String(err) }, { status: 500 });
+    console.error('[GET /api/collections]', err);
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }
 
 export async function POST(req: NextRequest) {
   try {
     const supabase = await createClient();
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    const tenantId = req.headers.get('x-tenant-id');
-    if (!tenantId) return NextResponse.json({ error: 'x-tenant-id required' }, { status: 400 });
-    const { name, description, is_smart, smart_rules } = await req.json();
-    const collection = await CollectionService.createCollection(
-      tenantId, name, description ?? null, is_smart ?? false, smart_rules ?? null, user.id
-    );
-    return NextResponse.json({ collection }, { status: 201 });
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    if (authError || !user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+
+    const body = await req.json();
+    const collectionService = new CollectionService(supabase);
+    const collection = await collectionService.createCollection({ ...body, createdBy: user.id });
+
+    return NextResponse.json(collection, { status: 201 });
   } catch (err) {
-    return NextResponse.json({ error: String(err) }, { status: 500 });
+    console.error('[POST /api/collections]', err);
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }
