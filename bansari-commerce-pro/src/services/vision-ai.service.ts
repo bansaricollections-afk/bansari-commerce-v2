@@ -1,257 +1,115 @@
 // Sprint 13 — VisionAIService
-// AI Vision processing: tagging, captioning, object detection, NSFW, quality
-// Wraps external AI provider (Google Vision / OpenAI / configurable)
-// DELTA ONLY
+// Delta only — provider-agnostic vision stub ready for Google Vision / AWS Rekognition
 
-import { createClient } from '@supabase/supabase-js';
-import type { DAMMetadata, AITag, DetectedObject, ColorSwatch } from '@/types/dam';
+import type { SupabaseClient } from '@supabase/supabase-js';
 import { AssetProcessingService } from './asset-processing.service';
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!,
-);
+export interface VisionAnalysisResult {
+  tags: Array<{ label: string; confidence: number }>;
+  colors: Array<{ hex: string; percent: number }>;
+  dominantColor: string | null;
+  captionText: string | null;
+  qualityScore: number | null;
+  isNsfw: boolean;
+  hasWatermark: boolean;
+  ocrText: string | null;
+  objects: Array<{ label: string; confidence: number; boundingBox?: Record<string, number> }>;
+  faces: number;
+  brands: Array<{ name: string; confidence: number }>;
+  embedding: number[] | null;
+}
 
 export class VisionAIService {
-  // ── Metadata Upsert ──────────────────────────────────────────
+  private readonly processingService: AssetProcessingService;
 
-  static async upsertMetadata(
-    tenantId: string,
-    assetId: string,
-    patch: Partial<Omit<DAMMetadata, 'id' | 'tenant_id' | 'asset_id' | 'created_at' | 'updated_at'>>,
-  ): Promise<DAMMetadata> {
-    const { data, error } = await supabase
-      .from('dam_metadata')
-      .upsert(
-        { tenant_id: tenantId, asset_id: assetId, ...patch },
-        { onConflict: 'asset_id' },
-      )
-      .select()
-      .single();
-
-    if (error) throw new Error(`VisionAIService.upsertMetadata: ${error.message}`);
-    return data as DAMMetadata;
+  constructor(private readonly sb: SupabaseClient) {
+    this.processingService = new AssetProcessingService(sb);
   }
 
-  static async getMetadata(tenantId: string, assetId: string): Promise<DAMMetadata | null> {
-    const { data } = await supabase
-      .from('dam_metadata')
-      .select('*')
-      .eq('tenant_id', tenantId)
-      .eq('asset_id', assetId)
-      .single();
-    return (data as DAMMetadata | null) ?? null;
-  }
+  async analyzeImage(assetId: string, tenantId: string, imageUrl: string): Promise<VisionAnalysisResult> {
+    // Provider-agnostic stub — replace with Google Vision / AWS Rekognition / Azure CV
+    // This returns a typed placeholder to keep tsc happy until provider is wired
+    const result: VisionAnalysisResult = {
+      tags: [],
+      colors: [],
+      dominantColor: null,
+      captionText: null,
+      qualityScore: null,
+      isNsfw: false,
+      hasWatermark: false,
+      ocrText: null,
+      objects: [],
+      faces: 0,
+      brands: [],
+      embedding: null,
+    };
 
-  // ── Auto Tagging (stub — replace with actual AI provider call) ───────
+    // Save analysis results to dam_ai_analysis
+    await this.processingService.saveAIAnalysis(
+      assetId,
+      tenantId,
+      'auto_tag',
+      { tags: result.tags },
+      undefined,
+      'stub-v1',
+    );
 
-  static async runAutoTag(
-    tenantId: string,
-    assetId: string,
-    jobId: string,
-    imageUrl: string,
-  ): Promise<AITag[]> {
-    const start = Date.now();
-    try {
-      // ⚠️ Replace stub with: Google Vision labelDetect / AWS Rekognition / OpenAI vision
-      const aiTags: AITag[] = [
-        { tag: 'apparel', confidence: 0.97, source: 'vision_ai' },
-        { tag: 'fashion', confidence: 0.92, source: 'vision_ai' },
-        { tag: 'product', confidence: 0.88, source: 'vision_ai' },
-      ];
+    await this.processingService.saveAIAnalysis(
+      assetId,
+      tenantId,
+      'color_analysis',
+      { colors: result.colors, dominantColor: result.dominantColor },
+      undefined,
+      'stub-v1',
+    );
 
-      // Persist to dam_metadata
-      const existing = await this.getMetadata(tenantId, assetId);
-      const merged = [...(existing?.ai_tags ?? []), ...aiTags].reduce(
-        (acc: AITag[], tag) => {
-          if (!acc.find((t) => t.tag === tag.tag)) acc.push(tag);
-          return acc;
-        },
-        [],
+    if (result.qualityScore !== null) {
+      await this.processingService.saveAIAnalysis(
+        assetId,
+        tenantId,
+        'quality_score',
+        { score: result.qualityScore },
+        result.qualityScore / 100,
+        'stub-v1',
       );
-
-      await this.upsertMetadata(tenantId, assetId, { ai_tags: merged });
-      await AssetProcessingService.saveAIAnalysis(
-        tenantId, assetId, 'auto_tag', 'completed',
-        { tags: aiTags }, undefined, Date.now() - start,
-      );
-      await AssetProcessingService.completeJob(jobId, { tags: aiTags });
-      return aiTags;
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err);
-      await AssetProcessingService.failJob(jobId, msg);
-      throw err;
     }
+
+    await this.processingService.saveAIAnalysis(
+      assetId,
+      tenantId,
+      'nsfw_detection',
+      { isNsfw: result.isNsfw },
+      undefined,
+      'stub-v1',
+    );
+
+    // Update asset metadata with AI results
+    await this.sb
+      .from('dam_assets')
+      .update({
+        metadata: result as unknown as Record<string, unknown>,
+        status: 'ready',
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', assetId);
+
+    void imageUrl; // consumed by provider when wired
+    return result;
   }
 
-  // ── Object Detection ─────────────────────────────────────────
+  async generateEmbedding(assetId: string, tenantId: string, imageUrl: string): Promise<number[]> {
+    // Stub — wire to OpenAI CLIP or similar
+    const embedding: number[] = new Array(512).fill(0);
 
-  static async runObjectDetection(
-    tenantId: string,
-    assetId: string,
-    jobId: string,
-    _imageUrl: string,
-  ): Promise<DetectedObject[]> {
-    const start = Date.now();
-    try {
-      // Stub — replace with provider call
-      const objects: DetectedObject[] = [];
-      await this.upsertMetadata(tenantId, assetId, { detected_objects: objects });
-      await AssetProcessingService.saveAIAnalysis(
-        tenantId, assetId, 'object_detect', 'completed',
-        { objects }, undefined, Date.now() - start,
-      );
-      await AssetProcessingService.completeJob(jobId, { objects });
-      return objects;
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err);
-      await AssetProcessingService.failJob(jobId, msg);
-      throw err;
-    }
-  }
+    await this.sb.from('dam_similarity').upsert({
+      asset_id: assetId,
+      similar_asset_id: assetId,
+      tenant_id: tenantId,
+      similarity_score: 1.0,
+      is_duplicate: false,
+    }, { onConflict: 'asset_id,similar_asset_id' });
 
-  // ── Color Analysis ──────────────────────────────────────────
-
-  static async runColorAnalysis(
-    tenantId: string,
-    assetId: string,
-    jobId: string,
-    _imageUrl: string,
-  ): Promise<{ dominant: string[]; palette: ColorSwatch[] }> {
-    const start = Date.now();
-    try {
-      // Stub — replace with sharp color extraction or provider
-      const dominant: string[] = [];
-      const palette: ColorSwatch[] = [];
-      await this.upsertMetadata(tenantId, assetId, { dominant_colors: dominant, color_palette: palette });
-      await AssetProcessingService.saveAIAnalysis(
-        tenantId, assetId, 'color_analysis', 'completed',
-        { dominant, palette }, undefined, Date.now() - start,
-      );
-      await AssetProcessingService.completeJob(jobId, { dominant, palette });
-      return { dominant, palette };
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err);
-      await AssetProcessingService.failJob(jobId, msg);
-      throw err;
-    }
-  }
-
-  // ── NSFW Detection ──────────────────────────────────────────
-
-  static async runNSFWDetect(
-    tenantId: string,
-    assetId: string,
-    jobId: string,
-    _imageUrl: string,
-  ): Promise<{ safe: boolean; score: number }> {
-    const start = Date.now();
-    try {
-      // Stub — replace with provider
-      const result = { safe: true, score: 0.01 };
-      await AssetProcessingService.saveAIAnalysis(
-        tenantId, assetId, 'nsfw_detect', 'completed',
-        result, undefined, Date.now() - start,
-      );
-      await AssetProcessingService.completeJob(jobId, result);
-      if (!result.safe) {
-        // Auto-reject asset
-        await supabase
-          .from('dam_assets')
-          .update({ status: 'rejected' })
-          .eq('id', assetId);
-      }
-      return result;
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err);
-      await AssetProcessingService.failJob(jobId, msg);
-      throw err;
-    }
-  }
-
-  // ── Caption Generation ───────────────────────────────────────
-
-  static async runCaptionGeneration(
-    tenantId: string,
-    assetId: string,
-    jobId: string,
-    _imageUrl: string,
-  ): Promise<string> {
-    const start = Date.now();
-    try {
-      // Stub — replace with OpenAI GPT-4o vision or similar
-      const caption = '';
-      if (caption) {
-        await supabase
-          .from('dam_assets')
-          .update({ caption })
-          .eq('id', assetId);
-      }
-      await AssetProcessingService.saveAIAnalysis(
-        tenantId, assetId, 'caption', 'completed',
-        { caption }, undefined, Date.now() - start,
-      );
-      await AssetProcessingService.completeJob(jobId, { caption });
-      return caption;
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err);
-      await AssetProcessingService.failJob(jobId, msg);
-      throw err;
-    }
-  }
-
-  // ── OCR ───────────────────────────────────────────────────
-
-  static async runOCR(
-    tenantId: string,
-    assetId: string,
-    jobId: string,
-    _imageUrl: string,
-  ): Promise<string> {
-    const start = Date.now();
-    try {
-      // Stub — replace with Google Vision OCR / Tesseract
-      const text = '';
-      await this.upsertMetadata(tenantId, assetId, { ocr_text: text });
-      await AssetProcessingService.saveAIAnalysis(
-        tenantId, assetId, 'ocr', 'completed',
-        { text }, undefined, Date.now() - start,
-      );
-      await AssetProcessingService.completeJob(jobId, { text });
-      return text;
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err);
-      await AssetProcessingService.failJob(jobId, msg);
-      throw err;
-    }
-  }
-
-  // ── Quality Score ────────────────────────────────────────────
-
-  static async runQualityScore(
-    tenantId: string,
-    assetId: string,
-    jobId: string,
-    _imageUrl: string,
-  ): Promise<number> {
-    const start = Date.now();
-    try {
-      // Stub: compute 0–100 quality score (blur, exposure, sharpness)
-      const score = 80;
-      await supabase
-        .from('dam_assets')
-        .update({ quality_score: score })
-        .eq('id', assetId);
-      await AssetProcessingService.saveAIAnalysis(
-        tenantId, assetId, 'quality_score', 'completed',
-        { score }, undefined, Date.now() - start,
-      );
-      await AssetProcessingService.completeJob(jobId, { score });
-      return score;
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err);
-      await AssetProcessingService.failJob(jobId, msg);
-      throw err;
-    }
+    void imageUrl;
+    return embedding;
   }
 }
