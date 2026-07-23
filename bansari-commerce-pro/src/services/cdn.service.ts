@@ -1,18 +1,18 @@
 // Sprint 13 — CDNService
-// REPAIR Step 1: Replaced illegal conditional type cast with TransformOptions import
-// Delta only — no architecture change
+// REPAIR: Import TransformOptions directly from @supabase/storage-js SDK.
+// Removed custom StorageTransformOptions interface — the SDK's own type is used verbatim.
+//
+// SDK fact (@supabase/storage-js, installed via @supabase/supabase-js ^2.110.0):
+//   TransformOptions.format?: 'origin'  — only valid value in the SDK type union.
+//   Omitting format lets the CDN auto-serve modern formats (WebP/AVIF) by default.
+//
+// CDNTransformOptions.format ('webp'|'avif'|'jpeg'|'png') is the caller-facing API.
+// Those values map to CDN auto-optimisation (no SDK format field needed).
+// Delta only — no architecture change.
 
 import type { SupabaseClient } from '@supabase/supabase-js';
+import type { TransformOptions } from '@supabase/storage-js';
 import type { CDNTransformOptions, DAMDerivative } from '@/types/dam';
-
-// Supabase Storage getPublicUrl transform options (matches @supabase/storage-js TransformOptions)
-interface StorageTransformOptions {
-  width?: number;
-  height?: number;
-  resize?: 'cover' | 'contain' | 'fill';
-  format?: 'origin' | 'avif' | 'webp';
-  quality?: number;
-}
 
 export class CDNService {
   constructor(private readonly sb: SupabaseClient) {}
@@ -27,16 +27,15 @@ export class CDNService {
     if (!asset) throw new Error('Asset not found');
     const a = asset as { storage_path: string; storage_bucket: string };
 
-    // REPAIR: Build a plain StorageTransformOptions object — no conditional type cast
-    const transform: StorageTransformOptions = {};
-    if (options.width) transform.width = options.width;
-    if (options.height) transform.height = options.height;
+    // Build TransformOptions using the SDK's own type — no custom interface.
+    const transform: TransformOptions = {};
+    if (options.width)   transform.width   = options.width;
+    if (options.height)  transform.height  = options.height;
     if (options.quality) transform.quality = options.quality;
-    // Map CDNTransformOptions format to Supabase Storage format subset
-    if (options.format === 'avif') transform.format = 'avif';
-    else if (options.format === 'webp') transform.format = 'webp';
-    // jpeg/png not supported by Supabase transform — serve origin
-    if (options.fit) transform.resize = options.fit;
+    if (options.fit)     transform.resize  = options.fit;
+    // SDK format only accepts 'origin'. The caller's 'webp'|'avif'|'jpeg'|'png'
+    // values are served by CDN auto-optimisation when format is omitted.
+    // No assignment here — omitting is the correct behaviour for all caller values.
 
     const { data } = this.sb.storage
       .from(a.storage_bucket)
@@ -94,7 +93,7 @@ export class CDNService {
       .eq('asset_id', assetId)
       .eq('derivative_type', derivativeType);
 
-    if (width) query = query.eq('width', width);
+    if (width)  query = query.eq('width', width);
     if (height) query = query.eq('height', height);
     if (format) query = query.eq('format', format);
 
