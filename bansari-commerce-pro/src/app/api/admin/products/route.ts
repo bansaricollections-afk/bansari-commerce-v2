@@ -64,10 +64,30 @@ export async function GET(request: NextRequest) {
     filters.ascending = sp.get('sortDir') === 'asc';
   }
 
+  // Stock range filter (used by admin UI status filters)
+  const minStock = sp.get('minStock');
+  const maxStock = sp.get('maxStock');
+
   try {
-    const result = await ProductV2Service.search(filters);
+    const result = await ProductV2Service.search({
+      ...filters,
+      ...(minStock !== null ? { minStock: Number(minStock) } : {}),
+      ...(maxStock !== null ? { maxStock: Number(maxStock) } : {}),
+    });
+
     log.info('admin.products.list.ok', { page, limit, total: result.total, requestId });
-    return NextResponse.json({ success: true, requestId, ...result });
+
+    // Return `data` key so the ProductManagement client (apiFetch<ApiListResponse>) can
+    // read res.data. The service returns `products` — alias it here.
+    return NextResponse.json({
+      success: true,
+      requestId,
+      data: result.products,
+      total: result.total,
+      page: result.page,
+      pageSize: result.limit,
+      totalPages: result.totalPages,
+    });
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Unknown error';
     log.error('admin.products.list.failed', err, { requestId });
@@ -114,6 +134,8 @@ export async function POST(request: NextRequest) {
       VALIDATION:    422,
       DUPLICATE_SKU: 409,
       DUPLICATE_SLUG: 409,
+      SKU_DUPLICATE: 409,
+      SLUG_DUPLICATE: 409,
       NOT_FOUND:     404,
       INTERNAL:      500,
     };

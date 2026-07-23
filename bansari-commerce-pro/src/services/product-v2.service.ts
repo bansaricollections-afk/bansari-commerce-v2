@@ -461,7 +461,8 @@ export const ProductV2Service = {
       best_seller:        payload.best_seller          ?? false,
       active:             payload.active               ?? true,
       display_order:      payload.display_order        ?? 0,
-      stock:              0,
+      // FIX: was hardcoded to 0 — now correctly reads from payload.
+      stock:              payload.stock                ?? 0,
       created_by:         payload.created_by           ?? null,
       updated_by:         payload.created_by           ?? null,
       created_at:         now,
@@ -540,7 +541,7 @@ export const ProductV2Service = {
       seo_title: 'seo_title', seo_description: 'seo_description',
       seo_keywords: 'seo_keywords', canonical_url: 'canonical_url',
       featured: 'featured', new_arrival: 'new_arrival', best_seller: 'best_seller',
-      active: 'active', display_order: 'display_order',
+      active: 'active', display_order: 'display_order', stock: 'stock',
       updated_by: 'updated_by',
     };
     for (const [key, col] of Object.entries(fieldMap)) {
@@ -567,7 +568,7 @@ export const ProductV2Service = {
 
   // ────────────────────────────────────────────────────────
   // VARIANTS
-  // ────────────────────────────────────────────────────────
+  // ───────────────────────────────────��────────────────────
 
   async addVariant(payload: CreateVariantPayload): Promise<ProductVariantV2> {
     const sb = createServiceRoleClient();
