@@ -3,7 +3,7 @@
 import { useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import { transferStockAction } from '@/app/actions/inventory.actions';
-import type { Warehouse, InventorySummaryRow } from '@/types/inventory';
+import type { Warehouse, InventorySummaryRow } from '@/services/inventory.service';
 
 interface Props {
   warehouses:    Warehouse[];
@@ -45,29 +45,25 @@ export function TransferStockForm({ warehouses, inventoryRows, preselectedInvent
 
   // unique products available in from-warehouse
   const fromWarehouseRows = fromWarehouseId
-    ? inventoryRows.filter(r => r.warehouse_id === Number(fromWarehouseId))
-    : inventoryRows;
+    ? inventoryRows.filter(r => r.warehouse_id === Number(fromWarehouseId) && r.available_qty > 0)
+    : [];
 
   const uniqueProducts = Array.from(
     new Map(fromWarehouseRows.map(r => [r.product_id, r])).values()
   );
 
   const variantsForProduct = productId
-    ? fromWarehouseRows.filter(
-        r => r.product_id === Number(productId) && r.variant_id != null
-      )
+    ? fromWarehouseRows.filter(r => r.product_id === Number(productId) && r.variant_id != null)
     : [];
 
-  const parsedQty = Number(quantity);
-  const maxQty    = sourceRow?.available_qty ?? Infinity;
-  const isValid   =
+  const isValid =
     fromWarehouseId &&
     toWarehouseId &&
     fromWarehouseId !== toWarehouseId &&
     productId &&
-    quantity !== '' &&
-    parsedQty > 0 &&
-    parsedQty <= maxQty;
+    quantity &&
+    Number(quantity) > 0 &&
+    (!sourceRow || Number(quantity) <= sourceRow.available_qty);
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -80,7 +76,7 @@ export function TransferStockForm({ warehouses, inventoryRows, preselectedInvent
         to_warehouse_id:   Number(toWarehouseId),
         product_id:        Number(productId),
         variant_id:        variantId ? Number(variantId) : undefined,
-        quantity:          parsedQty,
+        quantity:          Number(quantity),
         notes:             notes.trim() || undefined,
       });
 
@@ -97,14 +93,14 @@ export function TransferStockForm({ warehouses, inventoryRows, preselectedInvent
     return (
       <div className="form-success" role="status">
         <span className="success-icon">✓</span>
-        <strong>Stock transferred successfully.</strong>
+        <strong>Stock transfer initiated.</strong>
         <p>Redirecting to inventory…</p>
       </div>
     );
   }
 
   return (
-    <form className="inv-form" onSubmit={handleSubmit} noValidate>
+    <form className="inv-form transfer-form" onSubmit={handleSubmit} noValidate>
       <div className="form-row">
         <div className="form-group">
           <label className="form-label" htmlFor="tf-from">
@@ -114,18 +110,12 @@ export function TransferStockForm({ warehouses, inventoryRows, preselectedInvent
             id="tf-from"
             className="form-select"
             value={fromWarehouseId}
-            onChange={e => {
-              setFromWarehouseId(e.target.value);
-              setProductId('');
-              setVariantId('');
-            }}
+            onChange={e => { setFromWarehouseId(e.target.value); setProductId(''); setVariantId(''); }}
             required
           >
-            <option value="">Select warehouse…</option>
+            <option value="">Select source…</option>
             {warehouses.map(wh => (
-              <option key={wh.id} value={wh.id}>
-                {wh.name} ({wh.code})
-              </option>
+              <option key={wh.id} value={wh.id}>{wh.name} ({wh.code})</option>
             ))}
           </select>
         </div>
@@ -141,103 +131,105 @@ export function TransferStockForm({ warehouses, inventoryRows, preselectedInvent
             onChange={e => setToWarehouseId(e.target.value)}
             required
           >
-            <option value="">Select warehouse…</option>
+            <option value="">Select destination…</option>
             {warehouses
               .filter(wh => String(wh.id) !== fromWarehouseId)
               .map(wh => (
-                <option key={wh.id} value={wh.id}>
-                  {wh.name} ({wh.code})
-                </option>
+                <option key={wh.id} value={wh.id}>{wh.name} ({wh.code})</option>
               ))}
           </select>
-          {fromWarehouseId && toWarehouseId && fromWarehouseId === toWarehouseId && (
-            <p className="form-error-inline">Source and destination must differ.</p>
-          )}
         </div>
       </div>
 
-      <div className="form-group">
-        <label className="form-label" htmlFor="tf-product">
-          Product <span className="required">*</span>
-        </label>
-        <select
-          id="tf-product"
-          className="form-select"
-          value={productId}
-          onChange={e => {
-            setProductId(e.target.value);
-            setVariantId('');
-          }}
-          disabled={!fromWarehouseId}
-          required
-        >
-          <option value="">{fromWarehouseId ? 'Select product…' : 'Select from-warehouse first'}</option>
-          {uniqueProducts.map(r => (
-            <option key={r.product_id} value={r.product_id}>
-              {r.product_name} — {r.available_qty} available
-            </option>
-          ))}
-        </select>
-      </div>
-
-      {variantsForProduct.length > 0 && (
+      <div className="form-row">
         <div className="form-group">
-          <label className="form-label" htmlFor="tf-variant">Variant</label>
+          <label className="form-label" htmlFor="tf-product">
+            Product <span className="required">*</span>
+          </label>
           <select
-            id="tf-variant"
+            id="tf-product"
             className="form-select"
-            value={variantId}
-            onChange={e => setVariantId(e.target.value)}
+            value={productId}
+            onChange={e => { setProductId(e.target.value); setVariantId(''); }}
+            disabled={!fromWarehouseId}
+            required
           >
-            <option value="">All variants (base)</option>
-            {variantsForProduct.map(r => (
-              <option key={r.variant_id} value={r.variant_id!}>
-                {r.size_label ?? r.variant_sku} — {r.available_qty} available
+            <option value="">Select product…</option>
+            {uniqueProducts.map(r => (
+              <option key={r.product_id} value={r.product_id}>
+                {r.product_name} (available: {r.available_qty})
               </option>
             ))}
           </select>
         </div>
+
+        {variantsForProduct.length > 0 && (
+          <div className="form-group">
+            <label className="form-label" htmlFor="tf-variant">Variant</label>
+            <select
+              id="tf-variant"
+              className="form-select"
+              value={variantId}
+              onChange={e => setVariantId(e.target.value)}
+            >
+              <option value="">All variants</option>
+              {variantsForProduct.map(r => (
+                <option key={r.variant_id} value={String(r.variant_id)}>
+                  {r.size_label ?? `Variant #${r.variant_id}`} (avail: {r.available_qty})
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
+      </div>
+
+      <div className="form-row">
+        <div className="form-group">
+          <label className="form-label" htmlFor="tf-qty">
+            Quantity <span className="required">*</span>
+          </label>
+          <input
+            id="tf-qty"
+            type="number"
+            className="form-input"
+            value={quantity}
+            onChange={e => setQuantity(e.target.value)}
+            min="1"
+            max={sourceRow?.available_qty}
+            placeholder="Units to transfer"
+            required
+          />
+          {sourceRow && (
+            <p className="form-hint">
+              Available at source: <strong>{sourceRow.available_qty}</strong> units
+            </p>
+          )}
+          {sourceRow && Number(quantity) > sourceRow.available_qty && (
+            <p className="form-hint form-hint-error">
+              Exceeds available stock ({sourceRow.available_qty} units)
+            </p>
+          )}
+        </div>
+
+        <div className="form-group">
+          <label className="form-label" htmlFor="tf-notes">Notes</label>
+          <input
+            id="tf-notes"
+            type="text"
+            className="form-input"
+            value={notes}
+            onChange={e => setNotes(e.target.value)}
+            placeholder="Optional transfer notes"
+            maxLength={500}
+          />
+        </div>
+      </div>
+
+      {fromWarehouseId && toWarehouseId && fromWarehouseId === toWarehouseId && (
+        <p className="form-hint form-hint-error">
+          Source and destination warehouses must differ.
+        </p>
       )}
-
-      <div className="form-group">
-        <label className="form-label" htmlFor="tf-qty">
-          Quantity <span className="required">*</span>
-        </label>
-        <input
-          id="tf-qty"
-          type="number"
-          className="form-input"
-          value={quantity}
-          onChange={e => setQuantity(e.target.value)}
-          placeholder="Units to transfer"
-          min="1"
-          max={sourceRow?.available_qty}
-          required
-        />
-        {sourceRow && (
-          <p className="form-hint">
-            Available at source: <strong>{sourceRow.available_qty}</strong> units
-          </p>
-        )}
-        {quantity !== '' && parsedQty > maxQty && (
-          <p className="form-error-inline">
-            Cannot exceed available quantity ({maxQty}).
-          </p>
-        )}
-      </div>
-
-      <div className="form-group">
-        <label className="form-label" htmlFor="tf-notes">Notes</label>
-        <textarea
-          id="tf-notes"
-          className="form-textarea"
-          value={notes}
-          onChange={e => setNotes(e.target.value)}
-          placeholder="Optional: reason for transfer"
-          rows={2}
-          maxLength={500}
-        />
-      </div>
 
       {error && (
         <div className="form-error" role="alert">
@@ -259,7 +251,7 @@ export function TransferStockForm({ warehouses, inventoryRows, preselectedInvent
           className="btn btn-primary"
           disabled={!isValid || isPending}
         >
-          {isPending ? 'Transferring…' : 'Transfer Stock'}
+          {isPending ? 'Transferring…' : 'Initiate Transfer'}
         </button>
       </div>
     </form>

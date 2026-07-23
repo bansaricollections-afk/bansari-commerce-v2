@@ -3,7 +3,7 @@
 import { useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import { createPurchaseOrderAction } from '@/app/actions/inventory.actions';
-import type { Vendor, Warehouse } from '@/types/inventory';
+import type { Vendor, Warehouse } from '@/services/inventory.service';
 
 interface LineItem {
   product_id:  string;
@@ -36,7 +36,7 @@ export function PurchaseOrderForm({ vendors, warehouses }: Props) {
   const [error,        setError]        = useState<string | null>(null);
   const [success,      setSuccess]      = useState<{ poNumber: string } | null>(null);
 
-  // ── line-item helpers ──────────────────────────────────
+  // ── line-item helpers ──────────────────────────────────────────────
   function updateItem(key: number, field: keyof LineItem, value: string) {
     setItems(prev =>
       prev.map(it => (it._key === key ? { ...it, [field]: value } : it))
@@ -48,14 +48,14 @@ export function PurchaseOrderForm({ vendors, warehouses }: Props) {
     setItems(prev => prev.filter(it => it._key !== key));
   }
 
-  // ── derived totals ─────────────────────────────────────
+  // ── derived totals ────────────────────────────────────────────────
   const subtotal = items.reduce((acc, it) => {
     const qty  = parseFloat(it.ordered_qty) || 0;
     const cost = parseFloat(it.unit_cost)   || 0;
     return acc + qty * cost;
   }, 0);
 
-  // ── validation ────────────────────────────────────────
+  // ── validation ────────────────────────────────────────────────────
   const validItems = items.filter(
     it =>
       it.product_id.trim() &&
@@ -64,7 +64,7 @@ export function PurchaseOrderForm({ vendors, warehouses }: Props) {
   );
   const isFormValid = vendorId && warehouseId && validItems.length > 0;
 
-  // ── submit ────────────────────────────────────────────
+  // ── submit ────────────────────────────────────────────────────────
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!isFormValid) return;
