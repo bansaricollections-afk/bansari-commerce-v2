@@ -41,7 +41,7 @@ function writeEntry(entry: LogEntry): void {
   try {
     process.stdout.write(JSON.stringify(entry) + '\n');
   } catch {
-    // eslint-disable-next-line no-console
+     
     console.error('[logger] Failed to write structured log entry', entry);
   }
 }

@@ -28,7 +28,7 @@ export function useRecentlyViewed(currentProductId?: number) {
     } catch {
       /* sessionStorage unavailable — no-op */
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+   
   }, [currentProductId]);
 
   return ids;
