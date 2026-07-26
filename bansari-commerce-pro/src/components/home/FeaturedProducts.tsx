@@ -4,27 +4,40 @@ import Link from "next/link";
 import { useState, useEffect } from "react";
 
 import ProductCard from "@/components/product/ProductCard";
-import { getNewArrivals, getFeaturedProducts } from "@/services/product.service";
+import type { Product } from "@/services/product.service";
 
 /* ---------------------------------------------------------------
    TABS: New Collection | Best Sellers
-   - New Collection = getNewArrivals() (is_new = true, ordered by created_at desc)
-   - Best Sellers   = getFeaturedProducts() (is_featured = true)
+   - New Collection = GET /api/products/new-arrivals
+   - Best Sellers   = GET /api/products/featured
    - Both fall back gracefully with an empty state + link to /shop
+
+   NOTE: product.service.ts uses createServiceRoleClient() which
+   requires SUPABASE_SERVICE_ROLE_KEY — a server-only secret that is
+   never included in the browser bundle. All data fetching is
+   therefore routed through thin API endpoints that run server-side.
 --------------------------------------------------------------- */
 
 type Tab = "new" | "featured";
 
 export default function FeaturedProducts() {
   const [activeTab, setActiveTab] = useState<Tab>("new");
-  const [products, setProducts] = useState<Awaited<ReturnType<typeof getFeaturedProducts>>>([]);
+  const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     setLoading(true);
-    const fetcher = activeTab === "new" ? getNewArrivals : getFeaturedProducts;
-    fetcher()
-      .then((data) => setProducts(data.slice(0, 4)))
+    const url =
+      activeTab === "new"
+        ? "/api/products/new-arrivals"
+        : "/api/products/featured";
+
+    fetch(url)
+      .then((res) => {
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        return res.json() as Promise<{ success: boolean; data: Product[] }>;
+      })
+      .then((body) => setProducts((body.data ?? []).slice(0, 4)))
       .catch(() => setProducts([]))
       .finally(() => setLoading(false));
   }, [activeTab]);
