@@ -1,4 +1,9 @@
 import { createServiceRoleClient } from '@/lib/supabase/service';
+import {
+  logServiceQueryStart,
+  logServiceQueryResult,
+  logServiceError,
+} from '@/lib/debug/product-debug';
 
 // ---------------------------------------------------------------------------
 // Types — fields must exactly match public.products column names
@@ -177,6 +182,9 @@ export async function getProducts(): Promise<Product[]> {
 export async function getNewArrivals(): Promise<Product[]> {
   const supabase = createServiceRoleClient();
 
+  logServiceQueryStart('getNewArrivals', { active: true, new_arrival: true });
+  const t0 = Date.now();
+
   const { data, error } = await supabase
     .from('products')
     .select(PRODUCT_SELECT)
@@ -184,8 +192,14 @@ export async function getNewArrivals(): Promise<Product[]> {
     .eq('new_arrival', true)
     .order('created_at', { ascending: false });
 
-  if (error) throw new Error(error.message);
-  return (data ?? []).map(mapRow);
+  if (error) {
+    logServiceError('getNewArrivals', error);
+    throw new Error(error.message);
+  }
+
+  const rows = data ?? [];
+  logServiceQueryResult('getNewArrivals', rows, Date.now() - t0);
+  return rows.map(mapRow);
 }
 
 // ---------------------------------------------------------------------------
@@ -199,6 +213,9 @@ export async function getNewArrivals(): Promise<Product[]> {
 export async function getFeaturedProducts(): Promise<Product[]> {
   const supabase = createServiceRoleClient();
 
+  logServiceQueryStart('getFeaturedProducts', { active: true, featured: true });
+  const t0 = Date.now();
+
   const { data, error } = await supabase
     .from('products')
     .select(PRODUCT_SELECT)
@@ -206,8 +223,14 @@ export async function getFeaturedProducts(): Promise<Product[]> {
     .eq('featured', true)
     .order('created_at', { ascending: false });
 
-  if (error) throw new Error(error.message);
-  return (data ?? []).map(mapRow);
+  if (error) {
+    logServiceError('getFeaturedProducts', error);
+    throw new Error(error.message);
+  }
+
+  const rows = data ?? [];
+  logServiceQueryResult('getFeaturedProducts', rows, Date.now() - t0);
+  return rows.map(mapRow);
 }
 
 // ---------------------------------------------------------------------------

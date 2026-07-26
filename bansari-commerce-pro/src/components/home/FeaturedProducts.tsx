@@ -6,6 +6,10 @@ import { useState, useEffect } from "react";
 import ProductCard from "@/components/product/ProductCard";
 // Canonical Product type — same source as ProductCard uses (@/types → @/types/product)
 import type { Product } from "@/types";
+import {
+  logClientFetch,
+  logClientFetchError,
+} from "@/lib/debug/product-debug";
 
 /* ---------------------------------------------------------------
    TABS: New Collection | Best Sellers
@@ -33,13 +37,28 @@ export default function FeaturedProducts() {
         ? "/api/products/new-arrivals"
         : "/api/products/featured";
 
+    const t0 = performance.now();
+
     fetch(url, { cache: "no-store" })
       .then((res) => {
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         return res.json() as Promise<{ success: boolean; data: Product[] }>;
       })
-      .then((body) => setProducts((body.data ?? []).slice(0, 4)))
-      .catch(() => setProducts([]))
+      .then((body) => {
+        const sliced = (body.data ?? []).slice(0, 4);
+        const elapsed = performance.now() - t0;
+        // Approximate byte size from the raw JSON string of the sliced payload
+        let bytes = -1;
+        try {
+          bytes = new TextEncoder().encode(JSON.stringify(sliced)).length;
+        } catch { /* noop */ }
+        logClientFetch(url, sliced.length, elapsed, bytes);
+        setProducts(sliced);
+      })
+      .catch((err: unknown) => {
+        logClientFetchError(url, err);
+        setProducts([]);
+      })
       .finally(() => setLoading(false));
   }, [activeTab]);
 

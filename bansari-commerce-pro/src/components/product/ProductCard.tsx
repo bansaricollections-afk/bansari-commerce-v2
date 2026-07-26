@@ -1,12 +1,13 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { Heart, Star, ShoppingBag, Eye } from "lucide-react";
 import { useCart } from "@/hooks/useCart";
 
 import { Product } from "@/types";
+import { logCardRender } from "@/lib/debug/product-debug";
 
 type Props = {
   product: Product;
@@ -22,6 +23,12 @@ export default function ProductCard({ product, priority = false }: Props) {
 
   const primaryImage = product.images?.[0]?.url || "/placeholder.png";
   const hoverImage = product.images?.[1]?.url || primaryImage;
+
+  // Debug: log once on mount per card instance
+  useEffect(() => {
+    logCardRender(product.id, product.name, primaryImage);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const displayName =
     (product as any).shortName ||
