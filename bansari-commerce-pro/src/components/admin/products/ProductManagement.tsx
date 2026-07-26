@@ -51,6 +51,7 @@ import {
 } from "@/components/ui/sheet";
 import { createClient } from "@/lib/supabase/client";
 import { cn } from "@/lib/utils";
+import { logAdminSavePayload } from "@/lib/debug/product-debug";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -1063,31 +1064,25 @@ export default function ProductManagement() {
       if (filterCategory) params.set("category", filterCategory);
       if (filterStatus === "active") params.set("active", "true");
       if (filterStatus === "inactive") params.set("active", "false");
-      if (filterStatus === "low") { params.set("minStock", "1"); params.set("maxStock", String(LOW_STOCK_THRESHOLD)); }
-      if (filterStatus === "out") { params.set("minStock", "0"); params.set("maxStock", "0"); }
 
       const res = await apiFetch<ApiListResponse>(
         `/api/admin/products?${params.toString()}`,
-        { method: "GET" },
+        undefined,
         controller.signal,
       );
 
-      const mapped = (res.data ?? []).map(mapApiProduct);
-      setProducts(pageIndex === 0 ? mapped : (prev) => [...prev, ...mapped]);
-      setTotal(res.total ?? 0);
+      setProducts(res.data.map(mapApiProduct));
+      setTotal(res.total);
       setPage(pageIndex);
 
-      // Derive categories for filter dropdown
-      if (pageIndex === 0) {
-        setCatalogCategories((prev) => {
-          const set = new Set([...prev, ...mapped.map((p) => p.category).filter(Boolean)]);
-          return Array.from(set).sort();
-        });
+      // Derive categories from the full result set (first load only)
+      if (pageIndex === 0 && !filterCategory && !filterStatus && !debouncedSearch) {
+        const cats = [...new Set(res.data.map((p) => p.category).filter(Boolean))] as string[];
+        setCatalogCategories(cats);
       }
     } catch (err) {
-      if ((err as Error).name === "AbortError") return;
-      const msg = err instanceof Error ? err.message : "Failed to load products";
-      toast.error(msg);
+      if ((err as Error)?.name === "AbortError") return;
+      toast.error("Failed to load products.");
     } finally {
       setLoading(false);
     }
@@ -1095,134 +1090,131 @@ export default function ProductManagement() {
 
   useEffect(() => { void loadProducts(0); }, [loadProducts]);
 
-  const hasMore = useMemo(() => total > (page + 1) * PAGE_SIZE, [total, page]);
-
-  // ── Stats (derived from current page — accurate for visible products) ──────────
-  const stats = useMemo(() => ({
-    total,
-    active: products.filter((p) => p.active).length,
-    lowStock: products.filter((p) => p.stock > 0 && p.stock <= LOW_STOCK_THRESHOLD).length,
-    outOfStock: products.filter((p) => p.stock === 0).length,
-  }), [products, total]);
-
-  // ── Form helpers ──────────────────────────────────────────────────────────────
-
-  const updateForm = useCallback((id: keyof ProductFormState, v: string) => {
-    setForm((prev) => ({ ...prev, [id]: v }));
-    setFieldErrors((prev) => { const next = { ...prev }; delete next[id]; return next; });
-  }, []);
-
-  const toggleField = useCallback((id: ToggleFieldId, checked: boolean) => {
-    setForm((prev) => ({ ...prev, [id]: checked }));
-  }, []);
-
-  const applySlug = useCallback(() => {
-    setForm((prev) => ({ ...prev, slug: slugify(prev.name) }));
-  }, []);
-
-  const applySku = useCallback(() => {
-    setForm((prev) => ({ ...prev, sku: generateSku(prev.category, prev.name) }));
-  }, []);
-
-  // ── Image upload — Supabase Storage (stays client-side per spec) ──────────────
-
-  const uploadFiles = useCallback(async (files: FileList | File[]) => {
-    const list = Array.from(files);
-    const valid = list.filter((f) => {
-      if (!ALLOWED_MIME_TYPES.includes(f.type)) { toast.error(`${f.name}: unsupported file type`); return false; }
-      if (f.size > MAX_FILE_SIZE_BYTES) { toast.error(`${f.name}: exceeds 5 MB limit`); return false; }
-      return true;
-    });
-    if (!valid.length) return;
-    setUploading(true);
-    try {
-      const uploaded: ProductImage[] = [];
-      for (const file of valid) {
-        const path = buildStoragePath(file);
-        const { error: upErr } = await supabase.storage.from(PRODUCT_IMAGES_BUCKET).upload(path, file, { upsert: false });
-        if (upErr) { toast.error(`${file.name}: ${upErr.message}`); continue; }
-        const { data: { publicUrl } } = supabase.storage.from(PRODUCT_IMAGES_BUCKET).getPublicUrl(path);
-        uploaded.push({ url: publicUrl, alt: file.name.split(".")[0] || "Product image" });
-      }
-      if (uploaded.length) {
-        setForm((prev) => ({ ...prev, images: [...prev.images, ...uploaded] }));
-        toast.success(`${uploaded.length} image${uploaded.length > 1 ? "s" : ""} uploaded`);
-      }
-    } finally {
-      setUploading(false);
-    }
-  }, [supabase]);
-
-  const removeImage = useCallback((url: string) => {
-    setForm((prev) => ({ ...prev, images: prev.images.filter((i) => i.url !== url) }));
-  }, []);
-
-  // ── Drag & drop ───────────────────────────────────────────────────────────────
-
-  const handleDragOver = useCallback((e: React.DragEvent) => { e.preventDefault(); }, []);
-  const handleDragEnter = useCallback((e: React.DragEvent) => { e.preventDefault(); setDragOver(true); }, []);
-  const handleDragLeave = useCallback((e: React.DragEvent) => { e.preventDefault(); setDragOver(false); }, []);
-  const handleDrop = useCallback((e: React.DragEvent) => {
-    e.preventDefault(); setDragOver(false);
-    if (e.dataTransfer.files.length) void uploadFiles(e.dataTransfer.files);
-  }, [uploadFiles]);
-  const handleDropZoneClick = useCallback(() => { fileInputRef.current?.click(); }, []);
-  const handleDropZoneKeyDown = useCallback((e: React.KeyboardEvent) => {
-    if (e.key === "Enter" || e.key === " ") { e.preventDefault(); fileInputRef.current?.click(); }
-  }, []);
-
-  // ── Open sheet ────────────────────────────────────────────────────────────────
-
-  const openCreateSheet = useCallback(() => {
+  // ── Open sheet for add/edit ───────────────────────────────────────────────────
+  function openAdd() {
     setEditingProduct(null);
     setForm(emptyForm);
     setFieldErrors({});
     setWizardStep(0);
     setWizardMaxStep(0);
     setSheetOpen(true);
-  }, []);
+  }
 
-  const openEditSheet = useCallback((product: Product) => {
+  function openEdit(product: Product) {
     setEditingProduct(product);
     setForm(productToForm(product));
     setFieldErrors({});
     setWizardStep(0);
     setWizardMaxStep(STEPS.length - 1);
     setSheetOpen(true);
-  }, []);
+  }
+
+  function closeSheet() {
+    setSheetOpen(false);
+    setEditingProduct(null);
+    setForm(emptyForm);
+    setFieldErrors({});
+    setWizardStep(0);
+    setWizardMaxStep(0);
+  }
+
+  // ── Form field update ─────────────────────────────────────────────────────────
+  function updateForm(id: keyof ProductFormState, value: string) {
+    setForm((prev) => ({ ...prev, [id]: value }));
+    setFieldErrors((prev) => ({ ...prev, [id]: undefined }));
+  }
+
+  function toggleField(id: ToggleFieldId, checked: boolean) {
+    setForm((prev) => ({ ...prev, [id]: checked }));
+  }
 
   // ── Wizard navigation ─────────────────────────────────────────────────────────
-
-  const goToStep = useCallback((target: number) => {
+  function goToStep(target: number) {
     setWizardStep(target);
     setWizardMaxStep((prev) => Math.max(prev, target));
-  }, []);
+  }
 
-  const handleNext = useCallback(() => {
+  function handleNext() {
     if (wizardStep < STEPS.length - 1) goToStep(wizardStep + 1);
-  }, [wizardStep, goToStep]);
+  }
 
-  const handlePrev = useCallback(() => {
+  function handlePrev() {
     if (wizardStep > 0) setWizardStep((s) => s - 1);
-  }, [wizardStep]);
+  }
 
-  // ── Save — POST /api/admin/products or PUT /api/admin/products/[id] ───────────
+  // ── Slug / SKU auto-generation ────────────────────────────────────────────────
+  function applySlug() {
+    if (form.name) updateForm("slug", slugify(form.name));
+  }
 
-  const handleSave = useCallback(async () => {
+  function applySku() {
+    updateForm("sku", generateSku(form.category, form.name));
+  }
+
+  // ── Image upload ──────────────────────────────────────────────────────────────
+  async function uploadFiles(files: FileList | File[]) {
+    const fileArr = Array.from(files);
+    const valid = fileArr.filter((f) => {
+      if (!ALLOWED_MIME_TYPES.includes(f.type)) { toast.error(`"${f.name}" is not a supported image type.`); return false; }
+      if (f.size > MAX_FILE_SIZE_BYTES) { toast.error(`"${f.name}" exceeds the 5 MB limit.`); return false; }
+      return true;
+    });
+    if (valid.length === 0) return;
+
+    setUploading(true);
+    try {
+      const uploaded: ProductImage[] = await Promise.all(
+        valid.map(async (file) => {
+          const path = buildStoragePath(file);
+          const { error } = await supabase.storage.from(PRODUCT_IMAGES_BUCKET).upload(path, file, { upsert: false });
+          if (error) throw new Error(error.message);
+          const { data: { publicUrl } } = supabase.storage.from(PRODUCT_IMAGES_BUCKET).getPublicUrl(path);
+          return { url: publicUrl, alt: file.name.replace(/\.[^.]+$/, "") };
+        })
+      );
+      setForm((prev) => ({ ...prev, images: [...prev.images, ...uploaded] }));
+      toast.success(`${uploaded.length} image${uploaded.length > 1 ? "s" : ""} uploaded.`);
+    } catch (err) {
+      toast.error(`Upload failed: ${(err as Error).message}`);
+    } finally {
+      setUploading(false);
+    }
+  }
+
+  function removeImage(url: string) {
+    setForm((prev) => ({ ...prev, images: prev.images.filter((i) => i.url !== url) }));
+  }
+
+  // ── Drag-and-drop handlers ────────────────────────────────────────────────────
+  function handleDragOver(e: React.DragEvent) { e.preventDefault(); }
+  function handleDragEnter(e: React.DragEvent) { e.preventDefault(); setDragOver(true); }
+  function handleDragLeave(e: React.DragEvent) { e.preventDefault(); setDragOver(false); }
+  function handleDrop(e: React.DragEvent) {
+    e.preventDefault(); setDragOver(false);
+    if (e.dataTransfer.files.length) void uploadFiles(e.dataTransfer.files);
+  }
+  function handleDropzoneClick() { fileInputRef.current?.click(); }
+  function handleDropzoneKeyDown(e: React.KeyboardEvent) {
+    if (e.key === "Enter" || e.key === " ") { e.preventDefault(); fileInputRef.current?.click(); }
+  }
+
+  // ── Save (create / update) ────────────────────────────────────────────────────
+  async function handleSave() {
     const parsed = prepareForm(form);
     if (!parsed.success) {
-      const errors: FieldErrors = {};
+      const errs: FieldErrors = {};
       for (const issue of parsed.error.issues) {
         const key = issue.path[0] as keyof ProductFormState;
-        if (!errors[key]) errors[key] = issue.message;
+        if (key && !errs[key]) errs[key] = issue.message;
       }
-      setFieldErrors(errors);
-      for (const stepDef of STEPS) {
-        if (stepDef.fields.some((f) => errors[f])) {
-          setWizardStep(stepDef.id);
-          break;
-        }
-      }
+      setFieldErrors(errs);
+
+      // Jump to the first step that has an error
+      const firstErrorStep = STEPS.findIndex((s) =>
+        s.fields.some((f) => errs[f as keyof FieldErrors])
+      );
+      if (firstErrorStep >= 0) goToStep(firstErrorStep);
+
       toast.error("Please fix the highlighted fields.");
       return;
     }
@@ -1232,189 +1224,211 @@ export default function ProductManagement() {
       const payload = toApiPayload(parsed.data);
 
       if (editingProduct) {
-        await apiFetch<ApiSingleResponse>(
+        logAdminSavePayload('update', payload, editingProduct.id);
+        const res = await apiFetch<ApiSingleResponse>(
           `/api/admin/products/${editingProduct.id}`,
-          { method: "PUT", body: JSON.stringify(payload) },
+          { method: "PATCH", body: JSON.stringify(payload) },
         );
-        toast.success("Product updated successfully.");
+        const updated = mapApiProduct(res.data);
+        setProducts((prev) => prev.map((p) => (p.id === updated.id ? updated : p)));
+        toast.success("Product updated.");
       } else {
-        await apiFetch<ApiSingleResponse>(
-          `/api/admin/products`,
+        logAdminSavePayload('create', payload);
+        const res = await apiFetch<ApiSingleResponse>(
+          "/api/admin/products",
           { method: "POST", body: JSON.stringify(payload) },
         );
-        toast.success("Product created successfully.");
+        const created = mapApiProduct(res.data);
+        setProducts((prev) => [created, ...prev]);
+        setTotal((t) => t + 1);
+        toast.success("Product created.");
       }
 
-      setSheetOpen(false);
-      void loadProducts(0);
+      closeSheet();
     } catch (err) {
-      const msg = err instanceof Error ? err.message : "Failed to save product";
-      toast.error(msg);
+      toast.error((err as Error).message);
     } finally {
       setSaving(false);
     }
-  }, [form, editingProduct, loadProducts]);
+  }
 
-  // ── Delete — DELETE /api/admin/products/[id] ──────────────────────────────────
-
-  const handleDelete = useCallback(async () => {
+  // ── Delete ────────────────────────────────────────────────────────────────────
+  async function handleDelete() {
     if (!deleteProduct) return;
     setDeleting(true);
     try {
-      await apiFetch<{ success: boolean }>(
-        `/api/admin/products/${deleteProduct.id}`,
-        { method: "DELETE" },
-      );
-      toast.success(`"${deleteProduct.name}" deleted.`);
+      await apiFetch(`/api/admin/products/${deleteProduct.id}`, { method: "DELETE" });
+      setProducts((prev) => prev.filter((p) => p.id !== deleteProduct.id));
+      setTotal((t) => Math.max(0, t - 1));
+      toast.success("Product deleted.");
       setDeleteProduct(null);
-      void loadProducts(0);
     } catch (err) {
-      const msg = err instanceof Error ? err.message : "Failed to delete product";
-      toast.error(msg);
+      toast.error((err as Error).message);
     } finally {
       setDeleting(false);
     }
-  }, [deleteProduct, loadProducts]);
+  }
 
-  // ── Completeness ──────────────────────────────────────────────────────────────
-
+  // ── Derived UI state ──────────────────────────────────────────────────────────
   const completeness = useMemo(() => computeCompleteness(form), [form]);
+  const totalPages = Math.ceil(total / PAGE_SIZE);
+  const activeCount = products.filter((p) => p.active).length;
+  const lowStockCount = products.filter((p) => p.stock > 0 && p.stock <= LOW_STOCK_THRESHOLD).length;
+  const outOfStockCount = products.filter((p) => p.stock === 0).length;
 
-  // ─────────────────────────────────────────────────────────────────────────────
-
+  // ── Render ────────────────────────────────────────────────────────────────────
   return (
-    <div className="min-h-screen bg-[#faf9f7] px-4 py-8 sm:px-6 lg:px-8">
-      {/* Hidden file input */}
-      <input ref={fileInputRef} type="file" multiple accept={ALLOWED_MIME_TYPES.join(",")}
-        className="hidden" onChange={(e) => { if (e.target.files) void uploadFiles(e.target.files); }} />
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-50/80">
+      <div className="mx-auto max-w-[1400px] space-y-6 p-4 sm:p-6 lg:p-8">
 
-      {/* Header */}
-      <div className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h1 className="text-2xl font-extrabold tracking-tight text-slate-900">Products</h1>
-          <p className="mt-0.5 text-sm text-slate-500">Manage your catalogue — add, edit and control visibility.</p>
-        </div>
-        <Button onClick={openCreateSheet}
-          className="inline-flex items-center gap-2 rounded-xl bg-[#8A5A6A] px-5 py-2.5 text-sm font-semibold text-white shadow-md transition hover:bg-[#7a4a5a]">
-          <Plus className="size-4" /> Add Product
-        </Button>
-      </div>
-
-      {/* Stats */}
-      <div className="mb-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
-        <StatPill icon={<ShoppingBag className="size-5" />} label="Total" value={stats.total} color="border-slate-200 bg-white text-slate-800" />
-        <StatPill icon={<CheckCircle2 className="size-5" />} label="Active" value={stats.active} color="border-emerald-200 bg-emerald-50 text-emerald-800" />
-        <StatPill icon={<AlertTriangle className="size-5" />} label="Low Stock" value={stats.lowStock} color="border-amber-200 bg-amber-50 text-amber-800" />
-        <StatPill icon={<Package className="size-5" />} label="Out of Stock" value={stats.outOfStock} color="border-red-200 bg-red-50 text-red-800" />
-      </div>
-
-      {/* Filters */}
-      <div className="mb-6 flex flex-wrap items-center gap-3">
-        <div className="relative flex-1 min-w-[180px]">
-          <Search className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-slate-300" />
-          <input value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Search products…" aria-label="Search products"
-            className="h-9 w-full rounded-lg border border-slate-200 bg-white pl-9 pr-4 text-sm text-slate-900 placeholder:text-slate-300 outline-none transition focus:border-[#8A5A6A] focus:ring-2 focus:ring-[#8A5A6A]/20 shadow-sm" />
-        </div>
-        <FilterSelect value={filterCategory} onChange={setFilterCategory} aria-label="Filter by category">
-          <option value="">All categories</option>
-          {catalogCategories.map((c) => <option key={c} value={c}>{c}</option>)}
-        </FilterSelect>
-        <FilterSelect value={filterStatus} onChange={setFilterStatus} aria-label="Filter by status">
-          <option value="">All status</option>
-          <option value="active">Active</option>
-          <option value="inactive">Inactive</option>
-          <option value="low">Low stock</option>
-          <option value="out">Out of stock</option>
-        </FilterSelect>
-        <button type="button" onClick={() => void loadProducts(0)} aria-label="Refresh products"
-          className="flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-500 shadow-sm transition hover:border-[#8A5A6A] hover:text-[#8A5A6A]">
-          <RefreshCw className="size-4" />
-        </button>
-      </div>
-
-      {/* Grid */}
-      {loading && products.length === 0 ? (
-        <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
-          {Array.from({ length: 8 }).map((_, i) => <SkeletonCard key={i} />)}
-        </div>
-      ) : products.length === 0 ? (
-        <div className="flex flex-col items-center justify-center py-24 text-center">
-          <div className="flex h-20 w-20 items-center justify-center rounded-3xl bg-[#8A5A6A]/10">
-            <ShoppingBag className="size-10 text-[#8A5A6A]/40" />
+        {/* ── Page header ── */}
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div>
+            <div className="flex items-center gap-3">
+              <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-gradient-to-br from-[#8A5A6A] to-[#6a3a4a] shadow-lg">
+                <ShoppingBag className="size-5 text-white" />
+              </div>
+              <div>
+                <h1 className="text-xl font-extrabold text-slate-900">Product Catalogue</h1>
+                <p className="text-xs text-slate-400">{total} product{total !== 1 ? "s" : ""} · Page {page + 1} of {Math.max(1, totalPages)}</p>
+              </div>
+            </div>
           </div>
-          <h3 className="mt-5 text-lg font-bold text-slate-900">No products yet</h3>
-          <p className="mt-2 max-w-sm text-sm text-slate-400">Add your first product to start building your catalogue.</p>
-          <Button onClick={openCreateSheet} className="mt-6 inline-flex items-center gap-2 rounded-xl bg-[#8A5A6A] px-5 py-2.5 text-sm font-semibold text-white shadow-md transition hover:bg-[#7a4a5a]">
-            <Plus className="size-4" /> Add First Product
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button variant="outline" size="sm" onClick={() => void loadProducts(page)}
+              className="h-9 gap-1.5 rounded-xl border-slate-200 text-slate-600">
+              <RefreshCw className="size-3.5" /> Refresh
+            </Button>
+            <Button size="sm" onClick={openAdd}
+              className="h-9 gap-1.5 rounded-xl bg-[#8A5A6A] text-white hover:bg-[#7a4a5a]">
+              <Plus className="size-4" /> Add Product
+            </Button>
+          </div>
         </div>
-      ) : (
-        <>
-          <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
+
+        {/* ── Stat pills ── */}
+        <div className="flex flex-wrap gap-3">
+          <StatPill icon={<Package className="size-4" />} label="Total" value={total}
+            color="border-slate-200 bg-white text-slate-900" />
+          <StatPill icon={<CheckCircle2 className="size-4" />} label="Active" value={activeCount}
+            color="border-emerald-200 bg-emerald-50 text-emerald-800" />
+          <StatPill icon={<AlertTriangle className="size-4" />} label="Low Stock" value={lowStockCount}
+            color="border-amber-200 bg-amber-50 text-amber-800" />
+          <StatPill icon={<X className="size-4" />} label="Out of Stock" value={outOfStockCount}
+            color="border-red-200 bg-red-50 text-red-800" />
+        </div>
+
+        {/* ── Search + Filters ── */}
+        <div className="flex flex-wrap items-center gap-3">
+          <div className="relative flex-1 min-w-[180px]">
+            <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-slate-300" />
+            <input
+              type="search" placeholder="Search products…"
+              value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)}
+              className="h-9 w-full rounded-xl border border-slate-200 bg-white pl-9 pr-3.5 text-sm text-slate-900 placeholder:text-slate-300 outline-none transition focus:border-[#8A5A6A] focus:ring-2 focus:ring-[#8A5A6A]/20 shadow-sm"
+            />
+          </div>
+          <FilterSelect value={filterCategory} onChange={(v) => { setFilterCategory(v); void loadProducts(0); }} aria-label="Filter by category">
+            <option value="">All categories</option>
+            {catalogCategories.map((c) => <option key={c} value={c}>{c}</option>)}
+          </FilterSelect>
+          <FilterSelect value={filterStatus} onChange={(v) => { setFilterStatus(v); void loadProducts(0); }} aria-label="Filter by status">
+            <option value="">All statuses</option>
+            <option value="active">Active</option>
+            <option value="inactive">Inactive</option>
+          </FilterSelect>
+        </div>
+
+        {/* ── Product grid ── */}
+        {loading ? (
+          <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6">
+            {Array.from({ length: PAGE_SIZE }).map((_, i) => <SkeletonCard key={i} />)}
+          </div>
+        ) : products.length === 0 ? (
+          <div className="flex flex-col items-center justify-center gap-4 rounded-2xl border border-dashed border-slate-200 bg-white/60 py-24">
+            <div className="rounded-2xl bg-[#8A5A6A]/8 p-5"><Package className="size-10 text-[#8A5A6A]/40" /></div>
+            <div className="text-center">
+              <p className="text-sm font-semibold text-slate-700">No products found</p>
+              <p className="mt-1 text-xs text-slate-400">Try adjusting your search or filters, or add a new product.</p>
+            </div>
+            <Button size="sm" onClick={openAdd} className="mt-1 gap-1.5 rounded-xl bg-[#8A5A6A] text-white hover:bg-[#7a4a5a]">
+              <Plus className="size-4" /> Add Product
+            </Button>
+          </div>
+        ) : (
+          <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6">
             {products.map((p) => (
               <ProductCard key={p.id} product={p}
-                onView={setViewProduct} onEdit={openEditSheet} onDelete={setDeleteProduct} />
+                onView={setViewProduct} onEdit={openEdit}
+                onDelete={setDeleteProduct} />
             ))}
           </div>
-          {hasMore && (
-            <div className="mt-8 flex justify-center">
-              <Button onClick={() => void loadProducts(page + 1)} disabled={loading}
-                className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-6 py-2.5 text-sm font-semibold text-slate-700 shadow-sm transition hover:border-[#8A5A6A] hover:text-[#8A5A6A]">
-                {loading ? <Loader2 className="size-4 animate-spin" /> : null}
-                Load more
-              </Button>
-            </div>
-          )}
-        </>
-      )}
+        )}
 
-      {/* ── Add / Edit Sheet ──────────────────────────────────────────────────── */}
-      <Sheet open={sheetOpen} onOpenChange={(open) => { if (!open && !saving) setSheetOpen(false); }}>
-        <SheetContent
-          side="right"
-          className="flex w-full flex-col gap-0 overflow-hidden p-0 sm:max-w-2xl"
-        >
+        {/* ── Pagination ── */}
+        {totalPages > 1 && (
+          <div className="flex items-center justify-center gap-2">
+            <button type="button" disabled={page === 0} onClick={() => void loadProducts(page - 1)}
+              className="flex h-9 w-9 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-600 transition hover:border-slate-300 disabled:opacity-40">
+              <ChevronLeft className="size-4" />
+            </button>
+            <span className="text-sm font-medium text-slate-700">Page {page + 1} of {totalPages}</span>
+            <button type="button" disabled={page >= totalPages - 1} onClick={() => void loadProducts(page + 1)}
+              className="flex h-9 w-9 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-600 transition hover:border-slate-300 disabled:opacity-40">
+              <ChevronRight className="size-4" />
+            </button>
+          </div>
+        )}
+      </div>
+
+      {/* ── Hidden file input ── */}
+      <input ref={fileInputRef} type="file" accept={ALLOWED_MIME_TYPES.join(",")} multiple className="hidden"
+        onChange={(e) => { if (e.target.files?.length) void uploadFiles(e.target.files); e.target.value = ""; }} />
+
+      {/* ═══════════════════════════════════════════════════════════════
+          Add / Edit Sheet
+      ═══════════════════════════════════════════════════════════════ */}
+      <Sheet open={sheetOpen} onOpenChange={(open) => { if (!open) closeSheet(); }}>
+        <SheetContent side="right"
+          className="flex w-full max-w-2xl flex-col gap-0 overflow-hidden border-l border-slate-200 bg-white p-0 shadow-2xl sm:max-w-2xl">
+
           {/* Sheet header */}
-          <SheetHeader className="shrink-0 border-b border-slate-100 px-6 py-5">
+          <SheetHeader className="shrink-0 border-b border-slate-100 bg-white px-6 py-4">
             <div className="flex items-start justify-between gap-4">
-              <div>
-                <SheetTitle className="text-lg font-bold text-slate-900">
-                  {editingProduct ? "Edit Product" : "New Product"}
+              <div className="min-w-0">
+                <SheetTitle className="text-base font-bold text-slate-900">
+                  {editingProduct ? `Edit — ${editingProduct.name}` : "Add New Product"}
                 </SheetTitle>
-                <SheetDescription className="mt-1 text-xs text-slate-400">
-                  {editingProduct ? `Editing · ${editingProduct.name}` : "Fill in the details to add a product to your catalogue."}
+                <SheetDescription className="mt-0.5 text-xs text-slate-400">
+                  {editingProduct ? "Update product details and save." : "Fill in the details to add a new product to your catalogue."}
                 </SheetDescription>
               </div>
-              <div className="flex shrink-0 flex-col items-end gap-1.5">
-                <span className="text-[11px] font-semibold text-slate-400">Completeness</span>
-                <div className="w-32">
-                  <CompletenessBar pct={completeness} />
-                </div>
+              <div className="shrink-0 text-right">
+                <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">Completeness</p>
+                <p className="mt-0.5 text-lg font-extrabold tabular-nums text-slate-900">{completeness}%</p>
               </div>
+            </div>
+            <div className="mt-3">
+              <CompletenessBar pct={completeness} />
             </div>
             <div className="mt-4">
               <WizardStepBar step={wizardStep} maxStep={wizardMaxStep} onStep={goToStep} />
             </div>
           </SheetHeader>
 
-          {/* Step content */}
+          {/* Scrollable step content */}
           <div className="flex-1 overflow-y-auto px-6 py-6">
             {wizardStep === 0 && (
-              <StepMedia
-                form={form} fieldErrors={fieldErrors} uploading={uploading} dragOver={dragOver}
+              <StepMedia form={form} fieldErrors={fieldErrors} uploading={uploading} dragOver={dragOver}
                 fileInputRef={fileInputRef}
                 onDragOver={handleDragOver} onDragEnter={handleDragEnter}
                 onDragLeave={handleDragLeave} onDrop={handleDrop}
-                onClick={handleDropZoneClick} onKeyDown={handleDropZoneKeyDown}
-                onRemove={removeImage}
-              />
+                onClick={handleDropzoneClick} onKeyDown={handleDropzoneKeyDown}
+                onRemove={removeImage} />
             )}
             {wizardStep === 1 && (
-              <StepBasicInfo
-                form={form} fieldErrors={fieldErrors}
-                updateForm={updateForm} applySlug={applySlug} applySku={applySku}
-              />
+              <StepBasicInfo form={form} fieldErrors={fieldErrors} updateForm={updateForm}
+                applySlug={applySlug} applySku={applySku} />
             )}
             {wizardStep === 2 && (
               <StepPricing form={form} fieldErrors={fieldErrors} updateForm={updateForm} />
@@ -1428,24 +1442,29 @@ export default function ProductManagement() {
           </div>
 
           {/* Sheet footer */}
-          <SheetFooter className="shrink-0 border-t border-slate-100 px-6 py-4">
+          <SheetFooter className="shrink-0 border-t border-slate-100 bg-white px-6 py-4">
             <div className="flex w-full items-center justify-between gap-3">
-              <button type="button" onClick={handlePrev} disabled={wizardStep === 0}
-                className="flex h-9 items-center gap-1.5 rounded-lg border border-slate-200 px-3.5 text-sm font-semibold text-slate-600 transition hover:bg-slate-50 disabled:opacity-40">
-                <ChevronLeft className="size-4" /> Back
-              </button>
+              <Button variant="ghost" size="sm" onClick={closeSheet}
+                className="h-9 rounded-xl text-slate-500 hover:text-slate-700">
+                Cancel
+              </Button>
               <div className="flex items-center gap-2">
+                {wizardStep > 0 && (
+                  <Button variant="outline" size="sm" onClick={handlePrev}
+                    className="h-9 gap-1.5 rounded-xl border-slate-200">
+                    <ChevronLeft className="size-3.5" /> Back
+                  </Button>
+                )}
                 {wizardStep < STEPS.length - 1 ? (
-                  <button type="button" onClick={handleNext}
-                    className="flex h-9 items-center gap-1.5 rounded-lg bg-[#8A5A6A] px-4 text-sm font-semibold text-white shadow transition hover:bg-[#7a4a5a]">
-                    Next <ChevronRight className="size-4" />
-                  </button>
+                  <Button size="sm" onClick={handleNext}
+                    className="h-9 gap-1.5 rounded-xl bg-[#8A5A6A] text-white hover:bg-[#7a4a5a]">
+                    Next <ChevronRight className="size-3.5" />
+                  </Button>
                 ) : (
-                  <button type="button" onClick={() => void handleSave()} disabled={saving}
-                    className="flex h-9 min-w-[110px] items-center justify-center gap-2 rounded-lg bg-[#8A5A6A] px-5 text-sm font-semibold text-white shadow transition hover:bg-[#7a4a5a] disabled:opacity-60">
-                    {saving ? <Loader2 className="size-4 animate-spin" /> : <CheckCircle2 className="size-4" />}
-                    {saving ? "Saving…" : editingProduct ? "Save Changes" : "Publish Product"}
-                  </button>
+                  <Button size="sm" disabled={saving} onClick={() => void handleSave()}
+                    className="h-9 min-w-[100px] gap-1.5 rounded-xl bg-[#8A5A6A] text-white hover:bg-[#7a4a5a] disabled:opacity-60">
+                    {saving ? <><Loader2 className="size-3.5 animate-spin" /> Saving…</> : editingProduct ? "Save Changes" : "Create Product"}
+                  </Button>
                 )}
               </div>
             </div>
@@ -1453,102 +1472,80 @@ export default function ProductManagement() {
         </SheetContent>
       </Sheet>
 
-      {/* ── View Dialog ───────────────────────────────────────────────────────── */}
+      {/* ═══════════════════════════════════════════════════════════════
+          View Dialog
+      ═══════════════════════════════════════════════════════════════ */}
       <Dialog open={!!viewProduct} onOpenChange={(open) => { if (!open) setViewProduct(null); }}>
-        <DialogContent className="max-h-[90vh] max-w-2xl overflow-y-auto">
+        <DialogContent className="max-h-[90vh] max-w-2xl overflow-y-auto rounded-2xl border-slate-200 bg-white p-0">
           {viewProduct && (
             <>
-              <DialogHeader>
-                <div className="flex items-start gap-3">
-                  <Badge className={cn("mt-0.5 shrink-0 rounded-full px-2.5 text-[10px] font-bold uppercase",
-                    viewProduct.active ? "bg-emerald-100 text-emerald-700" : "bg-slate-100 text-slate-500")}>
-                    {viewProduct.active ? "Live" : "Draft"}
-                  </Badge>
-                  <div>
-                    <DialogTitle className="text-lg font-bold text-slate-900">{viewProduct.name}</DialogTitle>
-                    <DialogDescription className="font-mono text-xs">{viewProduct.sku}</DialogDescription>
-                  </div>
-                </div>
+              <DialogHeader className="border-b border-slate-100 px-6 py-4">
+                <DialogTitle className="text-base font-bold text-slate-900">{viewProduct.name}</DialogTitle>
+                <DialogDescription className="font-mono text-xs text-slate-400">{viewProduct.sku}</DialogDescription>
               </DialogHeader>
-
-              {/* Images */}
-              {viewProduct.images.length > 0 && (
-                <div className="grid grid-cols-3 gap-2">
-                  {viewProduct.images.slice(0, 6).map((img, i) => (
-                    <div key={img.url} className={cn("relative overflow-hidden rounded-xl bg-slate-100",
-                      i === 0 ? "col-span-2 row-span-2 aspect-[4/5]" : "aspect-square")}>
-                      <Image src={img.url} alt={img.alt} fill sizes="300px" className="object-cover" />
-                    </div>
-                  ))}
+              <div className="space-y-5 px-6 py-5">
+                {viewProduct.images.length > 0 && (
+                  <div className="flex gap-2 overflow-x-auto pb-1">
+                    {viewProduct.images.map((img, i) => (
+                      <div key={img.url} className="relative aspect-square h-20 shrink-0 overflow-hidden rounded-xl border border-slate-200 bg-slate-100">
+                        <Image src={img.url} alt={img.alt} fill sizes="80px" className="object-cover" />
+                        {i === 0 && <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/50 to-transparent pb-1"><span className="block text-center text-[8px] font-bold uppercase text-white">Cover</span></div>}
+                      </div>
+                    ))}
+                  </div>
+                )}
+                <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+                  <Detail label="Category" value={viewProduct.category} />
+                  <Detail label="Collection" value={viewProduct.collection} />
+                  <Detail label="Brand" value={viewProduct.brand} />
+                  <Detail label="Fabric" value={viewProduct.fabric} />
+                  <Detail label="Color" value={viewProduct.color} />
+                  <Detail label="Sizes" value={viewProduct.sizes.join(", ")} />
+                  <Detail label="Price" value={formatCurrency(viewProduct.price)} />
+                  <Detail label="Compare Price" value={viewProduct.comparePrice ? formatCurrency(viewProduct.comparePrice) : "—"} />
+                  <Detail label="Stock" value={String(viewProduct.stock)} />
+                  <Detail label="HSN" value={viewProduct.hsn} />
+                  <Detail label="GST" value={`${viewProduct.gst}%`} />
+                  <Detail label="Status" value={viewProduct.active ? "Active" : "Inactive"} />
                 </div>
-              )}
-
-              {/* Details */}
-              <dl className="grid grid-cols-2 gap-2 sm:grid-cols-3">
-                <Detail label="Category" value={viewProduct.category} />
-                <Detail label="Collection" value={viewProduct.collection} />
-                <Detail label="Brand" value={viewProduct.brand} />
-                <Detail label="Fabric" value={viewProduct.fabric} />
-                <Detail label="Color" value={viewProduct.color} />
-                <Detail label="Sizes" value={viewProduct.sizes.join(", ")} />
-                <Detail label="Price" value={formatCurrency(viewProduct.price)} />
-                <Detail label="Compare Price" value={viewProduct.comparePrice ? formatCurrency(viewProduct.comparePrice) : "—"} />
-                <Detail label="Stock" value={String(viewProduct.stock)} />
-                <Detail label="HSN" value={viewProduct.hsn} />
-                <Detail label="GST" value={`${viewProduct.gst}%`} />
-                <Detail label="Slug" value={viewProduct.slug} />
-              </dl>
-
-              {/* Description */}
-              {viewProduct.description && (
-                <div className="rounded-lg border border-slate-100 bg-slate-50 p-4">
-                  <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-wider text-slate-400">Description</p>
-                  <p className="whitespace-pre-line text-sm leading-relaxed text-slate-700">{viewProduct.description}</p>
+                {viewProduct.description && (
+                  <div className="rounded-lg border border-slate-100 bg-slate-50 p-3">
+                    <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">Description</p>
+                    <p className="mt-1.5 text-sm leading-relaxed text-slate-700">{viewProduct.description}</p>
+                  </div>
+                )}
+                <div className="flex flex-wrap gap-2">
+                  {viewProduct.featured && <Badge variant="secondary" className="text-[10px]">Featured</Badge>}
+                  {viewProduct.newArrival && <Badge variant="secondary" className="text-[10px]">New Arrival</Badge>}
+                  {viewProduct.bestSeller && <Badge variant="secondary" className="text-[10px]">Best Seller</Badge>}
                 </div>
-              )}
-
-              {/* Flags */}
-              <div className="flex flex-wrap gap-2">
-                {viewProduct.featured && <span className="rounded-full bg-[#8A5A6A]/10 px-3 py-1 text-xs font-semibold text-[#8A5A6A]">Featured</span>}
-                {viewProduct.newArrival && <span className="rounded-full bg-blue-50 px-3 py-1 text-xs font-semibold text-blue-700">New Arrival</span>}
-                {viewProduct.bestSeller && <span className="rounded-full bg-amber-50 px-3 py-1 text-xs font-semibold text-amber-700">Best Seller</span>}
               </div>
-
-              <DialogFooter className="flex-row gap-2">
-                <Button variant="outline" onClick={() => setViewProduct(null)} className="flex-1">
-                  Close
-                </Button>
-                <Button onClick={() => { setViewProduct(null); openEditSheet(viewProduct); }}
-                  className="flex-1 bg-[#8A5A6A] text-white hover:bg-[#7a4a5a]">
-                  <Edit className="mr-1.5 size-4" /> Edit Product
-                </Button>
+              <DialogFooter className="border-t border-slate-100 px-6 py-4">
+                <Button variant="outline" size="sm" onClick={() => setViewProduct(null)} className="rounded-xl">Close</Button>
+                <Button size="sm" onClick={() => { setViewProduct(null); openEdit(viewProduct); }}
+                  className="rounded-xl bg-[#8A5A6A] text-white hover:bg-[#7a4a5a]">Edit Product</Button>
               </DialogFooter>
             </>
           )}
         </DialogContent>
       </Dialog>
 
-      {/* ── Delete Confirm Dialog ─────────────────────────────────────────────── */}
-      <Dialog open={!!deleteProduct} onOpenChange={(open) => { if (!open && !deleting) setDeleteProduct(null); }}>
-        <DialogContent className="max-w-md">
+      {/* ═══════════════════════════════════════════════════════════════
+          Delete Confirmation Dialog
+      ═══════════════════════════════════════════════════════════════ */}
+      <Dialog open={!!deleteProduct} onOpenChange={(open) => { if (!open) setDeleteProduct(null); }}>
+        <DialogContent className="max-w-sm rounded-2xl border-slate-200 bg-white">
           <DialogHeader>
-            <DialogTitle className="flex items-center gap-2 text-red-600">
-              <Trash2 className="size-5" /> Delete Product
-            </DialogTitle>
-            <DialogDescription>
-              Are you sure you want to permanently delete{" "}
-              <strong className="text-slate-900">&quot;{deleteProduct?.name}&quot;</strong>?{" "}
-              This cannot be undone.
+            <DialogTitle className="text-base font-bold text-slate-900">Delete Product</DialogTitle>
+            <DialogDescription className="text-sm text-slate-500">
+              Are you sure you want to delete <strong className="font-semibold text-slate-800">{deleteProduct?.name}</strong>? This action cannot be undone.
             </DialogDescription>
           </DialogHeader>
-          <DialogFooter className="flex-row gap-2">
-            <Button variant="outline" onClick={() => setDeleteProduct(null)} disabled={deleting} className="flex-1">
-              Cancel
-            </Button>
-            <Button onClick={() => void handleDelete()} disabled={deleting}
-              className="flex-1 bg-red-500 text-white hover:bg-red-600">
-              {deleting ? <Loader2 className="mr-1.5 size-4 animate-spin" /> : <Trash2 className="mr-1.5 size-4" />}
-              {deleting ? "Deleting…" : "Yes, Delete"}
+          <DialogFooter className="mt-2 gap-2">
+            <Button variant="outline" size="sm" onClick={() => setDeleteProduct(null)} className="rounded-xl">Cancel</Button>
+            <Button size="sm" disabled={deleting} onClick={() => void handleDelete()}
+              className="rounded-xl bg-red-500 text-white hover:bg-red-600 disabled:opacity-60">
+              {deleting ? <><Loader2 className="size-3.5 animate-spin" /> Deleting…</> : "Delete"}
             </Button>
           </DialogFooter>
         </DialogContent>

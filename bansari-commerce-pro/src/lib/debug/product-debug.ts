@@ -1,224 +1,188 @@
 /**
  * product-debug.ts
  *
- * Zero-cost debug instrumentation for the product data pipeline.
+ * Centralised PRODUCT_DEBUG instrumentation.
  *
- * Usage:
- *   Set ENABLE_PRODUCT_DEBUG=true in .env.local (or the Vercel dashboard)
- *   to activate runtime logging. When the variable is absent or set to any
- *   other value, every exported function is a no-op and the module tree-shakes
- *   away in production builds.
+ * All helpers are strict no-ops at runtime unless the
+ * ENABLE_PRODUCT_DEBUG environment variable is set to the
+ * string "true".  Setting it to any other value (including
+ * absence) produces zero console output and zero overhead
+ * beyond a single boolean comparison.
  *
- * Contract:
- *   - No side effects when disabled.
- *   - All functions are synchronous except where noted.
- *   - Never throws — all internal errors are silently swallowed so that
- *     debug code can never break the production path.
+ * Usage
+ * -----
+ * Server (.env.local / Vercel env):
+ *   ENABLE_PRODUCT_DEBUG=true
+ *
+ * Client (Next.js public env):
+ *   NEXT_PUBLIC_ENABLE_PRODUCT_DEBUG=true
+ *
+ * The module reads both variables so it works in both
+ * server-side (Node) and client-side (browser) contexts.
  */
 
-const ENABLED =
-  process.env.ENABLE_PRODUCT_DEBUG === 'true';
-
 // ---------------------------------------------------------------------------
-// Internal helpers
+// Guard — resolves at module-evaluation time, never changes.
 // ---------------------------------------------------------------------------
 
-function prefix(layer: string): string {
-  return `[PRODUCT_DEBUG][${layer}]`;
-}
-
-function safeStringify(value: unknown): string {
-  try {
-    return JSON.stringify(value, null, 2);
-  } catch {
-    return String(value);
+const IS_DEBUG: boolean = (() => {
+  // Server-side: process.env is available.
+  if (typeof process !== 'undefined' && process.env) {
+    if (process.env['ENABLE_PRODUCT_DEBUG'] === 'true') return true;
+    if (process.env['NEXT_PUBLIC_ENABLE_PRODUCT_DEBUG'] === 'true') return true;
   }
-}
+  return false;
+})();
 
-function byteLength(value: unknown): number {
-  try {
-    return new TextEncoder().encode(JSON.stringify(value)).length;
-  } catch {
-    return -1;
-  }
+// ---------------------------------------------------------------------------
+// Internal helper
+// ---------------------------------------------------------------------------
+
+function dbg(namespace: string, ...args: unknown[]): void {
+  if (!IS_DEBUG) return;
+  // eslint-disable-next-line no-console
+  console.debug(`[PRODUCT_DEBUG][${namespace}]`, ...args);
 }
 
 // ---------------------------------------------------------------------------
-// Public API
+// Service-layer helpers  (used by product.service.ts)
 // ---------------------------------------------------------------------------
 
 /**
- * Log the start of a service-layer query.
- *
- * @param fn    - Name of the service function (e.g. 'getFeaturedProducts')
- * @param query - Optional object describing the Supabase filter applied
+ * Log the start of a Supabase query with the filter parameters.
  */
 export function logServiceQueryStart(
   fn: string,
-  query?: Record<string, unknown>,
+  filters: Record<string, unknown>,
 ): void {
-  if (!ENABLED) return;
-  try {
-    console.log(
-      `${prefix('service')} ${fn} → query start`,
-      query ? safeStringify(query) : '(no filter)',
-    );
-  } catch { /* noop */ }
+  dbg(fn, 'query-start', filters);
 }
 
 /**
- * Log the result returned by a service-layer query.
+ * Log the result of a Supabase query.
  *
- * @param fn      - Name of the service function
- * @param rows    - Raw rows returned from Supabase before mapping
- * @param elapsed - Wall-clock time in ms measured by the caller
+ * @param fn      Function name (e.g. 'getFeaturedProducts')
+ * @param rows    Raw rows returned by Supabase
+ * @param elapsedMs  Wall-clock time of the DB call in milliseconds
  */
 export function logServiceQueryResult(
   fn: string,
   rows: unknown[],
-  elapsed: number,
+  elapsedMs: number,
 ): void {
-  if (!ENABLED) return;
-  try {
-    console.log(
-      `${prefix('service')} ${fn} → ${rows.length} row(s) in ${elapsed.toFixed(1)} ms` +
-      ` | payload ${byteLength(rows)} bytes`,
-    );
-    if (rows.length > 0) {
-      console.log(
-        `${prefix('service')} ${fn} → first row keys:`,
-        Object.keys(rows[0] as object).join(', '),
-      );
-    }
-  } catch { /* noop */ }
+  dbg(fn, 'query-result', { count: rows.length, elapsedMs });
+  if (IS_DEBUG) {
+    dbg(fn, 'rows', rows);
+  }
 }
 
 /**
- * Log a service-layer error.
- *
- * @param fn  - Name of the service function
- * @param err - The thrown value
+ * Log a Supabase error.
  */
-export function logServiceError(fn: string, err: unknown): void {
-  if (!ENABLED) return;
-  try {
-    const message = err instanceof Error ? err.message : String(err);
-    console.error(`${prefix('service')} ${fn} → ERROR: ${message}`);
-  } catch { /* noop */ }
+export function logServiceError(
+  fn: string,
+  error: unknown,
+): void {
+  dbg(fn, 'error', error);
 }
 
+// ---------------------------------------------------------------------------
+// API route helpers  (used by route.ts handlers)
+// ---------------------------------------------------------------------------
+
 /**
- * Log an API route response before it is sent to the client.
+ * Log the outgoing API route response summary.
  *
- * @param route   - Route path (e.g. '/api/products/featured')
- * @param count   - Number of products included in the response
- * @param elapsed - Wall-clock time in ms from route entry to response
+ * @param route     Route path, e.g. '/api/products/featured'
+ * @param count     Number of products being returned
+ * @param elapsedMs Total handler time in milliseconds
  */
 export function logApiRouteResponse(
   route: string,
   count: number,
-  elapsed: number,
+  elapsedMs: number,
 ): void {
-  if (!ENABLED) return;
-  try {
-    console.log(
-      `${prefix('route')} ${route} → ${count} product(s) in ${elapsed.toFixed(1)} ms`,
-    );
-  } catch { /* noop */ }
+  dbg('api-route', route, { count, elapsedMs });
 }
 
 /**
- * Log an API route error before the 500 response is sent.
- *
- * @param route - Route path
- * @param err   - The caught error
+ * Log an API route error before responding with 500.
  */
-export function logApiRouteError(route: string, err: unknown): void {
-  if (!ENABLED) return;
-  try {
-    const message = err instanceof Error ? err.message : String(err);
-    console.error(`${prefix('route')} ${route} → ERROR: ${message}`);
-  } catch { /* noop */ }
+export function logApiRouteError(
+  route: string,
+  error: unknown,
+): void {
+  dbg('api-route-error', route, error);
 }
 
+// ---------------------------------------------------------------------------
+// Client-side fetch helpers  (used by FeaturedProducts.tsx)
+// ---------------------------------------------------------------------------
+
 /**
- * Log a client-side fetch result inside FeaturedProducts.
+ * Log a successful client-side fetch.
  *
- * @param url     - The fetch URL
- * @param count   - Number of products received after slicing
- * @param elapsed - Wall-clock time in ms from fetch start to state update
- * @param bytes   - Approximate response byte length (-1 if unavailable)
+ * @param url        The URL that was fetched
+ * @param count      Number of products in the sliced result
+ * @param elapsedMs  Elapsed time measured with performance.now()
+ * @param bytes      Approximate byte size of the JSON payload (-1 if unknown)
  */
 export function logClientFetch(
   url: string,
   count: number,
-  elapsed: number,
+  elapsedMs: number,
   bytes: number,
 ): void {
-  if (!ENABLED) return;
-  try {
-    console.log(
-      `${prefix('client')} fetch ${url} → ${count} item(s) in ${elapsed.toFixed(1)} ms` +
-      (bytes >= 0 ? ` | ~${bytes} bytes` : ''),
-    );
-  } catch { /* noop */ }
+  dbg('client-fetch', url, { count, elapsedMs, bytes });
 }
 
 /**
- * Log a client-side fetch error inside FeaturedProducts.
- *
- * @param url - The fetch URL
- * @param err - The caught error
+ * Log a client-side fetch error.
  */
-export function logClientFetchError(url: string, err: unknown): void {
-  if (!ENABLED) return;
-  try {
-    const message = err instanceof Error ? err.message : String(err);
-    console.error(`${prefix('client')} fetch ${url} → ERROR: ${message}`);
-  } catch { /* noop */ }
+export function logClientFetchError(
+  url: string,
+  error: unknown,
+): void {
+  dbg('client-fetch-error', url, error);
 }
 
+// ---------------------------------------------------------------------------
+// ProductCard render helper  (used by ProductCard.tsx)
+// ---------------------------------------------------------------------------
+
 /**
- * Log a ProductCard render event.
+ * Log a single ProductCard mount.  Called once per card instance
+ * via useEffect([]) so it fires only on mount, not on re-renders.
  *
- * @param productId   - Numeric product id
- * @param productName - Product display name
- * @param imageUrl    - Resolved primary image URL (or placeholder)
+ * @param productId  Numeric product id
+ * @param name       Product display name
+ * @param imageUrl   Resolved primary image URL
  */
 export function logCardRender(
   productId: number,
-  productName: string,
+  name: string,
   imageUrl: string,
 ): void {
-  if (!ENABLED) return;
-  try {
-    const isPlaceholder = imageUrl === '/placeholder.png';
-    console.log(
-      `${prefix('card')} id=${productId} "${productName}"` +
-      ` | image=${isPlaceholder ? '⚠ placeholder' : imageUrl}`,
-    );
-  } catch { /* noop */ }
+  dbg('card-render', { productId, name, imageUrl });
 }
 
+// ---------------------------------------------------------------------------
+// Admin save payload helper  (used by ProductManagement.tsx)
+// ---------------------------------------------------------------------------
+
 /**
- * Log the admin save payload inside ProductManagement before it is sent
- * to the API.
+ * Log the API payload that is about to be dispatched from the
+ * admin product save flow.  Called immediately before apiFetch
+ * inside handleSave, for both create and update operations.
  *
- * @param mode    - 'create' or 'update'
- * @param id      - Product id when updating (undefined when creating)
- * @param payload - The serialisable API payload object
+ * @param mode     'create' | 'update'
+ * @param payload  The ApiProductPayload object built by toApiPayload()
+ * @param productId  Existing product id when mode === 'update'; undefined for create
  */
 export function logAdminSavePayload(
   mode: 'create' | 'update',
-  id: number | undefined,
   payload: unknown,
+  productId?: number,
 ): void {
-  if (!ENABLED) return;
-  try {
-    const label = mode === 'update' ? `update id=${id}` : 'create';
-    console.log(
-      `${prefix('admin')} save → ${label} | payload ${byteLength(payload)} bytes`,
-    );
-    console.log(`${prefix('admin')} payload:`, safeStringify(payload));
-  } catch { /* noop */ }
+  dbg('admin-save', { mode, productId, payload });
 }
