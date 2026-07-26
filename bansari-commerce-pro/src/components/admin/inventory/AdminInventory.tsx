@@ -10,8 +10,8 @@ type InventoryRow = {
   category: string;
   stock: number;
   price: number;
-  active: boolean;
-  updated_at: string;
+  /** API returns `is_active` — matches the `is_active` column selected in the route */
+  is_active: boolean;
 };
 
 const LOW = 10;
@@ -39,7 +39,8 @@ export function AdminInventory() {
     setLoading(true);
     fetch("/api/admin/inventory")
       .then((r) => (r.ok ? r.json() : Promise.reject(r.statusText)))
-      .then((d) => setItems(d))
+      // API returns { success, requestId, data } — extract the data array
+      .then((d) => setItems(d.data ?? []))
       .catch((e) => setError(String(e)))
       .finally(() => setLoading(false));
   }, []);
@@ -69,7 +70,8 @@ export function AdminInventory() {
       const res = await fetch("/api/admin/inventory", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id, stock: val }),
+        // Route validates typeof id !== 'string' — must send as string
+        body: JSON.stringify({ id: String(id), stock: val }),
       });
       if (!res.ok) throw new Error(await res.text());
       setItems((prev) =>
