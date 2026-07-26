@@ -1,6 +1,8 @@
 import type { NextConfig } from 'next';
 import crypto from 'crypto';
 
+const isDev = process.env.NODE_ENV === 'development';
+
 const nextConfig: NextConfig = {
   compress: true,
   poweredByHeader: false,
@@ -66,8 +68,12 @@ const nextConfig: NextConfig = {
             key: 'Content-Security-Policy',
             value: [
               "default-src 'self'",
-              // Next.js requires unsafe-inline for styles and inline scripts
-              "script-src 'self' 'unsafe-inline' https://checkout.razorpay.com https://api.razorpay.com",
+              // unsafe-eval is required by Next.js/Turbopack in development mode
+              // for React call-stack reconstruction and HMR. It is intentionally
+              // omitted in production builds via the isDev guard.
+              isDev
+                ? "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://checkout.razorpay.com https://api.razorpay.com"
+                : "script-src 'self' 'unsafe-inline' https://checkout.razorpay.com https://api.razorpay.com",
               "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
               "font-src 'self' https://fonts.gstatic.com",
               // Supabase, Razorpay and WhatsApp API calls
@@ -86,7 +92,7 @@ const nextConfig: NextConfig = {
       },
       {
         // Cache static assets aggressively
-        source: '/(.*)\\.(ico|png|jpg|jpeg|webp|avif|svg|woff|woff2)',
+        source: '/(.*)\\.  (ico|png|jpg|jpeg|webp|avif|svg|woff|woff2)',
         headers: [
           {
             key: 'Cache-Control',
