@@ -32,7 +32,7 @@ export default function FeaturedProducts() {
         ? "/api/products/new-arrivals"
         : "/api/products/featured";
 
-    fetch(url)
+    fetch(url, { cache: "no-store" })
       .then((res) => {
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         return res.json() as Promise<{ success: boolean; data: Product[] }>;
