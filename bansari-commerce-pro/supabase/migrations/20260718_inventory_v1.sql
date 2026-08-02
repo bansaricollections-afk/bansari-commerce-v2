@@ -4,11 +4,12 @@
 -- =============================================================================
 -- Run order: this migration is additive and does not modify existing tables.
 -- Depends on: products table (already exists)
+-- Idempotent: all CREATE TABLE, CREATE INDEX, CREATE POLICY are guarded.
 -- =============================================================================
 
 -- ---------------------------------------------------------------------------
 -- 1. PRODUCT VARIANTS
---    One row per sellable variant (size × colour combination).
+--    One row per sellable variant (size x colour combination).
 --    Links to products.id.
 -- ---------------------------------------------------------------------------
 create table if not exists public.product_variants (
@@ -385,7 +386,7 @@ begin
   end if;
 
   if v_cur_status <> 'active' then
-    return;  -- idempotent — already processed
+    return;  -- idempotent -- already processed
   end if;
 
   -- Decrement reserved counter
@@ -404,53 +405,117 @@ grant execute on function public.inventory_release_reservation to service_role;
 
 -- ---------------------------------------------------------------------------
 -- 9. ROW LEVEL SECURITY
+--    All CREATE POLICY statements are guarded with IF NOT EXISTS checks
+--    so this migration is fully idempotent and safe to re-run.
 -- ---------------------------------------------------------------------------
-alter table public.product_variants         enable row level security;
-alter table public.inventory_ledger         enable row level security;
-alter table public.inventory_transactions   enable row level security;
-alter table public.inventory_reservations   enable row level security;
+alter table public.product_variants       enable row level security;
+alter table public.inventory_ledger       enable row level security;
+alter table public.inventory_transactions enable row level security;
+alter table public.inventory_reservations enable row level security;
 
--- Service role bypasses RLS by default (superuser context)
--- Admin authenticated users: read all
-create policy "admin_read_variants" on public.product_variants
-  for select using (
-    (auth.jwt() ->> 'role') = 'admin'
-    or (auth.jwt() -> 'user_metadata' ->> 'role') = 'admin'
-  );
+do $$ begin
+  if not exists (
+    select 1 from pg_policies
+    where schemaname = 'public'
+      and tablename  = 'product_variants'
+      and policyname = 'admin_read_variants'
+  ) then
+    create policy "admin_read_variants" on public.product_variants
+      for select using (
+        (auth.jwt() ->> 'role') = 'admin'
+        or (auth.jwt() -> 'user_metadata' ->> 'role') = 'admin'
+      );
+  end if;
 
-create policy "service_role_variants" on public.product_variants
-  for all using (true)
-  with check (true);
+  if not exists (
+    select 1 from pg_policies
+    where schemaname = 'public'
+      and tablename  = 'product_variants'
+      and policyname = 'service_role_variants'
+  ) then
+    create policy "service_role_variants" on public.product_variants
+      for all using (true)
+      with check (true);
+  end if;
+end $$;
 
-create policy "admin_read_ledger" on public.inventory_ledger
-  for select using (
-    (auth.jwt() ->> 'role') = 'admin'
-    or (auth.jwt() -> 'user_metadata' ->> 'role') = 'admin'
-  );
+do $$ begin
+  if not exists (
+    select 1 from pg_policies
+    where schemaname = 'public'
+      and tablename  = 'inventory_ledger'
+      and policyname = 'admin_read_ledger'
+  ) then
+    create policy "admin_read_ledger" on public.inventory_ledger
+      for select using (
+        (auth.jwt() ->> 'role') = 'admin'
+        or (auth.jwt() -> 'user_metadata' ->> 'role') = 'admin'
+      );
+  end if;
 
-create policy "service_role_ledger" on public.inventory_ledger
-  for all using (true)
-  with check (true);
+  if not exists (
+    select 1 from pg_policies
+    where schemaname = 'public'
+      and tablename  = 'inventory_ledger'
+      and policyname = 'service_role_ledger'
+  ) then
+    create policy "service_role_ledger" on public.inventory_ledger
+      for all using (true)
+      with check (true);
+  end if;
+end $$;
 
-create policy "admin_read_transactions" on public.inventory_transactions
-  for select using (
-    (auth.jwt() ->> 'role') = 'admin'
-    or (auth.jwt() -> 'user_metadata' ->> 'role') = 'admin'
-  );
+do $$ begin
+  if not exists (
+    select 1 from pg_policies
+    where schemaname = 'public'
+      and tablename  = 'inventory_transactions'
+      and policyname = 'admin_read_transactions'
+  ) then
+    create policy "admin_read_transactions" on public.inventory_transactions
+      for select using (
+        (auth.jwt() ->> 'role') = 'admin'
+        or (auth.jwt() -> 'user_metadata' ->> 'role') = 'admin'
+      );
+  end if;
 
-create policy "service_role_transactions" on public.inventory_transactions
-  for all using (true)
-  with check (true);
+  if not exists (
+    select 1 from pg_policies
+    where schemaname = 'public'
+      and tablename  = 'inventory_transactions'
+      and policyname = 'service_role_transactions'
+  ) then
+    create policy "service_role_transactions" on public.inventory_transactions
+      for all using (true)
+      with check (true);
+  end if;
+end $$;
 
-create policy "admin_read_reservations" on public.inventory_reservations
-  for select using (
-    (auth.jwt() ->> 'role') = 'admin'
-    or (auth.jwt() -> 'user_metadata' ->> 'role') = 'admin'
-  );
+do $$ begin
+  if not exists (
+    select 1 from pg_policies
+    where schemaname = 'public'
+      and tablename  = 'inventory_reservations'
+      and policyname = 'admin_read_reservations'
+  ) then
+    create policy "admin_read_reservations" on public.inventory_reservations
+      for select using (
+        (auth.jwt() ->> 'role') = 'admin'
+        or (auth.jwt() -> 'user_metadata' ->> 'role') = 'admin'
+      );
+  end if;
 
-create policy "service_role_reservations" on public.inventory_reservations
-  for all using (true)
-  with check (true);
+  if not exists (
+    select 1 from pg_policies
+    where schemaname = 'public'
+      and tablename  = 'inventory_reservations'
+      and policyname = 'service_role_reservations'
+  ) then
+    create policy "service_role_reservations" on public.inventory_reservations
+      for all using (true)
+      with check (true);
+  end if;
+end $$;
 
 -- ---------------------------------------------------------------------------
 -- 10. VIEWS
