@@ -628,8 +628,10 @@ export default function ProductManagement() {
   useEffect(() => {
     let cancelled = false;
     setCatalogLoading(true);
+    console.log("Loading catalog...");
     apiFetch<CatalogData & { success: boolean }>("/api/admin/catalog")
       .then((res) => {
+        console.log("Catalog response", res);
         if (cancelled) return;
         setCatalog({
           categories:    res.categories    ?? [],
@@ -639,7 +641,10 @@ export default function ProductManagement() {
           attrs:         res.attrs         ?? emptyCatalog.attrs,
         });
       })
-      .catch(() => { /* catalog fetch errors are non-fatal */ })
+      .catch((error) => {
+        console.error("Catalog load failed", error);
+        toast.error("Failed to load product catalog");
+      })
       .finally(() => { if (!cancelled) setCatalogLoading(false); });
     return () => { cancelled = true; };
   }, []);
