@@ -67,7 +67,8 @@ const SEARCH_DEBOUNCE_MS = 350;
 type LookupItem = { id: number; name: string; slug: string; displayOrder?: number; active?: boolean };
 type ColorItem  = LookupItem & { hex?: string };
 type SubcatItem = LookupItem & { categoryId: number };
-type SizeChartItem = { id: number; name: string; description?: string };
+// slug is optional in the DB record but LookupSelect requires it; we default to ""
+type SizeChartItem = { id: number; name: string; slug?: string; description?: string };
 
 type CatalogData = {
   categories:    LookupItem[];
@@ -647,6 +648,12 @@ export default function ProductManagement() {
   const filteredSubcats = useMemo(
     () => catalog.subcategories.filter((s) => !form.category_id || s.categoryId === form.category_id),
     [catalog.subcategories, form.category_id]
+  );
+
+  // SizeCharts coerced to LookupItem (slug defaults to "")
+  const sizeChartOptions = useMemo<LookupItem[]>(
+    () => catalog.sizeCharts.map((sc) => ({ id: sc.id, name: sc.name, slug: sc.slug ?? "" })),
+    [catalog.sizeCharts]
   );
 
   // ── Search debounce ────────────────────────────────────────────────────────
@@ -1255,7 +1262,7 @@ export default function ProductManagement() {
                   {fieldErrors.sku && <p className="text-xs text-red-500">{fieldErrors.sku}</p>}
                 </div>
 
-                {/* Category dropdown */}
+                {/* Category */}
                 <LookupSelect
                   label="Category"
                   required
@@ -1265,23 +1272,20 @@ export default function ProductManagement() {
                   onChange={(id, name) => {
                     setField("category_id", id);
                     setField("category", name);
-                    // Reset subcategory when category changes
                     setField("subcategory_id", null);
                   }}
                 />
 
-                {/* Subcategory (optional, filtered by category) */}
-                {filteredSubcats.length > 0 && (
-                  <LookupSelect
-                    label="Subcategory"
-                    value={form.subcategory_id}
-                    options={filteredSubcats}
-                    onChange={(id) => setField("subcategory_id", id)}
-                    placeholder="Select Subcategory (optional)"
-                  />
-                )}
+                {/* Subcategory — always rendered; filtered by category */}
+                <LookupSelect
+                  label="Subcategory"
+                  value={form.subcategory_id}
+                  options={filteredSubcats}
+                  onChange={(id) => setField("subcategory_id", id)}
+                  placeholder="Select Subcategory (optional)"
+                />
 
-                {/* Collection dropdown */}
+                {/* Collection */}
                 <LookupSelect
                   label="Collection"
                   required
@@ -1311,7 +1315,7 @@ export default function ProductManagement() {
                   {fieldErrors.brand && <p className="text-xs text-red-500">{fieldErrors.brand}</p>}
                 </div>
 
-                {/* Fabric dropdown */}
+                {/* Fabric */}
                 <LookupSelect
                   label="Fabric"
                   required
@@ -1324,7 +1328,7 @@ export default function ProductManagement() {
                   }}
                 />
 
-                {/* Color dropdown */}
+                {/* Color */}
                 <LookupSelect
                   label="Color"
                   required
@@ -1404,7 +1408,7 @@ export default function ProductManagement() {
                 <LookupSelect
                   label="Size Chart"
                   value={form.size_chart_id}
-                  options={catalog.sizeCharts}
+                  options={sizeChartOptions}
                   onChange={(id) => setField("size_chart_id", id)}
                   placeholder="Select Size Chart (optional)"
                 />
