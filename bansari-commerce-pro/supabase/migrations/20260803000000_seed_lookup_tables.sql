@@ -2,10 +2,11 @@
 -- SEED: LOOKUP TABLES
 -- 20260803000000_seed_lookup_tables.sql
 --
--- Source of truth: LIVE DATABASE SCHEMA (provided directly)
+-- Plain sequential INSERT ... VALUES ... ON CONFLICT DO NOTHING.
+-- No DO blocks. No procedural SQL. No JOINs. No CTEs.
+-- No transaction control. No exception handlers.
 --
--- Column lists verified against live schema:
---
+-- Live schema column lists:
 --   categories   : name, slug, description, image_url, active, sort_order
 --   subcategories: category_id, name, slug, description, image_url, active
 --   collections  : name, slug, description, image_url, active, featured, sort_order
@@ -20,15 +21,11 @@
 --   attr_length  : name, slug, active, sort_order
 --   size_master  : label, sort_order
 --   size_charts  : name, description, chart_data
---
--- Safety: every INSERT uses ON CONFLICT DO NOTHING so this
--- migration is safe to run more than once.
 -- ============================================================
 
--- ============================================================
+-- ------------------------------------------------------------
 -- categories
--- Live columns: name, slug, description, image_url, active, sort_order
--- ============================================================
+-- ------------------------------------------------------------
 insert into public.categories (name, slug, description, image_url, active, sort_order)
 values
   ('Sarees',      'sarees',      'Traditional and contemporary sarees', null, true, 1),
@@ -39,35 +36,30 @@ values
   ('Dupattas',    'dupattas',    'Dupattas and stoles',                 null, true, 6)
 on conflict (slug) do nothing;
 
--- ============================================================
+-- ------------------------------------------------------------
 -- subcategories
--- Live columns: category_id, name, slug, description, image_url, active
--- NOT present in live: sort_order
--- ============================================================
+-- category_id resolved via scalar subquery per row — no JOIN, no CTE
+-- ------------------------------------------------------------
 insert into public.subcategories (category_id, name, slug, description, image_url, active)
-select c.id, v.name, v.slug, v.description, null::text, true
-from (values
-  ('sarees',   'Silk Sarees',        'silk-sarees',        'Pure and art silk sarees'),
-  ('sarees',   'Cotton Sarees',      'cotton-sarees',      'Handloom and printed cotton'),
-  ('sarees',   'Georgette Sarees',   'georgette-sarees',   'Party and casual georgette'),
-  ('sarees',   'Banarasi Sarees',    'banarasi-sarees',    'Authentic Banarasi weaves'),
-  ('suits',    'Salwar Kameez',      'salwar-kameez',      'Stitched and unstitched suits'),
-  ('suits',    'Anarkali Suits',     'anarkali-suits',     'Flared anarkali style suits'),
-  ('suits',    'Patiala Suits',      'patiala-suits',      'Traditional Patiala style'),
-  ('lehengas', 'Bridal Lehengas',    'bridal-lehengas',    'Heavy bridal lehengas'),
-  ('lehengas', 'Party Lehengas',     'party-lehengas',     'Semi-formal party wear lehengas'),
-  ('lehengas', 'Designer Lehengas',  'designer-lehengas',  'Contemporary designer lehengas'),
-  ('kurtis',   'Casual Kurtis',      'casual-kurtis',      'Everyday casual kurtis'),
-  ('kurtis',   'Festive Kurtis',     'festive-kurtis',     'Festive and occasion kurtis'),
-  ('kurtis',   'Printed Kurtis',     'printed-kurtis',     'Block and digital print kurtis')
-) as v(cat_slug, name, slug, description)
-join public.categories c on c.slug = v.cat_slug
+values
+  ((select id from public.categories where slug = 'sarees'), 'Silk Sarees',       'silk-sarees',       'Pure and art silk sarees',                null, true),
+  ((select id from public.categories where slug = 'sarees'), 'Cotton Sarees',     'cotton-sarees',     'Handloom and printed cotton',             null, true),
+  ((select id from public.categories where slug = 'sarees'), 'Georgette Sarees',  'georgette-sarees',  'Party and casual georgette',              null, true),
+  ((select id from public.categories where slug = 'sarees'), 'Banarasi Sarees',   'banarasi-sarees',   'Authentic Banarasi weaves',               null, true),
+  ((select id from public.categories where slug = 'suits'),  'Salwar Kameez',     'salwar-kameez',     'Stitched and unstitched suits',           null, true),
+  ((select id from public.categories where slug = 'suits'),  'Anarkali Suits',    'anarkali-suits',    'Flared anarkali style suits',             null, true),
+  ((select id from public.categories where slug = 'suits'),  'Patiala Suits',     'patiala-suits',     'Traditional Patiala style',               null, true),
+  ((select id from public.categories where slug = 'lehengas'), 'Bridal Lehengas',   'bridal-lehengas',   'Heavy bridal lehengas',                 null, true),
+  ((select id from public.categories where slug = 'lehengas'), 'Party Lehengas',    'party-lehengas',    'Semi-formal party wear lehengas',       null, true),
+  ((select id from public.categories where slug = 'lehengas'), 'Designer Lehengas', 'designer-lehengas', 'Contemporary designer lehengas',        null, true),
+  ((select id from public.categories where slug = 'kurtis'), 'Casual Kurtis',     'casual-kurtis',     'Everyday casual kurtis',                  null, true),
+  ((select id from public.categories where slug = 'kurtis'), 'Festive Kurtis',    'festive-kurtis',    'Festive and occasion kurtis',             null, true),
+  ((select id from public.categories where slug = 'kurtis'), 'Printed Kurtis',    'printed-kurtis',    'Block and digital print kurtis',          null, true)
 on conflict (slug) do nothing;
 
--- ============================================================
+-- ------------------------------------------------------------
 -- collections
--- Live columns: name, slug, description, image_url, active, featured, sort_order
--- ============================================================
+-- ------------------------------------------------------------
 insert into public.collections (name, slug, description, image_url, active, featured, sort_order)
 values
   ('New Arrivals',      'new-arrivals',      'Latest additions to our catalogue', null, true, true,  1),
@@ -78,10 +70,9 @@ values
   ('Sale',              'sale',              'Special offers and discounts',      null, true, false, 6)
 on conflict (slug) do nothing;
 
--- ============================================================
+-- ------------------------------------------------------------
 -- attr_color
--- Live columns: name, slug, hex_code, active, sort_order
--- ============================================================
+-- ------------------------------------------------------------
 insert into public.attr_color (name, slug, hex_code, active, sort_order)
 values
   ('Red',       'red',       '#FF0000', true,  1),
@@ -106,10 +97,9 @@ values
   ('Lavender',  'lavender',  '#E6E6FA', true, 20)
 on conflict (slug) do nothing;
 
--- ============================================================
+-- ------------------------------------------------------------
 -- attr_fabric
--- Live columns: name, slug, active, sort_order
--- ============================================================
+-- ------------------------------------------------------------
 insert into public.attr_fabric (name, slug, active, sort_order)
 values
   ('Silk',          'silk',          true,  1),
@@ -129,10 +119,9 @@ values
   ('Tussar Silk',   'tussar-silk',   true, 15)
 on conflict (slug) do nothing;
 
--- ============================================================
+-- ------------------------------------------------------------
 -- attr_occasion
--- Live columns: name, slug, active, sort_order
--- ============================================================
+-- ------------------------------------------------------------
 insert into public.attr_occasion (name, slug, active, sort_order)
 values
   ('Casual',    'casual',    true, 1),
@@ -145,10 +134,9 @@ values
   ('Reception', 'reception', true, 8)
 on conflict (slug) do nothing;
 
--- ============================================================
+-- ------------------------------------------------------------
 -- attr_pattern
--- Live columns: name, slug, active, sort_order
--- ============================================================
+-- ------------------------------------------------------------
 insert into public.attr_pattern (name, slug, active, sort_order)
 values
   ('Solid',         'solid',         true,  1),
@@ -165,10 +153,9 @@ values
   ('Checks',        'checks',        true, 12)
 on conflict (slug) do nothing;
 
--- ============================================================
+-- ------------------------------------------------------------
 -- attr_fit
--- Live columns: name, slug, active, sort_order
--- ============================================================
+-- ------------------------------------------------------------
 insert into public.attr_fit (name, slug, active, sort_order)
 values
   ('Regular',  'regular',  true, 1),
@@ -180,10 +167,9 @@ values
   ('Fitted',   'fitted',   true, 7)
 on conflict (slug) do nothing;
 
--- ============================================================
+-- ------------------------------------------------------------
 -- attr_sleeve
--- Live columns: name, slug, active, sort_order
--- ============================================================
+-- ------------------------------------------------------------
 insert into public.attr_sleeve (name, slug, active, sort_order)
 values
   ('Sleeveless',    'sleeveless',    true, 1),
@@ -195,10 +181,9 @@ values
   ('Cold Shoulder', 'cold-shoulder', true, 7)
 on conflict (slug) do nothing;
 
--- ============================================================
+-- ------------------------------------------------------------
 -- attr_neck
--- Live columns: name, slug, active, sort_order
--- ============================================================
+-- ------------------------------------------------------------
 insert into public.attr_neck (name, slug, active, sort_order)
 values
   ('Round Neck',   'round-neck',   true, 1),
@@ -212,10 +197,9 @@ values
   ('Off Shoulder', 'off-shoulder', true, 9)
 on conflict (slug) do nothing;
 
--- ============================================================
+-- ------------------------------------------------------------
 -- attr_work
--- Live columns: name, slug, active, sort_order
--- ============================================================
+-- ------------------------------------------------------------
 insert into public.attr_work (name, slug, active, sort_order)
 values
   ('Plain',        'plain',        true,  1),
@@ -231,10 +215,9 @@ values
   ('Zardozi',      'zardozi',      true, 11)
 on conflict (slug) do nothing;
 
--- ============================================================
+-- ------------------------------------------------------------
 -- attr_length
--- Live columns: name, slug, active, sort_order
--- ============================================================
+-- ------------------------------------------------------------
 insert into public.attr_length (name, slug, active, sort_order)
 values
   ('Mini',       'mini',       true, 1),
@@ -246,10 +229,9 @@ values
   ('Above Knee', 'above-knee', true, 7)
 on conflict (slug) do nothing;
 
--- ============================================================
+-- ------------------------------------------------------------
 -- size_master
--- Live columns: label, sort_order
--- ============================================================
+-- ------------------------------------------------------------
 insert into public.size_master (label, sort_order)
 values
   ('XS',   1),
@@ -263,10 +245,9 @@ values
   ('Free', 9)
 on conflict (label) do nothing;
 
--- ============================================================
+-- ------------------------------------------------------------
 -- size_charts
--- Live columns: name, description, chart_data
--- ============================================================
+-- ------------------------------------------------------------
 insert into public.size_charts (name, description, chart_data)
 values
   (
