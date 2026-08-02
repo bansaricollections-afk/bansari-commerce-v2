@@ -2,269 +2,277 @@
 -- Migration : 20260803030000_seed_product_v2_master_data.sql
 -- Purpose   : Seed all Product V2 lookup / master tables.
 -- Strategy  : INSERT ... ON CONFLICT DO NOTHING  (fully idempotent).
+-- Schema    : Verified against 20260718100000_product_management_v2_foundation.sql
 -- =============================================================================
 
 -- ---------------------------------------------------------------------------
 -- 1. CATEGORIES  (9 records)
+-- Schema: id, name, slug, description, display_order, active, created_at, updated_at
+-- Conflict: slug (unique)
 -- ---------------------------------------------------------------------------
-INSERT INTO public.categories (name, slug, is_active, display_order)
+INSERT INTO public.categories (name, slug, display_order, active)
 VALUES
-  ('Sarees',       'sarees',       true,  1),
-  ('Kurta Sets',   'kurta-sets',   true,  2),
-  ('Kurtis',       'kurtis',       true,  3),
-  ('Dresses',      'dresses',      true,  4),
-  ('Co-Ord Sets',  'co-ord-sets',  true,  5),
-  ('Gowns',        'gowns',        true,  6),
-  ('Dupattas',     'dupattas',     true,  7),
-  ('Bottom Wear',  'bottom-wear',  true,  8),
-  ('Western Wear', 'western-wear', true,  9)
+  ('Sarees',       'sarees',       1, true),
+  ('Kurta Sets',   'kurta-sets',   2, true),
+  ('Kurtis',       'kurtis',       3, true),
+  ('Dresses',      'dresses',      4, true),
+  ('Co-Ord Sets',  'co-ord-sets',  5, true),
+  ('Gowns',        'gowns',        6, true),
+  ('Dupattas',     'dupattas',     7, true),
+  ('Bottom Wear',  'bottom-wear',  8, true),
+  ('Western Wear', 'western-wear', 9, true)
 ON CONFLICT (slug) DO NOTHING;
 
 -- ---------------------------------------------------------------------------
 -- 2. SUBCATEGORIES  (22 records)
+-- Schema: id, category_id, name, slug, description, display_order, active, created_at, updated_at
+-- Conflict: slug (unique)
 -- ---------------------------------------------------------------------------
-INSERT INTO public.subcategories (name, slug, category_id, is_active, display_order)
-SELECT v.name, v.slug, c.id, true, v.ord
+INSERT INTO public.subcategories (name, slug, category_id, display_order, active)
+SELECT v.name, v.slug, c.id, v.ord, true
 FROM (
   VALUES
-    -- Sarees
-    ('Silk Sarees',      'silk-sarees',      'sarees',       1),
-    ('Cotton Sarees',    'cotton-sarees',    'sarees',       2),
-    ('Georgette Sarees', 'georgette-sarees', 'sarees',       3),
-    ('Designer Sarees',  'designer-sarees',  'sarees',       4),
-    -- Kurta Sets
-    ('Anarkali Sets',    'anarkali-sets',    'kurta-sets',   1),
-    ('Straight Sets',    'straight-sets',    'kurta-sets',   2),
-    ('Palazzo Sets',     'palazzo-sets',     'kurta-sets',   3),
-    -- Kurtis
-    ('Casual Kurtis',    'casual-kurtis',    'kurtis',       1),
-    ('Printed Kurtis',   'printed-kurtis',   'kurtis',       2),
-    ('Embroidered Kurtis','embroidered-kurtis','kurtis',     3),
-    -- Dresses
-    ('Maxi Dresses',     'maxi-dresses',     'dresses',      1),
-    ('Midi Dresses',     'midi-dresses',     'dresses',      2),
-    ('Mini Dresses',     'mini-dresses',     'dresses',      3),
-    -- Co-Ord Sets
-    ('Top & Skirt',      'top-and-skirt',    'co-ord-sets',  1),
-    ('Top & Pants',      'top-and-pants',    'co-ord-sets',  2),
-    -- Gowns
-    ('Party Gowns',      'party-gowns',      'gowns',        1),
-    ('Anarkali Gowns',   'anarkali-gowns',   'gowns',        2),
-    -- Bottom Wear
-    ('Palazzos',         'palazzos',         'bottom-wear',  1),
-    ('Skirts',           'skirts',           'bottom-wear',  2),
-    ('Sharara',          'sharara',          'bottom-wear',  3),
-    -- Western Wear
-    ('Tops',             'tops',             'western-wear', 1),
-    ('Jumpsuits',        'jumpsuits',        'western-wear', 2)
+    ('Silk Sarees',        'silk-sarees',        'sarees',       1),
+    ('Cotton Sarees',      'cotton-sarees',      'sarees',       2),
+    ('Georgette Sarees',   'georgette-sarees',   'sarees',       3),
+    ('Designer Sarees',    'designer-sarees',    'sarees',       4),
+    ('Anarkali Sets',      'anarkali-sets',      'kurta-sets',   1),
+    ('Straight Sets',      'straight-sets',      'kurta-sets',   2),
+    ('Palazzo Sets',       'palazzo-sets',       'kurta-sets',   3),
+    ('Casual Kurtis',      'casual-kurtis',      'kurtis',       1),
+    ('Printed Kurtis',     'printed-kurtis',     'kurtis',       2),
+    ('Embroidered Kurtis', 'embroidered-kurtis', 'kurtis',       3),
+    ('Maxi Dresses',       'maxi-dresses',       'dresses',      1),
+    ('Midi Dresses',       'midi-dresses',       'dresses',      2),
+    ('Mini Dresses',       'mini-dresses',       'dresses',      3),
+    ('Top & Skirt',        'top-and-skirt',      'co-ord-sets',  1),
+    ('Top & Pants',        'top-and-pants',      'co-ord-sets',  2),
+    ('Party Gowns',        'party-gowns',        'gowns',        1),
+    ('Anarkali Gowns',     'anarkali-gowns',     'gowns',        2),
+    ('Palazzos',           'palazzos',           'bottom-wear',  1),
+    ('Skirts',             'skirts',             'bottom-wear',  2),
+    ('Sharara',            'sharara',            'bottom-wear',  3),
+    ('Tops',               'tops',               'western-wear', 1),
+    ('Jumpsuits',          'jumpsuits',          'western-wear', 2)
 ) AS v(name, slug, cat_slug, ord)
 JOIN public.categories c ON c.slug = v.cat_slug
 ON CONFLICT (slug) DO NOTHING;
 
 -- ---------------------------------------------------------------------------
 -- 3. COLLECTIONS  (8 records)
+-- Schema: id, name, slug, description, banner_url, display_order, active, created_at, updated_at
+-- Conflict: slug (unique)
 -- ---------------------------------------------------------------------------
-INSERT INTO public.collections (name, slug, is_active, display_order)
+INSERT INTO public.collections (name, slug, display_order, active)
 VALUES
-  ('Everyday',    'everyday',    true, 1),
-  ('Festive',     'festive',     true, 2),
-  ('Wedding',     'wedding',     true, 3),
-  ('Office Wear', 'office-wear', true, 4),
-  ('Party Wear',  'party-wear',  true, 5),
-  ('Summer',      'summer',      true, 6),
-  ('Winter',      'winter',      true, 7),
-  ('Premium',     'premium',     true, 8)
+  ('Everyday',    'everyday',    1, true),
+  ('Festive',     'festive',     2, true),
+  ('Wedding',     'wedding',     3, true),
+  ('Office Wear', 'office-wear', 4, true),
+  ('Party Wear',  'party-wear',  5, true),
+  ('Summer',      'summer',      6, true),
+  ('Winter',      'winter',      7, true),
+  ('Premium',     'premium',     8, true)
 ON CONFLICT (slug) DO NOTHING;
 
 -- ---------------------------------------------------------------------------
 -- 4. ATTR_COLOR  (23 records)
+-- Schema: id, name, slug, hex, display_order, active
+-- Conflict: name (unique), slug (unique)
 -- ---------------------------------------------------------------------------
-INSERT INTO public.attr_color (name, hex_code, is_active)
+INSERT INTO public.attr_color (name, slug, hex, display_order, active)
 VALUES
-  ('Black',     '#000000', true),
-  ('White',     '#FFFFFF', true),
-  ('Red',       '#E53935', true),
-  ('Maroon',    '#800000', true),
-  ('Pink',      '#F48FB1', true),
-  ('Peach',     '#FFCBA4', true),
-  ('Yellow',    '#FDD835', true),
-  ('Mustard',   '#FFDB58', true),
-  ('Orange',    '#FB8C00', true),
-  ('Green',     '#43A047', true),
-  ('Olive',     '#808000', true),
-  ('Mint',      '#98FF98', true),
-  ('Blue',      '#1E88E5', true),
-  ('Navy',      '#001F5B', true),
-  ('Sky Blue',  '#87CEEB', true),
-  ('Purple',    '#8E24AA', true),
-  ('Lavender',  '#E6E6FA', true),
-  ('Grey',      '#9E9E9E', true),
-  ('Brown',     '#6D4C41', true),
-  ('Beige',     '#F5F0DC', true),
-  ('Cream',     '#FFFDD0', true),
-  ('Gold',      '#FFD700', true),
-  ('Silver',    '#C0C0C0', true)
+  ('Black',     'black',     '#000000',  1, true),
+  ('White',     'white',     '#FFFFFF',  2, true),
+  ('Red',       'red',       '#E53935',  3, true),
+  ('Maroon',    'maroon',    '#800000',  4, true),
+  ('Pink',      'pink',      '#F48FB1',  5, true),
+  ('Peach',     'peach',     '#FFCBA4',  6, true),
+  ('Yellow',    'yellow',    '#FDD835',  7, true),
+  ('Mustard',   'mustard',   '#FFDB58',  8, true),
+  ('Orange',    'orange',    '#FB8C00',  9, true),
+  ('Green',     'green',     '#43A047', 10, true),
+  ('Olive',     'olive',     '#808000', 11, true),
+  ('Mint',      'mint',      '#98FF98', 12, true),
+  ('Blue',      'blue',      '#1E88E5', 13, true),
+  ('Navy',      'navy',      '#001F5B', 14, true),
+  ('Sky Blue',  'sky-blue',  '#87CEEB', 15, true),
+  ('Purple',    'purple',    '#8E24AA', 16, true),
+  ('Lavender',  'lavender',  '#E6E6FA', 17, true),
+  ('Grey',      'grey',      '#9E9E9E', 18, true),
+  ('Brown',     'brown',     '#6D4C41', 19, true),
+  ('Beige',     'beige',     '#F5F0DC', 20, true),
+  ('Cream',     'cream',     '#FFFDD0', 21, true),
+  ('Gold',      'gold',      '#FFD700', 22, true),
+  ('Silver',    'silver',    '#C0C0C0', 23, true)
 ON CONFLICT (name) DO NOTHING;
 
 -- ---------------------------------------------------------------------------
 -- 5. ATTR_FABRIC  (12 records)
+-- Schema: id, name, slug, display_order, active
+-- Conflict: name (unique), slug (unique)
 -- ---------------------------------------------------------------------------
-INSERT INTO public.attr_fabric (name, is_active)
+INSERT INTO public.attr_fabric (name, slug, display_order, active)
 VALUES
-  ('Cotton',       true),
-  ('Pure Cotton',  true),
-  ('Mul Cotton',   true),
-  ('Rayon',        true),
-  ('Viscose',      true),
-  ('Georgette',    true),
-  ('Chiffon',      true),
-  ('Silk',         true),
-  ('Roman Silk',   true),
-  ('Organza',      true),
-  ('Linen',        true),
-  ('Muslin',       true)
+  ('Cotton',      'cotton',      1,  true),
+  ('Pure Cotton', 'pure-cotton', 2,  true),
+  ('Mul Cotton',  'mul-cotton',  3,  true),
+  ('Rayon',       'rayon',       4,  true),
+  ('Viscose',     'viscose',     5,  true),
+  ('Georgette',   'georgette',   6,  true),
+  ('Chiffon',     'chiffon',     7,  true),
+  ('Silk',        'silk',        8,  true),
+  ('Roman Silk',  'roman-silk',  9,  true),
+  ('Organza',     'organza',     10, true),
+  ('Linen',       'linen',       11, true),
+  ('Muslin',      'muslin',      12, true)
 ON CONFLICT (name) DO NOTHING;
 
 -- ---------------------------------------------------------------------------
 -- 6. ATTR_OCCASION  (6 records)
+-- Schema: id, name, slug, display_order, active
+-- Conflict: name (unique), slug (unique)
 -- ---------------------------------------------------------------------------
-INSERT INTO public.attr_occasion (name, is_active)
+INSERT INTO public.attr_occasion (name, slug, display_order, active)
 VALUES
-  ('Casual',     true),
-  ('Office',     true),
-  ('Party',      true),
-  ('Festive',    true),
-  ('Wedding',    true),
-  ('Daily Wear', true)
+  ('Casual',     'casual',     1, true),
+  ('Office',     'office',     2, true),
+  ('Party',      'party',      3, true),
+  ('Festive',    'festive',    4, true),
+  ('Wedding',    'wedding',    5, true),
+  ('Daily Wear', 'daily-wear', 6, true)
 ON CONFLICT (name) DO NOTHING;
 
 -- ---------------------------------------------------------------------------
 -- 7. ATTR_PATTERN  (7 records)
+-- Schema: id, name, slug, display_order, active
+-- Conflict: name (unique), slug (unique)
 -- ---------------------------------------------------------------------------
-INSERT INTO public.attr_pattern (name, is_active)
+INSERT INTO public.attr_pattern (name, slug, display_order, active)
 VALUES
-  ('Printed',     true),
-  ('Solid',       true),
-  ('Embroidered', true),
-  ('Floral',      true),
-  ('Striped',     true),
-  ('Checked',     true),
-  ('Self Design', true)
+  ('Printed',     'printed',     1, true),
+  ('Solid',       'solid',       2, true),
+  ('Embroidered', 'embroidered', 3, true),
+  ('Floral',      'floral',      4, true),
+  ('Striped',     'striped',     5, true),
+  ('Checked',     'checked',     6, true),
+  ('Self Design', 'self-design', 7, true)
 ON CONFLICT (name) DO NOTHING;
 
 -- ---------------------------------------------------------------------------
 -- 8. ATTR_FIT  (5 records)
+-- Schema: id, name, slug, display_order, active
+-- Conflict: name (unique), slug (unique)
 -- ---------------------------------------------------------------------------
-INSERT INTO public.attr_fit (name, is_active)
+INSERT INTO public.attr_fit (name, slug, display_order, active)
 VALUES
-  ('Regular',  true),
-  ('Straight', true),
-  ('A-Line',   true),
-  ('Flared',   true),
-  ('Relaxed',  true)
+  ('Regular',  'regular',  1, true),
+  ('Straight', 'straight', 2, true),
+  ('A-Line',   'a-line',   3, true),
+  ('Flared',   'flared',   4, true),
+  ('Relaxed',  'relaxed',  5, true)
 ON CONFLICT (name) DO NOTHING;
 
 -- ---------------------------------------------------------------------------
 -- 9. ATTR_SLEEVE  (4 records)
+-- Schema: id, name, slug, display_order, active
+-- Conflict: name (unique), slug (unique)
 -- ---------------------------------------------------------------------------
-INSERT INTO public.attr_sleeve (name, is_active)
+INSERT INTO public.attr_sleeve (name, slug, display_order, active)
 VALUES
-  ('Sleeveless',     true),
-  ('Half Sleeve',    true),
-  ('Three Quarter',  true),
-  ('Full Sleeve',    true)
+  ('Sleeveless',    'sleeveless',    1, true),
+  ('Half Sleeve',   'half-sleeve',   2, true),
+  ('Three Quarter', 'three-quarter', 3, true),
+  ('Full Sleeve',   'full-sleeve',   4, true)
 ON CONFLICT (name) DO NOTHING;
 
 -- ---------------------------------------------------------------------------
 -- 10. ATTR_NECK  (7 records)
+-- Schema: id, name, slug, display_order, active
+-- Conflict: name (unique), slug (unique)
 -- ---------------------------------------------------------------------------
-INSERT INTO public.attr_neck (name, is_active)
+INSERT INTO public.attr_neck (name, slug, display_order, active)
 VALUES
-  ('Round',    true),
-  ('V',        true),
-  ('Mandarin', true),
-  ('Boat',     true),
-  ('Square',   true),
-  ('Keyhole',  true),
-  ('Notch',    true)
+  ('Round',    'round',    1, true),
+  ('V',        'v',        2, true),
+  ('Mandarin', 'mandarin', 3, true),
+  ('Boat',     'boat',     4, true),
+  ('Square',   'square',   5, true),
+  ('Keyhole',  'keyhole',  6, true),
+  ('Notch',    'notch',    7, true)
 ON CONFLICT (name) DO NOTHING;
 
 -- ---------------------------------------------------------------------------
 -- 11. ATTR_WORK  (7 records)
+-- Schema: id, name, slug, display_order, active
+-- Conflict: name (unique), slug (unique)
 -- ---------------------------------------------------------------------------
-INSERT INTO public.attr_work (name, is_active)
+INSERT INTO public.attr_work (name, slug, display_order, active)
 VALUES
-  ('Printed',      true),
-  ('Thread Work',  true),
-  ('Mirror Work',  true),
-  ('Zari',         true),
-  ('Sequins',      true),
-  ('Foil Print',   true),
-  ('Lace',         true)
+  ('Printed',      'printed',      1, true),
+  ('Thread Work',  'thread-work',  2, true),
+  ('Mirror Work',  'mirror-work',  3, true),
+  ('Zari',         'zari',         4, true),
+  ('Sequins',      'sequins',      5, true),
+  ('Foil Print',   'foil-print',   6, true),
+  ('Lace',         'lace',         7, true)
 ON CONFLICT (name) DO NOTHING;
 
 -- ---------------------------------------------------------------------------
 -- 12. ATTR_LENGTH  (4 records)
+-- Schema: id, name, slug, display_order, active
+-- Conflict: name (unique), slug (unique)
 -- ---------------------------------------------------------------------------
-INSERT INTO public.attr_length (name, is_active)
+INSERT INTO public.attr_length (name, slug, display_order, active)
 VALUES
-  ('Short',  true),
-  ('Calf',   true),
-  ('Ankle',  true),
-  ('Floor',  true)
+  ('Short', 'short', 1, true),
+  ('Calf',  'calf',  2, true),
+  ('Ankle', 'ankle', 3, true),
+  ('Floor', 'floor', 4, true)
 ON CONFLICT (name) DO NOTHING;
 
 -- ---------------------------------------------------------------------------
 -- 13. SIZE_MASTER  (8 records)
+-- Schema: id, name, sort_order, active
+-- Conflict: name (unique)
+-- Note: foundation migration 20260718100000 already seeds these with
+--       sort_order 10/20/.../80. This is a safe no-op on live DB.
 -- ---------------------------------------------------------------------------
-INSERT INTO public.size_master (name, sort_order, is_active)
+INSERT INTO public.size_master (name, sort_order, active)
 VALUES
-  ('XS',  1, true),
-  ('S',   2, true),
-  ('M',   3, true),
-  ('L',   4, true),
-  ('XL',  5, true),
-  ('XXL', 6, true),
-  ('3XL', 7, true),
-  ('4XL', 8, true)
+  ('XS',  10, true),
+  ('S',   20, true),
+  ('M',   30, true),
+  ('L',   40, true),
+  ('XL',  50, true),
+  ('XXL', 60, true),
+  ('3XL', 70, true),
+  ('4XL', 80, true)
 ON CONFLICT (name) DO NOTHING;
 
 -- ---------------------------------------------------------------------------
--- 14. SIZE_CHARTS  (1 default chart) + SIZE_CHART_ENTRIES
+-- 14. SIZE_CHARTS  (1 default chart)
+-- Schema: id, name, description, chart_data (jsonb), created_at, updated_at
+-- No is_active column. No size_chart_entries table.
+-- chart_data stores measurements inline as a JSONB array.
+-- Conflict: name (unique)
 -- ---------------------------------------------------------------------------
-INSERT INTO public.size_charts (name, description, is_active)
-VALUES
-  ('Standard Indian Size Chart', 'Default size chart for all categories', true)
+INSERT INTO public.size_charts (name, description, chart_data)
+VALUES (
+  'Standard Indian Size Chart',
+  'Default size chart for all categories',
+  '[
+    {"size": "XS",  "bust": 76, "waist": 60, "hip": 82,  "length": 50},
+    {"size": "S",   "bust": 80, "waist": 64, "hip": 86,  "length": 51},
+    {"size": "M",   "bust": 84, "waist": 68, "hip": 90,  "length": 52},
+    {"size": "L",   "bust": 88, "waist": 72, "hip": 94,  "length": 53},
+    {"size": "XL",  "bust": 92, "waist": 76, "hip": 98,  "length": 54},
+    {"size": "XXL", "bust": 96, "waist": 80, "hip": 102, "length": 55},
+    {"size": "3XL", "bust": 100,"waist": 84, "hip": 106, "length": 56},
+    {"size": "4XL", "bust": 104,"waist": 88, "hip": 110, "length": 57}
+  ]'::jsonb
+)
 ON CONFLICT (name) DO NOTHING;
-
--- Link all 8 sizes to the default chart
-INSERT INTO public.size_chart_entries (size_chart_id, size_master_id, chest_cm, waist_cm, hip_cm, length_cm)
-SELECT
-  sc.id,
-  sm.id,
-  v.chest,
-  v.waist,
-  v.hip,
-  v.length
-FROM public.size_charts sc
-CROSS JOIN (
-  SELECT sm2.id, v2.chest, v2.waist, v2.hip, v2.length
-  FROM public.size_master sm2
-  JOIN (
-    VALUES
-      ('XS',  76, 60,  82,  50),
-      ('S',   80, 64,  86,  51),
-      ('M',   84, 68,  90,  52),
-      ('L',   88, 72,  94,  53),
-      ('XL',  92, 76,  98,  54),
-      ('XXL', 96, 80, 102,  55),
-      ('3XL',100, 84, 106,  56),
-      ('4XL',104, 88, 110,  57)
-  ) AS v2(sz_name, chest, waist, hip, length)
-    ON sm2.name = v2.sz_name
-) AS v(id, chest, waist, hip, length)
-WHERE sc.name = 'Standard Indian Size Chart'
-ON CONFLICT (size_chart_id, size_master_id) DO NOTHING;
 
 -- ---------------------------------------------------------------------------
 -- 15. Reload PostgREST schema cache
