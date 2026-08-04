@@ -1,12 +1,13 @@
 "use client";
 
 import Link from "next/link";
-import { Heart, Menu, Search, ShoppingBag, User } from "lucide-react";
+import { Heart, Menu, ShoppingBag, User } from "lucide-react";
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useCart } from "@/store/cart";
 import { useWishlist } from "@/store/wishlist";
 import AnnouncementBar, { type AnnouncementBarProps } from "./AnnouncementBar";
 import MobileMenu from "./MobileMenu";
+import HeaderSearchInput from "@/components/search/HeaderSearchInput";
 
 export const NAV_CATEGORIES = [
   "Kurta Sets",
@@ -36,33 +37,6 @@ const ANNOUNCEMENT: AnnouncementBarProps = {
   storageKey: "announcement:v3",
 };
 
-/**
- * SHOP DROPDOWN — hover tolerance fix
- *
- * Problem: React's onMouseLeave fires the instant the pointer leaves the
- * trigger element boundary, even if the pointer is heading straight for the
- * dropdown panel. Any mouse path that travels diagonally from the trigger
- * label into the panel briefly exits the trigger bounding box, causing the
- * panel to vanish before the pointer arrives.
- *
- * Solution: add a 120 ms close-delay via setTimeout. If the pointer enters
- * the dropdown panel (or returns to the trigger) before the timer fires, the
- * timer is cancelled and the panel stays open. This is exactly how Zara,
- * H&M and most premium fashion retailers implement their mega-menus without
- * heavyweight libraries.
- *
- * Implementation details:
- * - closeTimerRef: stores the pending setTimeout id so we can cancel it.
- * - openDropdown(): clears any pending close timer and sets shopOpen = true.
- * - scheduleClose(): starts the 120 ms countdown; called on both trigger and
- *   panel mouse-leave.
- * - The dropdown container wraps both trigger and panel in a single <div>
- *   so we can attach onMouseEnter/Leave to the outer wrapper. The wrapper
- *   also has pointer-events: none gap elimination via a transparent
- *   bridge element (bc-dropdown-bridge) that sits in the ~0.5 rem gap
- *   between the trigger button bottom and the panel top, preventing the
- *   pointer from exiting the hover region while crossing that gap.
- */
 export default function Header() {
   const { items }           = useCart();
   const { items: wishlist } = useWishlist();
@@ -92,7 +66,6 @@ export default function Header() {
     }, 120);
   }, []);
 
-  // Clean up timer on unmount
   useEffect(() => () => {
     if (closeTimerRef.current !== null) clearTimeout(closeTimerRef.current);
   }, []);
@@ -159,8 +132,6 @@ export default function Header() {
                 Shop
               </button>
 
-              {/* Transparent bridge: fills the gap between trigger and panel
-                  so moving the cursor downward does not exit the hover zone */}
               {shopOpen && (
                 <div
                   aria-hidden="true"
@@ -291,12 +262,8 @@ export default function Header() {
 
           {/* ── Icons ── */}
           <div className="flex items-center" style={{ gap: "0.125rem" }}>
-            <button
-              aria-label="Search"
-              className="bc-icon-btn rounded-full p-2.5 transition-colors"
-            >
-              <Search size={19} />
-            </button>
+            {/* ─── Sprint 9C: live search overlay ─── */}
+            <HeaderSearchInput />
 
             <Link
               href="/wishlist"
