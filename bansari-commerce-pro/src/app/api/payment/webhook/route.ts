@@ -7,6 +7,8 @@ import {
   recoverOrderFromWebhook,
   type RazorpayPaymentEntity,
 } from '@/services/order.service';
+import { confirmStock, releaseStock, getReservationByOrder } from '@/services/reservation.service';
+import { confirmCouponUsage } from '@/services/coupon.service';
 import { createServiceRoleClient } from '@/lib/supabase/service';
 import { createLogger } from '@/lib/logger';
 import { withRetry, isTransientError } from '@/lib/retry';
@@ -16,15 +18,20 @@ import { apiError } from '@/lib/api-response';
 
 const log = createLogger({ service: 'webhook' });
 
-const HANDLED_EVENTS = new Set(['payment.captured', 'payment.failed']);
+// order.paid added as the canonical terminal success event from Razorpay
+const HANDLED_EVENTS = new Set([
+  'payment.captured',
+  'payment.failed',
+  'order.paid',
+]);
 
 async function fetchRazorpayPayment(
   paymentId: string,
   requestId: string
 ): Promise<RazorpayPaymentEntity | null> {
-  const keyId = process.env.RAZORPAY_KEY_ID;
+  const keyId     = process.env.RAZORPAY_KEY_ID;
   const keySecret = process.env.RAZORPAY_KEY_SECRET;
-  const wLog = log.child({ requestId, paymentId });
+  const wLog      = log.child({ requestId, paymentId });
 
   if (!keyId || !keySecret) {
     wLog.error('webhook.razorpay_creds_missing');
@@ -38,13 +45,13 @@ async function fetchRazorpayPayment(
       async () => {
         const res = await fetch(`https://api.razorpay.com/v1/payments/${paymentId}`, {
           headers: {
-            Authorization: `Basic ${credentials}`,
+            Authorization:  `Basic ${credentials}`,
             'Content-Type': 'application/json',
           },
         });
         if (!res.ok) {
           const text = await res.text();
-          const err = new Error(`Razorpay ${res.status}: ${text}`) as Error & { statusCode: number };
+          const err  = new Error(`Razorpay ${res.status}: ${text}`) as Error & { statusCode: number };
           err.statusCode = res.status;
           throw err;
         }
@@ -60,26 +67,19 @@ async function fetchRazorpayPayment(
 }
 
 /**
- * P0-2: Webhook exactly-once deduplication.
- *
- * Attempts to INSERT the Razorpay event_id into webhook_events.
- * - Returns 'new'       if this is the first delivery (proceed with processing).
- * - Returns 'duplicate' if the event was already processed (skip — return 200).
- * - Returns 'error'     if the INSERT failed for a non-dedup reason (log, continue).
- *
- * Uses ON CONFLICT DO NOTHING semantics via INSERT + checking insert count.
- * The unique index on webhook_events.event_id enforces exactly-once at DB level.
+ * Exactly-once deduplication via webhook_events table.
+ * Returns 'new' | 'duplicate' | 'error'.
  */
 async function deduplicateEvent(
-  eventId: string,
+  eventId:   string,
   eventType: string,
   paymentId: string | null,
   requestId: string
 ): Promise<'new' | 'duplicate' | 'error'> {
   const wLog = log.child({ requestId, eventId, eventType });
   try {
-    const supabase = createServiceRoleClient();
-    const { error } = await supabase
+    const supabase    = createServiceRoleClient();
+    const { error }   = await supabase
       .from('webhook_events')
       .insert({
         event_id:   eventId,
@@ -89,22 +89,18 @@ async function deduplicateEvent(
 
     if (!error) return 'new';
 
-    // PostgreSQL unique violation code: duplicate delivery
     if (error.code === '23505') {
       wLog.info('webhook.dedup.duplicate_event', { eventId });
       return 'duplicate';
     }
 
-    // Any other error: log but do not block processing.
-    // warn() signature: (event, ctx?) — merge Supabase error fields into ctx.
     wLog.warn('webhook.dedup.write_failed', {
       eventId,
-      errorCode: error.code,
+      errorCode:    error.code,
       errorMessage: error.message,
     });
     return 'error';
   } catch (err) {
-    // warn() signature: (event, ctx?) — merge caught error message into ctx.
     log.child({ requestId }).warn('webhook.dedup.unexpected', {
       errorMessage: err instanceof Error ? err.message : String(err),
     });
@@ -112,15 +108,78 @@ async function deduplicateEvent(
   }
 }
 
+/**
+ * Shared post-payment success handler.
+ * Confirms inventory reservation and coupon usage for a Razorpay order.
+ */
+async function handlePaymentSuccess(
+  razorpayOrderId: string,
+  requestId:       string
+): Promise<void> {
+  const wLog = log.child({ requestId, razorpayOrderId });
+
+  // ── Confirm inventory reservation ──────────────────────────────────────
+  const reservation = await getReservationByOrder(razorpayOrderId);
+  if (reservation && reservation.status === 'reserved') {
+    try {
+      await confirmStock(reservation.id);
+      wLog.info('webhook.inventory.confirmed', { reservationId: reservation.id });
+    } catch (err) {
+      wLog.warn('webhook.inventory.confirm_failed', {
+        reservationId: reservation.id,
+        error: err instanceof Error ? err.message : String(err),
+      });
+    }
+  } else if (!reservation) {
+    wLog.warn('webhook.inventory.no_reservation', {
+      note: 'No reservation found for order — stock may not have been reserved.',
+    });
+  }
+
+  // ── Confirm coupon usage (increment used_count) ─────────────────────────
+  const supabase = createServiceRoleClient();
+  const { data: pendingRow } = await supabase
+    .from('pending_orders')
+    .select('coupon_code')
+    .eq('razorpay_order_id', razorpayOrderId)
+    .maybeSingle();
+
+  const couponCode = (pendingRow as { coupon_code: string | null } | null)?.coupon_code;
+  if (couponCode) {
+    const result = await confirmCouponUsage(couponCode);
+    wLog.info('webhook.coupon.usage_confirmed', {
+      couponCode,
+      incremented: result.incremented,
+    });
+  }
+}
+
+/**
+ * Shared post-payment failure handler.
+ * Releases inventory reservation.
+ */
+async function handlePaymentFailure(
+  razorpayOrderId: string,
+  requestId:       string
+): Promise<void> {
+  const wLog = log.child({ requestId, razorpayOrderId });
+
+  const reservation = await getReservationByOrder(razorpayOrderId);
+  if (reservation && reservation.status === 'reserved') {
+    await releaseStock(reservation.id);
+    wLog.info('webhook.inventory.released', { reservationId: reservation.id });
+  }
+}
+
 export async function POST(request: NextRequest): Promise<NextResponse> {
   const requestId = generateRequestId();
-  const wLog = log.child({ requestId });
-  const timer = wLog.startTimer('webhook.duration');
+  const wLog      = log.child({ requestId });
+  const timer     = wLog.startTimer('webhook.duration');
 
   const rateLimitResponse = checkRateLimit(request, 'webhook', RATE_LIMIT_WEBHOOK, requestId);
   if (rateLimitResponse) return rateLimitResponse;
 
-  const rawBody = await request.text();
+  const rawBody   = await request.text();
   const signature = request.headers.get('x-razorpay-signature');
 
   if (!signature || !verifyWebhookSignature(rawBody, signature)) {
@@ -140,91 +199,167 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     return apiError(requestId, 'INVALID_PAYLOAD', 'Invalid webhook payload.', 400);
   }
 
-  const typedEvent = event as Record<string, unknown>;
-  const eventType  = typedEvent.event;
+  const typedEvent  = event as Record<string, unknown>;
+  const eventType   = typedEvent.event;
 
   if (typeof eventType !== 'string' || !HANDLED_EVENTS.has(eventType)) {
-    return NextResponse.json({ success: true, requestId, handled: false }, { status: 200 });
+    return NextResponse.json(
+      { success: true, requestId, handled: false },
+      { status: 200 }
+    );
   }
 
-  const payload       = typedEvent.payload as Record<string, unknown> | undefined;
-  const paymentWrapper = payload?.payment as Record<string, unknown> | undefined;
-  const entity         = paymentWrapper?.entity as Record<string, unknown> | undefined;
-  const paymentId      = entity?.id;
-  const razorpayOrderId = entity?.order_id;
+  const payload         = typedEvent.payload as Record<string, unknown> | undefined;
 
-  if (typeof paymentId !== 'string' || paymentId.length === 0) {
+  // order.paid has a different payload shape from payment.captured/failed
+  // order.paid: payload.order.entity  (+ payload.payment.entity for the associated payment)
+  // payment.*:  payload.payment.entity
+  let paymentId:       string | undefined;
+  let razorpayOrderId: string | undefined;
+
+  if (eventType === 'order.paid') {
+    const orderWrapper  = payload?.order as Record<string, unknown> | undefined;
+    const orderEntity   = orderWrapper?.entity as Record<string, unknown> | undefined;
+    razorpayOrderId     = orderEntity?.id as string | undefined;
+
+    // Also extract the payment id from payload.payment.entity
+    const paymentWrapper = payload?.payment as Record<string, unknown> | undefined;
+    const paymentEntity  = paymentWrapper?.entity as Record<string, unknown> | undefined;
+    paymentId            = paymentEntity?.id as string | undefined;
+  } else {
+    const paymentWrapper = payload?.payment as Record<string, unknown> | undefined;
+    const entity         = paymentWrapper?.entity as Record<string, unknown> | undefined;
+    paymentId            = entity?.id as string | undefined;
+    razorpayOrderId      = entity?.order_id as string | undefined;
+  }
+
+  // For payment.* events we require paymentId; for order.paid we require razorpayOrderId
+  if (eventType !== 'order.paid' && (!paymentId || paymentId.length === 0)) {
     wLog.warn('webhook.missing_payment_id');
     return apiError(requestId, 'MISSING_PAYMENT_ID', 'Missing payment id.', 400);
   }
 
-  const wLogP = wLog.child({ paymentId, razorpayOrderId: razorpayOrderId as string | undefined });
+  if (eventType === 'order.paid' && (!razorpayOrderId || razorpayOrderId.length === 0)) {
+    wLog.warn('webhook.order_paid.missing_order_id');
+    return apiError(requestId, 'MISSING_ORDER_ID', 'Missing order id in order.paid event.', 400);
+  }
+
+  const wLogP = wLog.child({
+    paymentId,
+    razorpayOrderId,
+  });
   wLogP.info('webhook.received', { eventType });
 
-  // ---------------------------------------------------------------------------
-  // P0-2: Exactly-once deduplication
-  // Must occur AFTER signature verification and payload extraction.
-  // ---------------------------------------------------------------------------
+  // ── Exactly-once deduplication ────────────────────────────────────────
   const eventId = typeof typedEvent.id === 'string' ? typedEvent.id : null;
 
   if (eventId) {
     const dedupResult = await deduplicateEvent(
       eventId,
       eventType,
-      typeof paymentId === 'string' ? paymentId : null,
+      paymentId ?? null,
       requestId
     );
 
     if (dedupResult === 'duplicate') {
-      // Already processed — acknowledge to stop Razorpay retries.
       timer('info', { duplicate: true });
       return NextResponse.json(
         { success: true, requestId, handled: false, duplicate: true },
         { status: 200 }
       );
     }
-    // 'error': dedup write failed for non-dedup reason — log and continue processing.
-    // 'new': proceed normally.
   } else {
     wLogP.warn('webhook.dedup.no_event_id', {
-      note: 'Razorpay event_id missing from payload. Deduplication skipped.',
+      note: 'Razorpay event_id missing. Deduplication skipped.',
     });
   }
 
-  // ---------------------------------------------------------------------------
-  // Business logic
-  // ---------------------------------------------------------------------------
+  // ── Business logic ────────────────────────────────────────────────────
   try {
-    const status = eventType === 'payment.captured' ? 'paid' : 'failed';
-    const result = await updatePaymentStatusFromWebhook(paymentId, status);
+    if (eventType === 'order.paid') {
+      // ── order.paid: canonical success event ─────────────────────────
+      // 1. Update order status in our DB
+      const result = await updatePaymentStatusFromWebhook(
+        paymentId ?? '',
+        'paid'
+      );
 
-    if (!result.updated && eventType === 'payment.captured') {
-      wLogP.warn('webhook.no_order_found.starting_recovery');
+      if (!result.updated && razorpayOrderId) {
+        wLogP.warn('webhook.order_paid.no_order_found.starting_recovery');
 
-      const paymentDetails = await fetchRazorpayPayment(paymentId, requestId);
-
-      if (!paymentDetails) {
-        wLogP.error('webhook.recovery.fetch_failed', undefined, {
-          note: 'CRITICAL: Manual intervention required.',
-        });
-        return apiError(requestId, 'RECOVERY_FETCH_FAILED', 'Could not fetch payment details for recovery.', 500);
+        // Attempt recovery using the associated payment id
+        if (paymentId) {
+          const paymentDetails = await fetchRazorpayPayment(paymentId, requestId);
+          if (paymentDetails) {
+            const recovery = await recoverOrderFromWebhook(paymentDetails);
+            if (!recovery.recovered) {
+              wLogP.error('webhook.order_paid.recovery.failed', undefined, {
+                error: recovery.error,
+              });
+            } else {
+              wLogP.info('webhook.order_paid.recovery.success', {
+                orderId: recovery.orderId,
+              });
+            }
+          }
+        }
+      } else {
+        wLogP.info('webhook.order_paid.order_updated');
       }
 
-      const recovery = await recoverOrderFromWebhook(paymentDetails);
+      // 2. Confirm inventory + coupon (idempotent)
+      if (razorpayOrderId) {
+        await handlePaymentSuccess(razorpayOrderId, requestId);
+      }
+    } else if (eventType === 'payment.captured') {
+      // ── payment.captured: secondary success signal ───────────────────
+      const result = await updatePaymentStatusFromWebhook(paymentId!, 'paid');
 
-      if (!recovery.recovered) {
-        wLogP.error('webhook.recovery.failed', undefined, {
-          error: recovery.error,
-          note: 'CRITICAL: Manual intervention required.',
-        });
-        return apiError(requestId, 'RECOVERY_FAILED', 'Order recovery failed.', 500);
+      if (!result.updated) {
+        wLogP.warn('webhook.payment_captured.no_order_found.starting_recovery');
+
+        const paymentDetails = await fetchRazorpayPayment(paymentId!, requestId);
+        if (!paymentDetails) {
+          wLogP.error('webhook.recovery.fetch_failed', undefined, {
+            note: 'CRITICAL: Manual intervention required.',
+          });
+          return apiError(
+            requestId,
+            'RECOVERY_FETCH_FAILED',
+            'Could not fetch payment details for recovery.',
+            500
+          );
+        }
+
+        const recovery = await recoverOrderFromWebhook(paymentDetails);
+        if (!recovery.recovered) {
+          wLogP.error('webhook.recovery.failed', undefined, {
+            error: recovery.error,
+            note: 'CRITICAL: Manual intervention required.',
+          });
+          return apiError(requestId, 'RECOVERY_FAILED', 'Order recovery failed.', 500);
+        }
+
+        wLogP.info('webhook.recovery.success', { orderId: recovery.orderId });
+      } else {
+        wLogP.info('webhook.payment_captured.order_updated');
       }
 
-      wLogP.info('webhook.recovery.success', { orderId: recovery.orderId });
-    } else if (!result.updated && eventType === 'payment.failed') {
-      wLogP.warn('webhook.failed_no_order', { note: 'Expected for pre-order payment failures.' });
-    } else {
-      wLogP.info('webhook.order_updated', { status });
+      // Confirm inventory + coupon (idempotent — order.paid may have already done this)
+      if (razorpayOrderId) {
+        await handlePaymentSuccess(razorpayOrderId, requestId);
+      }
+    } else if (eventType === 'payment.failed') {
+      // ── payment.failed: release reservation ─────────────────────────
+      await updatePaymentStatusFromWebhook(paymentId!, 'failed');
+
+      if (razorpayOrderId) {
+        await handlePaymentFailure(razorpayOrderId, requestId);
+      } else {
+        wLogP.warn('webhook.payment_failed.no_order_id', {
+          note: 'Cannot release reservation without razorpay_order_id.',
+        });
+      }
     }
   } catch (err) {
     wLogP.error('webhook.unhandled', err);
@@ -237,9 +372,11 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   }
 
   timer('info');
-  return NextResponse.json({ success: true, requestId, handled: true }, { status: 200 });
+  return NextResponse.json(
+    { success: true, requestId, handled: true },
+    { status: 200 }
+  );
 }
 
-// keep crypto import used by generateRequestId transitive dep
 const _c = crypto.randomUUID;
 void _c;
