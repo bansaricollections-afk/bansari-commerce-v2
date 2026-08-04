@@ -27,15 +27,6 @@
   /* Radius */
   --radius-card: 24px;
   --radius-button: 9999px;
-
-  /* ----------------------------------------
-     shadcn/ui popover tokens
-     Required by SheetContent (bg-popover / text-popover-foreground).
-     Without these, Tailwind v4 falls back to oklch(0.205 0 0) — near-black —
-     making every Sheet body render dark gray.
-     ---------------------------------------- */
-  --color-popover: #FFFFFF;
-  --color-popover-foreground: #1D1D1D;
 }
 
 /* ==========================================
@@ -287,7 +278,7 @@ button {
    SPRINT 6 — REDUCED MOTION SAFETY NET
    Ensure no Sprint 6 animation token causes motion
    issues for users who prefer reduced motion.
---------------------------------------------------- */
+-------------------------------------------------- */
 @media (prefers-reduced-motion: reduce) {
   :root {
     --bc-transition-fast:   0ms;
