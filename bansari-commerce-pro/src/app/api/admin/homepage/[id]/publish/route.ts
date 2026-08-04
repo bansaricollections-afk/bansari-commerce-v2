@@ -1,0 +1,31 @@
+/**
+ * PATCH /api/admin/homepage/[id]/publish
+ * Body: { published: boolean }
+ */
+import { NextRequest, NextResponse } from 'next/server';
+import { requireAdmin } from '@/lib/auth/requireAdmin';
+import { toggleCampaignPublish } from '@/services/homepage-campaign.service';
+import { CampaignError } from '@/lib/campaign-errors';
+
+export const dynamic = 'force-dynamic';
+
+type Params = { params: Promise<{ id: string }> };
+
+export async function PATCH(req: NextRequest, { params }: Params) {
+  try {
+    await requireAdmin();
+    const { id } = await params;
+    const { published } = await req.json();
+    if (typeof published !== 'boolean') {
+      return NextResponse.json({ error: '`published` must be boolean' }, { status: 400 });
+    }
+    const campaign = await toggleCampaignPublish(id, published);
+    return NextResponse.json({ campaign });
+  } catch (err) {
+    if (err instanceof CampaignError) {
+      const status = err.code === 'NOT_FOUND' ? 404 : err.code === 'UNAUTHORIZED' ? 401 : 500;
+      return NextResponse.json({ error: err.message }, { status });
+    }
+    return NextResponse.json({ error: 'Internal error' }, { status: 500 });
+  }
+}

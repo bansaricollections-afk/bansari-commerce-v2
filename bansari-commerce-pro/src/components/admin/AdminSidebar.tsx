@@ -4,6 +4,7 @@ import {
   Boxes,
   Home,
   LayoutDashboard,
+  LayoutTemplate,
   Package,
   Settings,
   ShoppingBag,
@@ -19,6 +20,11 @@ const navigationItems = [
     title: "Dashboard",
     href: "/admin",
     icon: LayoutDashboard,
+  },
+  {
+    title: "Homepage",
+    href: "/admin/homepage",
+    icon: LayoutTemplate,
   },
   {
     title: "Products",
