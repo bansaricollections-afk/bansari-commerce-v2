@@ -9,6 +9,28 @@ import { CampaignError } from '@/lib/campaign-errors';
 
 export const dynamic = 'force-dynamic';
 
+/**
+ * Validates a CTA URL.
+ * Accepts: relative paths starting with /
+ *          absolute https:// URLs
+ * Rejects:  javascript:, data:, ftp:, mailto:, empty malformed strings.
+ * Returns an error string, or null if valid (blank is allowed — means no CTA).
+ */
+function validateCtaUrl(url: unknown): string | null {
+  if (url === null || url === undefined || url === '') return null;
+  if (typeof url !== 'string') return 'CTA link must be a string';
+  const trimmed = url.trim();
+  if (trimmed === '') return null;
+  if (trimmed.startsWith('/')) return null;
+  try {
+    const parsed = new URL(trimmed);
+    if (parsed.protocol === 'https:') return null;
+    return `CTA link protocol "${parsed.protocol}" is not allowed. Use a relative path or https://.`;
+  } catch {
+    return `Invalid CTA URL "${trimmed}". Use a relative path (e.g. /shop) or https://…`;
+  }
+}
+
 export async function GET() {
   try {
     await requireAdmin();
@@ -30,6 +52,13 @@ export async function POST(req: NextRequest) {
     if (!payload?.title) {
       return NextResponse.json({ error: 'title is required' }, { status: 400 });
     }
+
+    const primaryErr = validateCtaUrl(payload.cta_primary_link);
+    if (primaryErr) return NextResponse.json({ error: `Primary CTA: ${primaryErr}` }, { status: 400 });
+
+    const secondaryErr = validateCtaUrl(payload.cta_secondary_link);
+    if (secondaryErr) return NextResponse.json({ error: `Secondary CTA: ${secondaryErr}` }, { status: 400 });
+
     const campaign = await createCampaign(payload);
     return NextResponse.json({ campaign }, { status: 201 });
   } catch (err) {
