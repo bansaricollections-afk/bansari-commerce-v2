@@ -47,6 +47,10 @@ export type ProductSpecification = {
   fit: string;
   occasion: string[];
   care: string;
+  /** Free-text model info shown on PDP. e.g. "Model is 5'7\", Measurements: 34-26-36" */
+  modelInfo?: string;
+  /** Size worn by the model shown on PDP. e.g. "S" */
+  sizeWorn?: string;
 };
 
 export type ProductSEO = {
