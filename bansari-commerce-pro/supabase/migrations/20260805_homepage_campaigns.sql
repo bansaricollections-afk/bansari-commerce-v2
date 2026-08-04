@@ -1,95 +1,79 @@
 -- ============================================================
--- Homepage Campaign Management System
--- Migration: 20260805_homepage_campaigns
+-- Homepage Campaign CMS Migration
 -- ============================================================
+-- Run via Supabase Dashboard SQL Editor or `supabase db push`
 
-create table if not exists public.homepage_campaigns (
-  id               uuid primary key default gen_random_uuid(),
-  title            text        not null,
-  headline_line1   text        not null default '',
-  headline_highlight text      not null default '',
-  headline_line2   text        not null default '',
-  description      text        not null default '',
-  cta_primary_text text        not null default '',
-  cta_primary_link text        not null default '/',
-  cta_secondary_text text      not null default '',
-  cta_secondary_link text      not null default '',
-  desktop_image    text        not null default '',
-  tablet_image     text        not null default '',
-  mobile_image     text        not null default '',
-  video_url        text,
-  image_alt        text        not null default '',
-  overlay_color    text        not null default '#000000',
-  overlay_opacity  numeric(4,3) not null default 0 check (overlay_opacity >= 0 and overlay_opacity <= 1),
-  text_alignment   text        not null default 'left' check (text_alignment in ('left','center','right')),
-  image_position   text        not null default 'center' check (image_position in ('left','center','right','top','bottom')),
-  button_style     text        not null default 'mauve' check (button_style in ('mauve','ivory','dark','outline')),
-  sort_order       integer     not null default 0,
-  status           text        not null default 'draft' check (status in ('draft','published','scheduled','archived')),
-  start_date       timestamptz,
-  end_date         timestamptz,
-  created_at       timestamptz not null default now(),
-  updated_at       timestamptz not null default now()
+create extension if not exists "uuid-ossp";
+
+create type campaign_status as enum ('draft', 'published', 'scheduled', 'archived');
+create type text_alignment as enum ('left', 'center', 'right');
+create type image_position as enum ('center', 'top', 'bottom', 'left', 'right');
+create type button_style as enum ('filled', 'outline', 'ghost');
+
+create table if not exists homepage_campaigns (
+  id                 uuid primary key default uuid_generate_v4(),
+  title              text not null,
+  headline_line1     text,
+  headline_highlight text,
+  headline_line2     text,
+  description        text,
+  cta_primary_text   text,
+  cta_primary_link   text,
+  cta_secondary_text text,
+  cta_secondary_link text,
+  desktop_image      text,
+  tablet_image       text,
+  mobile_image       text,
+  video_url          text,
+  image_alt          text,
+  overlay_color      text not null default '#000000',
+  overlay_opacity    numeric(4,3) not null default 0.3
+                       check (overlay_opacity between 0 and 1),
+  text_alignment     text_alignment not null default 'left',
+  image_position     image_position not null default 'center',
+  button_style       button_style not null default 'filled',
+  sort_order         integer not null default 0,
+  priority           integer not null default 0,
+  status             campaign_status not null default 'draft',
+  start_date         timestamptz,
+  end_date           timestamptz,
+  created_at         timestamptz not null default now(),
+  updated_at         timestamptz not null default now()
 );
 
--- updated_at trigger
-create or replace function public.set_updated_at()
-returns trigger language plpgsql as $$
-begin
-  new.updated_at = now();
-  return new;
-end;
-$$;
+create index if not exists idx_homepage_campaigns_status
+  on homepage_campaigns (status);
 
-drop trigger if exists homepage_campaigns_updated_at on public.homepage_campaigns;
-create trigger homepage_campaigns_updated_at
-  before update on public.homepage_campaigns
-  for each row execute procedure public.set_updated_at();
+create index if not exists idx_homepage_campaigns_sort
+  on homepage_campaigns (sort_order asc);
 
--- Index for ordered public fetching
-create index if not exists homepage_campaigns_status_sort
-  on public.homepage_campaigns (status, sort_order);
+create index if not exists idx_homepage_campaigns_schedule
+  on homepage_campaigns (start_date, end_date)
+  where status = 'published';
 
--- RLS
-alter table public.homepage_campaigns enable row level security;
+-- RLS: allow public read of published campaigns only
+alter table homepage_campaigns enable row level security;
 
--- Public: read published campaigns only
-create policy "public_read_published_campaigns"
-  on public.homepage_campaigns for select
+create policy "Public can read published campaigns"
+  on homepage_campaigns for select
   using (status = 'published');
 
--- Service role: full access (admin)
-create policy "service_role_full_access"
-  on public.homepage_campaigns for all
-  using (auth.role() = 'service_role')
-  with check (auth.role() = 'service_role');
+create policy "Service role has full access"
+  on homepage_campaigns for all
+  using (true)
+  with check (true);
 
--- Storage bucket for hero images
-insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
-values (
-  'hero-images',
-  'hero-images',
-  true,
-  52428800,  -- 50 MB
-  array['image/jpeg','image/jpg','image/png','image/webp','image/avif']
-)
+-- Supabase Storage bucket for campaign images
+insert into storage.buckets (id, name, public)
+values ('homepage-campaigns', 'homepage-campaigns', true)
 on conflict (id) do nothing;
 
 -- Storage policies
-create policy "hero_images_public_read"
+create policy "Anyone can read campaign images"
   on storage.objects for select
-  using (bucket_id = 'hero-images');
+  using (bucket_id = 'homepage-campaigns');
 
-create policy "hero_images_admin_upload"
-  on storage.objects for insert
-  with check (
-    bucket_id = 'hero-images'
-    and auth.role() = 'service_role'
-  );
-
-create policy "hero_images_admin_delete"
-  on storage.objects for delete
-  using (
-    bucket_id = 'hero-images'
-    and auth.role() = 'service_role'
-  );
+create policy "Service role can manage campaign images"
+  on storage.objects for all
+  using (bucket_id = 'homepage-campaigns')
+  with check (bucket_id = 'homepage-campaigns');
