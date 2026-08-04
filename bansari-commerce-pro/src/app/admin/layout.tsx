@@ -1,14 +1,11 @@
 import type { Metadata } from 'next';
-import { headers } from 'next/headers';
 import { AdminHeader } from '@/components/admin/AdminHeader';
 import { AdminSidebar } from '@/components/admin/AdminSidebar';
 import { requireAdminPage } from '@/lib/auth/requireAdmin';
 
-// Prevent Next.js from attempting a static prerender of any /admin/* segment.
-// This layout calls headers() — a Dynamic API — to detect /admin/login.
-// During build-time prerender, headers() returns an empty store, which causes
-// isLoginPage to evaluate false and requireAdminPage() to execute with no
-// valid request context, crashing the build when Supabase env vars are absent.
+// All /admin/* segments (except /admin/login, which has its own layout)
+// are protected by requireAdminPage(). No header-based pathname detection
+// is needed — Next.js route-segment layout scoping handles the exemption.
 export const dynamic = 'force-dynamic';
 
 export const metadata: Metadata = {
@@ -22,28 +19,8 @@ interface AdminLayoutProps {
 }
 
 export default async function AdminLayout({ children }: Readonly<AdminLayoutProps>) {
-  // Read the current request path.
-  // Next.js App Router populates x-invoke-path (Vercel) or next-url in RSC.
-  const headersList = await headers();
-  const pathname =
-    headersList.get('x-invoke-path') ??
-    headersList.get('x-pathname') ??
-    headersList.get('next-url') ??
-    '';
-
-  // /admin/login must never be gated by requireAdminPage() or wrapped in the
-  // admin shell (sidebar + header). It is a public page.
-  // The middleware regex already excludes /admin/login from protection;
-  // this is defence-in-depth at the RSC layer so the layout guard cannot
-  // accidentally block the login page even if middleware is misconfigured.
-  const isLoginPage =
-    pathname === '/admin/login' || pathname.startsWith('/admin/login/');
-
-  if (isLoginPage) {
-    return <>{children}</>;
-  }
-
-  // For all other /admin/* pages enforce admin authentication.
+  // This layout is never reached for /admin/login — that segment has its
+  // own layout (admin/login/layout.tsx) which Next.js resolves first.
   await requireAdminPage();
 
   return (
