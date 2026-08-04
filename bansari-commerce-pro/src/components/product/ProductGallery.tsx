@@ -3,22 +3,102 @@
 import Image from 'next/image';
 import { useCallback, useEffect, useRef, useState } from 'react';
 
-import type { Product } from '@/types/product';
+import type { Product, ProductImage, ProductVariant } from '@/types/product';
+
+// ─── Tab grouping ────────────────────────────────────────────────────────────
+const LOOK_TYPES: ProductImage['type'][] = ['front', 'back', 'side', 'lifestyle'];
+const FABRIC_TYPES: ProductImage['type'][] = ['fabric', 'detail', 'neckline', 'sleeve'];
+
+type Tab = 'look' | 'fabric' | 'details' | 'all';
+
+function classifyTab(type: ProductImage['type']): Tab {
+  if (LOOK_TYPES.includes(type)) return 'look';
+  if (FABRIC_TYPES.includes(type)) return 'fabric';
+  return 'details';
+}
+
+// Safely cast the loose Product.images union to ProductImage[]
+function toProductImages(
+  raw: (ProductImage | { url?: string; alt?: string; type?: string })[] | undefined,
+): ProductImage[] {
+  if (!raw) return [];
+  return raw.filter((img): img is ProductImage => !!img.url && !!img.type) as ProductImage[];
+}
 
 interface Props {
   product: Product;
+  selectedVariant?: ProductVariant | null;
 }
 
-export default function ProductGallery({ product }: Props) {
+export default function ProductGallery({ product, selectedVariant }: Props) {
+  // Derive active image list: variant images → product images
+  const baseImages = toProductImages(product.images);
+  const variantImages =
+    selectedVariant?.images && selectedVariant.images.length > 0
+      ? selectedVariant.images
+      : null;
+  const allImages = variantImages ?? baseImages;
+
+  // ─── Tab state ───────────────────────────────────────────────────────────
+  const tabCounts = allImages.reduce<Record<Tab, number>>(
+    (acc, img) => {
+      acc[classifyTab(img.type)] = (acc[classifyTab(img.type)] ?? 0) + 1;
+      return acc;
+    },
+    { look: 0, fabric: 0, details: 0, all: allImages.length },
+  );
+  const availableTabs: Tab[] = [
+    'look' as Tab,
+    ...(tabCounts.fabric > 0 ? (['fabric'] as Tab[]) : []),
+    ...(tabCounts.details > 0 ? (['details'] as Tab[]) : []),
+  ];
+  const showTabs = availableTabs.length >= 2;
+
+  const [activeTab, setActiveTab] = useState<Tab>(
+    showTabs ? 'look' : 'all',
+  );
+
+  // Reset tab + index when images change (variant switch)
+  const prevImagesKey = useRef<string>('');
+  const imagesKey = allImages.map((i) => i.url).join(',');
+  if (imagesKey !== prevImagesKey.current) {
+    prevImagesKey.current = imagesKey;
+    // Reset will happen via useEffect below
+  }
+
+  useEffect(() => {
+    setActiveTab(showTabs ? 'look' : 'all');
+    setActiveIndex(0);
+    setLightboxIndex(0);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [imagesKey]);
+
+  const images =
+    activeTab === 'all'
+      ? allImages
+      : allImages.filter((img) => classifyTab(img.type) === activeTab);
+
+  // When tab changes, clamp activeIndex
   const [activeIndex, setActiveIndex] = useState(0);
+  const handleTabChange = (tab: Tab) => {
+    setActiveTab(tab);
+    setActiveIndex(0);
+    setLightboxIndex(0);
+  };
+
+  // ─── Zoom panel state ────────────────────────────────────────────────────
   const [isZoomed, setIsZoomed] = useState(false);
   const [zoomPos, setZoomPos] = useState({ x: 50, y: 50 });
+
+  // ─── Lightbox state ──────────────────────────────────────────────────────
   const [lightboxOpen, setLightboxOpen] = useState(false);
   const [lightboxIndex, setLightboxIndex] = useState(0);
+
+  // ─── Touch swipe ─────────────────────────────────────────────────────────
   const [touchStart, setTouchStart] = useState<number | null>(null);
+
   const mainRef = useRef<HTMLDivElement>(null);
   const thumbsRef = useRef<HTMLDivElement>(null);
-  const images = product.images ?? [];
 
   const handleMouseMove = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
     if (!mainRef.current) return;
@@ -31,7 +111,6 @@ export default function ProductGallery({ product }: Props) {
   const handleTouchStart = (e: React.TouchEvent) => {
     setTouchStart(e.touches[0].clientX);
   };
-
   const handleTouchEnd = (e: React.TouchEvent) => {
     if (touchStart === null) return;
     const diff = touchStart - e.changedTouches[0].clientX;
@@ -42,15 +121,14 @@ export default function ProductGallery({ product }: Props) {
     setTouchStart(null);
   };
 
-  // Scroll active thumbnail into view on mobile strip
+  // Scroll active thumbnail into view
   useEffect(() => {
     if (!thumbsRef.current) return;
     const active = thumbsRef.current.children[activeIndex] as HTMLElement | undefined;
-    if (active) {
-      active.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
-    }
+    if (active) active.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
   }, [activeIndex]);
 
+  // Lightbox keyboard nav
   useEffect(() => {
     if (!lightboxOpen) return;
     const onKey = (e: KeyboardEvent) => {
@@ -62,7 +140,7 @@ export default function ProductGallery({ product }: Props) {
     return () => window.removeEventListener('keydown', onKey);
   }, [lightboxOpen, images.length]);
 
-  if (!images.length) {
+  if (!allImages.length) {
     return (
       <div className="aspect-[3/4] w-full bg-slate-100 flex items-center justify-center rounded-sm">
         <span className="text-slate-400 text-sm tracking-widest uppercase">No Image</span>
@@ -75,148 +153,191 @@ export default function ProductGallery({ product }: Props) {
   const isLowStock = product.stock && product.stock > 0 && product.stock <= 5;
   const isOutOfStock = product.stock === 0;
 
+  const TAB_LABELS: Record<Tab, string> = {
+    all: 'All',
+    look: 'Look',
+    fabric: 'Fabric',
+    details: 'Details',
+  };
+
   return (
-    <div className="flex gap-4">
-      {/* ── Desktop: Vertical thumbnail strip (lg+) ── */}
-      <div className="hidden lg:flex flex-col gap-2 w-16 flex-shrink-0">
-        {images.map((img, i) => (
-          <button
-            key={img.url}
-            onClick={() => setActiveIndex(i)}
-            aria-label={`View image ${i + 1}`}
-            className={`relative aspect-[3/4] w-full overflow-hidden rounded-sm border transition-all duration-200 ${
-              i === activeIndex
-                ? 'border-[#8A5A6A] shadow-sm'
-                : 'border-slate-200 opacity-60 hover:opacity-100 hover:border-slate-400'
-            }`}
-          >
-            <Image
-              src={img.url || '/placeholder.png'}
-              alt={img.alt || `Product view ${i + 1}`}
-              fill
-              className="object-cover"
-              sizes="64px"
-              loading="lazy"
-            />
-          </button>
-        ))}
-      </div>
+    // Outer wrapper: positions the side zoom panel relative to the whole gallery
+    <div className="relative">
+      {/* ── Gallery tabs ── (shown only when ≥2 tab groups exist) */}
+      {showTabs && (
+        <div className="flex gap-5 mb-3" role="tablist" aria-label="Gallery views">
+          {availableTabs.map((tab) => (
+            <button
+              key={tab}
+              role="tab"
+              aria-selected={activeTab === tab}
+              onClick={() => handleTabChange(tab)}
+              className={[
+                'text-[10px] tracking-[0.2em] uppercase pb-1 border-b transition-colors duration-150',
+                activeTab === tab
+                  ? 'text-[#8A5A6A] border-[#8A5A6A]'
+                  : 'text-slate-400 border-transparent hover:text-slate-600 hover:border-slate-300',
+              ].join(' ')}
+            >
+              {TAB_LABELS[tab]}
+            </button>
+          ))}
+        </div>
+      )}
 
-      {/* ── Main column ── */}
-      <div className="flex-1 flex flex-col gap-3">
-        {/* Main image */}
-        <div
-          ref={mainRef}
-          className="relative aspect-[3/4] w-full overflow-hidden rounded-sm bg-slate-50 cursor-zoom-in select-none"
-          onMouseEnter={() => setIsZoomed(true)}
-          onMouseLeave={() => setIsZoomed(false)}
-          onMouseMove={handleMouseMove}
-          onTouchStart={handleTouchStart}
-          onTouchEnd={handleTouchEnd}
-          onClick={() => { setLightboxIndex(activeIndex); setLightboxOpen(true); }}
-          role="button"
-          tabIndex={0}
-          aria-label="Click to view full size"
-          onKeyDown={(e) => e.key === 'Enter' && setLightboxOpen(true)}
-        >
-          {/* Badges */}
-          <div className="absolute top-4 left-4 z-10 flex flex-col gap-1.5">
-            {isNew && (
-              <span className="bg-[#8A5A6A] text-white text-[10px] font-medium tracking-[0.15em] uppercase px-2.5 py-1">
-                New
-              </span>
-            )}
-            {isBestseller && (
-              <span className="bg-slate-900 text-white text-[10px] font-medium tracking-[0.15em] uppercase px-2.5 py-1">
-                Bestseller
-              </span>
-            )}
-            {isLowStock && (
-              <span className="bg-amber-600 text-white text-[10px] font-medium tracking-[0.15em] uppercase px-2.5 py-1">
-                Almost Gone
-              </span>
-            )}
-            {isOutOfStock && (
-              <span className="bg-slate-500 text-white text-[10px] font-medium tracking-[0.15em] uppercase px-2.5 py-1">
-                Sold Out
-              </span>
-            )}
-          </div>
-
-          {/* Image counter */}
-          <div className="absolute bottom-4 right-4 z-10 bg-white/80 backdrop-blur-sm text-slate-700 text-[11px] tracking-widest px-2 py-1 rounded-sm">
-            {activeIndex + 1} / {images.length}
-          </div>
-
-          {/* Fullscreen icon */}
-          <button
-            onClick={(e) => { e.stopPropagation(); setLightboxIndex(activeIndex); setLightboxOpen(true); }}
-            aria-label="View fullscreen"
-            className="absolute bottom-4 left-4 z-10 bg-white/80 backdrop-blur-sm p-1.5 rounded-sm hover:bg-white transition-colors"
-          >
-            <svg className="w-4 h-4 text-slate-700" fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 3.75v4.5m0-4.5h4.5m-4.5 0L9 9M3.75 20.25v-4.5m0 4.5h4.5m-4.5 0L9 15M20.25 3.75h-4.5m4.5 0v4.5m0-4.5L15 9m5.25 11.25h-4.5m4.5 0v-4.5m0 4.5L15 15" />
-            </svg>
-          </button>
-
-          {/* Zoom layer */}
-          <div
-            className={`absolute inset-0 transition-opacity duration-200 pointer-events-none z-20 ${
-              isZoomed ? 'opacity-100' : 'opacity-0'
-            }`}
-            style={{
-              backgroundImage: `url(${images[activeIndex]?.url})`,
-              backgroundPosition: `${zoomPos.x}% ${zoomPos.y}%`,
-              backgroundSize: '250%',
-              backgroundRepeat: 'no-repeat',
-            }}
-          />
-
-          <Image
-            src={images[activeIndex]?.url ?? ''}
-            alt={images[activeIndex]?.alt || product.name}
-            fill
-            priority={activeIndex === 0}
-            className="object-cover transition-opacity duration-300"
-            sizes="(max-width: 768px) 100vw, 55vw"
-          />
+      <div className="flex gap-4">
+        {/* ── Desktop: Vertical thumbnail strip (lg+) ── */}
+        <div className="hidden lg:flex flex-col gap-2 w-16 flex-shrink-0">
+          {images.map((img, i) => (
+            <button
+              key={img.url + i}
+              onClick={() => setActiveIndex(i)}
+              aria-label={`View image ${i + 1}`}
+              className={`relative aspect-[3/4] w-full overflow-hidden rounded-sm border transition-all duration-200 ${
+                i === activeIndex
+                  ? 'border-[#8A5A6A] shadow-sm'
+                  : 'border-slate-200 opacity-60 hover:opacity-100 hover:border-slate-400'
+              }`}
+            >
+              <Image
+                src={img.url || '/placeholder.png'}
+                alt={img.alt || `Product view ${i + 1}`}
+                fill
+                className="object-cover"
+                sizes="64px"
+                loading="lazy"
+              />
+            </button>
+          ))}
         </div>
 
-        {/* ── Mobile: Horizontal thumbnail strip (below lg) ── */}
-        {images.length > 1 && (
+        {/* ── Main column ── */}
+        <div className="flex-1 flex flex-col gap-3">
+          {/* Main image */}
           <div
-            ref={thumbsRef}
-            className="flex lg:hidden gap-2 overflow-x-auto scrollbar-none pb-1 -mx-1 px-1"
-            aria-label="Product image thumbnails"
-            role="list"
+            ref={mainRef}
+            className="relative aspect-[3/4] w-full overflow-hidden rounded-sm bg-slate-50 select-none"
+            style={{ cursor: isZoomed ? 'crosshair' : 'zoom-in' }}
+            onMouseEnter={() => setIsZoomed(true)}
+            onMouseLeave={() => setIsZoomed(false)}
+            onMouseMove={handleMouseMove}
+            onTouchStart={handleTouchStart}
+            onTouchEnd={handleTouchEnd}
+            onClick={() => { setLightboxIndex(activeIndex); setLightboxOpen(true); }}
+            role="button"
+            tabIndex={0}
+            aria-label="Click to view full size"
+            onKeyDown={(e) => e.key === 'Enter' && setLightboxOpen(true)}
           >
-            {images.map((img, i) => (
-              <button
-                key={img.url + i}
-                role="listitem"
-                onClick={() => setActiveIndex(i)}
-                aria-label={`View image ${i + 1}`}
-                aria-pressed={i === activeIndex}
-                className={[
-                  'relative flex-shrink-0 w-14 aspect-[3/4] overflow-hidden rounded-sm border transition-all duration-200',
-                  i === activeIndex
-                    ? 'border-[#8A5A6A] shadow-sm'
-                    : 'border-slate-200 opacity-55 hover:opacity-100 hover:border-slate-400',
-                ].join(' ')}
-              >
-                <Image
-                  src={img.url || '/placeholder.png'}
-                  alt={img.alt || `Product view ${i + 1}`}
-                  fill
-                  className="object-cover"
-                  sizes="56px"
-                  loading="lazy"
-                />
-              </button>
-            ))}
+            {/* Badges */}
+            <div className="absolute top-4 left-4 z-10 flex flex-col gap-1.5">
+              {isNew && (
+                <span className="bg-[#8A5A6A] text-white text-[10px] font-medium tracking-[0.15em] uppercase px-2.5 py-1">
+                  New
+                </span>
+              )}
+              {isBestseller && (
+                <span className="bg-slate-900 text-white text-[10px] font-medium tracking-[0.15em] uppercase px-2.5 py-1">
+                  Bestseller
+                </span>
+              )}
+              {isLowStock && (
+                <span className="bg-amber-600 text-white text-[10px] font-medium tracking-[0.15em] uppercase px-2.5 py-1">
+                  Almost Gone
+                </span>
+              )}
+              {isOutOfStock && (
+                <span className="bg-slate-500 text-white text-[10px] font-medium tracking-[0.15em] uppercase px-2.5 py-1">
+                  Sold Out
+                </span>
+              )}
+            </div>
+
+            {/* Image counter */}
+            <div className="absolute bottom-4 right-4 z-10 bg-white/80 backdrop-blur-sm text-slate-700 text-[11px] tracking-widest px-2 py-1 rounded-sm">
+              {activeIndex + 1} / {images.length}
+            </div>
+
+            {/* Fullscreen icon */}
+            <button
+              onClick={(e) => { e.stopPropagation(); setLightboxIndex(activeIndex); setLightboxOpen(true); }}
+              aria-label="View fullscreen"
+              className="absolute bottom-4 left-4 z-10 bg-white/80 backdrop-blur-sm p-1.5 rounded-sm hover:bg-white transition-colors"
+            >
+              <svg className="w-4 h-4 text-slate-700" fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 3.75v4.5m0-4.5h4.5m-4.5 0L9 9M3.75 20.25v-4.5m0 4.5h4.5m-4.5 0L9 15M20.25 3.75h-4.5m4.5 0v4.5m0-4.5L15 9m5.25 11.25h-4.5m4.5 0v-4.5m0 4.5L15 15" />
+              </svg>
+            </button>
+
+            <Image
+              src={images[activeIndex]?.url ?? ''}
+              alt={images[activeIndex]?.alt || product.name}
+              fill
+              priority={activeIndex === 0}
+              className="object-cover transition-opacity duration-300"
+              sizes="(max-width: 768px) 100vw, 55vw"
+            />
           </div>
-        )}
+
+          {/* ── Mobile: Horizontal thumbnail strip (below lg) ── */}
+          {images.length > 1 && (
+            <div
+              ref={thumbsRef}
+              className="flex lg:hidden gap-2 overflow-x-auto scrollbar-none pb-1 -mx-1 px-1"
+              aria-label="Product image thumbnails"
+              role="list"
+            >
+              {images.map((img, i) => (
+                <button
+                  key={img.url + i}
+                  role="listitem"
+                  onClick={() => setActiveIndex(i)}
+                  aria-label={`View image ${i + 1}`}
+                  aria-pressed={i === activeIndex}
+                  className={[
+                    'relative flex-shrink-0 w-14 aspect-[3/4] overflow-hidden rounded-sm border transition-all duration-200',
+                    i === activeIndex
+                      ? 'border-[#8A5A6A] shadow-sm'
+                      : 'border-slate-200 opacity-55 hover:opacity-100 hover:border-slate-400',
+                  ].join(' ')}
+                >
+                  <Image
+                    src={img.url || '/placeholder.png'}
+                    alt={img.alt || `Product view ${i + 1}`}
+                    fill
+                    className="object-cover"
+                    sizes="56px"
+                    loading="lazy"
+                  />
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
       </div>
+
+      {/* ── Desktop side-panel zoom (lg+) ── */}
+      {/* Positioned absolutely to the right of the outer wrapper; */}
+      {/* does not affect flex layout of thumbnails + main column. */}
+      <div
+        aria-hidden="true"
+        className={[
+          'hidden lg:block',
+          'absolute top-0 left-[calc(100%+1.5rem)]',
+          'w-[420px] aspect-[3/4]',
+          'overflow-hidden rounded-sm border border-slate-200 bg-slate-50',
+          'shadow-lg',
+          'pointer-events-none',
+          'transition-opacity duration-200',
+          isZoomed ? 'opacity-100' : 'opacity-0',
+        ].join(' ')}
+        style={{
+          backgroundImage: `url(${images[activeIndex]?.url ?? ''})`,
+          backgroundPosition: `${zoomPos.x}% ${zoomPos.y}%`,
+          backgroundSize: '220%',
+          backgroundRepeat: 'no-repeat',
+        }}
+      />
 
       {/* ── Lightbox ── */}
       {lightboxOpen && (
