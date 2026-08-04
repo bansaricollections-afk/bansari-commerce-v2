@@ -5,7 +5,13 @@ import { NextResponse, type NextRequest } from 'next/server';
 const ADMIN_ROUTES     = /^\/admin(?!\/login(?:\/|$))(?:\/|$)/;
 const ADMIN_API_ROUTES = /^\/api\/admin/;
 
-const SECURITY_HEADERS: Record<string, string> = {
+const IS_DEV = process.env.NODE_ENV === 'development';
+
+// Full security headers applied in production only.
+// In development, next.config.ts owns the CSP (it adds 'unsafe-eval' for
+// Turbopack/HMR). Applying this CSP on top would overwrite that header and
+// strip 'unsafe-eval', breaking the dev runtime with a CSP eval violation.
+const PROD_SECURITY_HEADERS: Record<string, string> = {
   'Strict-Transport-Security': 'max-age=63072000; includeSubDomains; preload',
   'X-Content-Type-Options':    'nosniff',
   'X-Frame-Options':           'DENY',
@@ -27,7 +33,11 @@ const SECURITY_HEADERS: Record<string, string> = {
 };
 
 function applyHeaders(res: NextResponse): NextResponse {
-  Object.entries(SECURITY_HEADERS).forEach(([k, v]) => res.headers.set(k, v));
+  // In development, do not apply any security headers from the middleware.
+  // next.config.ts already sets the correct dev-compatible CSP with
+  // 'unsafe-eval'. Applying PROD_SECURITY_HEADERS here would overwrite it.
+  if (IS_DEV) return res;
+  Object.entries(PROD_SECURITY_HEADERS).forEach(([k, v]) => res.headers.set(k, v));
   return res;
 }
 
@@ -52,7 +62,7 @@ export default async function proxy(request: NextRequest) {
   const isAdminPage = ADMIN_ROUTES.test(pathname);
   const isAdminApi  = ADMIN_API_ROUTES.test(pathname);
 
-  // ── Non-admin routes ────────────────────────────────────────────────────────
+  // ── Non-admin routes ─────────────────────────────────────────────────────────
   if (!isAdminPage && !isAdminApi) {
     return applyHeaders(NextResponse.next());
   }
@@ -80,7 +90,7 @@ export default async function proxy(request: NextRequest) {
   // client-supplied cookie data alone.
   const { data: { user } } = await supabase.auth.getUser();
 
-  // ── Unauthenticated ─────────────────────────────────────────────────────────
+  // ── Unauthenticated ───────────────────────────────────────────────────────────
   if (!user) {
     if (isAdminApi) {
       return applyHeaders(
@@ -114,7 +124,7 @@ export default async function proxy(request: NextRequest) {
     return applyHeaders(NextResponse.redirect(url));
   }
 
-  // ── Authenticated admin — pass through ──────────────────────────────────────
+  // ── Authenticated admin — pass through ───────────────────────────────────────
   return applyHeaders(response);
 }
 
