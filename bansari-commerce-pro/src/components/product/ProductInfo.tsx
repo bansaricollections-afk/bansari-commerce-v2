@@ -6,6 +6,7 @@ import { useState } from 'react';
 import type { Product } from '@/types/product';
 import type { ProductVariant } from '@/types/product';
 
+import DeliveryEstimate from './DeliveryEstimate';
 import ProductActions from './ProductActions';
 import ProductVariantSelector from './ProductVariantSelector';
 import QuantitySelector from './QuantitySelector';
@@ -50,6 +51,14 @@ export default function ProductInfo({ product, canonicalUrl }: Props) {
   const isOutOfStock = !product.stock || product.stock === 0;
   const isLowStock = !isOutOfStock && (product.stock ?? 0) <= 5;
   const specs = product.specifications;
+
+  // Model info: pulled from specs if present, else null (hide strip entirely)
+  // Format expected: specs.modelInfo as a free-text string e.g.
+  // "Model is 5'7\", wears size S · Measurements: 34-26-36"
+  // Since ProductSpecification type does not include modelInfo yet,
+  // we cast safely to read it without touching types/product.ts.
+  const modelInfo = (specs as any)?.modelInfo as string | undefined;
+  const sizeWorn = (specs as any)?.sizeWorn as string | undefined;
 
   return (
     <div className="flex flex-col gap-6 lg:sticky lg:top-24 lg:self-start">
@@ -96,7 +105,7 @@ export default function ProductInfo({ product, canonicalUrl }: Props) {
       </div>
 
       {/* ── Price row ── */}
-      <div className="border-t border-b border-slate-100 py-4 flex flex-col gap-1">
+      <div className="border-t border-b border-slate-100 py-4 flex flex-col gap-2">
         <div className="flex items-baseline gap-3">
           <span className="text-2xl font-light text-slate-900">
             ₹{product.price.toLocaleString('en-IN')}
@@ -112,11 +121,21 @@ export default function ProductInfo({ product, canonicalUrl }: Props) {
             </>
           )}
         </div>
+
+        {/* Returns reassurance — inline, always visible */}
+        <p className="text-[11px] text-slate-500 flex items-center gap-1.5">
+          <svg className="w-3.5 h-3.5 text-green-600 flex-shrink-0" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24" aria-hidden="true">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182m0-4.991v4.99" />
+          </svg>
+          Free 7-day returns · Free pickup · Full refund
+        </p>
+
         <p className="text-[11px] text-slate-400 tracking-wide">
           Inclusive of all taxes · Free shipping on all orders
         </p>
+
         {/* Availability + Style Code */}
-        <div className="flex flex-wrap items-center gap-x-4 gap-y-1 mt-1">
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
           {isOutOfStock ? (
             <span className="flex items-center gap-1 text-[11px] text-red-500">
               <span className="w-1.5 h-1.5 rounded-full bg-red-500 inline-block" />
@@ -140,6 +159,30 @@ export default function ProductInfo({ product, canonicalUrl }: Props) {
           )}
         </div>
       </div>
+
+      {/* ── Delivery Estimate ── */}
+      {!isOutOfStock && <DeliveryEstimate />}
+
+      {/* ── Model Info Strip ── */}
+      {(modelInfo || sizeWorn) && (
+        <div className="flex items-start gap-2 text-[11px] text-slate-500 bg-slate-50 border border-slate-100 rounded-sm px-3 py-2.5">
+          <svg
+            className="w-3.5 h-3.5 text-[#8A5A6A] flex-shrink-0 mt-px"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.5"
+            viewBox="0 0 24 24"
+            aria-hidden="true"
+          >
+            <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 6a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0zM4.501 20.118a7.5 7.5 0 0114.998 0A17.933 17.933 0 0112 21.75c-2.676 0-5.216-.584-7.499-1.632z" />
+          </svg>
+          <span>
+            {modelInfo && <span>{modelInfo}</span>}
+            {modelInfo && sizeWorn && <span className="mx-1">·</span>}
+            {sizeWorn && <span>Model wears size <strong className="text-slate-700">{sizeWorn}</strong></span>}
+          </span>
+        </div>
+      )}
 
       {/* ── Size selector ── */}
       {product.variants && product.variants.length > 0 && (
