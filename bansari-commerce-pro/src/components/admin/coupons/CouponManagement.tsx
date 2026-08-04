@@ -591,7 +591,7 @@ export default function CouponManagement() {
             />
           </div>
 
-          <SheetFooter className="mt-8 flex gap-2 justify-end px-6 pb-6">
+          <SheetFooter className="sticky bottom-0 bg-white border-t border-gray-200 px-6 py-4 flex items-center justify-end gap-2">
             <Button variant="outline" onClick={() => setIsSheetOpen(false)} disabled={isSaving}>
               Cancel
             </Button>
