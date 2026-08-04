@@ -468,15 +468,17 @@ export default function CouponManagement() {
 
       {/* ── Add / Edit Sheet ────────────────────────────────────────────────── */}
       <Sheet open={isSheetOpen} onOpenChange={setIsSheetOpen}>
-        <SheetContent side="right" className="w-full sm:max-w-lg overflow-y-auto">
-          <SheetHeader className="mb-6">
-            <SheetTitle>{editCoupon ? `Edit: ${editCoupon.code}` : "New Coupon"}</SheetTitle>
-            <SheetDescription>
+        <SheetContent side="right" className="w-full sm:max-w-lg overflow-y-auto p-0">
+          <SheetHeader className="sticky top-0 z-10 bg-white border-b border-gray-200 px-6 py-4">
+            <SheetTitle className="text-lg font-semibold">
+              {editCoupon ? `Edit: ${editCoupon.code}` : "New Coupon"}
+            </SheetTitle>
+            <SheetDescription className="text-sm text-gray-500">
               {editCoupon ? "Update coupon details below." : "Create a new discount code."}
             </SheetDescription>
           </SheetHeader>
 
-          <div className="space-y-5 px-1">
+          <div className="px-6 py-6 space-y-4">
             {/* Code */}
             <div className="space-y-1.5">
               <label className="block text-sm font-medium text-gray-700">
@@ -515,7 +517,7 @@ export default function CouponManagement() {
               <select
                 value={form.discount_type}
                 onChange={(e) => setField("discount_type", e.target.value as DiscountType)}
-                className="w-full h-10 rounded-md border border-gray-300 px-3 py-2 text-sm bg-white shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                className="w-full h-10 rounded-md border border-gray-300 px-3 py-2 text-sm bg-white shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
               >
                 <option value="percentage">Percentage (%)</option>
                 <option value="flat">Flat Amount (₹)</option>
@@ -589,7 +591,7 @@ export default function CouponManagement() {
             />
           </div>
 
-          <SheetFooter className="mt-8 flex gap-2 justify-end">
+          <SheetFooter className="mt-8 flex gap-2 justify-end px-6 pb-6">
             <Button variant="outline" onClick={() => setIsSheetOpen(false)} disabled={isSaving}>
               Cancel
             </Button>
