@@ -27,6 +27,10 @@ const nextConfig: NextConfig = {
       },
       {
         protocol: 'https',
+        hostname: 'images.pexels.com',
+      },
+      {
+        protocol: 'https',
         hostname: 'cdn.shopify.com',
       },
     ],
@@ -78,8 +82,8 @@ const nextConfig: NextConfig = {
               "font-src 'self' https://fonts.gstatic.com",
               // Supabase, Razorpay and WhatsApp API calls
               `connect-src 'self' https://*.supabase.co wss://*.supabase.co https://api.razorpay.com https://wa.me`,
-              // Images: Supabase storage + Unsplash + Shopify CDN
-              "img-src 'self' data: blob: https://*.supabase.co https://images.unsplash.com https://cdn.shopify.com",
+              // Images: Supabase storage + Unsplash + Pexels + Shopify CDN
+              "img-src 'self' data: blob: https://*.supabase.co https://images.unsplash.com https://images.pexels.com https://cdn.shopify.com",
               // Razorpay payment iframe
               "frame-src https://api.razorpay.com https://checkout.razorpay.com",
               "object-src 'none'",
