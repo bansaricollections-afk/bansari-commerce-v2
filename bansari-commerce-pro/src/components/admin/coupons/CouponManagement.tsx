@@ -468,7 +468,8 @@ export default function CouponManagement() {
 
       {/* ── Add / Edit Sheet ────────────────────────────────────────────────── */}
       <Sheet open={isSheetOpen} onOpenChange={setIsSheetOpen}>
-        <SheetContent side="right" className="w-full sm:max-w-lg overflow-y-auto p-0">
+        {/* Desktop: wider panel to accommodate 2-col grid */}
+        <SheetContent side="right" className="w-full sm:max-w-lg lg:max-w-xl overflow-y-auto p-0">
           <SheetHeader className="sticky top-0 z-10 bg-white border-b border-gray-200 px-6 py-4">
             <SheetTitle className="text-lg font-semibold">
               {editCoupon ? `Edit: ${editCoupon.code}` : "New Coupon"}
@@ -478,7 +479,18 @@ export default function CouponManagement() {
             </SheetDescription>
           </SheetHeader>
 
-          <div className="px-6 py-6 space-y-4">
+          {/*
+            Desktop (lg+): responsive 2-column grid.
+            Mobile/tablet: single column (grid-cols-1).
+            Fields are intentionally paired by semantic relationship:
+              Row 1 — code  |  description
+              Row 2 — discount_type  |  discount_value
+              Row 3 — min_order  |  max_uses
+              Row 4 — expires_at  (full-width)
+              Row 5 — active toggle  (full-width)
+          */}
+          <div className="px-6 py-6 grid grid-cols-1 lg:grid-cols-2 gap-x-5 gap-y-4">
+
             {/* Code */}
             <div className="space-y-1.5">
               <label className="block text-sm font-medium text-gray-700">
@@ -570,8 +582,8 @@ export default function CouponManagement() {
               />
             </div>
 
-            {/* Expires at */}
-            <div className="space-y-1.5">
+            {/* Expires at — full-width */}
+            <div className="space-y-1.5 lg:col-span-2">
               <label className="block text-sm font-medium text-gray-700">Expires At</label>
               <input
                 type="datetime-local"
@@ -582,13 +594,16 @@ export default function CouponManagement() {
               <p className="text-xs text-gray-400">Leave blank to never expire.</p>
             </div>
 
-            {/* Active toggle */}
-            <ToggleSwitch
-              checked={form.active}
-              onChange={(v) => setField("active", v)}
-              label="Active"
-              description="Inactive coupons cannot be redeemed at checkout."
-            />
+            {/* Active toggle — full-width */}
+            <div className="lg:col-span-2">
+              <ToggleSwitch
+                checked={form.active}
+                onChange={(v) => setField("active", v)}
+                label="Active"
+                description="Inactive coupons cannot be redeemed at checkout."
+              />
+            </div>
+
           </div>
 
           <SheetFooter className="sticky bottom-0 bg-white border-t border-gray-200 px-6 py-4 flex items-center justify-end gap-2">
