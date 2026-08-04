@@ -1,11 +1,18 @@
 "use client";
 
 import { ChevronLeft, ChevronRight } from "lucide-react";
-import { useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import type { PaginationMeta } from "@/types/filter-params";
 
-const TOTAL_PAGES = 8;
-const PER_PAGE = 24;
-const TOTAL_PRODUCTS = 192;
+// ─── Props ───────────────────────────────────────────────────────────────────
+// Pagination is driven entirely by real data from PaginationMeta (returned by
+// getFilteredProducts). All hardcoded constants have been removed.
+// The component is URL-driven: clicking a page number pushes ?page=N to the
+// URL which triggers a full RSC re-render with the correct data slice.
+
+interface PaginationProps {
+  meta: PaginationMeta;
+}
 
 function getPageRange(current: number, total: number): (number | "...")[] {
   if (total <= 7) return Array.from({ length: total }, (_, i) => i + 1);
@@ -14,17 +21,24 @@ function getPageRange(current: number, total: number): (number | "...")[] {
   return [1, "...", current - 1, current, current + 1, "...", total];
 }
 
-export default function Pagination() {
-  const [page, setPage] = useState(1);
-  const pages = getPageRange(page, TOTAL_PAGES);
+export default function Pagination({ meta }: PaginationProps) {
+  const router       = useRouter();
+  const searchParams = useSearchParams();
 
-  const from = (page - 1) * PER_PAGE + 1;
-  const to = Math.min(page * PER_PAGE, TOTAL_PRODUCTS);
-  const progressPct = (page / TOTAL_PAGES) * 100;
+  const { page, perPage, total, totalPages } = meta;
+  const pages      = getPageRange(page, totalPages);
+  const from       = total === 0 ? 0 : (page - 1) * perPage + 1;
+  const to         = Math.min(page * perPage, total);
+  const progressPct = totalPages > 1 ? (page / totalPages) * 100 : 100;
+
+  // Hide the component entirely when there is only one page
+  if (totalPages <= 1 && total > 0) return null;
 
   function handleSetPage(p: number) {
-    setPage(p);
-    window.scrollTo({ top: 0, behavior: "smooth" });
+    const params = new URLSearchParams(searchParams.toString());
+    params.set('page', String(p));
+    router.push(`/shop?${params.toString()}`);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   }
 
   return (
@@ -40,7 +54,7 @@ export default function Pagination() {
           aria-valuenow={progressPct}
           aria-valuemin={0}
           aria-valuemax={100}
-          aria-label={`Page ${page} of ${TOTAL_PAGES}`}
+          aria-label={`Page ${page} of ${totalPages}`}
         >
           <div
             className="h-full bg-[#8A5A6A] transition-all duration-500"
@@ -48,7 +62,7 @@ export default function Pagination() {
           />
         </div>
         <p className="text-[10px] uppercase tracking-[0.14em] text-slate-400">
-          {from}–{to} of {TOTAL_PRODUCTS} products
+          {from}–{to} of {total} products
         </p>
       </div>
 
@@ -58,7 +72,7 @@ export default function Pagination() {
         <button
           type="button"
           aria-label="Previous page"
-          disabled={page === 1}
+          disabled={!meta.hasPrevPage}
           onClick={() => handleSetPage(Math.max(1, page - 1))}
           className="flex items-center gap-2 border border-slate-200 bg-white px-5 py-2.5 text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-600 transition-all duration-200 hover:border-slate-400 hover:text-slate-900 disabled:cursor-not-allowed disabled:opacity-30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#8A5A6A]"
         >
@@ -101,8 +115,8 @@ export default function Pagination() {
         <button
           type="button"
           aria-label="Next page"
-          disabled={page === TOTAL_PAGES}
-          onClick={() => handleSetPage(Math.min(TOTAL_PAGES, page + 1))}
+          disabled={!meta.hasNextPage}
+          onClick={() => handleSetPage(Math.min(totalPages, page + 1))}
           className="flex items-center gap-2 border border-slate-200 bg-white px-5 py-2.5 text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-600 transition-all duration-200 hover:border-slate-400 hover:text-slate-900 disabled:cursor-not-allowed disabled:opacity-30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#8A5A6A]"
         >
           Next

@@ -4,6 +4,7 @@ import {
   logServiceQueryResult,
   logServiceError,
 } from '@/lib/debug/product-debug';
+import type { FilterParams, PaginationMeta, SortOption } from '@/types/filter-params';
 
 // ---------------------------------------------------------------------------
 // Types — fields must exactly match public.products column names
@@ -150,12 +151,15 @@ export async function getProductById(id: number): Promise<Product | null> {
 }
 
 // ---------------------------------------------------------------------------
-// getProducts
+// getProducts  ← UNTOUCHED — zero regression on existing callers
 // ---------------------------------------------------------------------------
 
 /**
  * Fetch all active products, newest first.
- * Used by ProductGrid and WishlistPage.
+ * Used by ProductGrid (legacy), WishlistPage, and home-page components.
+ *
+ * DO NOT MODIFY — callers depend on the exact no-argument signature.
+ * For filtered/paginated/sorted queries use getFilteredProducts() instead.
  */
 export async function getProducts(): Promise<Product[]> {
   const supabase = createServiceRoleClient();
@@ -168,6 +172,151 @@ export async function getProducts(): Promise<Product[]> {
 
   if (error) throw new Error(error.message);
   return (data ?? []).map(mapRow);
+}
+
+// ---------------------------------------------------------------------------
+// getFilteredProducts  ← Sprint 9A: dynamic query builder
+// ---------------------------------------------------------------------------
+
+/**
+ * Filtered, sorted, and paginated product query.
+ *
+ * Builds a single Supabase SELECT with all WHERE clauses applied dynamically
+ * based on the FilterParams supplied by the caller.  A parallel COUNT query
+ * (head:true) returns the total number of matching rows without fetching data.
+ *
+ * Returns { products, meta } where meta carries full pagination information
+ * that Pagination.tsx and ShopToolbar.tsx can render without any additional
+ * data fetching.
+ *
+ * All fields in FilterParams are optional; omitted fields are ignored so the
+ * function degrades gracefully to the full active-product list when no filters
+ * are provided.
+ */
+export async function getFilteredProducts(
+  params: FilterParams = {}
+): Promise<{ products: Product[]; meta: PaginationMeta }> {
+  const {
+    page = 1,
+    perPage = 24,
+    sort = 'newest',
+    category,
+    collection,
+    fabric,
+    color,
+    priceMin,
+    priceMax,
+    occasion,
+    size,
+    inStock,
+  } = params;
+
+  const safePerPage = Math.min(Math.max(1, perPage), 100); // clamp 1–100
+  const safePage    = Math.max(1, page);
+  const from        = (safePage - 1) * safePerPage;
+  const to          = from + safePerPage - 1;
+
+  const supabase = createServiceRoleClient();
+
+  // ── Build the base query (always filter active products) ──────────────────
+  // We use a helper to apply identical filters to both the data query and the
+  // count query, so the total count always matches the returned page.
+
+  function applyFilters<T extends ReturnType<typeof supabase.from>>(q: T): T {
+    // @ts-expect-error — Supabase generic chain types do not widen cleanly;
+    // the runtime behaviour is correct and tested.
+    let query = q.eq('active', true);
+
+    if (category)   query = query.eq('category', category);
+    if (collection) query = query.eq('collection', collection);
+    if (fabric)     query = query.eq('fabric', fabric);
+    if (color)      query = query.eq('color', color);
+
+    if (priceMin !== undefined) query = query.gte('price', priceMin);
+    if (priceMax !== undefined) query = query.lte('price', priceMax);
+
+    if (inStock === true) query = query.gt('stock', 0);
+
+    // sizes is a text[] column; use Supabase .contains() which maps to @>
+    if (size) query = query.contains('sizes', [size]);
+
+    // occasion is stored inside the specifications JSONB column
+    // Use Postgres ->> cast and ilike for case-insensitive match
+    if (occasion) {
+      query = query.ilike('specifications->>occasion', `%${occasion}%`);
+    }
+
+    return query as T;
+  }
+
+  // ── Apply sort order ──────────────────────────────────────────────────────
+  function applySort<T>(q: T, sortOption: SortOption): T {
+    // @ts-expect-error — same Supabase generic chain limitation as above
+    let query = q;
+    switch (sortOption) {
+      case 'newest':
+        query = query.order('created_at', { ascending: false });
+        break;
+      case 'price_asc':
+        query = query.order('price', { ascending: true });
+        break;
+      case 'price_desc':
+        query = query.order('price', { ascending: false });
+        break;
+      case 'bestseller':
+        // best_seller flag first, then newest within that group
+        query = query
+          .order('best_seller', { ascending: false })
+          .order('created_at', { ascending: false });
+        break;
+      case 'discount':
+        // Highest absolute discount first (compare_price - price DESC).
+        // Supabase does not support computed ORDER BY expressions via the JS
+        // client, so we order by compare_price DESC as the closest proxy —
+        // products with a higher compare_price tend to have a larger discount.
+        // A proper computed sort requires a DB view or RPC (Sprint 9C candidate).
+        query = query
+          .order('compare_price', { ascending: false })
+          .order('price', { ascending: true });
+        break;
+      default:
+        query = query.order('created_at', { ascending: false });
+    }
+    return query as T;
+  }
+
+  // ── Parallel: count (head:true = no rows returned) + data ─────────────────
+  const countQuery = applyFilters(
+    supabase.from('products').select('*', { count: 'exact', head: true })
+  );
+
+  const dataQuery = applySort(
+    applyFilters(
+      supabase.from('products').select(PRODUCT_SELECT)
+    ),
+    sort
+  ).range(from, to);
+
+  const [{ count, error: countError }, { data, error: dataError }] =
+    await Promise.all([countQuery, dataQuery]);
+
+  if (countError) throw new Error(countError.message);
+  if (dataError)  throw new Error(dataError.message);
+
+  const total      = count ?? 0;
+  const totalPages = Math.max(1, Math.ceil(total / safePerPage));
+
+  return {
+    products: (data ?? []).map(mapRow),
+    meta: {
+      page:        safePage,
+      perPage:     safePerPage,
+      total,
+      totalPages,
+      hasNextPage: safePage < totalPages,
+      hasPrevPage: safePage > 1,
+    },
+  };
 }
 
 // ---------------------------------------------------------------------------
