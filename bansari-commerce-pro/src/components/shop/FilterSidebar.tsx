@@ -1,9 +1,8 @@
 "use client";
 
-import { useCallback } from "react";
+import { useState, useCallback, Suspense } from "react";
 import { useRouter, useSearchParams, usePathname } from "next/navigation";
 import { ChevronDown, SlidersHorizontal, X } from "lucide-react";
-import { Suspense } from "react";
 
 // ─── Static option lists ─────────────────────────────────────────────────────
 
@@ -26,13 +25,13 @@ const COLORS: { hex: string; label: string }[] = [
   { hex: "#6B7280", label: "Grey" },
 ];
 const AVAILABILITY_OPTIONS = [
-  { label: "In Stock",    value: "in_stock" },
+  { label: "In Stock",     value: "in_stock" },
   { label: "Out of Stock", value: "out_of_stock" },
-  { label: "New Arrival", value: "new_arrival" },
+  { label: "New Arrival",  value: "new_arrival" },
 ];
 
 // ─── Shared URL-builder ───────────────────────────────────────────────────────
-// Always resets page to 1 when a filter changes.
+
 function useFilterUrl() {
   const router   = useRouter();
   const pathname = usePathname();
@@ -46,7 +45,6 @@ function useFilterUrl() {
       } else {
         next.set(key, value);
       }
-      // Reset to page 1 whenever any filter changes
       if (key !== "page") next.set("page", "1");
       return `${pathname}?${next.toString()}`;
     },
@@ -100,14 +98,14 @@ function AccordionSection({
 }: {
   title: string; count?: number; defaultOpen?: boolean; children: React.ReactNode;
 }) {
-  // Local open/close state is fine — it's purely visual, not filter state
-  const [open, setOpen] = require("react").useState(defaultOpen);
+  // Accordion open/close is purely visual — local useState is correct here
+  const [open, setOpen] = useState(defaultOpen);
   return (
     <div className="border-b border-slate-100">
       <button
         type="button"
         aria-expanded={open}
-        onClick={() => setOpen((v: boolean) => !v)}
+        onClick={() => setOpen((v) => !v)}
         className="flex w-full items-center justify-between py-4 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#8A5A6A] focus-visible:ring-inset"
       >
         <span className="flex items-center gap-2">
@@ -140,25 +138,21 @@ function AccordionSection({
 function FilterSidebarInner() {
   const { params, navigate } = useFilterUrl();
 
-  // Read current filter values from URL
-  const category    = params.get("category") ?? "";
-  const occasion    = params.get("occasion") ?? "";
-  const fabric      = params.get("fabric") ?? "";
-  const size        = params.get("size") ?? "";
-  const color       = params.get("color") ?? "";
+  const category     = params.get("category")     ?? "";
+  const occasion     = params.get("occasion")     ?? "";
+  const fabric       = params.get("fabric")       ?? "";
+  const size         = params.get("size")         ?? "";
+  const color        = params.get("color")        ?? "";
   const availability = params.get("availability") ?? "";
-  const priceMin    = params.get("priceMin") ?? "";
-  const priceMax    = params.get("priceMax") ?? "";
+  const priceMin     = params.get("priceMin")     ?? "";
+  const priceMax     = params.get("priceMax")     ?? "";
 
-  // Count active filters for badge
   const totalActive = [
-    category, occasion, fabric, size, color, availability,
-    priceMin, priceMax,
+    category, occasion, fabric, size, color, availability, priceMin, priceMax,
   ].filter(Boolean).length;
 
   const clearAll = useCallback(() => {
     const next = new URLSearchParams();
-    // Preserve sort if set
     const sort = params.get("sort");
     if (sort) next.set("sort", sort);
     next.set("page", "1");
@@ -197,8 +191,7 @@ function FilterSidebarInner() {
         <div className="space-y-1.5">
           {CATEGORIES.map((c) => (
             <Checkbox
-              key={c}
-              label={c}
+              key={c} label={c}
               checked={category === c}
               onChange={() => navigate("category", category === c ? null : c)}
             />
@@ -211,8 +204,7 @@ function FilterSidebarInner() {
         <div className="space-y-1.5">
           {OCCASIONS.map((o) => (
             <Checkbox
-              key={o}
-              label={o}
+              key={o} label={o}
               checked={occasion === o}
               onChange={() => navigate("occasion", occasion === o ? null : o)}
             />
@@ -225,8 +217,7 @@ function FilterSidebarInner() {
         <div className="space-y-1.5">
           {FABRICS.map((f) => (
             <Checkbox
-              key={f}
-              label={f}
+              key={f} label={f}
               checked={fabric === f}
               onChange={() => navigate("fabric", fabric === f ? null : f)}
             />
@@ -241,15 +232,12 @@ function FilterSidebarInner() {
             const active = size === s;
             return (
               <button
-                key={s}
-                type="button"
+                key={s} type="button"
                 aria-pressed={active}
                 onClick={() => navigate("size", active ? null : s)}
                 className={[
                   "flex h-9 min-w-[40px] items-center justify-center border px-2 text-[11px] font-semibold tracking-wide transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#8A5A6A]",
-                  active
-                    ? "border-[#8A5A6A] bg-[#8A5A6A] text-white"
-                    : "border-slate-200 bg-white text-slate-600 hover:border-slate-900",
+                  active ? "border-[#8A5A6A] bg-[#8A5A6A] text-white" : "border-slate-200 bg-white text-slate-600 hover:border-slate-900",
                 ].join(" ")}
               >
                 {s}
@@ -267,17 +255,12 @@ function FilterSidebarInner() {
             const lightBg = ["#FFFFFF", "#C9A84C", "#E8A0B4", "#B5A09A"].includes(hex);
             return (
               <button
-                key={hex}
-                type="button"
-                aria-label={label}
-                aria-pressed={active}
-                title={label}
+                key={hex} type="button"
+                aria-label={label} aria-pressed={active} title={label}
                 onClick={() => navigate("color", active ? null : hex)}
                 className={[
                   "relative h-7 w-7 rounded-full border-2 transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#8A5A6A] focus-visible:ring-offset-1",
-                  active
-                    ? "scale-110 border-[#8A5A6A] shadow-sm"
-                    : "border-slate-200 hover:scale-110 hover:border-slate-400",
+                  active ? "scale-110 border-[#8A5A6A] shadow-sm" : "border-slate-200 hover:scale-110 hover:border-slate-400",
                 ].join(" ")}
                 style={{ backgroundColor: hex }}
               >
@@ -288,9 +271,7 @@ function FilterSidebarInner() {
                       <path
                         d="M1 3l2 2 4-4"
                         stroke={lightBg ? "#1C1917" : "white"}
-                        strokeWidth="1.5"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
+                        strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"
                       />
                     </svg>
                   </span>
@@ -301,15 +282,13 @@ function FilterSidebarInner() {
         </div>
       </AccordionSection>
 
-      {/* Price Range — number inputs, no slider (as per Sprint 9B spec) */}
+      {/* Price Range */}
       <AccordionSection title="Price Range" count={priceMin || priceMax ? 1 : 0}>
         <div className="flex gap-2">
           <div className="flex-1">
             <label className="mb-1 block text-[9px] uppercase tracking-widest text-slate-400">Min (₹)</label>
             <input
-              type="number"
-              min={0}
-              placeholder="499"
+              type="number" min={0} placeholder="499"
               value={priceMin}
               onChange={(e) => navigate("priceMin", e.target.value || null)}
               className="w-full border border-slate-200 px-2 py-1.5 text-[11px] text-slate-700 focus:border-[#8A5A6A] focus:outline-none"
@@ -319,9 +298,7 @@ function FilterSidebarInner() {
           <div className="flex-1">
             <label className="mb-1 block text-[9px] uppercase tracking-widest text-slate-400">Max (₹)</label>
             <input
-              type="number"
-              min={0}
-              placeholder="29999"
+              type="number" min={0} placeholder="29999"
               value={priceMax}
               onChange={(e) => navigate("priceMax", e.target.value || null)}
               className="w-full border border-slate-200 px-2 py-1.5 text-[11px] text-slate-700 focus:border-[#8A5A6A] focus:outline-none"
@@ -336,8 +313,7 @@ function FilterSidebarInner() {
         <div className="space-y-1.5">
           {AVAILABILITY_OPTIONS.map(({ label, value }) => (
             <Checkbox
-              key={value}
-              label={label}
+              key={value} label={label}
               checked={availability === value}
               onChange={() => navigate("availability", availability === value ? null : value)}
             />
@@ -348,7 +324,7 @@ function FilterSidebarInner() {
   );
 }
 
-// ─── Public export — wrapped in Suspense for useSearchParams ─────────────────
+// ─── Public export — wrapped in Suspense for useSearchParams ──────────────────
 export default function FilterSidebar() {
   return (
     <Suspense fallback={<div className="w-[260px]" />}>
