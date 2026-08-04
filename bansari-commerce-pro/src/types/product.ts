@@ -11,6 +11,15 @@ export type ProductImage = {
     | "sleeve"
     | "fabric"
     | "lifestyle";
+  // ── V2 media fields (optional — absent on legacy JSONB images) ────────────
+  /** Render branch: "image" (default) or "video". */
+  mediaType?: "image" | "video";
+  /** High-resolution URL for desktop zoom panel; falls back to `url` when absent. */
+  hiResUrl?: string;
+  /** Editorial or fabric caption; rendered in lightbox and Fabric gallery tab. */
+  caption?: string;
+  /** Explicit sort position; replaces array-index dependency in V2 source. */
+  sortOrder?: number;
 };
 
 export type ProductVariant = {
