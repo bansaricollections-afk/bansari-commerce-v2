@@ -2,10 +2,10 @@ import type { Metadata } from 'next';
 import { AdminHeader } from '@/components/admin/AdminHeader';
 import { AdminSidebar } from '@/components/admin/AdminSidebar';
 import { requireAdminPage } from '@/lib/auth/requireAdmin';
+import { headers } from 'next/headers';
 
-// All /admin/* segments (except /admin/login, which has its own layout)
-// are protected by requireAdminPage(). No header-based pathname detection
-// is needed — Next.js route-segment layout scoping handles the exemption.
+// All /admin/* segments are protected by requireAdminPage(), except
+// /admin/login, which must render without the admin shell.
 export const dynamic = 'force-dynamic';
 
 export const metadata: Metadata = {
@@ -19,8 +19,12 @@ interface AdminLayoutProps {
 }
 
 export default async function AdminLayout({ children }: Readonly<AdminLayoutProps>) {
-  // This layout is never reached for /admin/login — that segment has its
-  // own layout (admin/login/layout.tsx) which Next.js resolves first.
+  const pathname = (await headers()).get('x-pathname');
+
+  if (pathname?.startsWith('/admin/login')) {
+    return <>{children}</>;
+  }
+
   await requireAdminPage();
 
   return (
