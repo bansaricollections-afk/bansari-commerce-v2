@@ -1144,3 +1144,555 @@ export default function ProductManagement() {
                     )}
                   >
                     <Icon className="h-4 w-4" />
+                    <span className="hidden sm:block">{step.short}</span>
+                  </button>
+                );
+              })}
+            </div>
+          </SheetHeader>
+
+          <div className="px-6 py-6 space-y-6">
+
+            {/* ── STEP 0: Media ─────────────────────────────────────────── */}
+            {currentStep === 0 && (
+              <div className="space-y-4">
+                <div
+                  className="border-2 border-dashed border-gray-300 rounded-xl p-8 text-center cursor-pointer hover:border-indigo-400 transition-colors"
+                  onClick={() => fileInputRef.current?.click()}
+                >
+                  {uploadingImages ? (
+                    <Loader2 className="h-8 w-8 animate-spin text-indigo-500 mx-auto" />
+                  ) : (
+                    <>
+                      <ImagePlus className="h-10 w-10 text-gray-400 mx-auto mb-2" />
+                      <p className="text-sm text-gray-600 font-medium">Click to upload images</p>
+                      <p className="text-xs text-gray-400 mt-1">JPEG, PNG, WebP, GIF · max 5 MB each</p>
+                    </>
+                  )}
+                </div>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  multiple
+                  accept={ALLOWED_MIME_TYPES.join(",")}
+                  className="hidden"
+                  onChange={(e) => handleImageUpload(e.target.files)}
+                />
+
+                {imagePreviews.length > 0 && (
+                  <div className="grid grid-cols-3 gap-3">
+                    {imagePreviews.map((url, i) => (
+                      <div key={i} className="relative aspect-square rounded-lg overflow-hidden bg-gray-100">
+                        <Image src={url} alt={`Preview ${i + 1}`} fill className="object-cover" sizes="200px" />
+                        <button
+                          type="button"
+                          onClick={() => removeImage(i)}
+                          className="absolute top-1 right-1 bg-red-500 text-white rounded-full w-5 h-5 flex items-center justify-center hover:bg-red-600"
+                        >
+                          <X className="h-3 w-3" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* ── STEP 1: Basic Info ────────────────────────────────────── */}
+            {currentStep === 1 && (
+              <div className="space-y-4">
+                {/* Name */}
+                <div className="space-y-1.5">
+                  <label className="block text-sm font-medium text-gray-700">
+                    Product Name <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={form.name}
+                    onChange={(e) => handleNameChange(e.target.value)}
+                    placeholder="e.g. Silk Embroidered Saree"
+                    className={cn(
+                      "w-full h-10 rounded-md border px-3 py-2 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500",
+                      fieldErrors.name ? "border-red-400" : "border-gray-300"
+                    )}
+                  />
+                  {fieldErrors.name && <p className="text-xs text-red-500">{fieldErrors.name}</p>}
+                </div>
+
+                {/* Slug */}
+                <div className="space-y-1.5">
+                  <label className="block text-sm font-medium text-gray-700">
+                    Slug <span className="text-red-500">*</span>
+                  </label>
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      value={form.slug}
+                      onChange={(e) => setField("slug", slugify(e.target.value))}
+                      className={cn(
+                        "flex-1 h-10 rounded-md border px-3 py-2 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500",
+                        fieldErrors.slug ? "border-red-400" : "border-gray-300"
+                      )}
+                    />
+                    <Button type="button" variant="outline" size="sm" onClick={() => setField("slug", slugify(form.name))}>
+                      <Wand2 className="h-4 w-4" />
+                    </Button>
+                  </div>
+                  {fieldErrors.slug && <p className="text-xs text-red-500">{fieldErrors.slug}</p>}
+                </div>
+
+                {/* SKU */}
+                <div className="space-y-1.5">
+                  <label className="block text-sm font-medium text-gray-700">
+                    SKU <span className="text-red-500">*</span>
+                  </label>
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      value={form.sku}
+                      onChange={(e) => setField("sku", e.target.value.toUpperCase())}
+                      className={cn(
+                        "flex-1 h-10 rounded-md border px-3 py-2 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500",
+                        fieldErrors.sku ? "border-red-400" : "border-gray-300"
+                      )}
+                    />
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setField("sku", generateSku(form.category, form.name))}
+                    >
+                      <Wand2 className="h-4 w-4" />
+                    </Button>
+                  </div>
+                  {fieldErrors.sku && <p className="text-xs text-red-500">{fieldErrors.sku}</p>}
+                </div>
+
+                {/* Category */}
+                <LookupSelect
+                  label="Category"
+                  required
+                  value={form.category_id}
+                  options={catalog.categories}
+                  error={fieldErrors.category}
+                  onChange={(id, name) => {
+                    setField("category_id", id);
+                    setField("category", name);
+                    setField("subcategory_id", null);
+                  }}
+                />
+
+                {/* Subcategory — always rendered; filtered by category */}
+                <LookupSelect
+                  label="Subcategory"
+                  value={form.subcategory_id}
+                  options={filteredSubcats}
+                  onChange={(id) => setField("subcategory_id", id)}
+                  placeholder="Select Subcategory (optional)"
+                />
+
+                {/* Collection */}
+                <LookupSelect
+                  label="Collection"
+                  required
+                  value={form.collection_id}
+                  options={catalog.collections}
+                  error={fieldErrors.collection}
+                  onChange={(id, name) => {
+                    setField("collection_id", id);
+                    setField("collection", name);
+                  }}
+                />
+
+                {/* Brand */}
+                <div className="space-y-1.5">
+                  <label className="block text-sm font-medium text-gray-700">
+                    Brand <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={form.brand}
+                    onChange={(e) => setField("brand", e.target.value)}
+                    className={cn(
+                      "w-full h-10 rounded-md border px-3 py-2 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500",
+                      fieldErrors.brand ? "border-red-400" : "border-gray-300"
+                    )}
+                  />
+                  {fieldErrors.brand && <p className="text-xs text-red-500">{fieldErrors.brand}</p>}
+                </div>
+
+                {/* Fabric */}
+                <LookupSelect
+                  label="Fabric"
+                  required
+                  value={form.attr_fabric_id}
+                  options={catalog.attrs.fabric}
+                  error={fieldErrors.fabric}
+                  onChange={(id, name) => {
+                    setField("attr_fabric_id", id);
+                    setField("fabric", name);
+                  }}
+                />
+
+                {/* Color */}
+                <LookupSelect
+                  label="Color"
+                  required
+                  value={form.attr_color_id}
+                  options={catalog.attrs.color}
+                  error={fieldErrors.color}
+                  onChange={(id, name) => {
+                    setField("attr_color_id", id);
+                    setField("color", name);
+                  }}
+                />
+
+                {/* Occasion */}
+                <LookupSelect
+                  label="Occasion"
+                  value={form.attr_occasion_id}
+                  options={catalog.attrs.occasion}
+                  onChange={(id) => setField("attr_occasion_id", id)}
+                  placeholder="Select Occasion (optional)"
+                />
+
+                {/* Pattern */}
+                <LookupSelect
+                  label="Pattern"
+                  value={form.attr_pattern_id}
+                  options={catalog.attrs.pattern}
+                  onChange={(id) => setField("attr_pattern_id", id)}
+                  placeholder="Select Pattern (optional)"
+                />
+
+                {/* Fit */}
+                <LookupSelect
+                  label="Fit"
+                  value={form.attr_fit_id}
+                  options={catalog.attrs.fit}
+                  onChange={(id) => setField("attr_fit_id", id)}
+                  placeholder="Select Fit (optional)"
+                />
+
+                {/* Sleeve */}
+                <LookupSelect
+                  label="Sleeve"
+                  value={form.attr_sleeve_id}
+                  options={catalog.attrs.sleeve}
+                  onChange={(id) => setField("attr_sleeve_id", id)}
+                  placeholder="Select Sleeve (optional)"
+                />
+
+                {/* Neck */}
+                <LookupSelect
+                  label="Neck"
+                  value={form.attr_neck_id}
+                  options={catalog.attrs.neck}
+                  onChange={(id) => setField("attr_neck_id", id)}
+                  placeholder="Select Neck (optional)"
+                />
+
+                {/* Work */}
+                <LookupSelect
+                  label="Work"
+                  value={form.attr_work_id}
+                  options={catalog.attrs.work}
+                  onChange={(id) => setField("attr_work_id", id)}
+                  placeholder="Select Work (optional)"
+                />
+
+                {/* Length */}
+                <LookupSelect
+                  label="Length"
+                  value={form.attr_length_id}
+                  options={catalog.attrs.length}
+                  onChange={(id) => setField("attr_length_id", id)}
+                  placeholder="Select Length (optional)"
+                />
+
+                {/* Size Chart */}
+                <LookupSelect
+                  label="Size Chart"
+                  value={form.size_chart_id}
+                  options={sizeChartOptions}
+                  onChange={(id) => setField("size_chart_id", id)}
+                  placeholder="Select Size Chart (optional)"
+                />
+
+                {/* Sizes (comma-separated text input) */}
+                <div className="space-y-1.5">
+                  <label className="block text-sm font-medium text-gray-700">
+                    Available Sizes <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={form.sizes}
+                    onChange={(e) => setField("sizes", e.target.value)}
+                    placeholder="S, M, L, XL, XXL"
+                    className={cn(
+                      "w-full h-10 rounded-md border px-3 py-2 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500",
+                      fieldErrors.sizes ? "border-red-400" : "border-gray-300"
+                    )}
+                  />
+                  <p className="text-xs text-gray-400">Comma-separated, e.g. S, M, L, XL</p>
+                  {fieldErrors.sizes && <p className="text-xs text-red-500">{fieldErrors.sizes}</p>}
+                </div>
+              </div>
+            )}
+
+            {/* ── STEP 2: Pricing ───────────────────────────────────────── */}
+            {currentStep === 2 && (
+              <div className="space-y-4">
+                {[
+                  { key: "price" as const,        label: "Selling Price (₹)", required: true  },
+                  { key: "comparePrice" as const,  label: "MRP / Compare Price (₹)", required: false },
+                  { key: "cost" as const,          label: "Cost Price (₹)",     required: false },
+                  { key: "stock" as const,         label: "Stock",              required: true  },
+                  { key: "hsn" as const,           label: "HSN Code",           required: true  },
+                  { key: "gst" as const,           label: "GST %",              required: false },
+                ].map(({ key, label, required }) => (
+                  <div key={key} className="space-y-1.5">
+                    <label className="block text-sm font-medium text-gray-700">
+                      {label}{required && <span className="text-red-500 ml-0.5">*</span>}
+                    </label>
+                    <input
+                      type={key === "hsn" ? "text" : "number"}
+                      value={form[key]}
+                      onChange={(e) => setField(key, e.target.value)}
+                      min={key !== "hsn" ? "0" : undefined}
+                      className={cn(
+                        "w-full h-10 rounded-md border px-3 py-2 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500",
+                        fieldErrors[key] ? "border-red-400" : "border-gray-300"
+                      )}
+                    />
+                    {fieldErrors[key] && <p className="text-xs text-red-500">{fieldErrors[key]}</p>}
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* ── STEP 3: Content ───────────────────────────────────────── */}
+            {currentStep === 3 && (
+              <div className="space-y-4">
+                <div className="space-y-1.5">
+                  <label className="block text-sm font-medium text-gray-700">
+                    Description <span className="text-red-500">*</span>
+                  </label>
+                  <textarea
+                    rows={5}
+                    value={form.description}
+                    onChange={(e) => setField("description", e.target.value)}
+                    className={cn(
+                      "w-full rounded-md border px-3 py-2 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 resize-y",
+                      fieldErrors.description ? "border-red-400" : "border-gray-300"
+                    )}
+                  />
+                  {fieldErrors.description && <p className="text-xs text-red-500">{fieldErrors.description}</p>}
+                </div>
+                <div className="space-y-1.5">
+                  <label className="block text-sm font-medium text-gray-700">
+                    SEO Title <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={form.seoTitle}
+                    onChange={(e) => setField("seoTitle", e.target.value)}
+                    className={cn(
+                      "w-full h-10 rounded-md border px-3 py-2 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500",
+                      fieldErrors.seoTitle ? "border-red-400" : "border-gray-300"
+                    )}
+                  />
+                  {fieldErrors.seoTitle && <p className="text-xs text-red-500">{fieldErrors.seoTitle}</p>}
+                </div>
+                <div className="space-y-1.5">
+                  <label className="block text-sm font-medium text-gray-700">
+                    SEO Description <span className="text-red-500">*</span>
+                  </label>
+                  <textarea
+                    rows={3}
+                    value={form.seoDescription}
+                    onChange={(e) => setField("seoDescription", e.target.value)}
+                    className={cn(
+                      "w-full rounded-md border px-3 py-2 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 resize-y",
+                      fieldErrors.seoDescription ? "border-red-400" : "border-gray-300"
+                    )}
+                  />
+                  {fieldErrors.seoDescription && <p className="text-xs text-red-500">{fieldErrors.seoDescription}</p>}
+                </div>
+              </div>
+            )}
+
+            {/* ── STEP 4: Visibility ────────────────────────────────────── */}
+            {currentStep === 4 && (
+              <div className="space-y-4">
+                <p className="text-sm text-gray-500">
+                  Control how this product appears on the website. Featured and Best Seller products
+                  appear automatically in their respective homepage sections.
+                </p>
+
+                <ToggleSwitch
+                  checked={form.active}
+                  onChange={(v) => setField("active", v)}
+                  label="Active / Published"
+                  description="Product is visible on the website to customers."
+                />
+
+                <ToggleSwitch
+                  checked={form.featured}
+                  onChange={(v) => setField("featured", v)}
+                  label="Featured"
+                  description="Appears in the Featured Products section on the homepage."
+                />
+
+                <ToggleSwitch
+                  checked={form.bestSeller}
+                  onChange={(v) => setField("bestSeller", v)}
+                  label="Best Seller"
+                  description="Appears in the Best Sellers section on the homepage."
+                />
+
+                <ToggleSwitch
+                  checked={form.newArrival}
+                  onChange={(v) => setField("newArrival", v)}
+                  label="New Arrival"
+                  description="Appears in the New Arrivals section on the homepage."
+                />
+
+                {/* Summary */}
+                <div className="rounded-lg bg-gray-50 border border-gray-200 p-4 space-y-2">
+                  <p className="text-xs font-semibold text-gray-600 uppercase tracking-wide">Summary</p>
+                  {[
+                    ["Name", form.name],
+                    ["SKU", form.sku],
+                    ["Category", form.category],
+                    ["Collection", form.collection],
+                    ["Price", form.price ? `₹${Number(form.price).toLocaleString("en-IN")}` : "—"],
+                    ["Stock", form.stock],
+                    ["Images", String(form.images.length)],
+                  ].map(([k, v]) => (
+                    <div key={k} className="flex justify-between text-sm">
+                      <span className="text-gray-500">{k}</span>
+                      <span className="font-medium text-gray-800 text-right max-w-[60%] truncate">{v || "—"}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Footer nav */}
+          <SheetFooter className="sticky bottom-0 bg-white border-t border-gray-200 px-6 py-4 flex items-center justify-between gap-3">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={handleBack}
+              disabled={currentStep === 0}
+              className="flex items-center gap-1.5"
+            >
+              <ChevronLeft className="h-4 w-4" /> Back
+            </Button>
+
+            <div className="flex gap-2">
+              {currentStep < STEPS.length - 1 ? (
+                <Button type="button" onClick={handleNext} className="bg-indigo-600 hover:bg-indigo-700 flex items-center gap-1.5">
+                  Next <ChevronRight className="h-4 w-4" />
+                </Button>
+              ) : (
+                <>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => handleSave(false)}
+                    disabled={isSaving || isPublishing}
+                    className="flex items-center gap-1.5"
+                  >
+                    {isSaving && <Loader2 className="h-4 w-4 animate-spin" />}
+                    Save Draft
+                  </Button>
+                  <Button
+                    type="button"
+                    onClick={() => handleSave(true)}
+                    disabled={isSaving || isPublishing}
+                    className="bg-indigo-600 hover:bg-indigo-700 flex items-center gap-1.5"
+                  >
+                    {isPublishing && <Loader2 className="h-4 w-4 animate-spin" />}
+                    <CheckCircle2 className="h-4 w-4" />
+                    {editProduct ? "Update & Publish" : "Create & Publish"}
+                  </Button>
+                </>
+              )}
+            </div>
+          </SheetFooter>
+        </SheetContent>
+      </Sheet>
+
+      {/* ── Delete Confirmation ─────────────────────────────────────────────── */}
+      <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Delete Product</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to delete &ldquo;{productToDelete?.name}&rdquo;? This will set it inactive.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDeleteDialogOpen(false)} disabled={isDeleting}>
+              Cancel
+            </Button>
+            <Button variant="destructive" onClick={handleDelete} disabled={isDeleting}>
+              {isDeleting && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
+              Delete
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ── View Dialog ─────────────────────────────────────────────────────── */}
+      <Dialog open={viewDialogOpen} onOpenChange={setViewDialogOpen}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>{viewProduct?.name}</DialogTitle>
+            <DialogDescription>{viewProduct?.sku}</DialogDescription>
+          </DialogHeader>
+          {viewProduct && (
+            <div className="space-y-3 text-sm">
+              {viewProduct.images[0] && (
+                <div className="aspect-video relative rounded-lg overflow-hidden bg-gray-100">
+                  <Image src={viewProduct.images[0].url} alt={viewProduct.images[0].alt} fill className="object-cover" sizes="480px" />
+                </div>
+              )}
+              <div className="grid grid-cols-2 gap-2">
+                {[
+                  ["Category", viewProduct.category],
+                  ["Collection", viewProduct.collection],
+                  ["Fabric", viewProduct.fabric],
+                  ["Color", viewProduct.color],
+                  ["Price", `₹${viewProduct.price.toLocaleString("en-IN")}`],
+                  ["Stock", String(viewProduct.stock)],
+                  ["Featured", viewProduct.featured ? "Yes" : "No"],
+                  ["Best Seller", viewProduct.bestSeller ? "Yes" : "No"],
+                  ["New Arrival", viewProduct.newArrival ? "Yes" : "No"],
+                  ["Active", viewProduct.active ? "Yes" : "No"],
+                ].map(([k, v]) => (
+                  <div key={k} className="flex flex-col">
+                    <span className="text-xs text-gray-400">{k}</span>
+                    <span className="font-medium text-gray-800">{v}</span>
+                  </div>
+                ))}
+              </div>
+              {viewProduct.description && (
+                <p className="text-gray-600 text-sm">{viewProduct.description.slice(0, 200)}{viewProduct.description.length > 200 ? "…" : ""}</p>
+              )}
+            </div>
+          )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => { setViewDialogOpen(false); if (viewProduct) openEdit(viewProduct); }}>
+              <Edit className="h-4 w-4 mr-1.5" /> Edit
+            </Button>
+            <Button onClick={() => setViewDialogOpen(false)}>Close</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}

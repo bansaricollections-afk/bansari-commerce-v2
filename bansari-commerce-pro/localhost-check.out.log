@@ -1,0 +1,20 @@
+
+> bansari-commerce-pro@0.1.0 dev
+> next dev
+
+▲ Next.js 16.2.9 (Turbopack)
+- Local:         http://localhost:3000
+- Network:       http://192.168.1.5:3000
+- Environments: .env.local
+✓ Ready in 959ms
+Creating turbopack project {
+  dir: 'D:\\latest website\\bansari-commerce-v2\\bansari-commerce-pro',
+  testMode: true
+}
+
+[2026-08-04T12:34:45.846Z] Environment validation passed.
+  ✓ 9 required variables present and valid.
+
+
+ GET / 200 in 1594ms (next.js: 229ms, proxy.ts: 324ms, application-code: 1041ms)
+ GET /admin/login 200 in 217ms (next.js: 73ms, proxy.ts: 4ms, application-code: 140ms)

@@ -27,7 +27,15 @@ export default function AdminLoginPage() {
 
     try {
       setLoading(true);
-      await signInAdmin(email, password);
+      const signInData = await signInAdmin(email, password);
+      const signedInUser = signInData.user;
+
+      console.log('[AUTH_DIAG] admin login sign-in user', {
+        id: signedInUser?.id ?? null,
+        email: signedInUser?.email ?? null,
+        app_metadata: signedInUser?.app_metadata ?? null,
+        user_metadata: signedInUser?.user_metadata ?? null,
+      });
 
       // Preserve the originally requested admin page if provided.
       const next = searchParams.get('next');

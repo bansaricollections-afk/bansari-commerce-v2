@@ -58,17 +58,19 @@ function isAdmin(user: {
 
 export default async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
+  const requestHeaders = new Headers(request.headers);
+  requestHeaders.set('x-pathname', pathname);
 
   const isAdminPage = ADMIN_ROUTES.test(pathname);
   const isAdminApi  = ADMIN_API_ROUTES.test(pathname);
 
   // ── Non-admin routes ─────────────────────────────────────────────────────────
   if (!isAdminPage && !isAdminApi) {
-    return applyHeaders(NextResponse.next());
+    return applyHeaders(NextResponse.next({ request: { headers: requestHeaders } }));
   }
 
   // Build a mutable response so Supabase SSR can write refreshed session cookies.
-  const response = NextResponse.next({ request: { headers: request.headers } });
+  const response = NextResponse.next({ request: { headers: requestHeaders } });
   if (isAdminApi) response.headers.set('Cache-Control', 'no-store');
 
   const supabase = createServerClient(
