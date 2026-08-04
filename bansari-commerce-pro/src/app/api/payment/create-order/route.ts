@@ -3,6 +3,8 @@ import crypto from 'crypto';
 
 import { getRazorpay } from '@/lib/razorpay';
 import { validateCartItems, type CartItem } from '@/services/product.service';
+import { validateCoupon } from '@/services/coupon.service';
+import { reserveStock, ReservationError } from '@/services/reservation.service';
 import { createServiceRoleClient } from '@/lib/supabase/service';
 import { createServerClient } from '@supabase/ssr';
 import { createLogger } from '@/lib/logger';
@@ -11,8 +13,8 @@ import { checkRateLimit, RATE_LIMIT_CHECKOUT } from '@/lib/rate-limit';
 import { apiError } from '@/lib/api-response';
 
 const FREE_SHIPPING_THRESHOLD = 2999;
-const STANDARD_SHIPPING_FEE = 99;
-const MAX_ITEMS = 50;
+const STANDARD_SHIPPING_FEE   = 99;
+const MAX_ITEMS               = 50;
 
 function round2(n: number) {
   return Math.round(n * 100) / 100;
@@ -88,11 +90,6 @@ function parseShipping(raw: unknown): ShippingInput | string {
   };
 }
 
-/**
- * P0-3: Resolve the authenticated user's ID from the server-side JWT.
- * Returns null for unauthenticated/guest users. Never returns ''.
- * Used to populate pending_orders.user_id for ownership tracking in recovery.
- */
 async function resolveUserId(request: NextRequest): Promise<string | null> {
   try {
     const supabaseUrl     = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -115,8 +112,8 @@ async function resolveUserId(request: NextRequest): Promise<string | null> {
 
 export async function POST(request: NextRequest) {
   const requestId = generateRequestId();
-  const log = createLogger({ service: 'create-order', requestId });
-  const timer = log.startTimer('create-order.duration');
+  const log       = createLogger({ service: 'create-order', requestId });
+  const timer     = log.startTimer('create-order.duration');
 
   const rateLimitResponse = checkRateLimit(request, 'checkout', RATE_LIMIT_CHECKOUT, requestId);
   if (rateLimitResponse) return rateLimitResponse;
@@ -124,6 +121,7 @@ export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
 
+    // ── Input validation ──────────────────────────────────────────────────
     const itemsResult = parseItems(body?.items);
     if (typeof itemsResult === 'string') {
       log.warn('create-order.validation.items', { error: itemsResult });
@@ -142,13 +140,14 @@ export async function POST(request: NextRequest) {
       return apiError(requestId, 'VALIDATION_ERROR', shippingResult, 400);
     }
 
-    const customer = customerResult;
-    const shipping = shippingResult;
-    const couponCode =
+    const customer    = customerResult;
+    const shipping    = shippingResult;
+    const couponCode  =
       typeof body?.coupon === 'string' && body.coupon.trim().length > 0
-        ? body.coupon.trim()
+        ? body.coupon.trim().toUpperCase()
         : null;
 
+    // ── Cart validation ───────────────────────────────────────────────────
     const cartValidation = await validateCartItems(itemsResult);
     if (!cartValidation.valid) {
       log.warn('create-order.validation.cart', { errors: cartValidation.errors });
@@ -159,49 +158,125 @@ export async function POST(request: NextRequest) {
 
     const subtotal    = round2(lineItems.reduce((s, r) => s + r.lineTotal, 0));
     const shippingFee = subtotal >= FREE_SHIPPING_THRESHOLD ? 0 : STANDARD_SHIPPING_FEE;
-    const discount    = 0;
-    const grandTotal  = round2(subtotal + shippingFee - discount);
+    const orderTotal  = round2(subtotal + shippingFee);
+
+    // ── Coupon validation (BEFORE Razorpay order creation) ────────────────
+    let discountAmount = 0;
+    let finalAmount    = orderTotal;
+    let couponId: number | null = null;
+
+    if (couponCode) {
+      const couponResult = await validateCoupon(couponCode, orderTotal);
+
+      if (!couponResult.valid) {
+        log.warn('create-order.coupon.invalid', {
+          couponCode,
+          reason: couponResult.code,
+          message: couponResult.message,
+        });
+        return apiError(requestId, `COUPON_${couponResult.code}`, couponResult.message, 400);
+      }
+
+      discountAmount = couponResult.discount_amount;
+      finalAmount    = couponResult.final_amount;
+      couponId       = couponResult.coupon.id;
+
+      log.info('create-order.coupon.applied', {
+        couponCode,
+        couponId,
+        discountAmount,
+        finalAmount,
+      });
+    }
+
+    const grandTotal  = finalAmount;   // finalAmount already = subtotal + shipping - discount
     const amountPaise = Math.round(grandTotal * 100);
     const currency    = 'INR';
 
-    log.info('create-order.pricing', { subtotal, shippingFee, discount, grandTotal });
+    log.info('create-order.pricing', {
+      subtotal, shippingFee, discountAmount, grandTotal,
+    });
 
-    // P0-3: Resolve user_id BEFORE creating the Razorpay order.
-    // This ensures pending_orders carries the correct ownership.
+    // ── Resolve authenticated user ────────────────────────────────────────
     const userId = await resolveUserId(request);
     log.info('create-order.user_resolved', { authenticated: userId !== null });
 
-    const razorpay  = getRazorpay();
-    const rzpOrder  = await razorpay.orders.create({
+    // ── Create Razorpay order with correct (discounted) amount ────────────
+    const razorpay = getRazorpay();
+    const rzpOrder = await razorpay.orders.create({
       amount:   amountPaise,
       currency,
       receipt:  `BC-${Date.now()}`,
       notes: {
-        customer_name:  customer.name,
-        customer_email: customer.email,
-        subtotal:       String(subtotal),
-        shipping_fee:   String(shippingFee),
-        grand_total:    String(grandTotal),
-        item_count:     String(lineItems.length),
+        customer_name:    customer.name,
+        customer_email:   customer.email,
+        subtotal:         String(subtotal),
+        shipping_fee:     String(shippingFee),
+        discount_amount:  String(discountAmount),
+        coupon_code:      couponCode ?? '',
+        grand_total:      String(grandTotal),
+        item_count:       String(lineItems.length),
       },
     });
 
-    log.info('create-order.razorpay.created', { razorpayOrderId: rzpOrder.id, amountPaise });
+    log.info('create-order.razorpay.created', {
+      razorpayOrderId: rzpOrder.id,
+      amountPaise,
+    });
 
+    // ── Reserve inventory (AFTER Razorpay order, BEFORE returning to client)
+    const reservationItems = lineItems.map(li => ({
+      product_id: li.productId,
+      variant_id: (li as Record<string, unknown>).variantId as number | null ?? null,
+      quantity:   li.quantity,
+    }));
+
+    let reservationId: string | null = null;
+    try {
+      reservationId = await reserveStock(rzpOrder.id, reservationItems);
+      log.info('create-order.inventory.reserved', {
+        razorpayOrderId: rzpOrder.id,
+        reservationId,
+      });
+    } catch (reserveErr) {
+      if (reserveErr instanceof ReservationError && reserveErr.code === 'INSUFFICIENT_STOCK') {
+        log.warn('create-order.inventory.insufficient', {
+          razorpayOrderId: rzpOrder.id,
+        });
+        // Razorpay order was created but we cannot reserve stock.
+        // Surface a clean error — the Razorpay order will expire unused.
+        return apiError(
+          requestId,
+          'INSUFFICIENT_STOCK',
+          'One or more items in your cart are no longer available. Please update your cart.',
+          409
+        );
+      }
+      // Non-stock DB errors: log and continue — reservation failure should
+      // not block checkout (we degrade gracefully; manual reconciliation handles edge cases).
+      log.warn('create-order.inventory.reserve_failed', {
+        razorpayOrderId: rzpOrder.id,
+        error: reserveErr instanceof Error ? reserveErr.message : String(reserveErr),
+      });
+    }
+
+    // ── Persist pending order ─────────────────────────────────────────────
     const supabase = createServiceRoleClient();
     const { error: pendingError } = await supabase
       .from('pending_orders')
       .upsert(
         {
           razorpay_order_id:      rzpOrder.id,
-          user_id:                userId,   // P0-3: null for guests, UUID for auth users
+          user_id:                userId,
           status:                 'pending',
           subtotal,
           shipping_fee:           shippingFee,
-          discount,
-          grand_total:            grandTotal,
-          currency,
+          discount_amount:        discountAmount,
           coupon_code:            couponCode,
+          coupon_id:              couponId,
+          final_amount:           grandTotal,
+          currency,
+          reservation_id:         reservationId,
           items_json:             lineItems,
           customer_name:          customer.name,
           customer_email:         customer.email,
@@ -220,15 +295,17 @@ export async function POST(request: NextRequest) {
       );
 
     if (pendingError) {
-      // warn() signature: (event, ctx?) — no error param.
-      // Merge Supabase error fields into ctx.
       log.warn('create-order.pending_orders.write_failed', {
-        razorpayOrderId: rzpOrder.id,
-        errorCode: pendingError.code,
-        errorMessage: pendingError.message,
+        razorpayOrderId:  rzpOrder.id,
+        errorCode:        pendingError.code,
+        errorMessage:     pendingError.message,
       });
     } else {
-      log.info('create-order.pending_orders.saved', { razorpayOrderId: rzpOrder.id,  userId: userId ?? undefined, });
+      log.info('create-order.pending_orders.saved', {
+        razorpayOrderId: rzpOrder.id,
+        userId: userId ?? undefined,
+        reservationId: reservationId ?? undefined,
+      });
     }
 
     timer('info', { razorpayOrderId: rzpOrder.id });
@@ -237,10 +314,18 @@ export async function POST(request: NextRequest) {
       success: true,
       requestId,
       order:   rzpOrder,
-      pricing: { subtotal, shippingFee, discount, grandTotal },
+      pricing: {
+        subtotal,
+        shippingFee,
+        discountAmount,
+        couponCode,
+        grandTotal,
+      },
     });
   } catch (error) {
-    timer('error', { error: error instanceof Error ? error.message : String(error) });
+    timer('error', {
+      error: error instanceof Error ? error.message : String(error),
+    });
     log.error('create-order.unhandled', error);
     return apiError(
       requestId,
