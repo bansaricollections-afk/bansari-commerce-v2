@@ -17,6 +17,7 @@ export default function ProductGallery({ product }: Props) {
   const [lightboxIndex, setLightboxIndex] = useState(0);
   const [touchStart, setTouchStart] = useState<number | null>(null);
   const mainRef = useRef<HTMLDivElement>(null);
+  const thumbsRef = useRef<HTMLDivElement>(null);
   const images = product.images ?? [];
 
   const handleMouseMove = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
@@ -40,6 +41,15 @@ export default function ProductGallery({ product }: Props) {
     }
     setTouchStart(null);
   };
+
+  // Scroll active thumbnail into view on mobile strip
+  useEffect(() => {
+    if (!thumbsRef.current) return;
+    const active = thumbsRef.current.children[activeIndex] as HTMLElement | undefined;
+    if (active) {
+      active.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
+    }
+  }, [activeIndex]);
 
   useEffect(() => {
     if (!lightboxOpen) return;
@@ -67,7 +77,7 @@ export default function ProductGallery({ product }: Props) {
 
   return (
     <div className="flex gap-4">
-      {/* Vertical thumbnail strip */}
+      {/* ── Desktop: Vertical thumbnail strip (lg+) ── */}
       <div className="hidden lg:flex flex-col gap-2 w-16 flex-shrink-0">
         {images.map((img, i) => (
           <button
@@ -92,11 +102,12 @@ export default function ProductGallery({ product }: Props) {
         ))}
       </div>
 
-      {/* Main image */}
+      {/* ── Main column ── */}
       <div className="flex-1 flex flex-col gap-3">
+        {/* Main image */}
         <div
           ref={mainRef}
-          className={`relative aspect-[3/4] w-full overflow-hidden rounded-sm bg-slate-50 cursor-zoom-in select-none`}
+          className="relative aspect-[3/4] w-full overflow-hidden rounded-sm bg-slate-50 cursor-zoom-in select-none"
           onMouseEnter={() => setIsZoomed(true)}
           onMouseLeave={() => setIsZoomed(false)}
           onMouseMove={handleMouseMove}
@@ -171,22 +182,43 @@ export default function ProductGallery({ product }: Props) {
           />
         </div>
 
-        {/* Mobile dot nav */}
-        <div className="flex lg:hidden items-center justify-center gap-1.5">
-          {images.map((_, i) => (
-            <button
-              key={i}
-              onClick={() => setActiveIndex(i)}
-              aria-label={`Go to image ${i + 1}`}
-              className={`rounded-full transition-all duration-200 ${
-                i === activeIndex ? 'w-4 h-1.5 bg-[#8A5A6A]' : 'w-1.5 h-1.5 bg-slate-300'
-              }`}
-            />
-          ))}
-        </div>
+        {/* ── Mobile: Horizontal thumbnail strip (below lg) ── */}
+        {images.length > 1 && (
+          <div
+            ref={thumbsRef}
+            className="flex lg:hidden gap-2 overflow-x-auto scrollbar-none pb-1 -mx-1 px-1"
+            aria-label="Product image thumbnails"
+            role="list"
+          >
+            {images.map((img, i) => (
+              <button
+                key={img.url + i}
+                role="listitem"
+                onClick={() => setActiveIndex(i)}
+                aria-label={`View image ${i + 1}`}
+                aria-pressed={i === activeIndex}
+                className={[
+                  'relative flex-shrink-0 w-14 aspect-[3/4] overflow-hidden rounded-sm border transition-all duration-200',
+                  i === activeIndex
+                    ? 'border-[#8A5A6A] shadow-sm'
+                    : 'border-slate-200 opacity-55 hover:opacity-100 hover:border-slate-400',
+                ].join(' ')}
+              >
+                <Image
+                  src={img.url || '/placeholder.png'}
+                  alt={img.alt || `Product view ${i + 1}`}
+                  fill
+                  className="object-cover"
+                  sizes="56px"
+                  loading="lazy"
+                />
+              </button>
+            ))}
+          </div>
+        )}
       </div>
 
-      {/* Lightbox */}
+      {/* ── Lightbox ── */}
       {lightboxOpen && (
         <div
           className="fixed inset-0 z-50 bg-black/95 flex items-center justify-center"
