@@ -176,6 +176,13 @@ type Product = {
   attr_neck_id?: number | null;
   attr_work_id?: number | null;
   attr_length_id?: number | null;
+  // Phase 1B — model / sizing copy (stored inside specifications JSONB)
+  specifications?: {
+    modelInfo?: string | null;
+    sizeWorn?: string | null;
+    fitGuidance?: string | null;
+    [key: string]: unknown;
+  } | null;
 };
 
 type ProductFormState = {
@@ -217,6 +224,10 @@ type ProductFormState = {
   attr_neck_id: number | null;
   attr_work_id: number | null;
   attr_length_id: number | null;
+  // Phase 1B — specifications sub-fields (flat in form state, nested in payload)
+  spec_modelInfo: string;
+  spec_sizeWorn: string;
+  spec_fitGuidance: string;
 };
 
 type ApiProductPayload = {
@@ -257,6 +268,13 @@ type ApiProductPayload = {
   attr_neck_id: number | null;
   attr_work_id: number | null;
   attr_length_id: number | null;
+  // Phase 1B — merged into existing specifications JSONB
+  specifications: {
+    modelInfo: string;
+    sizeWorn: string;
+    fitGuidance: string;
+    [key: string]: unknown;
+  };
 };
 
 type FieldErrors = Partial<Record<keyof ProductFormState, string>>;
@@ -304,6 +322,13 @@ type ApiProductRecord = {
   attr_neck_id?: number | null;
   attr_work_id?: number | null;
   attr_length_id?: number | null;
+  // Phase 1B — specifications JSONB (may be absent on legacy rows)
+  specifications?: {
+    modelInfo?: string | null;
+    sizeWorn?: string | null;
+    fitGuidance?: string | null;
+    [key: string]: unknown;
+  } | null;
 };
 
 type ApiListResponse = {
@@ -347,6 +372,10 @@ const emptyForm: ProductFormState = {
   attr_fabric_id: null, attr_color_id: null, attr_occasion_id: null,
   attr_pattern_id: null, attr_fit_id: null, attr_sleeve_id: null,
   attr_neck_id: null, attr_work_id: null, attr_length_id: null,
+  // Phase 1B
+  spec_modelInfo: "",
+  spec_sizeWorn: "",
+  spec_fitGuidance: "",
 };
 
 const REQUIRED_FIELDS: Array<keyof ProductFormState> = [
@@ -392,6 +421,7 @@ function mapApiProductToForm(p: ApiProductRecord): ProductFormState {
   const sizesStr = Array.isArray(rawSizes)
     ? rawSizes.join(", ")
     : typeof rawSizes === "string" ? rawSizes : "";
+  const specs = p.specifications ?? {};
   return {
     name:           p.name ?? "",
     sku:            p.sku ?? "",
@@ -429,6 +459,10 @@ function mapApiProductToForm(p: ApiProductRecord): ProductFormState {
     attr_neck_id:     p.attr_neck_id ?? null,
     attr_work_id:     p.attr_work_id ?? null,
     attr_length_id:   p.attr_length_id ?? null,
+    // Phase 1B — read from specifications JSONB, fall back to ""
+    spec_modelInfo:   typeof specs.modelInfo  === "string" ? specs.modelInfo  : "",
+    spec_sizeWorn:    typeof specs.sizeWorn   === "string" ? specs.sizeWorn   : "",
+    spec_fitGuidance: typeof specs.fitGuidance === "string" ? specs.fitGuidance : "",
   };
 }
 
@@ -479,6 +513,7 @@ function mapApiProductToProduct(p: ApiProductRecord): Product {
     attr_neck_id:     p.attr_neck_id ?? null,
     attr_work_id:     p.attr_work_id ?? null,
     attr_length_id:   p.attr_length_id ?? null,
+    specifications:   p.specifications ?? null,
   };
 }
 
@@ -867,6 +902,13 @@ export default function ProductManagement() {
       attr_neck_id:     form.attr_neck_id,
       attr_work_id:     form.attr_work_id,
       attr_length_id:   form.attr_length_id,
+      // Phase 1B — merge new fields into specifications; existing keys are preserved
+      // by the API handler which does a JSONB merge (or the record starts empty).
+      specifications: {
+        modelInfo:   form.spec_modelInfo,
+        sizeWorn:    form.spec_sizeWorn,
+        fitGuidance: form.spec_fitGuidance,
+      },
     };
   }
 
@@ -1518,6 +1560,59 @@ export default function ProductManagement() {
                     )}
                   />
                   {fieldErrors.seoDescription && <p className="text-xs text-red-500">{fieldErrors.seoDescription}</p>}
+                </div>
+
+                {/* ── Model Information (Phase 1B) ──────────────────────── */}
+                <div className="pt-2 border-t border-gray-100">
+                  <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">
+                    Model Information
+                  </p>
+
+                  {/* Model Info — full-width */}
+                  <div className="space-y-1.5">
+                    <label className="block text-sm font-medium text-gray-700">
+                      Model Info
+                    </label>
+                    <input
+                      type="text"
+                      value={form.spec_modelInfo}
+                      onChange={(e) => setField("spec_modelInfo", e.target.value)}
+                      placeholder="Model is 5'7\", Measurements: 34-26-36"
+                      className="w-full h-10 rounded-md border border-gray-300 px-3 py-2 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    />
+                  </div>
+
+                  {/* Size Worn + Fit Guidance — side by side */}
+                  <div className="flex gap-3 mt-3">
+                    {/* Size Worn — short */}
+                    <div className="space-y-1.5 w-28 flex-shrink-0">
+                      <label className="block text-sm font-medium text-gray-700">
+                        Size Worn
+                      </label>
+                      <input
+                        type="text"
+                        value={form.spec_sizeWorn}
+                        onChange={(e) => setField("spec_sizeWorn", e.target.value)}
+                        placeholder="S"
+                        className="w-full h-10 rounded-md border border-gray-300 px-3 py-2 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                      />
+                    </div>
+
+                    {/* Fit Guidance — fills remaining width */}
+                    <div className="space-y-1.5 flex-1">
+                      <label className="block text-sm font-medium text-gray-700">
+                        Fit Guidance
+                        <span className="ml-1 font-normal text-gray-400">(optional)</span>
+                      </label>
+                      <input
+                        type="text"
+                        value={form.spec_fitGuidance}
+                        onChange={(e) => setField("spec_fitGuidance", e.target.value)}
+                        placeholder="Regular fit. If between sizes, choose one size larger."
+                        className="w-full h-10 rounded-md border border-gray-300 px-3 py-2 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                      />
+                    </div>
+                  </div>
                 </div>
               </div>
             )}
