@@ -4,6 +4,10 @@
  * Accepts pre-fetched slides from the Hero server component.
  * Crossfade only (no sliding).
  * Pause on hover, swipe on mobile, keyboard left/right.
+ *
+ * Render window: only prev / current / next slides are mounted.
+ * All others are unmounted to keep memory and network usage minimal.
+ * When slides.length <= 3 the window covers all slides naturally.
  */
 'use client';
 
@@ -16,6 +20,16 @@ const SLIDE_DURATION_MS = 5000;
 
 interface Props {
   slides: HomepageCampaign[];
+}
+
+/** Returns the set of indices that should be mounted right now. */
+function windowIndices(active: number, total: number): Set<number> {
+  if (total <= 3) {
+    return new Set(Array.from({ length: total }, (_, i) => i));
+  }
+  const prev = (active - 1 + total) % total;
+  const next = (active + 1) % total;
+  return new Set([prev, active, next]);
 }
 
 export function HeroSlider({ slides }: Props) {
@@ -52,34 +66,12 @@ export function HeroSlider({ slides }: Props) {
     return () => window.removeEventListener('keydown', onKey);
   }, [advance]);
 
-  const slide = slides[active];
-
-  const textAlignClass =
-    slide.textAlignment === 'center'
-      ? 'items-center text-center'
-      : slide.textAlignment === 'right'
-      ? 'items-end text-right'
-      : 'items-start text-left';
-
-  const imgPos =
-    slide.imagePosition === 'top' ? 'top'
-      : slide.imagePosition === 'bottom' ? 'bottom'
-      : slide.imagePosition === 'left' ? '20% center'
-      : slide.imagePosition === 'right' ? '80% center'
-      : 'center';
-
-  // CTA button class derived from button_style
-  const primaryClass =
-    slide.buttonStyle === 'outline'
-      ? 'bc4-btn bc4-btn--ghost'
-      : slide.buttonStyle === 'ghost'
-      ? 'bc4-btn bc4-btn--ghost'
-      : 'bc4-btn bc4-btn--primary';
-  const secondaryClass = 'bc4-btn bc4-btn--ghost';
+  const mounted = windowIndices(active, slides.length);
+  const activeSlide = slides[active];
 
   return (
     <section
-      aria-label={`Hero — ${slide.title}`}
+      aria-label={`Hero — ${activeSlide.title}`}
       className="bc4-hero"
       onMouseEnter={() => setPaused(true)}
       onMouseLeave={() => setPaused(false)}
@@ -91,90 +83,116 @@ export function HeroSlider({ slides }: Props) {
         touchStartX.current = null;
       }}
     >
-      {/* ── SLIDES ── */}
+      {/* ── SLIDES — each contains its own image + text so everything crossfades together ── */}
       {slides.map((s, i) => {
         const isActive = i === active;
+
+        // Only render DOM for prev/current/next; unmount all others
+        if (!mounted.has(i)) return null;
+
+        const imgPos =
+          s.imagePosition === 'top' ? 'top'
+            : s.imagePosition === 'bottom' ? 'bottom'
+            : s.imagePosition === 'left' ? '20% center'
+            : s.imagePosition === 'right' ? '80% center'
+            : 'center';
+
+        const textAlignClass =
+          s.textAlignment === 'center'
+            ? 'items-center text-center'
+            : s.textAlignment === 'right'
+            ? 'items-end text-right'
+            : 'items-start text-left';
+
+        const primaryClass =
+          s.buttonStyle === 'outline' || s.buttonStyle === 'ghost'
+            ? 'bc4-btn bc4-btn--ghost'
+            : 'bc4-btn bc4-btn--primary';
+
         return (
           <div
             key={s.id}
             className="bc4-slide"
             aria-hidden={!isActive}
-            style={{ opacity: isActive ? 1 : 0, pointerEvents: isActive ? 'auto' : 'none' }}
+            style={{
+              opacity: isActive ? 1 : 0,
+              pointerEvents: isActive ? 'auto' : 'none',
+            }}
           >
-            {/* Image */}
-            <div className="bc4-hero__image-wrap" aria-hidden="true">
-              <div className="bc4-hero__veil" />
-              {(s.desktopImage || s.tabletImage || s.mobileImage) && (
-                <Image
-                  src={s.desktopImage || s.tabletImage || s.mobileImage}
-                  alt={s.imageAlt || s.title}
-                  fill
-                  priority={i === 0}
-                  loading={i === 0 ? 'eager' : 'lazy'}
-                  sizes="(max-width: 767px) 100vw, (max-width: 1023px) 100vw, 58vw"
-                  className="bc4-hero__img"
-                  style={{ objectPosition: imgPos }}
-                />
-              )}
-              {/* Overlay */}
+            {/* ── Full-bleed grid: text left, image right ── */}
+            <div className="bc4-hero__grid">
+              {/* TEXT COLUMN — crossfades with slide */}
               <div
-                className="bc4-hero__overlay"
-                style={{
-                  backgroundColor: s.overlayColor,
-                  opacity: s.overlayOpacity,
-                }}
-              />
+                className={`bc4-hero__text ${textAlignClass}`}
+                role="group"
+                aria-label="Hero content"
+              >
+                {/* Eyebrow — independent label, not duplicated in h1 */}
+                {s.headlineLine1 && (
+                  <p className="bc4-eyebrow" aria-label="Collection">
+                    <span className="bc4-eyebrow__line" aria-hidden="true" />
+                    {s.headlineLine1}
+                  </p>
+                )}
+
+                {/* H1 — headlineHighlight + headlineLine2 only */}
+                <h1 className="bc4-headline">
+                  {s.headlineHighlight ? (
+                    <em className="bc4-headline__em">{s.headlineHighlight}</em>
+                  ) : null}
+                  {s.headlineHighlight && s.headlineLine2 ? <br /> : null}
+                  {s.headlineLine2 ?? null}
+                  {/* Fallback: if only title, show title */}
+                  {!s.headlineHighlight && !s.headlineLine2 ? s.title : null}
+                </h1>
+
+                {s.description && (
+                  <p className="bc4-subline">{s.description}</p>
+                )}
+
+                {(s.ctaPrimaryText || s.ctaSecondaryText) && (
+                  <div className="bc4-ctas">
+                    {s.ctaPrimaryText && s.ctaPrimaryLink && (
+                      <Link href={s.ctaPrimaryLink} className={primaryClass}>
+                        {s.ctaPrimaryText}
+                      </Link>
+                    )}
+                    {s.ctaSecondaryText && s.ctaSecondaryLink && (
+                      <Link href={s.ctaSecondaryLink} className="bc4-btn bc4-btn--ghost">
+                        {s.ctaSecondaryText}
+                      </Link>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              {/* IMAGE COLUMN — crossfades with slide */}
+              <div className="bc4-hero__image-wrap" aria-hidden="true">
+                <div className="bc4-hero__veil" />
+                {(s.desktopImage || s.tabletImage || s.mobileImage) && (
+                  <Image
+                    src={s.desktopImage || s.tabletImage || s.mobileImage}
+                    alt={s.imageAlt || s.title}
+                    fill
+                    priority={i === 0}
+                    loading={isActive ? 'eager' : 'lazy'}
+                    sizes="(max-width: 767px) 100vw, (max-width: 1023px) 100vw, 55vw"
+                    className="bc4-hero__img"
+                    style={{ objectPosition: imgPos }}
+                  />
+                )}
+                <div
+                  className="bc4-hero__overlay"
+                  style={{
+                    backgroundColor: s.overlayColor,
+                    opacity: s.overlayOpacity,
+                  }}
+                />
+              </div>
             </div>
           </div>
         );
       })}
-
-      {/* ── TEXT (always on top, crossfades) ── */}
-      <div className={`bc4-hero__grid`}>
-        <div className={`bc4-hero__text ${textAlignClass}`} role="group" aria-label="Hero content">
-          {slide.headlineLine1 || slide.headlineHighlight || slide.headlineLine2 ? (
-            <>
-              {slide.headlineLine1 && (
-                <p className="bc4-eyebrow" aria-label="Collection">
-                  <span className="bc4-eyebrow__line" aria-hidden="true" />
-                  {slide.headlineLine1}
-                </p>
-              )}
-              <h1 className="bc4-headline">
-                {slide.headlineLine1 && <>{slide.headlineLine1}<br /></>}
-                {slide.headlineHighlight && (
-                  <em className="bc4-headline__em">{slide.headlineHighlight}</em>
-                )}
-                {slide.headlineLine2 && <><br />{slide.headlineLine2}</>}
-              </h1>
-            </>
-          ) : (
-            <h1 className="bc4-headline">{slide.title}</h1>
-          )}
-
-          {slide.description && (
-            <p className="bc4-subline">{slide.description}</p>
-          )}
-
-          {(slide.ctaPrimaryText || slide.ctaSecondaryText) && (
-            <div className="bc4-ctas">
-              {slide.ctaPrimaryText && slide.ctaPrimaryLink && (
-                <Link href={slide.ctaPrimaryLink} className={primaryClass}>
-                  {slide.ctaPrimaryText}
-                </Link>
-              )}
-              {slide.ctaSecondaryText && slide.ctaSecondaryLink && (
-                <Link href={slide.ctaSecondaryLink} className={secondaryClass}>
-                  {slide.ctaSecondaryText}
-                </Link>
-              )}
-            </div>
-          )}
-        </div>
-
-        {/* Empty right column for layout grid */}
-        <div className="bc4-hero__image-wrap" aria-hidden="true" />
-      </div>
 
       {/* ── DOTS ── */}
       {slides.length > 1 && (
@@ -217,7 +235,9 @@ export function HeroSlider({ slides }: Props) {
           z-index: 1;
         }
 
-        /* SLIDES — absolutely stacked, crossfade via opacity */
+        /* SLIDES — absolutely stacked, full crossfade via opacity.
+           Each slide contains its own image + text columns so both
+           fade in/out together. */
         .bc4-slide {
           position: absolute;
           inset: 0;
@@ -225,7 +245,7 @@ export function HeroSlider({ slides }: Props) {
           transition: opacity 0.9s cubic-bezier(0.16, 1, 0.3, 1);
         }
 
-        /* GRID */
+        /* GRID — inside each slide */
         .bc4-hero__grid {
           display: grid;
           min-height: 100svh;

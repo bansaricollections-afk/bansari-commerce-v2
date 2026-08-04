@@ -6,9 +6,7 @@
  */
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
-import Image from 'next/image';
-import { Upload, X } from 'lucide-react';
+import { useEffect, useState } from 'react';
 import {
   Sheet,
   SheetContent,
@@ -27,6 +25,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { ImageUploadField, type ImageVariant } from './ImageUploadField';
 import type { HomepageCampaign, CampaignStatus } from '@/types/homepage-campaign';
 
 interface Props {
@@ -36,13 +35,24 @@ interface Props {
   onSaved: () => void;
 }
 
-type ImageVariant = 'desktop' | 'tablet' | 'mobile';
-
-const VARIANT_LABELS: Record<ImageVariant, string> = {
-  desktop: 'Desktop (min 3840px)',
-  tablet: 'Tablet (min 2048px)',
-  mobile: 'Mobile (min 1440px)',
-};
+/**
+ * Validates a CTA URL.
+ * Accepts: relative paths starting with /
+ *          absolute https:// URLs
+ * Rejects:  javascript:, data:, ftp:, mailto:, empty, malformed
+ * Returns an error string, or null if valid (or blank — blank is allowed).
+ */
+function validateCtaUrl(url: string): string | null {
+  if (!url.trim()) return null; // blank = no CTA, which is fine
+  if (url.startsWith('/')) return null; // relative path
+  try {
+    const parsed = new URL(url);
+    if (parsed.protocol === 'https:') return null;
+    return `Only relative paths (/) or https:// URLs are allowed.`;
+  } catch {
+    return 'Invalid URL. Use a relative path (e.g. /shop) or https://…';
+  }
+}
 
 export function CampaignFormSheet({ open, onOpenChange, campaign, onSaved }: Props) {
   const isEdit = !!campaign;
@@ -75,6 +85,10 @@ export function CampaignFormSheet({ open, onOpenChange, campaign, onSaved }: Pro
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
 
+  // Field-level CTA validation errors
+  const [ctaPrimaryLinkError, setCtaPrimaryLinkError] = useState<string | null>(null);
+  const [ctaSecondaryLinkError, setCtaSecondaryLinkError] = useState<string | null>(null);
+
   // Populate on edit
   useEffect(() => {
     if (campaign) {
@@ -102,7 +116,6 @@ export function CampaignFormSheet({ open, onOpenChange, campaign, onSaved }: Pro
       setStartDate(campaign.startDate?.slice(0, 16) ?? '');
       setEndDate(campaign.endDate?.slice(0, 16) ?? '');
     } else {
-      // Reset
       setTitle(''); setHeadlineLine1(''); setHeadlineHighlight(''); setHeadlineLine2('');
       setDescription(''); setCtaPrimaryText(''); setCtaPrimaryLink('');
       setCtaSecondaryText(''); setCtaSecondaryLink('');
@@ -113,10 +126,12 @@ export function CampaignFormSheet({ open, onOpenChange, campaign, onSaved }: Pro
       setStartDate(''); setEndDate('');
     }
     setError('');
+    setCtaPrimaryLinkError(null);
+    setCtaSecondaryLinkError(null);
   }, [campaign, open]);
 
-  // Image upload
-  const uploadImage = async (file: File, variant: ImageVariant) => {
+  // Image upload handler (stable, passed down as prop)
+  const handleUpload = async (file: File, variant: ImageVariant) => {
     setUploading(variant);
     const form = new FormData();
     form.append('file', file);
@@ -130,69 +145,29 @@ export function CampaignFormSheet({ open, onOpenChange, campaign, onSaved }: Pro
     if (variant === 'mobile') setMobileImage(json.url);
   };
 
-  const ImageUploadField = ({ variant, value }: { variant: ImageVariant; value: string }) => {
-    const ref = useRef<HTMLInputElement>(null);
-    return (
-      <div className="space-y-1.5">
-        <Label className="text-xs text-slate-600">{VARIANT_LABELS[variant]}</Label>
-        <div className="flex items-center gap-2">
-          <div className="relative size-16 shrink-0 overflow-hidden rounded-md bg-slate-100">
-            {value ? (
-              <Image src={value} alt={variant} fill sizes="64px" className="object-cover" />
-            ) : (
-              <div className="flex size-full items-center justify-center text-xs text-slate-400">None</div>
-            )}
-          </div>
-          <input
-            ref={ref}
-            type="file"
-            accept="image/jpeg,image/jpg,image/png,image/webp,image/avif"
-            className="hidden"
-            onChange={(e) => { const f = e.target.files?.[0]; if (f) uploadImage(f, variant); }}
-          />
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            disabled={uploading === variant}
-            onClick={() => ref.current?.click()}
-          >
-            <Upload className="mr-1.5 size-3" />
-            {uploading === variant ? 'Uploading…' : 'Upload'}
-          </Button>
-          {value && (
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              onClick={() => {
-                if (variant === 'desktop') setDesktopImage('');
-                if (variant === 'tablet') setTabletImage('');
-                if (variant === 'mobile') setMobileImage('');
-              }}
-            >
-              <X className="size-3" />
-            </Button>
-          )}
-        </div>
-        {/* Allow direct URL input as fallback */}
-        <Input
-          placeholder="Or paste image URL…"
-          value={value}
-          onChange={(e) => {
-            if (variant === 'desktop') setDesktopImage(e.target.value);
-            if (variant === 'tablet') setTabletImage(e.target.value);
-            if (variant === 'mobile') setMobileImage(e.target.value);
-          }}
-          className="text-xs"
-        />
-      </div>
-    );
+  const handleClear = (variant: ImageVariant) => {
+    if (variant === 'desktop') setDesktopImage('');
+    if (variant === 'tablet') setTabletImage('');
+    if (variant === 'mobile') setMobileImage('');
+  };
+
+  const handleUrlChange = (url: string, variant: ImageVariant) => {
+    if (variant === 'desktop') setDesktopImage(url);
+    if (variant === 'tablet') setTabletImage(url);
+    if (variant === 'mobile') setMobileImage(url);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!title.trim()) { setError('Campaign title is required'); return; }
+
+    // Client-side CTA URL validation
+    const primaryErr = validateCtaUrl(ctaPrimaryLink);
+    const secondaryErr = validateCtaUrl(ctaSecondaryLink);
+    setCtaPrimaryLinkError(primaryErr);
+    setCtaSecondaryLinkError(secondaryErr);
+    if (primaryErr || secondaryErr) return;
+
     setSaving(true);
     setError('');
     const payload = {
@@ -280,11 +255,11 @@ export function CampaignFormSheet({ open, onOpenChange, campaign, onSaved }: Pro
           <fieldset className="space-y-4">
             <legend className="text-xs font-semibold uppercase tracking-widest text-slate-400">Headline & Copy</legend>
             <div className="space-y-1.5">
-              <Label htmlFor="cf-h1">Headline Line 1</Label>
-              <Input id="cf-h1" value={headlineLine1} onChange={(e) => setHeadlineLine1(e.target.value)} placeholder="Where Heritage" />
+              <Label htmlFor="cf-h1">Eyebrow / Line 1 (shown above headline)</Label>
+              <Input id="cf-h1" value={headlineLine1} onChange={(e) => setHeadlineLine1(e.target.value)} placeholder="New Arrivals" />
             </div>
             <div className="space-y-1.5">
-              <Label htmlFor="cf-hh">Headline Highlight (italic)</Label>
+              <Label htmlFor="cf-hh">Headline (italic accent)</Label>
               <Input id="cf-hh" value={headlineHighlight} onChange={(e) => setHeadlineHighlight(e.target.value)} placeholder="Becomes" />
             </div>
             <div className="space-y-1.5">
@@ -307,7 +282,19 @@ export function CampaignFormSheet({ open, onOpenChange, campaign, onSaved }: Pro
               </div>
               <div className="space-y-1.5">
                 <Label htmlFor="cf-cta1l">Primary CTA Link</Label>
-                <Input id="cf-cta1l" value={ctaPrimaryLink} onChange={(e) => setCtaPrimaryLink(e.target.value)} placeholder="/shop" />
+                <Input
+                  id="cf-cta1l"
+                  value={ctaPrimaryLink}
+                  onChange={(e) => {
+                    setCtaPrimaryLink(e.target.value);
+                    setCtaPrimaryLinkError(validateCtaUrl(e.target.value));
+                  }}
+                  placeholder="/shop or https://…"
+                  aria-invalid={!!ctaPrimaryLinkError}
+                />
+                {ctaPrimaryLinkError && (
+                  <p className="text-xs text-red-600">{ctaPrimaryLinkError}</p>
+                )}
               </div>
               <div className="space-y-1.5">
                 <Label htmlFor="cf-cta2t">Secondary CTA Text</Label>
@@ -315,7 +302,19 @@ export function CampaignFormSheet({ open, onOpenChange, campaign, onSaved }: Pro
               </div>
               <div className="space-y-1.5">
                 <Label htmlFor="cf-cta2l">Secondary CTA Link</Label>
-                <Input id="cf-cta2l" value={ctaSecondaryLink} onChange={(e) => setCtaSecondaryLink(e.target.value)} placeholder="/collections" />
+                <Input
+                  id="cf-cta2l"
+                  value={ctaSecondaryLink}
+                  onChange={(e) => {
+                    setCtaSecondaryLink(e.target.value);
+                    setCtaSecondaryLinkError(validateCtaUrl(e.target.value));
+                  }}
+                  placeholder="/collections or https://…"
+                  aria-invalid={!!ctaSecondaryLinkError}
+                />
+                {ctaSecondaryLinkError && (
+                  <p className="text-xs text-red-600">{ctaSecondaryLinkError}</p>
+                )}
               </div>
             </div>
             <div className="space-y-1.5">
@@ -334,9 +333,9 @@ export function CampaignFormSheet({ open, onOpenChange, campaign, onSaved }: Pro
           {/* ── Images ── */}
           <fieldset className="space-y-4">
             <legend className="text-xs font-semibold uppercase tracking-widest text-slate-400">Hero Images</legend>
-            <ImageUploadField variant="desktop" value={desktopImage} />
-            <ImageUploadField variant="tablet" value={tabletImage} />
-            <ImageUploadField variant="mobile" value={mobileImage} />
+            <ImageUploadField variant="desktop" value={desktopImage} uploading={uploading} onUpload={handleUpload} onClear={handleClear} onUrlChange={handleUrlChange} />
+            <ImageUploadField variant="tablet" value={tabletImage} uploading={uploading} onUpload={handleUpload} onClear={handleClear} onUrlChange={handleUrlChange} />
+            <ImageUploadField variant="mobile" value={mobileImage} uploading={uploading} onUpload={handleUpload} onClear={handleClear} onUrlChange={handleUrlChange} />
             <div className="space-y-1.5">
               <Label htmlFor="cf-alt">Image Alt Text</Label>
               <Input id="cf-alt" value={imageAlt} onChange={(e) => setImageAlt(e.target.value)} placeholder="Bansari Collections — heritage editorial" />
