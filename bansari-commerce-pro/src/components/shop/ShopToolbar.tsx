@@ -1,20 +1,30 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { ChevronDown, Grid2X2, LayoutGrid, Rows3 } from "lucide-react";
+import type { SortOption } from "@/types/filter-params";
 
-const SORT_OPTIONS = [
+const SORT_OPTIONS: { value: SortOption; label: string }[] = [
   { value: "newest",     label: "Newest First" },
   { value: "bestseller", label: "Best Selling" },
   { value: "price_asc",  label: "Price: Low → High" },
   { value: "price_desc", label: "Price: High → Low" },
-  { value: "rating",     label: "Highest Rated" },
-  { value: "featured",   label: "Featured" },
-  { value: "az",         label: "A → Z" },
+  { value: "discount",   label: "Highest Discount" },
 ];
 
-export default function ShopToolbar() {
-  const [sort, setSort] = useState("newest");
+interface ShopToolbarProps {
+  /** Total product count to display — sourced from PaginationMeta. */
+  total?: number;
+}
+
+export default function ShopToolbar({ total }: ShopToolbarProps) {
+  const router       = useRouter();
+  const searchParams = useSearchParams();
+
+  // Read current sort from URL; default to 'newest'
+  const currentSort = (searchParams.get('sort') ?? 'newest') as SortOption;
+
   const [grid, setGrid] = useState<"2" | "3" | "4">("3");
   const [open, setOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
@@ -30,13 +40,33 @@ export default function ShopToolbar() {
     return () => document.removeEventListener("mousedown", handleClick);
   }, [open]);
 
-  const selectedLabel = SORT_OPTIONS.find((o) => o.value === sort)?.label ?? "Sort";
+  const selectedLabel =
+    SORT_OPTIONS.find((o) => o.value === currentSort)?.label ?? "Newest First";
+
+  function handleSort(value: SortOption) {
+    const params = new URLSearchParams(searchParams.toString());
+    params.set('sort', value);
+    // Reset to page 1 whenever sort changes
+    params.delete('page');
+    router.push(`/shop?${params.toString()}`);
+    setOpen(false);
+  }
 
   return (
     <div className="mb-5 flex items-center justify-between border-b border-slate-200 pb-5">
-      {/* Left — product count */}
+      {/* Left — product count (real from DB) */}
       <p className="text-[11px] uppercase tracking-[0.12em] text-slate-400">
-        Showing <span className="font-semibold text-slate-900">48</span> products
+        {total !== undefined ? (
+          <>
+            Showing{" "}
+            <span className="font-semibold text-slate-900">
+              {total.toLocaleString()}
+            </span>{" "}
+            product{total !== 1 ? "s" : ""}
+          </>
+        ) : (
+          <span className="inline-block h-3 w-24 animate-pulse rounded bg-slate-100" />
+        )}
       </p>
 
       {/* Right — sort + grid toggle */}
@@ -71,17 +101,17 @@ export default function ShopToolbar() {
                   <button
                     type="button"
                     role="option"
-                    aria-selected={sort === opt.value}
-                    onClick={() => { setSort(opt.value); setOpen(false); }}
+                    aria-selected={currentSort === opt.value}
+                    onClick={() => handleSort(opt.value)}
                     className={[
                       "flex w-full items-center justify-between px-4 py-3 text-left text-[11px] uppercase tracking-[0.1em] transition-colors duration-150 hover:bg-slate-50",
-                      sort === opt.value
+                      currentSort === opt.value
                         ? "font-semibold text-[#8A5A6A]"
                         : "font-medium text-slate-600",
                     ].join(" ")}
                   >
                     {opt.label}
-                    {sort === opt.value && (
+                    {currentSort === opt.value && (
                       <svg width="10" height="8" viewBox="0 0 10 8" fill="none" aria-hidden="true">
                         <path d="M1 4l3 3 5-6" stroke="#8A5A6A" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
                       </svg>

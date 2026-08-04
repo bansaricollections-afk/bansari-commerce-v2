@@ -1,10 +1,20 @@
 import ProductCard from "@/components/product/ProductCard";
-import { getProducts } from "@/services/product.service";
+import { getFilteredProducts } from "@/services/product.service";
 import ProductGridSkeleton from "@/components/shop/ProductGridSkeleton";
 import { Suspense } from "react";
+import type { FilterParams } from "@/types/filter-params";
 
-async function GridInner() {
-  const productList = await getProducts();
+// ─── Props ───────────────────────────────────────────────────────────────────
+// ProductGrid is a React Server Component. It receives pre-parsed FilterParams
+// from ShopPage (which reads Next.js searchParams) and forwards them directly
+// to getFilteredProducts. No client state, no useEffect, no fetch() call.
+
+interface ProductGridProps {
+  filterParams?: FilterParams;
+}
+
+async function GridInner({ filterParams = {} }: ProductGridProps) {
+  const { products: productList, meta } = await getFilteredProducts(filterParams);
 
   if (productList.length === 0) {
     return (
@@ -53,7 +63,7 @@ async function GridInner() {
     <div
       className="grid grid-cols-2 gap-x-5 gap-y-12 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4"
       role="list"
-      aria-label="Products"
+      aria-label={`Products — ${meta.total} results`}
     >
       {productList.map((product, i) => (
         <div key={product.id} role="listitem">
@@ -64,10 +74,10 @@ async function GridInner() {
   );
 }
 
-export default function ProductGrid() {
+export default function ProductGrid({ filterParams }: ProductGridProps) {
   return (
     <Suspense fallback={<ProductGridSkeleton />}>
-      <GridInner />
+      <GridInner filterParams={filterParams} />
     </Suspense>
   );
 }

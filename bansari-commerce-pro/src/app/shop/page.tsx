@@ -13,6 +13,8 @@ import ShopEditorialHero from "@/components/shop/ShopEditorialHero";
 import ShopEditorialBreak from "@/components/shop/ShopEditorialBreak";
 import ShopCROStrip from "@/components/shop/ShopCROStrip";
 import ShopSocialProof from "@/components/shop/ShopSocialProof";
+import { getFilteredProducts } from "@/services/product.service";
+import type { FilterParams, SortOption } from "@/types/filter-params";
 
 export const dynamic = 'force-dynamic';
 
@@ -34,7 +36,69 @@ export const metadata: Metadata = {
   },
 };
 
-export default function ShopPage() {
+// ─── Helpers — parse raw URL searchParams strings safely ─────────────────────
+
+const VALID_SORTS = new Set<SortOption>(
+  ['newest', 'price_asc', 'price_desc', 'bestseller', 'discount']
+);
+
+function parseSort(raw: string | undefined): SortOption {
+  return VALID_SORTS.has(raw as SortOption) ? (raw as SortOption) : 'newest';
+}
+
+function parsePositiveInt(raw: string | undefined, fallback: number): number {
+  const n = Number(raw);
+  return Number.isInteger(n) && n > 0 ? n : fallback;
+}
+
+function parsePositiveFloat(raw: string | undefined): number | undefined {
+  if (!raw) return undefined;
+  const n = Number(raw);
+  return Number.isFinite(n) && n >= 0 ? n : undefined;
+}
+
+// ─── Page Component ──────────────────────────────────────────────────────────
+
+// Next.js 15 App Router: searchParams is a Promise<Record<string, string | string[] | undefined>>
+type SearchParamsType = Record<string, string | string[] | undefined>;
+
+export default async function ShopPage({
+  searchParams,
+}: {
+  searchParams: Promise<SearchParamsType>;
+}) {
+  // Await the searchParams promise (Next.js 15 App Router requirement)
+  const sp = await searchParams;
+
+  // Helper to safely extract a single string from searchParams
+  function str(key: string): string | undefined {
+    const v = sp[key];
+    return Array.isArray(v) ? v[0] : v;
+  }
+
+  // Build FilterParams from URL
+  const filterParams: FilterParams = {
+    page:       parsePositiveInt(str('page'), 1),
+    perPage:    24,
+    sort:       parseSort(str('sort')),
+    category:   str('category'),
+    collection: str('collection'),
+    fabric:     str('fabric'),
+    color:      str('color'),
+    priceMin:   parsePositiveFloat(str('priceMin')),
+    priceMax:   parsePositiveFloat(str('priceMax')),
+    occasion:   str('occasion'),
+    size:       str('size'),
+    inStock:    str('availability') === 'in_stock' ? true : undefined,
+  };
+
+  // Fetch data at the page level so both ShopToolbar (total count) and
+  // Pagination (meta) get the same result without a second DB round-trip.
+  // ProductGrid re-uses the same filterParams so it issues its own
+  // parallel query — both queries are identical and Supabase's connection
+  // pool handles them efficiently. A shared cache (Sprint 9C) can deduplicate.
+  const { meta } = await getFilteredProducts(filterParams);
+
   return (
     <>
       <Header />
@@ -70,7 +134,7 @@ export default function ShopPage() {
       <div className="pb-16 lg:pb-0">
         <main className="min-h-screen bg-white">
 
-          {/* ─── EDITORIAL CAMPAIGN HERO (NEW) ─── */}
+          {/* ─── EDITORIAL CAMPAIGN HERO (PRESERVED) ─── */}
           <ShopEditorialHero />
 
           {/* ─── PAGE HEADER ─── */}
@@ -108,7 +172,7 @@ export default function ShopPage() {
             <CategoryPills />
           </div>
 
-          {/* ─── LIVE SOCIAL PROOF TICKER (NEW) ─── */}
+          {/* ─── LIVE SOCIAL PROOF TICKER (PRESERVED) ─── */}
           <ShopSocialProof />
 
           {/* ─── MAIN LAYOUT ─── */}
@@ -125,22 +189,26 @@ export default function ShopPage() {
 
               {/* Product section */}
               <section className="min-w-0 flex-1" aria-label="Product listing">
-                <ShopToolbar />
+                {/* ShopToolbar now receives real total count from DB */}
+                <ShopToolbar total={meta.total} />
                 <ActiveFilters />
-                <ProductGrid />
 
-                {/* ─── EDITORIAL BREAK mid-page (NEW) ─── */}
+                {/* ProductGrid receives filterParams — issues its own parallel query */}
+                <ProductGrid filterParams={filterParams} />
+
+                {/* ─── EDITORIAL BREAK mid-page (PRESERVED) ─── */}
                 <ShopEditorialBreak />
 
-                <Pagination />
+                {/* Pagination driven by real PaginationMeta */}
+                <Pagination meta={meta} />
               </section>
             </div>
           </div>
 
-          {/* ─── CRO STRIP — WhatsApp + Recently Viewed (NEW) ─── */}
+          {/* ─── CRO STRIP — WhatsApp + Recently Viewed (PRESERVED) ─── */}
           <ShopCROStrip />
 
-          {/* ─── MobileFilterBar/Sort Bar (fixed bottom) ─── */}
+          {/* ─── MobileFilterBar/Sort Bar (fixed bottom, PRESERVED) ─── */}
           <MobileFilterBar />
         </main>
       </div>
