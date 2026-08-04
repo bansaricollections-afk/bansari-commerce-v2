@@ -28,7 +28,10 @@ export default async function AdminLayout({ children }: Readonly<AdminLayoutProp
   await requireAdminPage();
 
   return (
-    <div className="min-h-screen bg-slate-50">
+    // [&_h1,...]:font-sans resets the storefront globals.css Playfair serif rule
+    // that targets h1–h6 globally, preventing it from bleeding into shadcn Sheet
+    // titles (<h2> via Radix Dialog.Title) inside admin panels.
+    <div className="min-h-screen bg-slate-50 [&_h1]:font-sans [&_h2]:font-sans [&_h3]:font-sans [&_h4]:font-sans [&_h5]:font-sans [&_h6]:font-sans">
       <div className="flex">
         {/* Skip to main content — accessibility */}
         <a
