@@ -880,7 +880,8 @@ export default function ProductManagement() {
 
     try {
       const payload = buildPayload(publishNow);
-      logAdminSavePayload(editProduct ? "edit" : "create", payload, editProduct?.id);
+      // FIX: was "edit" — not assignable to 'create' | 'update' union in logAdminSavePayload
+      logAdminSavePayload(editProduct ? "update" : "create", payload, editProduct?.id);
 
       let result: ApiSingleResponse;
       if (editProduct) {
