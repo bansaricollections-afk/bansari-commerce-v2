@@ -6,6 +6,7 @@ import FilterSidebar from "@/components/shop/FilterSidebar";
 import ProductGrid from "@/components/shop/ProductGrid";
 import ShopToolbar from "@/components/shop/ShopToolbar";
 import ActiveFilters from "@/components/shop/ActiveFilters";
+import ResultHeader from "@/components/shop/ResultHeader";
 import Pagination from "@/components/shop/Pagination";
 import ShopTrustStrip from "@/components/shop/ShopTrustStrip";
 import CategoryPills from "@/components/shop/CategoryPills";
@@ -59,7 +60,6 @@ function parsePositiveFloat(raw: string | undefined): number | undefined {
 
 // ─── Page Component ──────────────────────────────────────────────────────────
 
-// Next.js 15 App Router: searchParams is a Promise<Record<string, string | string[] | undefined>>
 type SearchParamsType = Record<string, string | string[] | undefined>;
 
 export default async function ShopPage({
@@ -67,16 +67,13 @@ export default async function ShopPage({
 }: {
   searchParams: Promise<SearchParamsType>;
 }) {
-  // Await the searchParams promise (Next.js 15 App Router requirement)
   const sp = await searchParams;
 
-  // Helper to safely extract a single string from searchParams
   function str(key: string): string | undefined {
     const v = sp[key];
     return Array.isArray(v) ? v[0] : v;
   }
 
-  // Build FilterParams from URL
   const filterParams: FilterParams = {
     page:       parsePositiveInt(str('page'), 1),
     perPage:    24,
@@ -89,20 +86,16 @@ export default async function ShopPage({
     priceMax:   parsePositiveFloat(str('priceMax')),
     occasion:   str('occasion'),
     size:       str('size'),
-    inStock:    str('availability') === 'in_stock' ? true : undefined,
+    inStock:    str('availability') === 'in_stock' ? true
+                : str('availability') === 'out_of_stock' ? false
+                : undefined,
   };
 
-  // Fetch data at the page level so both ShopToolbar (total count) and
-  // Pagination (meta) get the same result without a second DB round-trip.
-  // ProductGrid re-uses the same filterParams so it issues its own
-  // parallel query — both queries are identical and Supabase's connection
-  // pool handles them efficiently. A shared cache (Sprint 9C) can deduplicate.
   const { meta } = await getFilteredProducts(filterParams);
 
   return (
     <>
       <Header />
-      {/* Breadcrumb schema — PRESERVED */}
       <script
         type="application/ld+json"
         suppressHydrationWarning
@@ -134,24 +127,17 @@ export default async function ShopPage({
       <div className="pb-16 lg:pb-0">
         <main className="min-h-screen bg-white">
 
-          {/* ─── EDITORIAL CAMPAIGN HERO (PRESERVED) ─── */}
           <ShopEditorialHero />
 
-          {/* ─── PAGE HEADER ─── */}
           <div className="border-b border-slate-100 bg-white">
             <div className="mx-auto max-w-[1440px] px-5 py-10 md:px-10 lg:px-16">
-
-              {/* Breadcrumb */}
               <nav aria-label="Breadcrumb" className="mb-5">
                 <ol className="flex items-center gap-2 text-[11px] tracking-wide text-slate-400">
-                  <li>
-                    <a href="/" className="transition-colors duration-200 hover:text-slate-700">Home</a>
-                  </li>
+                  <li><a href="/" className="transition-colors duration-200 hover:text-slate-700">Home</a></li>
                   <li aria-hidden="true" className="text-slate-200">/</li>
                   <li className="font-medium text-slate-900" aria-current="page">Shop</li>
                 </ol>
               </nav>
-
               <div className="flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
                 <div>
                   <p className="mb-2 text-[10px] font-bold uppercase tracking-[0.26em] text-[#8A5A6A]">
@@ -167,15 +153,11 @@ export default async function ShopPage({
                 <ShopTrustStrip />
               </div>
             </div>
-
-            {/* Category scroll pills */}
             <CategoryPills />
           </div>
 
-          {/* ─── LIVE SOCIAL PROOF TICKER (PRESERVED) ─── */}
           <ShopSocialProof />
 
-          {/* ─── MAIN LAYOUT ─── */}
           <div className="mx-auto max-w-[1440px] px-5 md:px-10 lg:px-16">
             <div className="flex gap-10 py-8">
 
@@ -189,26 +171,32 @@ export default async function ShopPage({
 
               {/* Product section */}
               <section className="min-w-0 flex-1" aria-label="Product listing">
-                {/* ShopToolbar now receives real total count from DB */}
+
+                {/* ShopToolbar — preserved, continues to receive total */}
                 <ShopToolbar total={meta.total} />
+
+                {/* ResultHeader — Showing X–Y of Z + sort dropdown */}
+                <ResultHeader
+                  total={meta.total}
+                  page={meta.page}
+                  perPage={meta.perPage}
+                />
+
+                {/* AppliedFilterChips via ActiveFilters re-export */}
                 <ActiveFilters />
 
-                {/* ProductGrid receives filterParams — issues its own parallel query */}
                 <ProductGrid filterParams={filterParams} />
 
-                {/* ─── EDITORIAL BREAK mid-page (PRESERVED) ─── */}
                 <ShopEditorialBreak />
 
-                {/* Pagination driven by real PaginationMeta */}
                 <Pagination meta={meta} />
               </section>
             </div>
           </div>
 
-          {/* ─── CRO STRIP — WhatsApp + Recently Viewed (PRESERVED) ─── */}
           <ShopCROStrip />
 
-          {/* ─── MobileFilterBar/Sort Bar (fixed bottom, PRESERVED) ─── */}
+          {/* Mobile bottom sheet */}
           <MobileFilterBar />
         </main>
       </div>

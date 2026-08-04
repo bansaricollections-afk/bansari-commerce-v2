@@ -1,14 +1,15 @@
 "use client";
 
-import { useState, useCallback } from "react";
-import { ChevronDown, X, SlidersHorizontal } from "lucide-react";
+import { useCallback } from "react";
+import { useRouter, useSearchParams, usePathname } from "next/navigation";
+import { ChevronDown, SlidersHorizontal, X } from "lucide-react";
+import { Suspense } from "react";
+
+// ─── Static option lists ─────────────────────────────────────────────────────
 
 const CATEGORIES = ["Kurta Sets", "Ethnic Dresses", "Sarees", "Lehengas", "Co-ord Sets", "Gowns"];
 const OCCASIONS  = ["Wedding", "Festive", "Office", "Party", "Travel", "Casual"];
 const FABRICS    = ["Cotton", "Silk", "Rayon", "Georgette", "Organza", "Chiffon", "Crepe", "Linen"];
-const SLEEVES    = ["Sleeveless", "Half Sleeve", "Full Sleeve", "Puff Sleeve", "Bell Sleeve"];
-const NECK_TYPES = ["Round Neck", "V-Neck", "Boat Neck", "Collar", "Halter", "Square Neck"];
-const FIT_TYPES  = ["Regular", "Slim Fit", "Relaxed", "Flared", "Straight"];
 const SIZES      = ["XS", "S", "M", "L", "XL", "XXL", "3XL"];
 const COLORS: { hex: string; label: string }[] = [
   { hex: "#FFFFFF", label: "White" },
@@ -24,33 +25,51 @@ const COLORS: { hex: string; label: string }[] = [
   { hex: "#B5A09A", label: "Beige" },
   { hex: "#6B7280", label: "Grey" },
 ];
-const AVAILABILITY = ["In Stock", "On Sale", "New Arrivals", "Limited Edition"];
-const DISCOUNT_RANGES = ["10% and above", "20% and above", "30% and above", "50% and above"];
+const AVAILABILITY_OPTIONS = [
+  { label: "In Stock",    value: "in_stock" },
+  { label: "Out of Stock", value: "out_of_stock" },
+  { label: "New Arrival", value: "new_arrival" },
+];
 
-type FilterState = {
-  categories: string[];
-  occasions: string[];
-  fabrics: string[];
-  sleeves: string[];
-  neck: string[];
-  fit: string[];
-  sizes: string[];
-  colors: string[];
-  availability: string[];
-  discount: string[];
-  priceMin: number;
-  priceMax: number;
-};
+// ─── Shared URL-builder ───────────────────────────────────────────────────────
+// Always resets page to 1 when a filter changes.
+function useFilterUrl() {
+  const router   = useRouter();
+  const pathname = usePathname();
+  const params   = useSearchParams();
 
-const INITIAL: FilterState = {
-  categories: [], occasions: [], fabrics: [],
-  sleeves: [], neck: [], fit: [],
-  sizes: [], colors: [],
-  availability: [], discount: [],
-  priceMin: 499, priceMax: 29999,
-};
+  const build = useCallback(
+    (key: string, value: string | null) => {
+      const next = new URLSearchParams(params.toString());
+      if (value === null || value === "") {
+        next.delete(key);
+      } else {
+        next.set(key, value);
+      }
+      // Reset to page 1 whenever any filter changes
+      if (key !== "page") next.set("page", "1");
+      return `${pathname}?${next.toString()}`;
+    },
+    [params, pathname]
+  );
 
-function Checkbox({ checked, onChange, label }: { checked: boolean; onChange: () => void; label: string }) {
+  const navigate = useCallback(
+    (key: string, value: string | null) => {
+      router.replace(build(key, value), { scroll: false });
+    },
+    [router, build]
+  );
+
+  return { params, navigate, build };
+}
+
+// ─── Sub-components ───────────────────────────────────────────────────────────
+
+function Checkbox({
+  checked, onChange, label,
+}: {
+  checked: boolean; onChange: () => void; label: string;
+}) {
   return (
     <label className="group/item flex cursor-pointer items-center gap-3 py-0.5">
       <span
@@ -81,13 +100,14 @@ function AccordionSection({
 }: {
   title: string; count?: number; defaultOpen?: boolean; children: React.ReactNode;
 }) {
-  const [open, setOpen] = useState(defaultOpen);
+  // Local open/close state is fine — it's purely visual, not filter state
+  const [open, setOpen] = require("react").useState(defaultOpen);
   return (
     <div className="border-b border-slate-100">
       <button
         type="button"
         aria-expanded={open}
-        onClick={() => setOpen((v) => !v)}
+        onClick={() => setOpen((v: boolean) => !v)}
         className="flex w-full items-center justify-between py-4 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#8A5A6A] focus-visible:ring-inset"
       >
         <span className="flex items-center gap-2">
@@ -115,27 +135,35 @@ function AccordionSection({
   );
 }
 
-export default function FilterSidebar() {
-  const [filters, setFilters] = useState<FilterState>(INITIAL);
+// ─── Core sidebar implementation ──────────────────────────────────────────────
 
-  const toggle = useCallback(
-    (key: keyof Pick<FilterState, "categories" | "occasions" | "fabrics" | "sleeves" | "neck" | "fit" | "sizes" | "colors" | "availability" | "discount">, val: string) => {
-      setFilters((prev) => {
-        const arr = prev[key] as string[];
-        return { ...prev, [key]: arr.includes(val) ? arr.filter((v) => v !== val) : [...arr, val] };
-      });
-    },
-    []
-  );
+function FilterSidebarInner() {
+  const { params, navigate } = useFilterUrl();
 
-  const clearAll = useCallback(() => setFilters(INITIAL), []);
+  // Read current filter values from URL
+  const category    = params.get("category") ?? "";
+  const occasion    = params.get("occasion") ?? "";
+  const fabric      = params.get("fabric") ?? "";
+  const size        = params.get("size") ?? "";
+  const color       = params.get("color") ?? "";
+  const availability = params.get("availability") ?? "";
+  const priceMin    = params.get("priceMin") ?? "";
+  const priceMax    = params.get("priceMax") ?? "";
 
-  const totalActive =
-    filters.categories.length + filters.occasions.length + filters.fabrics.length +
-    filters.sleeves.length + filters.neck.length + filters.fit.length +
-    filters.sizes.length + filters.colors.length + filters.availability.length +
-    filters.discount.length +
-    (filters.priceMin !== INITIAL.priceMin || filters.priceMax !== INITIAL.priceMax ? 1 : 0);
+  // Count active filters for badge
+  const totalActive = [
+    category, occasion, fabric, size, color, availability,
+    priceMin, priceMax,
+  ].filter(Boolean).length;
+
+  const clearAll = useCallback(() => {
+    const next = new URLSearchParams();
+    // Preserve sort if set
+    const sort = params.get("sort");
+    if (sort) next.set("sort", sort);
+    next.set("page", "1");
+    window.location.href = `${window.location.pathname}?${next.toString()}`;
+  }, [params]);
 
   return (
     <aside
@@ -164,57 +192,64 @@ export default function FilterSidebar() {
         )}
       </div>
 
-      {/* All sections */}
-      <AccordionSection title="Category" count={filters.categories.length} defaultOpen>
+      {/* Category */}
+      <AccordionSection title="Category" count={category ? 1 : 0} defaultOpen>
         <div className="space-y-1.5">
-          {CATEGORIES.map((c) => <Checkbox key={c} label={c} checked={filters.categories.includes(c)} onChange={() => toggle("categories", c)} />)}
+          {CATEGORIES.map((c) => (
+            <Checkbox
+              key={c}
+              label={c}
+              checked={category === c}
+              onChange={() => navigate("category", category === c ? null : c)}
+            />
+          ))}
         </div>
       </AccordionSection>
 
-      <AccordionSection title="Occasion" count={filters.occasions.length} defaultOpen>
+      {/* Occasion */}
+      <AccordionSection title="Occasion" count={occasion ? 1 : 0} defaultOpen>
         <div className="space-y-1.5">
-          {OCCASIONS.map((o) => <Checkbox key={o} label={o} checked={filters.occasions.includes(o)} onChange={() => toggle("occasions", o)} />)}
+          {OCCASIONS.map((o) => (
+            <Checkbox
+              key={o}
+              label={o}
+              checked={occasion === o}
+              onChange={() => navigate("occasion", occasion === o ? null : o)}
+            />
+          ))}
         </div>
       </AccordionSection>
 
-      <AccordionSection title="Fabric" count={filters.fabrics.length}>
+      {/* Fabric */}
+      <AccordionSection title="Fabric" count={fabric ? 1 : 0}>
         <div className="space-y-1.5">
-          {FABRICS.map((f) => <Checkbox key={f} label={f} checked={filters.fabrics.includes(f)} onChange={() => toggle("fabrics", f)} />)}
-        </div>
-      </AccordionSection>
-
-      <AccordionSection title="Sleeve" count={filters.sleeves.length}>
-        <div className="space-y-1.5">
-          {SLEEVES.map((s) => <Checkbox key={s} label={s} checked={filters.sleeves.includes(s)} onChange={() => toggle("sleeves", s)} />)}
-        </div>
-      </AccordionSection>
-
-      <AccordionSection title="Neck Type" count={filters.neck.length}>
-        <div className="space-y-1.5">
-          {NECK_TYPES.map((n) => <Checkbox key={n} label={n} checked={filters.neck.includes(n)} onChange={() => toggle("neck", n)} />)}
-        </div>
-      </AccordionSection>
-
-      <AccordionSection title="Fit" count={filters.fit.length}>
-        <div className="space-y-1.5">
-          {FIT_TYPES.map((f) => <Checkbox key={f} label={f} checked={filters.fit.includes(f)} onChange={() => toggle("fit", f)} />)}
+          {FABRICS.map((f) => (
+            <Checkbox
+              key={f}
+              label={f}
+              checked={fabric === f}
+              onChange={() => navigate("fabric", fabric === f ? null : f)}
+            />
+          ))}
         </div>
       </AccordionSection>
 
       {/* Size chips */}
-      <AccordionSection title="Size" count={filters.sizes.length}>
+      <AccordionSection title="Size" count={size ? 1 : 0}>
         <div className="flex flex-wrap gap-1.5">
           {SIZES.map((s) => {
-            const active = filters.sizes.includes(s);
+            const active = size === s;
             return (
               <button
                 key={s}
                 type="button"
                 aria-pressed={active}
-                onClick={() => toggle("sizes", s)}
+                onClick={() => navigate("size", active ? null : s)}
                 className={[
                   "flex h-9 min-w-[40px] items-center justify-center border px-2 text-[11px] font-semibold tracking-wide transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#8A5A6A]",
-                  active ? "border-[#8A5A6A] bg-[#8A5A6A] text-white" : "border-slate-200 bg-white text-slate-600 hover:border-slate-900",
+                  active
+                    ? "border-[#8A5A6A] bg-[#8A5A6A] text-white"
+                    : "border-slate-200 bg-white text-slate-600 hover:border-slate-900",
                 ].join(" ")}
               >
                 {s}
@@ -225,10 +260,10 @@ export default function FilterSidebar() {
       </AccordionSection>
 
       {/* Colour swatches */}
-      <AccordionSection title="Colour" count={filters.colors.length}>
+      <AccordionSection title="Colour" count={color ? 1 : 0}>
         <div className="flex flex-wrap gap-2">
           {COLORS.map(({ hex, label }) => {
-            const active = filters.colors.includes(hex);
+            const active = color === hex;
             const lightBg = ["#FFFFFF", "#C9A84C", "#E8A0B4", "#B5A09A"].includes(hex);
             return (
               <button
@@ -237,10 +272,12 @@ export default function FilterSidebar() {
                 aria-label={label}
                 aria-pressed={active}
                 title={label}
-                onClick={() => toggle("colors", hex)}
+                onClick={() => navigate("color", active ? null : hex)}
                 className={[
                   "relative h-7 w-7 rounded-full border-2 transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#8A5A6A] focus-visible:ring-offset-1",
-                  active ? "scale-110 border-[#8A5A6A] shadow-sm" : "border-slate-200 hover:scale-110 hover:border-slate-400",
+                  active
+                    ? "scale-110 border-[#8A5A6A] shadow-sm"
+                    : "border-slate-200 hover:scale-110 hover:border-slate-400",
                 ].join(" ")}
                 style={{ backgroundColor: hex }}
               >
@@ -248,7 +285,13 @@ export default function FilterSidebar() {
                 {active && (
                   <span className="absolute inset-0 flex items-center justify-center rounded-full">
                     <svg width="8" height="6" viewBox="0 0 8 6" fill="none">
-                      <path d="M1 3l2 2 4-4" stroke={lightBg ? "#1C1917" : "white"} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                      <path
+                        d="M1 3l2 2 4-4"
+                        stroke={lightBg ? "#1C1917" : "white"}
+                        strokeWidth="1.5"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      />
                     </svg>
                   </span>
                 )}
@@ -258,69 +301,58 @@ export default function FilterSidebar() {
         </div>
       </AccordionSection>
 
-      {/* Price range */}
-      <AccordionSection title="Price Range">
-        <div className="space-y-3">
-          <div className="flex items-center justify-between">
-            <span className="text-[11px] font-semibold text-slate-700">₹{filters.priceMin.toLocaleString("en-IN")}</span>
-            <span className="text-[11px] font-semibold text-slate-700">₹{filters.priceMax.toLocaleString("en-IN")}</span>
-          </div>
-          <div className="relative h-1 rounded-full bg-slate-100" aria-hidden="true">
-            <div
-              className="absolute h-full rounded-full bg-[#8A5A6A]"
-              style={{
-                left: `${((filters.priceMin - 499) / (29999 - 499)) * 100}%`,
-                right: `${100 - ((filters.priceMax - 499) / (29999 - 499)) * 100}%`,
-              }}
+      {/* Price Range — number inputs, no slider (as per Sprint 9B spec) */}
+      <AccordionSection title="Price Range" count={priceMin || priceMax ? 1 : 0}>
+        <div className="flex gap-2">
+          <div className="flex-1">
+            <label className="mb-1 block text-[9px] uppercase tracking-widest text-slate-400">Min (₹)</label>
+            <input
+              type="number"
+              min={0}
+              placeholder="499"
+              value={priceMin}
+              onChange={(e) => navigate("priceMin", e.target.value || null)}
+              className="w-full border border-slate-200 px-2 py-1.5 text-[11px] text-slate-700 focus:border-[#8A5A6A] focus:outline-none"
+              aria-label="Minimum price"
             />
           </div>
-          <input
-            type="range" min={499} max={29999} step={500}
-            value={filters.priceMax}
-            onChange={(e) => setFilters((p) => ({ ...p, priceMax: Number(e.target.value) }))}
-            className="w-full accent-[#8A5A6A]"
-            aria-label="Maximum price"
-          />
-          <div className="flex gap-2">
-            <div className="flex-1">
-              <label className="mb-1 block text-[9px] uppercase tracking-widest text-slate-400">Min</label>
-              <input
-                type="number" min={499} max={filters.priceMax} value={filters.priceMin}
-                onChange={(e) => setFilters((p) => ({ ...p, priceMin: Number(e.target.value) }))}
-                className="w-full border border-slate-200 px-2 py-1.5 text-[11px] text-slate-700 focus:border-[#8A5A6A] focus:outline-none"
-                aria-label="Minimum price"
-              />
-            </div>
-            <div className="flex-1">
-              <label className="mb-1 block text-[9px] uppercase tracking-widest text-slate-400">Max</label>
-              <input
-                type="number" min={filters.priceMin} max={29999} value={filters.priceMax}
-                onChange={(e) => setFilters((p) => ({ ...p, priceMax: Number(e.target.value) }))}
-                className="w-full border border-slate-200 px-2 py-1.5 text-[11px] text-slate-700 focus:border-[#8A5A6A] focus:outline-none"
-                aria-label="Maximum price"
-              />
-            </div>
+          <div className="flex-1">
+            <label className="mb-1 block text-[9px] uppercase tracking-widest text-slate-400">Max (₹)</label>
+            <input
+              type="number"
+              min={0}
+              placeholder="29999"
+              value={priceMax}
+              onChange={(e) => navigate("priceMax", e.target.value || null)}
+              className="w-full border border-slate-200 px-2 py-1.5 text-[11px] text-slate-700 focus:border-[#8A5A6A] focus:outline-none"
+              aria-label="Maximum price"
+            />
           </div>
         </div>
       </AccordionSection>
 
       {/* Availability */}
-      <AccordionSection title="Availability" count={filters.availability.length}>
+      <AccordionSection title="Availability" count={availability ? 1 : 0}>
         <div className="space-y-1.5">
-          {AVAILABILITY.map((v) => (
-            <Checkbox key={v} label={v} checked={filters.availability.includes(v)} onChange={() => toggle("availability", v)} />
-          ))}
-        </div>
-      </AccordionSection>
-
-      {/* Discount */}
-      <AccordionSection title="Discount" count={filters.discount.length}>
-        <div className="space-y-1.5">
-          {DISCOUNT_RANGES.map((d) => (
-            <Checkbox key={d} label={d} checked={filters.discount.includes(d)} onChange={() => toggle("discount", d)} />
+          {AVAILABILITY_OPTIONS.map(({ label, value }) => (
+            <Checkbox
+              key={value}
+              label={label}
+              checked={availability === value}
+              onChange={() => navigate("availability", availability === value ? null : value)}
+            />
           ))}
         </div>
       </AccordionSection>
     </aside>
+  );
+}
+
+// ─── Public export — wrapped in Suspense for useSearchParams ─────────────────
+export default function FilterSidebar() {
+  return (
+    <Suspense fallback={<div className="w-[260px]" />}>
+      <FilterSidebarInner />
+    </Suspense>
   );
 }
