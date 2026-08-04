@@ -52,13 +52,10 @@ export default function ProductInfo({ product, canonicalUrl }: Props) {
   const isLowStock = !isOutOfStock && (product.stock ?? 0) <= 5;
   const specs = product.specifications;
 
-  // Model info: pulled from specs if present, else null (hide strip entirely)
-  // Format expected: specs.modelInfo as a free-text string e.g.
-  // "Model is 5'7\", wears size S · Measurements: 34-26-36"
-  // Since ProductSpecification type does not include modelInfo yet,
-  // we cast safely to read it without touching types/product.ts.
-  const modelInfo = (specs as any)?.modelInfo as string | undefined;
-  const sizeWorn = (specs as any)?.sizeWorn as string | undefined;
+  // Model info: pulled from specs if present, else null (hide strip entirely).
+  // Fields are typed on ProductSpecification — no cast required.
+  const modelInfo = specs?.modelInfo;
+  const sizeWorn = specs?.sizeWorn;
 
   return (
     <div className="flex flex-col gap-6 lg:sticky lg:top-24 lg:self-start">
