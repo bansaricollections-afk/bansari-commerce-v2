@@ -2,7 +2,7 @@
  * POST /api/admin/homepage/[id]/duplicate
  */
 import { NextRequest, NextResponse } from 'next/server';
-import { requireAdmin } from '@/lib/auth/requireAdmin';
+import { requireAdminSession } from '@/lib/auth/requireAdmin';
 import { duplicateCampaign } from '@/services/homepage-campaign.service';
 import { CampaignError } from '@/lib/campaign-errors';
 
@@ -10,9 +10,10 @@ export const dynamic = 'force-dynamic';
 
 type Params = { params: Promise<{ id: string }> };
 
-export async function POST(_req: NextRequest, { params }: Params) {
+export async function POST(req: NextRequest, { params }: Params) {
   try {
-    await requireAdmin();
+    const auth = await requireAdminSession(req);
+    if (auth instanceof NextResponse) return auth;
     const { id } = await params;
     const campaign = await duplicateCampaign(id);
     return NextResponse.json({ campaign }, { status: 201 });

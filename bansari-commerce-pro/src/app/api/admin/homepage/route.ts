@@ -3,7 +3,7 @@
  * POST /api/admin/homepage  — create a campaign
  */
 import { NextRequest, NextResponse } from 'next/server';
-import { requireAdmin } from '@/lib/auth/requireAdmin';
+import { requireAdminSession } from '@/lib/auth/requireAdmin';
 import { listAllCampaigns, createCampaign } from '@/services/homepage-campaign.service';
 import { CampaignError } from '@/lib/campaign-errors';
 
@@ -31,9 +31,10 @@ function validateCtaUrl(url: unknown): string | null {
   }
 }
 
-export async function GET() {
+export async function GET(req: NextRequest) {
   try {
-    await requireAdmin();
+    const auth = await requireAdminSession(req);
+    if (auth instanceof NextResponse) return auth;
     const campaigns = await listAllCampaigns();
     return NextResponse.json({ campaigns });
   } catch (err) {
@@ -47,7 +48,8 @@ export async function GET() {
 
 export async function POST(req: NextRequest) {
   try {
-    await requireAdmin();
+    const auth = await requireAdminSession(req);
+    if (auth instanceof NextResponse) return auth;
     const payload = await req.json();
     if (!payload?.title) {
       return NextResponse.json({ error: 'title is required' }, { status: 400 });
