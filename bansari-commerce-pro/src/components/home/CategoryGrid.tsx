@@ -1,169 +1,377 @@
 "use client";
 
-import Link from 'next/link';
-import ImageWithFallback from '@/components/ui/ImageWithFallback';
+import Image from "next/image";
+import Link from "next/link";
 
-// ── Normalized filenames: no spaces, no uppercase, no fragile paths ──────────
-const categories = [
+/* ------------------------------------------------------------------
+   CATEGORY DATA
+   occasion: occasion-led label (not marketing copy)
+   objectPosition: tuned per garment for face → embroidery priority
+------------------------------------------------------------------ */
+const featured = {
+  title: "Sarees",
+  occasion: "Wedding & Celebration",
+  image: "/categories/sarees.png",
+  alt: "Model in embroidered silk saree — face, neck embroidery and pallu border visible",
+  link: "/shop?category=sarees",
+  objectPosition: "center top",
+};
+
+const supporting: {
+  title: string;
+  occasion: string;
+  image: string;
+  alt: string;
+  link: string;
+  objectPosition: string;
+}[] = [
   {
-    id: 'sarees',
-    label: 'Sarees',
-    href: '/shop?category=sarees',
-    image: '/categories/sarees.png',
-    alt: 'Sarees — silk, cotton, georgette and more',
-    span: 'large',
+    title: "Kurta Sets",
+    occasion: "Contemporary Ease",
+    image: "/categories/kurta.png",
+    alt: "Model in embroidered kurta set — yoke embroidery and sleeve detail visible",
+    link: "/shop?category=kurta-sets",
+    objectPosition: "center 20%",
   },
   {
-    id: 'suits',
-    label: 'Suits & Sets',
-    href: '/shop?category=suits',
-    image: '/categories/suits.png',
-    alt: 'Suits and sets — salwar, anarkali and pant suits',
-    span: 'normal',
+    title: "Co-ord Sets",
+    occasion: "Modern Ease",
+    image: "/categories/coords.png",
+    alt: "Model in co-ord set — full silhouette and garment composition visible",
+    link: "/shop?category=co-ord-sets",
+    objectPosition: "center center",
   },
   {
-    id: 'kurtis',
-    label: 'Kurtis',
-    href: '/shop?category=kurtis',
-    image: '/categories/kurtis.png',
-    alt: 'Kurtis — casual, festive and work kurtis',
-    span: 'normal',
+    title: "Anarkali",
+    occasion: "Timeless Grace",
+    image: "/categories/anarkali.png",
+    alt: "Model in Anarkali — face, neck embroidery and flared silhouette visible",
+    link: "/shop?category=anarkali",
+    objectPosition: "center top",
   },
   {
-    id: 'lehengas',
-    label: 'Lehengas',
-    href: '/shop?category=lehengas',
-    image: '/categories/lehengas.png',
-    alt: 'Lehengas — bridal and occasion lehenga cholis',
-    span: 'normal',
-  },
-  {
-    id: 'western-wear',
-    label: 'Western Wear',
-    href: '/shop?category=western-wear',
-    // Previously: 'western wear.png' — spaces removed, lowercase enforced
-    image: '/categories/western-wear.png',
-    alt: 'Western wear — indo-western fusion outfits',
-    span: 'normal',
-  },
-  {
-    id: 'ethnic-glory',
-    label: 'Ethnic Glory',
-    href: '/shop?category=ethnic-glory',
-    // Previously: 'Ethnic Glory.png' — spaces removed, lowercase enforced
-    image: '/categories/ethnic-glory.png',
-    alt: 'Ethnic glory — premium ethnic collection',
-    span: 'large',
+    title: "Western Wear",
+    occasion: "Modern Silhouettes",
+    image: "/categories/western-wear.png",
+    alt: "Model in western wear — full silhouette and garment cut visible",
+    link: "/shop?category=western-wear",
+    objectPosition: "center center",
   },
 ];
 
+const closing = {
+  title: "Ethnic Glory",
+  occasion: "Heritage Craft",
+  image: "/categories/ethnic-glory.png",
+  alt: "Model in ethnic ensemble — border embroidery and garment heritage detail visible",
+  link: "/shop?category=ethnic-glory",
+  objectPosition: "center 30%",
+};
+
+/* ------------------------------------------------------------------
+   TILE LABEL OVERLAY
+   Sits inside the image plane at the bottom.
+   No external card div. No shadow. No radius.
+------------------------------------------------------------------ */
+function TileLabel({
+  title,
+  occasion,
+  cta = true,
+}: {
+  title: string;
+  occasion: string;
+  cta?: boolean;
+}) {
+  return (
+    <div
+      className="absolute inset-x-0 bottom-0 flex flex-col gap-0.5 px-5 pb-5 pt-10"
+      style={{
+        background:
+          `linear-gradient(to top, var(--bc-surface-overlay-deep) 0%, rgba(29,16,24,0.28) 60%, transparent 100%)`,
+      }}
+    >
+      <span
+        style={{
+          fontFamily: "var(--font-inter), sans-serif",
+          fontSize: "var(--bc-text-xs)",
+          color: "var(--bc-text-gold)",
+          letterSpacing: "0.14em",
+          textTransform: "uppercase",
+          display: "block",
+        }}
+      >
+        {occasion}
+      </span>
+      <span
+        style={{
+          fontFamily: "var(--font-playfair), serif",
+          fontSize: "var(--bc-text-lg)",
+          color: "var(--bc-text-inverse)",
+          fontWeight: 500,
+          lineHeight: 1.15,
+          display: "block",
+        }}
+      >
+        {title}
+      </span>
+      {cta && (
+        <span
+          style={{
+            fontFamily: "var(--font-inter), sans-serif",
+            fontSize: "var(--bc-text-sm)",
+            color: "var(--bc-text-inverse)",
+            opacity: 0.72,
+            marginTop: "var(--bc-space-1)",
+            display: "block",
+          }}
+        >
+          Discover →
+        </span>
+      )}
+    </div>
+  );
+}
+
+/* ------------------------------------------------------------------
+   IMAGE TILE
+   overflow-hidden on the outer Link clips the scale transform.
+   No shadow. No radius. Scale 1 → 1.025 over 700 ms ease-out only.
+------------------------------------------------------------------ */
+function ImageTile({
+  title,
+  occasion,
+  image,
+  alt,
+  link,
+  objectPosition,
+  priority = false,
+  className = "",
+  sizes = "50vw",
+}: {
+  title: string;
+  occasion: string;
+  image: string;
+  alt: string;
+  link: string;
+  objectPosition: string;
+  priority?: boolean;
+  className?: string;
+  sizes?: string;
+}) {
+  return (
+    <Link
+      href={link}
+      aria-label={`Shop ${title} — ${occasion}`}
+      className={`relative block overflow-hidden${className ? ` ${className}` : ""}`}
+    >
+      <div
+        className="h-full w-full"
+        style={{ transition: "transform 700ms ease-out" }}
+        onMouseEnter={(e) => {
+          (e.currentTarget as HTMLDivElement).style.transform = "scale(1.025)";
+        }}
+        onMouseLeave={(e) => {
+          (e.currentTarget as HTMLDivElement).style.transform = "scale(1)";
+        }}
+      >
+        <Image
+          src={image}
+          alt={alt}
+          fill
+          sizes={sizes}
+          priority={priority}
+          className="object-cover"
+          style={{ objectPosition }}
+        />
+      </div>
+      <TileLabel title={title} occasion={occasion} />
+    </Link>
+  );
+}
+
+/* ------------------------------------------------------------------
+   CATEGORY GRID — LUXURY EDITORIAL v2
+   Desktop: featured (left, ~60%) + 2×2 supporting grid (right, ~40%)
+   Closing: full-width editorial band for Ethnic Glory
+   Mobile: natural single-column stack — no carousel
+   Gap: 1px (flush, editorial — closer to Massimo Dutti)
+------------------------------------------------------------------ */
 export default function CategoryGrid() {
   return (
     <section
-      aria-label="Shop by category"
+      aria-label="Shop The Edit — curated category discovery"
       style={{
-        backgroundColor: 'var(--bc-surface-cream)',
-        paddingBlock: 'var(--bc-section-padding)',
-        borderTop: '1px solid var(--bc-border-soft)',
+        backgroundColor: "var(--bc-surface-warm)",
+        paddingBlock: "var(--bc-section-padding)",
       }}
     >
       <div
         className="mx-auto"
         style={{
-          maxWidth: 'var(--bc-content-wide)',
-          paddingInline: 'var(--bc-gutter)',
+          maxWidth: "var(--bc-content-wide)",
+          paddingInline: "var(--bc-gutter)",
         }}
       >
-        <div style={{ marginBottom: 'var(--bc-space-10)' }}>
+        {/* ── Section heading ── */}
+        <div
+          style={{
+            marginBottom: "var(--bc-space-10)",
+            borderBottom: "1px solid var(--bc-border-soft)",
+            paddingBottom: "var(--bc-space-6)",
+          }}
+        >
           <p
             style={{
-              fontFamily: 'var(--font-inter), sans-serif',
-              fontSize: 'var(--bc-text-xs)',
+              fontFamily: "var(--font-inter), sans-serif",
+              fontSize: "var(--bc-text-xs)",
               fontWeight: 500,
-              letterSpacing: '0.18em',
-              textTransform: 'uppercase',
-              color: 'var(--bc-text-gold)',
-              marginBottom: 'var(--bc-space-2)',
+              letterSpacing: "0.18em",
+              textTransform: "uppercase",
+              color: "var(--bc-text-gold)",
+              marginBottom: "var(--bc-space-2)",
             }}
           >
-            The Collection
+            The Edit
           </p>
           <h2
             style={{
-              fontFamily: 'var(--font-playfair), serif',
-              fontSize: 'var(--bc-text-2xl)',
+              fontFamily: "var(--font-playfair), serif",
+              fontSize: "var(--bc-text-xl)",
               fontWeight: 400,
-              lineHeight: 1.1,
-              color: 'var(--bc-text-primary)',
+              color: "var(--bc-text-primary)",
+              lineHeight: 1.12,
+              letterSpacing: "-0.01em",
             }}
           >
-            Shop By Category
+            Curated for You
           </h2>
         </div>
 
+        {/* ── Main layout: featured left + 2×2 supporting right ── */}
+        <div className="grid gap-px md:grid-cols-[3fr_2fr]">
+          {/* Featured tile — Sarees */}
+          <ImageTile
+            {...featured}
+            priority
+            sizes="(min-width: 768px) 60vw, 100vw"
+            className="min-h-[420px] md:min-h-[680px]"
+          />
+
+          {/* Supporting 2×2 grid */}
+          <div className="grid grid-cols-2 gap-px">
+            {supporting.map((cat) => (
+              <ImageTile
+                key={cat.title}
+                {...cat}
+                priority={false}
+                sizes="(min-width: 768px) 20vw, 50vw"
+                className="min-h-[200px] md:min-h-[336px]"
+              />
+            ))}
+          </div>
+        </div>
+
+        {/* ── Closing editorial band — Ethnic Glory ── */}
         <div
+          className="mt-px grid md:grid-cols-[1fr_2fr] items-center"
           style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(3, 1fr)',
-            gap: 'var(--bc-space-3)',
+            borderTop: "1px solid var(--bc-border-soft)",
+            borderBottom: "1px solid var(--bc-border-soft)",
+            backgroundColor: "var(--bc-surface-cream)",
           }}
         >
-          {categories.map((cat) => (
-            <Link
-              key={cat.id}
-              href={cat.href}
+          {/* Editorial text side */}
+          <div
+            className="flex flex-col justify-center"
+            style={{ padding: "var(--bc-space-10) var(--bc-space-8)" }}
+          >
+            <p
               style={{
-                display: 'block',
-                textDecoration: 'none',
-                gridColumn: cat.span === 'large' ? 'span 2' : 'span 1',
+                fontFamily: "var(--font-inter), sans-serif",
+                fontSize: "var(--bc-text-xs)",
+                fontWeight: 500,
+                letterSpacing: "0.18em",
+                textTransform: "uppercase",
+                color: "var(--bc-text-gold)",
+                marginBottom: "var(--bc-space-3)",
               }}
             >
-              <div
-                style={{
-                  position: 'relative',
-                  aspectRatio: cat.span === 'large' ? '16/9' : '3/4',
-                  overflow: 'hidden',
-                  borderRadius: '2px',
-                  backgroundColor: 'var(--bc-surface-offset)',
-                }}
-              >
-                <ImageWithFallback
-                  src={cat.image}
-                  alt={cat.alt}
-                  fill
-                  sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 400px"
-                  style={{ objectFit: 'cover' }}
-                />
-                <div
-                  style={{
-                    position: 'absolute',
-                    inset: 0,
-                    background:
-                      'linear-gradient(to top, rgba(0,0,0,0.5) 0%, transparent 55%)',
-                  }}
-                />
-                <div
-                  style={{
-                    position: 'absolute',
-                    bottom: 'var(--bc-space-4)',
-                    left: 'var(--bc-space-4)',
-                  }}
-                >
-                  <span
-                    style={{
-                      fontFamily: 'var(--font-playfair), serif',
-                      fontSize: 'var(--bc-text-lg)',
-                      fontWeight: 400,
-                      color: '#fff',
-                      lineHeight: 1.2,
-                    }}
-                  >
-                    {cat.label}
-                  </span>
-                </div>
-              </div>
+              {closing.occasion}
+            </p>
+            <h3
+              style={{
+                fontFamily: "var(--font-playfair), serif",
+                fontSize: "var(--bc-text-xl)",
+                fontWeight: 400,
+                color: "var(--bc-text-primary)",
+                lineHeight: 1.12,
+                letterSpacing: "-0.01em",
+                marginBottom: "var(--bc-space-4)",
+              }}
+            >
+              {closing.title}
+            </h3>
+            <p
+              style={{
+                fontFamily: "var(--font-inter), sans-serif",
+                fontSize: "var(--bc-text-sm)",
+                color: "var(--bc-text-muted)",
+                maxWidth: "32ch",
+                lineHeight: 1.75,
+                marginBottom: "var(--bc-space-6)",
+              }}
+            >
+              Craftsmanship rooted in tradition. Each piece honours the artisans
+              behind every stitch.
+            </p>
+            <Link
+              href={closing.link}
+              aria-label={`Shop ${closing.title} — ${closing.occasion}`}
+              style={{
+                fontFamily: "var(--font-inter), sans-serif",
+                fontSize: "var(--bc-text-xs)",
+                fontWeight: 500,
+                letterSpacing: "0.12em",
+                textTransform: "uppercase",
+                color: "var(--bc-text-secondary)",
+                borderBottom: "1px solid var(--bc-border-gold)",
+                paddingBottom: "2px",
+                display: "inline-flex",
+                alignItems: "center",
+                gap: "var(--bc-space-1)",
+                width: "fit-content",
+                transition: "color var(--bc-transition-base), border-color var(--bc-transition-base)",
+              }}
+            >
+              Discover the collection
             </Link>
-          ))}
+          </div>
+
+          {/* Image side */}
+          <div
+            className="relative overflow-hidden"
+            style={{ height: "clamp(260px, 36vw, 480px)" }}
+          >
+            <div
+              className="h-full w-full"
+              style={{ transition: "transform 700ms ease-out" }}
+              onMouseEnter={(e) => {
+                (e.currentTarget as HTMLDivElement).style.transform = "scale(1.025)";
+              }}
+              onMouseLeave={(e) => {
+                (e.currentTarget as HTMLDivElement).style.transform = "scale(1)";
+              }}
+            >
+              <Image
+                src={closing.image}
+                alt={closing.alt}
+                fill
+                sizes="(min-width: 768px) 66vw, 100vw"
+                className="object-cover"
+                style={{ objectPosition: closing.objectPosition }}
+              />
+            </div>
+          </div>
         </div>
       </div>
     </section>

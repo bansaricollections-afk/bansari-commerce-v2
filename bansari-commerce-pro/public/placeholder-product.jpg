@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="800" height="1000" viewBox="0 0 800 1000">
+  <rect width="800" height="1000" fill="#f5f0eb"/>
+  <rect x="0" y="880" width="800" height="120" fill="#1d1018"/>
+  <text x="400" y="945" font-family="Georgia, serif" font-size="16" fill="#c9a96e" text-anchor="middle" letter-spacing="3">BANSARI COMMERCE PRO</text>
+  <line x1="280" y1="860" x2="520" y2="860" stroke="#c9a96e" stroke-width="1" opacity="0.4"/>
+  <rect x="300" y="320" width="200" height="240" rx="2" fill="none" stroke="#c9a96e" stroke-width="1" opacity="0.4"/>
+  <line x1="360" y1="320" x2="340" y2="280" stroke="#c9a96e" stroke-width="1" opacity="0.3"/>
+  <line x1="440" y1="320" x2="460" y2="280" stroke="#c9a96e" stroke-width="1" opacity="0.3"/>
+  <line x1="340" y1="280" x2="460" y2="280" stroke="#c9a96e" stroke-width="1" opacity="0.3"/>
+  <text x="400" y="630" font-family="Georgia, serif" font-size="13" fill="#9e8a7a" text-anchor="middle" letter-spacing="2" opacity="0.6">NO IMAGE AVAILABLE</text>
+</svg>

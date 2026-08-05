@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="900" viewBox="0 0 1600 900">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#1d1018"/>
+      <stop offset="100%" stop-color="#2e1a24"/>
+    </linearGradient>
+  </defs>
+  <rect width="1600" height="900" fill="url(#bg)"/>
+  <rect x="0" y="0" width="600" height="900" fill="#f5f0eb" opacity="0.04"/>
+  <line x1="640" y1="300" x2="960" y2="300" stroke="#c9a96e" stroke-width="1" opacity="0.3"/>
+  <line x1="640" y1="580" x2="960" y2="580" stroke="#c9a96e" stroke-width="1" opacity="0.3"/>
+  <text x="800" y="390" font-family="Georgia, serif" font-size="56" font-weight="400" fill="#f5f0eb" text-anchor="middle" letter-spacing="6">BANSARI</text>
+  <text x="800" y="460" font-family="Georgia, serif" font-size="22" font-weight="400" fill="#c9a96e" text-anchor="middle" letter-spacing="12">COMMERCE PRO</text>
+  <text x="800" y="540" font-family="Georgia, serif" font-size="14" fill="#f5f0eb" text-anchor="middle" letter-spacing="3" opacity="0.5">HERO PLACEHOLDER — REPLACE WITH PRODUCTION ASSET</text>
+</svg>

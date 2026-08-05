@@ -5,6 +5,7 @@ import {
   logServiceError,
 } from '@/lib/debug/product-debug';
 import type { FilterParams, PaginationMeta, SortOption } from '@/types/filter-params';
+import { resolveProductImages } from '@/lib/mappers/product.mapper';
 
 // ---------------------------------------------------------------------------
 // Types — fields must exactly match public.products column names
@@ -77,6 +78,10 @@ const PRODUCT_SELECT =
 
 // ---------------------------------------------------------------------------
 // mapRow — normalises a raw Supabase row into the Product shape
+//
+// Every public query function (getProducts, getFeaturedProducts, etc.) MUST
+// pipe its rows through mapRow.  mapRow itself calls resolveProductImages()
+// from the canonical product.mapper so image resolution is a single owner.
 // ---------------------------------------------------------------------------
 
 function mapRow(row: Record<string, any>): Product {
@@ -100,14 +105,19 @@ function mapRow(row: Record<string, any>): Product {
         }))
       : undefined;
 
+  // Resolve images through the canonical mapper — this is the single place
+  // where image normalisation and placeholder injection happen.
+  const productName: string = typeof row['name'] === 'string' ? row['name'] : 'Product';
+  const images = resolveProductImages(row['images'], productName);
+
   return {
     id: row['id'],
-    name: row['name'],
+    name: productName,
     slug: row['slug'] ?? '',
     price: row['price'],
     stock: row['stock'] ?? 0,
     active: row['active'] ?? false,
-    images: row['images'] ?? [],
+    images,
     category: row['category'] ?? undefined,
     featured: row['featured'] ?? false,
     newArrival: row['new_arrival'] ?? false,
