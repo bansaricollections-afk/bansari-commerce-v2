@@ -2,10 +2,31 @@
 
 import Image from "next/image";
 import Link from "next/link";
+import { useState } from "react";
+
+/* ------------------------------------------------------------------
+   BRANDED PLACEHOLDER — shown when a local /public image is missing.
+   Pure CSS: no network request, no broken-image icon, brand-safe.
+------------------------------------------------------------------ */
+const PLACEHOLDER_STYLE: React.CSSProperties = {
+  position: "absolute",
+  inset: 0,
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "center",
+  backgroundColor: "#F5F0EB",
+  color: "#C4A882",
+  fontSize: "0.75rem",
+  fontFamily: "var(--font-inter), sans-serif",
+  letterSpacing: "0.12em",
+  textTransform: "uppercase",
+};
 
 /* ------------------------------------------------------------------
    CATEGORY DATA
-   occasion: occasion-led label (not marketing copy)
+   IMPORTANT: No spaces in filenames. "western wear.png" renamed to
+   "western-wear.png" to avoid 404 on web servers / CDNs that do not
+   URL-encode paths consistently.
    objectPosition: tuned per garment for face → embroidery priority
 ------------------------------------------------------------------ */
 const featured = {
@@ -52,7 +73,10 @@ const supporting: {
   {
     title: "Western Wear",
     occasion: "Modern Silhouettes",
-    image: "/categories/western wear.png",
+    // Renamed from "western wear.png" (space) to "western-wear.png" (hyphen)
+    // A space in the filename produces a 404 on most static servers and CDNs
+    // unless the path is explicitly percent-encoded — Next.js does NOT do this.
+    image: "/categories/western-wear.png",
     alt: "Model in western wear — full silhouette and garment cut visible",
     link: "/shop?category=western-wear",
     objectPosition: "center center",
@@ -70,8 +94,6 @@ const closing = {
 
 /* ------------------------------------------------------------------
    TILE LABEL OVERLAY
-   Sits inside the image plane at the bottom.
-   No external card div. No shadow. No radius.
 ------------------------------------------------------------------ */
 function TileLabel({
   title,
@@ -134,8 +156,8 @@ function TileLabel({
 
 /* ------------------------------------------------------------------
    IMAGE TILE
-   overflow-hidden on the outer Link clips the scale transform.
-   No shadow. No radius. Scale 1 → 1.025 over 700 ms ease-out only.
+   - onError: renders a branded CSS placeholder instead of a broken
+     image icon. Never a 404 state visible to the user.
 ------------------------------------------------------------------ */
 function ImageTile({
   title,
@@ -158,6 +180,8 @@ function ImageTile({
   className?: string;
   sizes?: string;
 }) {
+  const [errored, setErrored] = useState(false);
+
   return (
     <Link
       href={link}
@@ -174,15 +198,22 @@ function ImageTile({
           (e.currentTarget as HTMLDivElement).style.transform = "scale(1)";
         }}
       >
-        <Image
-          src={image}
-          alt={alt}
-          fill
-          sizes={sizes}
-          priority={priority}
-          className="object-cover"
-          style={{ objectPosition }}
-        />
+        {errored ? (
+          <div style={PLACEHOLDER_STYLE} aria-label={alt}>
+            {title}
+          </div>
+        ) : (
+          <Image
+            src={image}
+            alt={alt}
+            fill
+            sizes={sizes}
+            priority={priority}
+            className="object-cover"
+            style={{ objectPosition }}
+            onError={() => setErrored(true)}
+          />
+        )}
       </div>
       <TileLabel title={title} occasion={occasion} />
     </Link>
@@ -191,12 +222,10 @@ function ImageTile({
 
 /* ------------------------------------------------------------------
    CATEGORY GRID — LUXURY EDITORIAL v2
-   Desktop: featured (left, ~60%) + 2×2 supporting grid (right, ~40%)
-   Closing: full-width editorial band for Ethnic Glory
-   Mobile: natural single-column stack — no carousel
-   Gap: 1px (flush, editorial — closer to Massimo Dutti)
 ------------------------------------------------------------------ */
 export default function CategoryGrid() {
+  const [closingErrored, setClosingErrored] = useState(false);
+
   return (
     <section
       aria-label="Shop The Edit — curated category discovery"
@@ -362,14 +391,21 @@ export default function CategoryGrid() {
                 (e.currentTarget as HTMLDivElement).style.transform = "scale(1)";
               }}
             >
-              <Image
-                src={closing.image}
-                alt={closing.alt}
-                fill
-                sizes="(min-width: 768px) 66vw, 100vw"
-                className="object-cover"
-                style={{ objectPosition: closing.objectPosition }}
-              />
+              {closingErrored ? (
+                <div style={{ ...PLACEHOLDER_STYLE, position: "absolute", inset: 0 }} aria-label={closing.alt}>
+                  {closing.title}
+                </div>
+              ) : (
+                <Image
+                  src={closing.image}
+                  alt={closing.alt}
+                  fill
+                  sizes="(min-width: 768px) 66vw, 100vw"
+                  className="object-cover"
+                  style={{ objectPosition: closing.objectPosition }}
+                  onError={() => setClosingErrored(true)}
+                />
+              )}
             </div>
           </div>
         </div>

@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 
@@ -10,8 +11,10 @@ import Link from "next/link";
    Handle: @bansari_collections  (with underscore)
 
    Images: Unsplash ethnic fashion (free commercial use)
-   unoptimized={true} — bypasses /_next/image optimizer to avoid
-   CORS/CSP issues in preview and staging environments.
+   Domain "images.unsplash.com" is in next.config.ts remotePatterns ✓
+   next/image optimisation is ENABLED (unoptimized flag removed).
+
+   onError: branded placeholder — never a broken-image icon.
 ------------------------------------------------------------------ */
 
 const INSTAGRAM_URL = "https://instagram.com/bansari_collections";
@@ -43,6 +46,61 @@ const gallery = [
     alt: "Bansari — midnight blue georgette saree",
   },
 ];
+
+function GalleryTile({ src, alt }: { src: string; alt: string }) {
+  const [errored, setErrored] = useState(false);
+
+  return (
+    <Link
+      href={INSTAGRAM_URL}
+      target="_blank"
+      rel="noopener noreferrer"
+      aria-label={alt}
+      className="bc-instagram-tile relative block aspect-square overflow-hidden"
+    >
+      <div
+        className="bc-instagram-tile__inner h-full w-full"
+        style={{ transition: "transform 700ms ease-out" }}
+        onMouseEnter={(e) => {
+          (e.currentTarget as HTMLDivElement).style.transform = "scale(1.025)";
+        }}
+        onMouseLeave={(e) => {
+          (e.currentTarget as HTMLDivElement).style.transform = "scale(1)";
+        }}
+      >
+        {errored ? (
+          <div
+            style={{
+              position: "absolute",
+              inset: 0,
+              backgroundColor: "#F5F0EB",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              color: "#C4A882",
+              fontSize: "0.625rem",
+              fontFamily: "var(--font-inter), sans-serif",
+              letterSpacing: "0.14em",
+              textTransform: "uppercase",
+            }}
+            aria-label={alt}
+          >
+            Bansari
+          </div>
+        ) : (
+          <Image
+            src={src}
+            alt={alt}
+            fill
+            sizes="(min-width: 768px) 33vw, 50vw"
+            className="object-cover"
+            onError={() => setErrored(true)}
+          />
+        )}
+      </div>
+    </Link>
+  );
+}
 
 export default function InstagramGallery() {
   return (
@@ -132,34 +190,7 @@ export default function InstagramGallery() {
         {/* ── Gallery grid ── */}
         <div className="grid grid-cols-2 gap-px md:grid-cols-3">
           {gallery.map(({ src, alt }, index) => (
-            <Link
-              href={INSTAGRAM_URL}
-              target="_blank"
-              rel="noopener noreferrer"
-              key={index}
-              aria-label={alt}
-              className="bc-instagram-tile relative block aspect-square overflow-hidden"
-            >
-              <div
-                className="bc-instagram-tile__inner h-full w-full"
-                style={{ transition: "transform 700ms ease-out" }}
-                onMouseEnter={(e) => {
-                  (e.currentTarget as HTMLDivElement).style.transform = "scale(1.025)";
-                }}
-                onMouseLeave={(e) => {
-                  (e.currentTarget as HTMLDivElement).style.transform = "scale(1)";
-                }}
-              >
-                <Image
-                  src={src}
-                  alt={alt}
-                  fill
-                  unoptimized
-                  sizes="(min-width: 768px) 33vw, 50vw"
-                  className="object-cover"
-                />
-              </div>
-            </Link>
+            <GalleryTile key={index} src={src} alt={alt} />
           ))}
         </div>
       </div>
