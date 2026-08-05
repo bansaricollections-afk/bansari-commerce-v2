@@ -1,10 +1,18 @@
+"use client";
+
+import { useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import SectionTitle from "../ui/SectionTitle";
 
 /* ----------------------------------------------------------------
-   Real Unsplash ethnic fashion images — free commercial use.
-   Replaces broken /categories/*.jpg local files.
+   Celebration Edit — Occasion imagery
+
+   Image source: Unsplash (free commercial use)
+   Domain "images.unsplash.com" is in next.config.ts remotePatterns ✓
+   next/image optimisation is ENABLED (unoptimized removed).
+
+   onError: renders a branded CSS placeholder — never a broken icon.
 ---------------------------------------------------------------- */
 const occasions = [
   {
@@ -37,6 +45,55 @@ const occasions = [
   },
 ];
 
+function OccasionCard({ title, href, image, alt }: typeof occasions[0]) {
+  const [errored, setErrored] = useState(false);
+
+  return (
+    <Link
+      key={title}
+      href={href}
+      className="group overflow-hidden rounded-3xl"
+    >
+      <div className="relative">
+        {errored ? (
+          <div
+            style={{
+              height: 420,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              backgroundColor: "#F5F0EB",
+              color: "#C4A882",
+              fontFamily: "var(--font-inter), sans-serif",
+              fontSize: "0.75rem",
+              letterSpacing: "0.12em",
+              textTransform: "uppercase",
+            }}
+            aria-label={alt}
+          >
+            {title}
+          </div>
+        ) : (
+          <Image
+            src={image}
+            alt={alt}
+            width={500}
+            height={700}
+            className="h-[420px] w-full object-cover transition duration-700 group-hover:scale-105"
+            onError={() => setErrored(true)}
+          />
+        )}
+        <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/10 to-transparent" />
+        <div className="absolute bottom-8 left-8">
+          <h3 className="text-2xl font-semibold text-white">
+            {title}
+          </h3>
+        </div>
+      </div>
+    </Link>
+  );
+}
+
 export default function CelebrationEdit() {
   return (
     <section className="bg-[#FFFDF9] py-24">
@@ -49,28 +106,7 @@ export default function CelebrationEdit() {
 
         <div className="grid gap-8 md:grid-cols-2 lg:grid-cols-4">
           {occasions.map((item) => (
-            <Link
-              key={item.title}
-              href={item.href}
-              className="group overflow-hidden rounded-3xl"
-            >
-              <div className="relative">
-                <Image
-                  src={item.image}
-                  alt={item.alt}
-                  width={500}
-                  height={700}
-                  unoptimized
-                  className="h-[420px] w-full object-cover transition duration-700 group-hover:scale-105"
-                />
-                <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/10 to-transparent" />
-                <div className="absolute bottom-8 left-8">
-                  <h3 className="text-2xl font-semibold text-white">
-                    {item.title}
-                  </h3>
-                </div>
-              </div>
-            </Link>
+            <OccasionCard key={item.title} {...item} />
           ))}
         </div>
       </div>

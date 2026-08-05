@@ -15,13 +15,30 @@ type Props = {
   priority?: boolean;
 };
 
+/**
+ * BRANDED PLACEHOLDER — inline SVG data-URI.
+ *
+ * /placeholder.png does NOT exist in /public. Rather than serving a
+ * 404 through the Next.js image optimizer (which breaks the img tag
+ * visually and logs a noisy error), we use an inline SVG that:
+ *   - Makes zero network requests
+ *   - Never shows a broken-image icon
+ *   - Is brand-safe (cream background, mauve monogram)
+ *   - Is valid for `src` on <next/image> because it is a data: URI
+ *
+ * The SVG is a simple 300×400 cream rectangle with a centred "B" mark.
+ */
+const BRAND_PLACEHOLDER_SVG = `<svg xmlns="http://www.w3.org/2000/svg" width="300" height="400" viewBox="0 0 300 400"><rect width="300" height="400" fill="#F5F0EB"/><text x="150" y="210" font-family="Georgia,serif" font-size="64" font-weight="300" text-anchor="middle" fill="#C4A882" opacity="0.6">B</text></svg>`;
+const BRAND_PLACEHOLDER = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(BRAND_PLACEHOLDER_SVG)}`;
+
 export default function ProductCard({ product, priority = false }: Props) {
   const [wishlisted, setWishlisted] = useState(false);
   const [hovered, setHovered] = useState(false);
   const [quickAdded, setQuickAdded] = useState(false);
   const { addItem } = useCart();
 
-  const primaryImage = product.images?.[0]?.url || "/placeholder.png";
+  // Use brand placeholder instead of /placeholder.png (which does not exist)
+  const primaryImage = product.images?.[0]?.url || BRAND_PLACEHOLDER;
   const hoverImage = product.images?.[1]?.url || primaryImage;
 
   // Debug: log once on mount per card instance
@@ -93,6 +110,8 @@ export default function ProductCard({ product, priority = false }: Props) {
               "transition-[opacity] duration-[700ms] ease-out",
               hovered ? "opacity-0" : "opacity-100",
             ].join(" ")}
+            // data: URIs do not go through the optimizer — unoptimized only for placeholder
+            unoptimized={primaryImage.startsWith("data:")}
           />
 
           {/* Hover image — gentle zoom */}
@@ -107,6 +126,7 @@ export default function ProductCard({ product, priority = false }: Props) {
               "transition-[transform,opacity] duration-[700ms] ease-out",
               hovered ? "scale-[1.04] opacity-100" : "scale-100 opacity-0",
             ].join(" ")}
+            unoptimized={hoverImage.startsWith("data:")}
           />
 
           {/* Hover overlay — very subtle scrim */}
