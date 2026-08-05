@@ -1,0 +1,20 @@
+--- PATCH INSTRUCTIONS FOR ProductManagement.tsx ---
+
+This file is too large to push in full via this commit.
+Apply this single-line change manually or via `sed`:
+
+FILE: src/components/admin/products/ProductManagement.tsx
+
+FIND (exact string, line ~1580):
+  placeholder="Model is 5'7\", Measurements: 34-26-36"
+
+REPLACE WITH:
+  placeholder={`Model is 5'7", Measurements: 34-26-36`}
+
+WHY: A double-quote character inside a JSX string attribute delimited by double
+quotes terminates the attribute early, causing a parse error at compile time.
+Using a template literal (backtick) as a JSX expression eliminates the conflict.
+
+Bash one-liner to apply:
+  sed -i 's/placeholder="Model is 5'\''7\\", Measurements: 34-26-36"/placeholder={`Model is 5'\''7", Measurements: 34-26-36`}/' \
+    src/components/admin/products/ProductManagement.tsx
