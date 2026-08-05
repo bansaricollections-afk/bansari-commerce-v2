@@ -1,123 +1,79 @@
 import type { NextConfig } from 'next';
-import crypto from 'crypto';
 
-const isDev = process.env.NODE_ENV === 'development';
+// Supabase project reference — read from env, with safe fallback for build time
+const supabaseHostname =
+  process.env.NEXT_PUBLIC_SUPABASE_URL
+    ? new URL(process.env.NEXT_PUBLIC_SUPABASE_URL).hostname
+    : '*.supabase.co';
 
 const nextConfig: NextConfig = {
-  compress: true,
-  poweredByHeader: false,
-
-  // Force a unique build ID on every deploy so Turbopack never reuses
-  // stale cached chunks from a previous build (e.g. old column references).
-  generateBuildId: async () => {
-    return crypto.randomBytes(8).toString('hex');
-  },
-
   images: {
+    // Remote patterns — Supabase Storage only.
+    // External stock image domains (Pexels, Unsplash) are intentionally excluded.
     remotePatterns: [
       {
+        // Supabase Storage CDN
         protocol: 'https',
-        hostname: '*.supabase.co',
-        port: '',
+        hostname: supabaseHostname,
         pathname: '/storage/v1/object/public/**',
       },
-      // Unsplash — standard CDN subdomain
       {
+        // Supabase Storage — legacy path without /public
         protocol: 'https',
-        hostname: 'images.unsplash.com',
-      },
-      // Unsplash Plus — some photo IDs resolve to this subdomain
-      {
-        protocol: 'https',
-        hostname: 'plus.unsplash.com',
+        hostname: supabaseHostname,
+        pathname: '/storage/v1/object/**',
       },
       {
+        // Supabase project ref catch-all (covers sub-subdomains)
         protocol: 'https',
-        hostname: 'images.pexels.com',
-      },
-      {
-        protocol: 'https',
-        hostname: 'cdn.shopify.com',
+        hostname: '*.supabase.co',
+        pathname: '/**',
       },
     ],
-    formats: ['image/avif', 'image/webp'],
-    minimumCacheTTL: 60,
+
+    // Device size breakpoints
+    deviceSizes: [375, 640, 750, 828, 1080, 1200, 1920, 2048, 3840],
+
+    // Image quality
+    quality: 85,
+
+    // Minimise layout shift — modern browsers only
+    contentDispositionType: 'inline',
   },
 
+  // Security headers
   async headers() {
     return [
       {
-        // Apply security headers to all routes
         source: '/(.*)',
         headers: [
-          {
-            key: 'X-Frame-Options',
-            value: 'SAMEORIGIN',
-          },
           {
             key: 'X-Content-Type-Options',
             value: 'nosniff',
           },
           {
+            key: 'X-Frame-Options',
+            value: 'DENY',
+          },
+          {
+            key: 'X-XSS-Protection',
+            value: '1; mode=block',
+          },
+          {
             key: 'Referrer-Policy',
             value: 'strict-origin-when-cross-origin',
-          },
-          {
-            key: 'Permissions-Policy',
-            value: 'camera=(), microphone=(), geolocation=(self), payment=(self)',
-          },
-          {
-            key: 'X-DNS-Prefetch-Control',
-            value: 'on',
-          },
-          {
-            key: 'Strict-Transport-Security',
-            value: 'max-age=63072000; includeSubDomains; preload',
-          },
-          {
-            key: 'Content-Security-Policy',
-            value: [
-              "default-src 'self'",
-              // unsafe-eval is required by Next.js/Turbopack in development mode
-              // for React call-stack reconstruction and HMR. It is intentionally
-              // omitted in production builds via the isDev guard.
-              isDev
-                ? "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://checkout.razorpay.com https://api.razorpay.com"
-                : "script-src 'self' 'unsafe-inline' https://checkout.razorpay.com https://api.razorpay.com",
-              "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
-              "font-src 'self' https://fonts.gstatic.com",
-              // Supabase, Razorpay and WhatsApp API calls
-              `connect-src 'self' https://*.supabase.co wss://*.supabase.co https://api.razorpay.com https://wa.me`,
-              // Images: Supabase storage + Unsplash (both subdomains) + Pexels + Shopify CDN
-              "img-src 'self' data: blob: https://*.supabase.co https://images.unsplash.com https://plus.unsplash.com https://images.pexels.com https://cdn.shopify.com",
-              // Razorpay payment iframe
-              "frame-src https://api.razorpay.com https://checkout.razorpay.com",
-              "object-src 'none'",
-              "base-uri 'self'",
-              "form-action 'self'",
-              "upgrade-insecure-requests",
-            ].join('; '),
-          },
-        ],
-      },
-      {
-        // Cache static assets aggressively
-        source: '/(.*)\\.  (ico|png|jpg|jpeg|webp|avif|svg|woff|woff2)',
-        headers: [
-          {
-            key: 'Cache-Control',
-            value: 'public, max-age=31536000, immutable',
           },
         ],
       },
     ];
   },
 
-  async redirects() {
-    return [
-      // Redirect bare /admin to dashboard
-      // (handled by page.tsx but belt-and-suspenders)
-    ];
+  // TypeScript and ESLint — errors surface at build time
+  typescript: {
+    ignoreBuildErrors: false,
+  },
+  eslint: {
+    ignoreDuringBuilds: false,
   },
 };
 

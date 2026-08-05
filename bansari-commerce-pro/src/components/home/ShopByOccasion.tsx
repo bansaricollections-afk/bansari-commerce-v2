@@ -1,77 +1,141 @@
-import Image from "next/image";
-import Link from "next/link";
+import Image from 'next/image';
+import Link from 'next/link';
+import ImageWithFallback from '@/components/ui/ImageWithFallback';
 
 const occasions = [
   {
-    title: "Wedding",
-    subtitle: "Celebrate every special moment",
-    image: "/occasions/wedding.jpg",
-    href: "/shop?occasion=wedding",
+    id: 'wedding',
+    label: 'Wedding',
+    href: '/shop?occasion=wedding',
+    image: '/occasions/wedding.png',
+    alt: 'Wedding ethnic wear — bridal and guest outfits',
   },
   {
-    title: "Festive",
-    subtitle: "Traditional elegance",
-    image: "/occasions/festive.jpg",
-    href: "/shop?occasion=festive",
+    id: 'festive',
+    label: 'Festive',
+    href: '/shop?occasion=festive',
+    image: '/occasions/festive.png',
+    alt: 'Festive wear — Diwali, Navratri and celebration outfits',
   },
   {
-    title: "Office",
-    subtitle: "Elegant workwear",
-    image: "/occasions/office.jpg",
-    href: "/shop?occasion=office",
+    id: 'office',
+    label: 'Office',
+    href: '/shop?occasion=office',
+    image: '/occasions/office.png',
+    alt: 'Office ethnic wear — workwear kurtas and suits',
   },
   {
-    title: "Party",
-    subtitle: "Make every entrance memorable",
-    image: "/occasions/party.jpg",
-    href: "/shop?occasion=party",
+    id: 'party',
+    label: 'Party',
+    href: '/shop?occasion=party',
+    image: '/occasions/party.png',
+    alt: 'Party wear — evening and cocktail ethnic outfits',
   },
 ];
 
 export default function ShopByOccasion() {
   return (
-    <section className="bg-white py-24">
-      <div className="mx-auto max-w-7xl px-6">
-        <div className="mb-16 text-center">
-          <p className="uppercase tracking-[5px] text-[#8A5A6A]">
+    <section
+      aria-label="Shop by occasion"
+      style={{
+        backgroundColor: 'var(--bc-surface-cream)',
+        paddingBlock: 'var(--bc-section-padding)',
+        borderTop: '1px solid var(--bc-border-soft)',
+      }}
+    >
+      <div
+        className="mx-auto"
+        style={{
+          maxWidth: 'var(--bc-content-wide)',
+          paddingInline: 'var(--bc-gutter)',
+        }}
+      >
+        <div
+          style={{
+            marginBottom: 'var(--bc-space-10)',
+          }}
+        >
+          <p
+            style={{
+              fontFamily: 'var(--font-inter), sans-serif',
+              fontSize: 'var(--bc-text-xs)',
+              fontWeight: 500,
+              letterSpacing: '0.18em',
+              textTransform: 'uppercase',
+              color: 'var(--bc-text-gold)',
+              marginBottom: 'var(--bc-space-2)',
+            }}
+          >
+            Dress The Occasion
+          </p>
+          <h2
+            style={{
+              fontFamily: 'var(--font-playfair), serif',
+              fontSize: 'var(--bc-text-2xl)',
+              fontWeight: 400,
+              lineHeight: 1.1,
+              color: 'var(--bc-text-primary)',
+            }}
+          >
             Shop By Occasion
-          </p>
-
-          <h2 className="mt-3 font-[family:var(--font-playfair)] text-5xl font-bold">
-            Dress For Every Celebration
           </h2>
-
-          <p className="mx-auto mt-5 max-w-2xl text-gray-600">
-            Whether it&apos;s a wedding, festival, office gathering or evening
-            event, discover styles thoughtfully curated for every occasion.
-          </p>
         </div>
 
-        <div className="grid gap-8 md:grid-cols-2 lg:grid-cols-4">
-          {occasions.map((item) => (
+        <div
+          style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))',
+            gap: 'var(--bc-space-4)',
+          }}
+        >
+          {occasions.map((occ) => (
             <Link
-              key={item.title}
-              href={item.href}
-              className="group overflow-hidden rounded-[32px]"
+              key={occ.id}
+              href={occ.href}
+              style={{ display: 'block', textDecoration: 'none' }}
             >
-              <div className="relative h-[420px]">
-                <Image
-                  src={item.image}
-                  alt={item.title}
+              <div
+                style={{
+                  position: 'relative',
+                  aspectRatio: '3/4',
+                  overflow: 'hidden',
+                  borderRadius: '2px',
+                  backgroundColor: 'var(--bc-surface-offset)',
+                }}
+              >
+                <ImageWithFallback
+                  src={occ.image}
+                  alt={occ.alt}
                   fill
-                  className="object-cover transition duration-700 group-hover:scale-110"
+                  sizes="(max-width: 640px) 50vw, (max-width: 1024px) 25vw, 280px"
+                  style={{ objectFit: 'cover' }}
                 />
-
-                <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent" />
-
-                <div className="absolute bottom-8 left-8">
-                  <h3 className="font-[family:var(--font-playfair)] text-3xl font-bold text-white">
-                    {item.title}
-                  </h3>
-
-                  <p className="mt-2 text-sm text-white/90">
-                    {item.subtitle}
-                  </p>
+                <div
+                  style={{
+                    position: 'absolute',
+                    inset: 0,
+                    background:
+                      'linear-gradient(to top, rgba(0,0,0,0.55) 0%, transparent 50%)',
+                  }}
+                />
+                <div
+                  style={{
+                    position: 'absolute',
+                    bottom: 'var(--bc-space-4)',
+                    left: 'var(--bc-space-4)',
+                  }}
+                >
+                  <span
+                    style={{
+                      fontFamily: 'var(--font-playfair), serif',
+                      fontSize: 'var(--bc-text-lg)',
+                      fontWeight: 400,
+                      color: '#fff',
+                      lineHeight: 1.2,
+                    }}
+                  >
+                    {occ.label}
+                  </span>
                 </div>
               </div>
             </Link>
