@@ -31,17 +31,23 @@ export default async function AdminLayout({ children }: Readonly<AdminLayoutProp
     /*
      * admin-shell: scoping class for all admin-only CSS overrides.
      *
-     * 1. [&_h1,...]:font-sans — resets the storefront globals.css Playfair serif
-     *    rule that targets h1–h6 globally, preventing it from bleeding into
-     *    shadcn Sheet titles (<h2> via Radix Dialog.Title) inside admin panels.
+     * 1. [&_h1]:font-sans … [&_h6]:font-sans — resets the storefront
+     *    globals.css Playfair serif rule that targets h1–h6 globally,
+     *    preventing it from bleeding into shadcn Sheet titles (<h2> via
+     *    Radix Dialog.Title) inside admin panels.
      *
-     * 2. The <style> block below declares --color-popover / --color-popover-foreground
-     *    scoped under .admin-shell so Tailwind v4’s bg-popover utility resolves to
-     *    white (#FFFFFF) inside admin Sheets instead of its built-in near-black
-     *    default (oklch(0.205 0 0)). These tokens MUST NOT live in globals.css :root
-     *    because Tailwind v4 exposes every :root CSS variable as a design token,
-     *    which would override the built-in popover palette for ALL pages including
-     *    the storefront.
+     *    Each heading level is listed as a separate Tailwind arbitrary
+     *    variant. The grouped shorthand [&_h1,...]:font-sans is NOT valid
+     *    Tailwind v4 syntax — Lightning CSS rejects the comma-joined
+     *    selector "& h1,..." and aborts the entire CSS parse.
+     *
+     * 2. The <style> block below declares --color-popover /
+     *    --color-popover-foreground scoped under .admin-shell so Tailwind
+     *    v4's bg-popover utility resolves to white (#FFFFFF) inside admin
+     *    Sheets instead of its built-in near-black default. These tokens
+     *    MUST NOT live in globals.css :root because Tailwind v4 exposes
+     *    every :root CSS variable as a design token, which would override
+     *    the built-in popover palette for ALL pages including the storefront.
      */
     <>
       <style>{`
