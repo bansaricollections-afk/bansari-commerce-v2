@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="800" height="1000" viewBox="0 0 800 1000">
+  <rect width="800" height="1000" fill="#f5f0eb"/>
+  <rect x="0" y="880" width="800" height="120" fill="#1d1018"/>
+  <text x="400" y="940" font-family="Georgia, serif" font-size="28" font-weight="400" fill="#c9a96e" text-anchor="middle" letter-spacing="4">ETHNIC GLORY</text>
+  <text x="400" y="975" font-family="Georgia, serif" font-size="14" fill="#c9a96e" text-anchor="middle" letter-spacing="3" opacity="0.7">BANSARI COMMERCE PRO</text>
+  <line x1="200" y1="860" x2="600" y2="860" stroke="#c9a96e" stroke-width="1" opacity="0.4"/>
+  <text x="400" y="440" font-family="Georgia, serif" font-size="18" fill="#9e8a7a" text-anchor="middle" letter-spacing="2" opacity="0.6">PLACEHOLDER ASSET</text>
+  <text x="400" y="470" font-family="Georgia, serif" font-size="13" fill="#9e8a7a" text-anchor="middle" opacity="0.5">Replace with production photography</text>
+</svg>
