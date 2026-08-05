@@ -1,39 +1,13 @@
 -- =============================================================================
--- BATCH 1 · Migration 11 — inventory_reservations table
+-- BATCH 1 · Migration 11 (REVISED) — inventory_reservations table
 -- =============================================================================
--- PURPOSE
---   Soft-hold inventory for the duration of a Razorpay checkout session.
---   Prevents overselling when two customers checkout the last unit concurrently.
---
--- LIFECYCLE
---   1. reserve_inventory() RPC  → status = 'reserved'
---      Called from CheckoutService BEFORE creating the Razorpay order.
---      TTL: 15 minutes (configurable via expires_at).
---
---   2. confirm_inventory() RPC  → status = 'confirmed'
---      Called from InventoryService.confirm() AFTER payment.captured webhook
---      or /api/orders/create. Does NOT decrement stock — that is done by
---      InventoryService.adjustStock() as a separate responsibility.
---
---   3. release_inventory() RPC  → status = 'released'
---      Called from InventoryService.release() on payment.failed or
---      customer abandonment.
---
---   4. expire_inventory() RPC   → status = 'expired'
---      Batch job (pg_cron or Supabase Edge Function) sets TTL-elapsed rows.
---      Returns count of expired rows for monitoring.
---
--- OVERSELL PREVENTION
---   reserve_inventory() uses SELECT ... FOR UPDATE on the products row to
---   serialise concurrent checkouts. Available stock is computed as:
---     products.stock  -  SUM(quantity WHERE status = 'reserved')
---   If the result < requested quantity, the RPC raises 'insufficient_stock'.
---
--- IDEMPOTENCY
---   The partial unique index on (razorpay_order_id, product_id) WHERE status
---   = 'reserved' ensures only one active reservation per product per checkout.
---   Duplicate reserve calls for the same order silently succeed (ON CONFLICT
---   DO NOTHING) and the existing reservation is returned.
+-- REVISION CHANGELOG (2026-08-05)
+--   P0: Table now carries confirmed_at/released_at/expired_at/updated_at.
+--       Trigger fn_inv_res_lifecycle_timestamps auto-populates them on
+--       every status transition.
+--   P1: Added partial index (product_id) WHERE status='reserved'.
+--   P1: Added variant_id for SKU-level reservation accuracy.
+--   P2: Added reservation_source for future warehouse/admin holds.
 -- =============================================================================
 
 BEGIN;
@@ -42,69 +16,135 @@ CREATE TABLE IF NOT EXISTS public.inventory_reservations (
   -- ── Identity ──────────────────────────────────────────────────────────────
   id                    UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
 
-  -- ── Order linkage (populated AFTER payment confirmed) ─────────────────────
-  -- Nullable: not yet known at reservation time. Set by confirm_inventory().
+  -- ── Order linkage (nullable — not known until payment confirmed) ──────────
   order_id              UUID        REFERENCES public.orders(id) ON DELETE SET NULL,
 
   -- ── Session identity ──────────────────────────────────────────────────────
-  -- customer_id: auth user UUID (null for guests)
   customer_id           UUID,
-  -- session_id: anonymous session token for guest tracking
   session_id            TEXT,
 
-  -- ── Razorpay linkage ──────────────────────────────────────────────────────
-  -- Populated immediately at reservation time. Used as the join key throughout
-  -- the reservation lifecycle because order_id is not yet known.
+  -- ── Razorpay linkage (primary lifecycle join key) ─────────────────────────
   razorpay_order_id     TEXT        NOT NULL,
 
-  -- ── Product ───────────────────────────────────────────────────────────────
+  -- ── Product / SKU ─────────────────────────────────────────────────────────
   product_id            INTEGER     NOT NULL REFERENCES public.products(id),
+  -- variant_id: NULL = no variants; populated when product has size/colour SKUs
+  variant_id            INTEGER,
   quantity              INTEGER     NOT NULL CHECK (quantity > 0),
 
   -- ── Status lifecycle ──────────────────────────────────────────────────────
-  status                public.inventory_reservation_status NOT NULL
-                          DEFAULT 'reserved',
+  status                public.inventory_reservation_status NOT NULL DEFAULT 'reserved',
 
-  -- Populated when status transitions to 'released' or 'expired'.
-  -- Allows analytics queries like: why did reservations not convert?
+  -- Human-readable reason for terminal states (released / expired)
   expires_reason        TEXT,
-    -- Possible values (convention, not enforced by DB):
-    --   'payment_failed'     — Razorpay payment.failed event received
-    --   'ttl_elapsed'        — expire_inventory() batch ran
-    --   'customer_abandoned' — explicit cancellation from checkout UI
-    --   'order_cancelled'    — downstream order cancellation
+    -- Convention (not DB-enforced):
+    --   'payment_failed'      — payment.failed webhook
+    --   'ttl_elapsed'         — expire_inventory() batch
+    --   'customer_abandoned'  — explicit checkout cancellation
+    --   'order_cancelled'     — downstream order cancellation
 
-  -- ── Timestamps ────────────────────────────────────────────────────────────
+  -- Source of this reservation (future extensibility: admin holds, warehouse)
+  reservation_source    TEXT        NOT NULL DEFAULT 'checkout',
+    -- Convention: 'checkout' | 'admin_hold' | 'webhook_recovery'
+
+  -- ── State-transition timestamps ───────────────────────────────────────────
+  -- All set automatically by trigger fn_inv_res_lifecycle_timestamps.
+  -- Never set manually by application code.
   reserved_at           TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  expires_at            TIMESTAMPTZ NOT NULL DEFAULT (NOW() + INTERVAL '15 minutes')
+  expires_at            TIMESTAMPTZ NOT NULL DEFAULT (NOW() + INTERVAL '15 minutes'),
+  confirmed_at          TIMESTAMPTZ,   -- populated when status → 'confirmed'
+  released_at           TIMESTAMPTZ,   -- populated when status → 'released'
+  expired_at            TIMESTAMPTZ,   -- populated when status → 'expired'
+  updated_at            TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    -- updated by trigger on every UPDATE
 );
 
--- ── Indexes ──────────────────────────────────────────────────────────────────
+-- =============================================================================
+-- TRIGGER: auto-populate state-transition timestamps
+-- =============================================================================
+-- Fires BEFORE UPDATE on every row. Sets the appropriate timestamp column
+-- when status changes to a terminal state. Also maintains updated_at.
+--
+-- WHY A TRIGGER AND NOT APPLICATION CODE:
+--   Application code can forget. The RPC function can be called directly.
+--   A trigger is the only reliable guarantee that these timestamps are ALWAYS
+--   set — regardless of call site.
+-- =============================================================================
+CREATE OR REPLACE FUNCTION public.fn_inv_res_lifecycle_timestamps()
+RETURNS TRIGGER
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public, pg_temp
+AS $$
+BEGIN
+  -- Always update updated_at
+  NEW.updated_at := NOW();
 
--- Fast lookup by Razorpay order id (primary join key in all RPC functions)
+  -- Set transition timestamp when status changes
+  IF OLD.status IS DISTINCT FROM NEW.status THEN
+    CASE NEW.status
+      WHEN 'confirmed' THEN
+        NEW.confirmed_at := NOW();
+      WHEN 'released' THEN
+        NEW.released_at  := NOW();
+      WHEN 'expired' THEN
+        NEW.expired_at   := NOW();
+      ELSE
+        NULL; -- 'reserved' → 'reserved' (no-op, updated_at still refreshed)
+    END CASE;
+  END IF;
+
+  RETURN NEW;
+END;
+$$;
+
+DROP TRIGGER IF EXISTS trg_inv_res_lifecycle_timestamps
+  ON public.inventory_reservations;
+
+CREATE TRIGGER trg_inv_res_lifecycle_timestamps
+  BEFORE UPDATE ON public.inventory_reservations
+  FOR EACH ROW
+  EXECUTE FUNCTION public.fn_inv_res_lifecycle_timestamps();
+
+-- =============================================================================
+-- INDEXES
+-- =============================================================================
+
+-- Primary lifecycle join key (used by all 4 RPC functions)
 CREATE INDEX IF NOT EXISTS inv_res_razorpay_order_id_idx
   ON public.inventory_reservations (razorpay_order_id);
 
--- Partial unique index — prevents duplicate active reservations for the
--- same product in the same Razorpay order. ON CONFLICT DO NOTHING in
--- reserve_inventory() uses this index for idempotent re-calls.
+-- Deduplication: prevents two active reservations for the same product
+-- in the same Razorpay order. Also the ON CONFLICT target in reserve_inventory().
 CREATE UNIQUE INDEX IF NOT EXISTS inv_res_active_reservation_unique_idx
   ON public.inventory_reservations (razorpay_order_id, product_id)
   WHERE status = 'reserved';
 
--- TTL expiry scan — expire_inventory() queries this index to find candidates
+-- P1 FIX: Accelerates the available-stock calculation in reserve_inventory().
+--
+-- Query served:
+--   SELECT COALESCE(SUM(quantity), 0)
+--   FROM inventory_reservations
+--   WHERE product_id = $1 AND status = 'reserved'
+--
+-- Without this index the query does a full table scan on every cart item in
+-- every concurrent checkout. With it, Postgres uses an index scan on only
+-- the active reservation subset — typically <1% of the table at any time.
+CREATE INDEX IF NOT EXISTS inv_res_product_reserved_idx
+  ON public.inventory_reservations (product_id)
+  WHERE status = 'reserved';
+
+-- TTL expiry scan for expire_inventory() batch job
 CREATE INDEX IF NOT EXISTS inv_res_expires_at_idx
   ON public.inventory_reservations (expires_at)
   WHERE status = 'reserved';
 
--- Analytics: look up all reservations for an order after confirmation
+-- Post-confirmation lookup by order_id
 CREATE INDEX IF NOT EXISTS inv_res_order_id_idx
   ON public.inventory_reservations (order_id)
   WHERE order_id IS NOT NULL;
 
 -- ── Security ─────────────────────────────────────────────────────────────────
--- RLS disabled — accessed exclusively via service-role client from server-side
--- API routes and Postgres RPCs. Never exposed to Supabase PostgREST auto-API.
 ALTER TABLE public.inventory_reservations DISABLE ROW LEVEL SECURITY;
 
 COMMIT;
