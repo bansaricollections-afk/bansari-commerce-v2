@@ -1,10 +1,15 @@
 'use client';
 
-import { useState } from 'react';
+import { Suspense, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { signInAdmin } from '@/services/auth.service';
 
-export default function AdminLoginPage() {
+// ─── Inner component ──────────────────────────────────────────────────────────
+// ALL useSearchParams() usage lives here, inside the Suspense boundary.
+// Next.js 16 requires this: a Client Component that calls useSearchParams()
+// must be wrapped in <Suspense> so the router can defer the search-params
+// read to the client instead of attempting a synchronous static prerender.
+function AdminLoginContent() {
   const router       = useRouter();
   const searchParams = useSearchParams();
 
@@ -104,5 +109,17 @@ export default function AdminLoginPage() {
         </div>
       </div>
     </main>
+  );
+}
+
+// ─── Page shell ───────────────────────────────────────────────────────────────
+// Thin Suspense wrapper — no logic here.
+// fallback={null} is correct: the login form has no meaningful skeleton;
+// the browser will hydrate and show the real form immediately.
+export default function AdminLoginPage() {
+  return (
+    <Suspense fallback={null}>
+      <AdminLoginContent />
+    </Suspense>
   );
 }
