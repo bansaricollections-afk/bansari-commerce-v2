@@ -251,21 +251,24 @@ export async function getFilteredProducts(
 
   // ── Apply sort order ──────────────────────────────────────────────────────
   function applySort<T>(q: T, sortOption: SortOption): T {
-    // @ts-expect-error — same Supabase generic chain limitation as above
     let query = q;
     switch (sortOption) {
       case 'newest':
-        query = query.order('created_at', { ascending: false });
+        // @ts-expect-error — Supabase generic chain types do not widen cleanly
+        query = (query as any).order('created_at', { ascending: false });
         break;
       case 'price_asc':
-        query = query.order('price', { ascending: true });
+        // @ts-expect-error — Supabase generic chain types do not widen cleanly
+        query = (query as any).order('price', { ascending: true });
         break;
       case 'price_desc':
-        query = query.order('price', { ascending: false });
+        // @ts-expect-error — Supabase generic chain types do not widen cleanly
+        query = (query as any).order('price', { ascending: false });
         break;
       case 'bestseller':
         // best_seller flag first, then newest within that group
-        query = query
+        // @ts-expect-error — Supabase generic chain types do not widen cleanly
+        query = (query as any)
           .order('best_seller', { ascending: false })
           .order('created_at', { ascending: false });
         break;
@@ -275,12 +278,14 @@ export async function getFilteredProducts(
         // client, so we order by compare_price DESC as the closest proxy —
         // products with a higher compare_price tend to have a larger discount.
         // A proper computed sort requires a DB view or RPC (Sprint 9C candidate).
-        query = query
+        // @ts-expect-error — Supabase generic chain types do not widen cleanly
+        query = (query as any)
           .order('compare_price', { ascending: false })
           .order('price', { ascending: true });
         break;
       default:
-        query = query.order('created_at', { ascending: false });
+        // @ts-expect-error — Supabase generic chain types do not widen cleanly
+        query = (query as any).order('created_at', { ascending: false });
     }
     return query as T;
   }
@@ -366,7 +371,7 @@ export async function getFeaturedProducts(): Promise<Product[]> {
   const t0 = Date.now();
 
   const { data, error } = await supabase
-    .from('products')
+    .from('products')\
     .select(PRODUCT_SELECT)
     .eq('active', true)
     .eq('featured', true)
