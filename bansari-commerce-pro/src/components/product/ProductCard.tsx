@@ -24,7 +24,6 @@ export default function ProductCard({ product, priority = false }: Props) {
   const primaryImage = product.images?.[0]?.url || "/placeholder.png";
   const hoverImage = product.images?.[1]?.url || primaryImage;
 
-  // Debug: log once on mount per card instance
   useEffect(() => {
     logCardRender(product.id, product.name, primaryImage);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -66,6 +65,10 @@ export default function ProductCard({ product, priority = false }: Props) {
     setTimeout(() => setQuickAdded(false), 1800);
   }
 
+  /* Shared badge base classes */
+  const badgeBase =
+    "px-2 py-[3px] text-[9px] font-bold uppercase tracking-[0.12em] leading-none";
+
   return (
     <article
       className="group relative"
@@ -73,12 +76,11 @@ export default function ProductCard({ product, priority = false }: Props) {
       onMouseLeave={() => setHovered(false)}
     >
       {/* ── Image container — 3:4 ── */}
-      <div className="relative aspect-[3/4] w-full overflow-hidden bg-slate-50">
+      <div className="relative aspect-[3/4] w-full overflow-hidden bg-[#F7F3EE]">
         <Link
           href={`/product/${product.id}`}
           aria-label={`View ${displayName}`}
-          className="block h-full w-full"
-          tabIndex={0}
+          className="block h-full w-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#8A5A6A] focus-visible:ring-inset"
         >
           {/* Primary image */}
           <Image
@@ -90,120 +92,140 @@ export default function ProductCard({ product, priority = false }: Props) {
             sizes="(max-width:640px) 50vw, (max-width:1024px) 50vw, 25vw"
             className={[
               "object-cover object-[center_12%]",
-              "transition-[opacity] duration-[700ms] ease-out",
-              hovered ? "opacity-0" : "opacity-100",
+              "transition-[opacity,transform] duration-700 ease-out will-change-[opacity,transform]",
+              hovered ? "opacity-0 scale-100" : "opacity-100 scale-100",
             ].join(" ")}
           />
 
-          {/* Hover image — gentle zoom */}
+          {/* Hover image — reveals with gentle zoom */}
           <Image
             src={hoverImage}
-            alt={`${product.name} alternate view`}
+            alt={`${product.name} — alternate view`}
             fill
             loading="lazy"
             sizes="(max-width:640px) 50vw, (max-width:1024px) 50vw, 25vw"
             className={[
-              "absolute inset-0 object-cover object-[center_12%]",
-              "transition-[transform,opacity] duration-[700ms] ease-out",
-              hovered ? "scale-[1.04] opacity-100" : "scale-100 opacity-0",
+              "absolute inset-0 object-cover object-[center_12%] will-change-[opacity,transform]",
+              "transition-[transform,opacity] duration-700 ease-out",
+              hovered ? "scale-[1.04] opacity-100" : "scale-[1.01] opacity-0",
             ].join(" ")}
           />
 
-          {/* Hover overlay — very subtle scrim */}
+          {/* Subtle scrim on hover */}
           <div
             className={[
-              "absolute inset-0 bg-slate-900/0 transition-colors duration-500",
-              hovered ? "bg-slate-900/[0.04]" : "",
+              "absolute inset-0 transition-colors duration-500 pointer-events-none",
+              hovered ? "bg-slate-900/[0.03]" : "bg-transparent",
             ].join(" ")}
             aria-hidden="true"
           />
         </Link>
 
         {/* ── Badges — top left ── */}
-        <div className="absolute left-3 top-3 flex flex-col gap-1.5">
+        <div
+          className="absolute left-2.5 top-2.5 flex flex-col gap-1.5"
+          aria-hidden="true"
+        >
           {isOnSale && (
-            <span className="bg-[#8A5A6A] px-2 py-0.5 text-[9px] font-bold uppercase tracking-[0.12em] text-white">
+            <span className={`${badgeBase} bg-[#8A5A6A] text-white`}>
               -{discountPct}%
             </span>
           )}
           {isNew && !isOnSale && (
-            <span className="border border-slate-900 bg-white px-2 py-0.5 text-[9px] font-bold uppercase tracking-[0.12em] text-slate-900">
+            <span className={`${badgeBase} bg-slate-900 text-white`}>
               New
             </span>
           )}
           {isBestSeller && (
-            <span className="bg-amber-50 px-2 py-0.5 text-[9px] font-bold uppercase tracking-[0.12em] text-amber-700">
+            <span className={`${badgeBase} bg-amber-500 text-white`}>
               Best Seller
             </span>
           )}
           {isLowStock && (
-            <span className="border border-[#8A5A6A]/40 bg-white/90 px-2 py-0.5 text-[9px] font-semibold uppercase tracking-[0.1em] text-[#8A5A6A]">
+            <span className={`${badgeBase} bg-rose-600 text-white`}>
               Low Stock
             </span>
           )}
         </div>
 
-        {/* ── Wishlist — top right ── */}
+        {/* ── Wishlist — top right, always visible, 44×44 touch target ── */}
         <button
           type="button"
-          aria-label={wishlisted ? "Remove from wishlist" : "Add to wishlist"}
+          aria-label={wishlisted ? `Remove ${displayName} from wishlist` : `Add ${displayName} to wishlist`}
           aria-pressed={wishlisted}
-          onClick={(e) => { e.preventDefault(); e.stopPropagation(); setWishlisted((v) => !v); }}
-          className="absolute right-0 top-0 flex items-start justify-end p-3 transition-transform duration-200 hover:scale-110"
+          onClick={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            setWishlisted((v) => !v);
+          }}
+          className="absolute right-0 top-0 flex items-center justify-center transition-transform duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#8A5A6A] focus-visible:ring-offset-1"
           style={{ width: 44, height: 44 }}
         >
           <Heart
-            size={16}
+            size={17}
             strokeWidth={1.5}
-            className="transition-colors duration-200"
+            className="transition-all duration-200 drop-shadow-sm"
             style={{
-              color: wishlisted ? "#8A5A6A" : "#C4A882",
+              color: wishlisted ? "#8A5A6A" : "rgba(255,255,255,0.9)",
               fill: wishlisted ? "#8A5A6A" : "none",
+              filter: wishlisted ? "none" : "drop-shadow(0 1px 2px rgba(0,0,0,0.35))",
             }}
           />
         </button>
 
-        {/* ── Quick View — appears on hover, bottom-left ── */}
-        <Link
-          href={`/product/${product.id}`}
-          aria-label={`Quick view ${displayName}`}
-          className={[
-            "absolute bottom-3 left-3 flex items-center gap-1.5 border border-white/80 bg-white/90 px-3 py-1.5 text-[10px] font-semibold uppercase tracking-[0.1em] text-slate-700 backdrop-blur-sm",
-            "transition-all duration-300",
-            hovered ? "translate-y-0 opacity-100" : "translate-y-2 opacity-0 pointer-events-none",
-          ].join(" ")}
-          tabIndex={hovered ? 0 : -1}
+        {/* ── Hover actions row (Quick View + Quick Add) ── */}
+        <div
+          className="absolute bottom-0 left-0 right-0 flex items-center justify-between px-2.5 pb-2.5"
+          aria-hidden={!hovered}
         >
-          <Eye size={11} aria-hidden="true" />
-          Quick View
-        </Link>
+          {/* Quick View */}
+          <Link
+            href={`/product/${product.id}`}
+            aria-label={`Quick view ${displayName}`}
+            className={[
+              "flex items-center gap-1.5 bg-white/90 backdrop-blur-sm border border-white/60 px-3 py-2",
+              "text-[10px] font-semibold uppercase tracking-[0.1em] text-slate-700",
+              "transition-all duration-300 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#8A5A6A]",
+              hovered
+                ? "opacity-100 translate-y-0"
+                : "opacity-0 translate-y-2 pointer-events-none",
+            ].join(" ")}
+            tabIndex={hovered ? 0 : -1}
+          >
+            <Eye size={11} aria-hidden="true" />
+            Quick View
+          </Link>
 
-        {/* ── Quick Add — appears on hover, bottom-right ── */}
-        <button
-          type="button"
-          aria-label={`Quick add ${displayName} to cart`}
-          onClick={handleQuickAdd}
-          className={[
-            "absolute bottom-3 right-3 flex items-center gap-1.5 border bg-white/90 px-3 py-1.5 text-[10px] font-semibold uppercase tracking-[0.1em] backdrop-blur-sm",
-            "transition-all duration-300",
-            hovered ? "translate-y-0 opacity-100" : "translate-y-2 opacity-0 pointer-events-none",
-            quickAdded
-              ? "border-[#8A5A6A] bg-[#8A5A6A] text-white"
-              : "border-white/80 text-slate-700",
-          ].join(" ")}
-          tabIndex={hovered ? 0 : -1}
-        >
-          <ShoppingBag size={11} aria-hidden="true" />
-          {quickAdded ? "Added" : "Quick Add"}
-        </button>
+          {/* Quick Add */}
+          <button
+            type="button"
+            aria-label={`Quick add ${displayName} to cart`}
+            onClick={handleQuickAdd}
+            className={[
+              "flex items-center gap-1.5 border px-3 py-2 backdrop-blur-sm",
+              "text-[10px] font-semibold uppercase tracking-[0.1em]",
+              "transition-all duration-300 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#8A5A6A]",
+              hovered
+                ? "opacity-100 translate-y-0"
+                : "opacity-0 translate-y-2 pointer-events-none",
+              quickAdded
+                ? "border-[#8A5A6A] bg-[#8A5A6A] text-white"
+                : "border-white/60 bg-white/90 text-slate-700",
+            ].join(" ")}
+            tabIndex={hovered ? 0 : -1}
+          >
+            <ShoppingBag size={11} aria-hidden="true" />
+            {quickAdded ? "Added ✓" : "Quick Add"}
+          </button>
+        </div>
       </div>
 
       {/* ── Metadata — below image ── */}
-      <div className="mt-3.5 space-y-1">
+      <div className="mt-4 flex flex-col gap-1.5">
 
         {/* Collection eyebrow */}
         {product.collection && (
-          <p className="text-[9px] font-semibold uppercase tracking-[0.16em] text-[#8A5A6A]">
+          <p className="text-[9px] font-semibold uppercase tracking-[0.18em] text-[#8A5A6A]">
             {product.collection}
           </p>
         )}
@@ -211,28 +233,29 @@ export default function ProductCard({ product, priority = false }: Props) {
         {/* Product name */}
         <Link
           href={`/product/${product.id}`}
-          className="block font-[family:var(--font-playfair)] text-[0.95rem] font-normal leading-snug text-slate-900 transition-colors duration-200 hover:text-[#8A5A6A] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#8A5A6A] focus-visible:ring-offset-2"
-          tabIndex={0}
+          className="font-[family:var(--font-playfair)] text-[1rem] font-normal leading-snug text-slate-900 transition-colors duration-200 hover:text-[#8A5A6A] focus-visible:outline-none focus-visible:rounded-sm focus-visible:ring-2 focus-visible:ring-[#8A5A6A] focus-visible:ring-offset-2"
         >
           {displayName}
         </Link>
 
         {/* Craft detail */}
         {craftDetail && (
-          <p className="text-[11px] text-slate-400">{craftDetail}</p>
+          <p className="text-[11px] leading-relaxed text-slate-400">{craftDetail}</p>
         )}
 
         {/* Rating */}
         {rating !== undefined && (
-          <div className="flex items-center gap-1.5" aria-label={`Rated ${rating} out of 5`}>
-            <div className="flex items-center gap-0.5">
+          <div
+            className="flex items-center gap-1.5"
+            aria-label={`Rated ${rating} out of 5${reviewCount !== undefined ? `, ${reviewCount} reviews` : ""}`}
+          >
+            <div className="flex items-center gap-[2px]" aria-hidden="true">
               {Array.from({ length: 5 }).map((_, i) => (
                 <Star
                   key={i}
                   size={9}
                   strokeWidth={0}
                   fill={i < Math.floor(rating) ? "#C4A84C" : "#E2E8F0"}
-                  aria-hidden="true"
                 />
               ))}
             </div>
@@ -244,11 +267,11 @@ export default function ProductCard({ product, priority = false }: Props) {
 
         {/* Price row */}
         <div className="flex items-baseline gap-2">
-          <p className="text-[13px] font-semibold text-slate-900">
+          <p className="text-[14px] font-semibold tabular-nums text-slate-900">
             &#x20B9;{product.price.toLocaleString("en-IN")}
           </p>
           {isOnSale && originalPrice && (
-            <p className="text-[11px] text-slate-400 line-through">
+            <p className="text-[12px] tabular-nums text-slate-400 line-through">
               &#x20B9;{originalPrice.toLocaleString("en-IN")}
             </p>
           )}
@@ -260,8 +283,7 @@ export default function ProductCard({ product, priority = false }: Props) {
         {/* Discover CTA */}
         <Link
           href={`/product/${product.id}`}
-          className="inline-block text-[10px] font-semibold uppercase tracking-[0.1em] text-slate-400 underline-offset-4 transition-colors duration-200 hover:text-slate-900 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#8A5A6A] focus-visible:ring-offset-2"
-          tabIndex={0}
+          className="w-fit text-[10px] font-semibold uppercase tracking-[0.1em] text-slate-400 underline-offset-4 transition-colors duration-200 hover:text-slate-900 hover:underline focus-visible:outline-none focus-visible:rounded-sm focus-visible:ring-2 focus-visible:ring-[#8A5A6A] focus-visible:ring-offset-2"
           aria-label={`Discover ${displayName}`}
         >
           Discover &rarr;
