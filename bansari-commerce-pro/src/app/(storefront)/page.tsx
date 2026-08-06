@@ -1,54 +1,70 @@
-import BrandStory from "@/components/home/BrandStory";
-import CampaignBanner from "@/components/home/CampaignBanner";
-import CategoryGrid from "@/components/home/CategoryGrid";
-import CelebrationEdit from "@/components/home/CelebrationEdit";
-import FeaturedProducts from "@/components/home/FeaturedProducts";
-import Hero from "@/components/home/Hero";
-import HomeTrustStrip from "@/components/home/HomeTrustStrip";
-import InstagramGallery from "@/components/home/InstagramGallery";
-import Newsletter from "@/components/home/Newsletter";
-import ShopByOccasion from "@/components/home/ShopByOccasion";
-import Testimonials from "@/components/home/Testimonials";
-import WhyChooseUs from "@/components/home/WhyChooseUs";
+import { Suspense } from "react";
 
-export default function Home() {
+import AnnouncementBar from "@/components/home/AnnouncementBar";
+import EditorialHero from "@/components/home/EditorialHero";
+import CategoryShowcase from "@/components/home/CategoryShowcase";
+import TrendingCollections from "@/components/home/TrendingCollections";
+import NewArrivals from "@/components/home/NewArrivals";
+import BestSellers from "@/components/home/BestSellers";
+import FeaturedCollections from "@/components/home/FeaturedCollections";
+import OccasionEdit from "@/components/home/OccasionEdit";
+import CraftsmanshipStory from "@/components/home/CraftsmanshipStory";
+import WhyBansari from "@/components/home/WhyBansari";
+import CustomerStories from "@/components/home/CustomerStories";
+import LuxuryNewsletter from "@/components/home/LuxuryNewsletter";
+
+export const metadata = {
+  title: "Bansari Collection — Luxury Indian Ethnic Fashion",
+  description:
+    "Discover handcrafted luxury Indian ethnic wear — sarees, lehengas, kurtas and more. Shop the finest artisanal fashion at Bansari Collection.",
+};
+
+export default function HomePage() {
   return (
-    <main>
-      {/* ── Hero ── */}
-      <Hero />
+    <>
+      {/* ── 1. Announcement Bar ── */}
+      <AnnouncementBar />
 
-      {/* ── Campaign Banner ── */}
-      <CampaignBanner />
+      {/* ── 2. Header is in layout ── */}
 
-      {/* ── Trust Strip ── */}
-      <HomeTrustStrip />
+      {/* ── 3. Editorial Hero ── */}
+      <EditorialHero />
 
-      {/* ── Shop by Category ── */}
-      <CategoryGrid />
+      {/* ── 4. Shop by Category ── */}
+      <Suspense>
+        <CategoryShowcase />
+      </Suspense>
 
-      {/* ── The House Edit (Featured / Best Sellers) ── */}
-      <FeaturedProducts />
+      {/* ── 5. Trending Collections ── */}
+      <TrendingCollections />
 
-      {/* ── Shop by Occasion (Wedding Edit) ── */}
-      <ShopByOccasion />
+      {/* ── 6. New Arrivals ── */}
+      <Suspense>
+        <NewArrivals />
+      </Suspense>
 
-      {/* ── Celebration Edit (New Arrivals) ── */}
-      <CelebrationEdit />
+      {/* ── 7. Best Sellers ── */}
+      <Suspense>
+        <BestSellers />
+      </Suspense>
 
-      {/* ── Why Choose Us ── */}
-      <WhyChooseUs />
+      {/* ── 8. Featured Collections ── */}
+      <FeaturedCollections />
 
-      {/* ── Luxury Brand Story ── */}
-      <BrandStory />
+      {/* ── 9. Shop by Occasion ── */}
+      <OccasionEdit />
 
-      {/* ── Testimonials (Editor's Picks social proof) ── */}
-      <Testimonials />
+      {/* ── 10. Craftsmanship Story ── */}
+      <CraftsmanshipStory />
 
-      {/* ── Instagram Gallery ── */}
-      <InstagramGallery />
+      {/* ── 11. Why Bansari ── */}
+      <WhyBansari />
 
-      {/* ── Newsletter ── */}
-      <Newsletter />
-    </main>
+      {/* ── 12. Customer Stories ── */}
+      <CustomerStories />
+
+      {/* ── 13. Newsletter ── */}
+      <LuxuryNewsletter />
+    </>
   );
 }
