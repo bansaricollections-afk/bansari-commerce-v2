@@ -27,13 +27,13 @@ export default function HomePage() {
         Skip to main content
       </a>
 
-      {/* ── 1. Announcement Bar ── */}
+      {/* ── 1. Announcement Bar (outside <main> — correct landmark) ── */}
       <AnnouncementBar />
 
       {/* ── 2. Header is in layout ── */}
 
       {/* ── 3–13. Homepage sections ── */}
-      <main id="main-content">
+      <main id="main-content" tabIndex={-1}>
         {/* ── 3. Editorial Hero ── */}
         <EditorialHero />
 
