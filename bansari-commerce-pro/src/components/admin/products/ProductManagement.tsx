@@ -1024,7 +1024,7 @@ export default function ProductManagement() {
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
           <input
             type="text"
-            placeholder="Search products by name, SKU, or slug…"
+            placeholder="Search products by name, SKU, or slug..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             className="w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white"
@@ -1276,8 +1276,14 @@ export default function ProductManagement() {
                         fieldErrors.slug ? "border-red-400" : "border-gray-300"
                       )}
                     />
-                    <Button type="button" variant="outline" size="sm" onClick={() => setField("slug", slugify(form.name))}>
-                      <Wand2 className="h-4 w-4" />
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setField("slug", slugify(form.name))}
+                      className="shrink-0"
+                    >
+                      <RefreshCw className="h-3 w-3" />
                     </Button>
                   </div>
                   {fieldErrors.slug && <p className="text-xs text-red-500">{fieldErrors.slug}</p>}
@@ -1292,7 +1298,7 @@ export default function ProductManagement() {
                     <input
                       type="text"
                       value={form.sku}
-                      onChange={(e) => setField("sku", e.target.value.toUpperCase())}
+                      onChange={(e) => setField("sku", e.target.value)}
                       className={cn(
                         "flex-1 h-10 rounded-md border px-3 py-2 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500",
                         fieldErrors.sku ? "border-red-400" : "border-gray-300"
@@ -1303,8 +1309,9 @@ export default function ProductManagement() {
                       variant="outline"
                       size="sm"
                       onClick={() => setField("sku", generateSku(form.category, form.name))}
+                      className="shrink-0"
                     >
-                      <Wand2 className="h-4 w-4" />
+                      <Wand2 className="h-3 w-3" />
                     </Button>
                   </div>
                   {fieldErrors.sku && <p className="text-xs text-red-500">{fieldErrors.sku}</p>}
@@ -1324,13 +1331,13 @@ export default function ProductManagement() {
                   }}
                 />
 
-                {/* Subcategory — always rendered; filtered by category */}
+                {/* Subcategory */}
                 <LookupSelect
                   label="Subcategory"
                   value={form.subcategory_id}
                   options={filteredSubcats}
-                  onChange={(id) => setField("subcategory_id", id)}
-                  placeholder="Select Subcategory (optional)"
+                  onChange={(id, name) => setField("subcategory_id", id)}
+                  placeholder="Select subcategory (optional)"
                 />
 
                 {/* Collection */}
@@ -1360,7 +1367,6 @@ export default function ProductManagement() {
                       fieldErrors.brand ? "border-red-400" : "border-gray-300"
                     )}
                   />
-                  {fieldErrors.brand && <p className="text-xs text-red-500">{fieldErrors.brand}</p>}
                 </div>
 
                 {/* Fabric */}
@@ -1394,8 +1400,8 @@ export default function ProductManagement() {
                   label="Occasion"
                   value={form.attr_occasion_id}
                   options={catalog.attrs.occasion}
-                  onChange={(id) => setField("attr_occasion_id", id)}
-                  placeholder="Select Occasion (optional)"
+                  onChange={(id, _name) => setField("attr_occasion_id", id)}
+                  placeholder="Select occasion (optional)"
                 />
 
                 {/* Pattern */}
@@ -1403,8 +1409,8 @@ export default function ProductManagement() {
                   label="Pattern"
                   value={form.attr_pattern_id}
                   options={catalog.attrs.pattern}
-                  onChange={(id) => setField("attr_pattern_id", id)}
-                  placeholder="Select Pattern (optional)"
+                  onChange={(id, _name) => setField("attr_pattern_id", id)}
+                  placeholder="Select pattern (optional)"
                 />
 
                 {/* Fit */}
@@ -1412,8 +1418,8 @@ export default function ProductManagement() {
                   label="Fit"
                   value={form.attr_fit_id}
                   options={catalog.attrs.fit}
-                  onChange={(id) => setField("attr_fit_id", id)}
-                  placeholder="Select Fit (optional)"
+                  onChange={(id, _name) => setField("attr_fit_id", id)}
+                  placeholder="Select fit (optional)"
                 />
 
                 {/* Sleeve */}
@@ -1421,8 +1427,8 @@ export default function ProductManagement() {
                   label="Sleeve"
                   value={form.attr_sleeve_id}
                   options={catalog.attrs.sleeve}
-                  onChange={(id) => setField("attr_sleeve_id", id)}
-                  placeholder="Select Sleeve (optional)"
+                  onChange={(id, _name) => setField("attr_sleeve_id", id)}
+                  placeholder="Select sleeve (optional)"
                 />
 
                 {/* Neck */}
@@ -1430,8 +1436,8 @@ export default function ProductManagement() {
                   label="Neck"
                   value={form.attr_neck_id}
                   options={catalog.attrs.neck}
-                  onChange={(id) => setField("attr_neck_id", id)}
-                  placeholder="Select Neck (optional)"
+                  onChange={(id, _name) => setField("attr_neck_id", id)}
+                  placeholder="Select neck (optional)"
                 />
 
                 {/* Work */}
@@ -1439,8 +1445,8 @@ export default function ProductManagement() {
                   label="Work"
                   value={form.attr_work_id}
                   options={catalog.attrs.work}
-                  onChange={(id) => setField("attr_work_id", id)}
-                  placeholder="Select Work (optional)"
+                  onChange={(id, _name) => setField("attr_work_id", id)}
+                  placeholder="Select work (optional)"
                 />
 
                 {/* Length */}
@@ -1448,74 +1454,149 @@ export default function ProductManagement() {
                   label="Length"
                   value={form.attr_length_id}
                   options={catalog.attrs.length}
-                  onChange={(id) => setField("attr_length_id", id)}
-                  placeholder="Select Length (optional)"
+                  onChange={(id, _name) => setField("attr_length_id", id)}
+                  placeholder="Select length (optional)"
                 />
+
+                {/* Sizes */}
+                <div className="space-y-1.5">
+                  <label className="block text-sm font-medium text-gray-700">
+                    Sizes <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={form.sizes}
+                    onChange={(e) => setField("sizes", e.target.value)}
+                    placeholder="XS, S, M, L, XL"
+                    className={cn(
+                      "w-full h-10 rounded-md border px-3 py-2 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500",
+                      fieldErrors.sizes ? "border-red-400" : "border-gray-300"
+                    )}
+                  />
+                  <p className="text-xs text-gray-400">Comma-separated list of sizes</p>
+                  {fieldErrors.sizes && <p className="text-xs text-red-500">{fieldErrors.sizes}</p>}
+                </div>
 
                 {/* Size Chart */}
                 <LookupSelect
                   label="Size Chart"
                   value={form.size_chart_id}
                   options={sizeChartOptions}
-                  onChange={(id) => setField("size_chart_id", id)}
-                  placeholder="Select Size Chart (optional)"
+                  onChange={(id, _name) => setField("size_chart_id", id)}
+                  placeholder="Select size chart (optional)"
                 />
-
-                {/* Sizes (comma-separated text input) */}
-                <div className="space-y-1.5">
-                  <label className="block text-sm font-medium text-gray-700">
-                    Available Sizes <span className="text-red-500">*</span>
-                  </label>
-                  <input
-                    type="text"
-                    value={form.sizes}
-                    onChange={(e) => setField("sizes", e.target.value)}
-                    placeholder="S, M, L, XL, XXL"
-                    className={cn(
-                      "w-full h-10 rounded-md border px-3 py-2 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500",
-                      fieldErrors.sizes ? "border-red-400" : "border-gray-300"
-                    )}
-                  />
-                  <p className="text-xs text-gray-400">Comma-separated, e.g. S, M, L, XL</p>
-                  {fieldErrors.sizes && <p className="text-xs text-red-500">{fieldErrors.sizes}</p>}
-                </div>
               </div>
             )}
 
             {/* ── STEP 2: Pricing ───────────────────────────────────────── */}
             {currentStep === 2 && (
               <div className="space-y-4">
-                {[
-                  { key: "price" as const,        label: "Selling Price (₹)", required: true  },
-                  { key: "comparePrice" as const,  label: "MRP / Compare Price (₹)", required: false },
-                  { key: "cost" as const,          label: "Cost Price (₹)",     required: false },
-                  { key: "stock" as const,         label: "Stock",              required: true  },
-                  { key: "hsn" as const,           label: "HSN Code",           required: true  },
-                  { key: "gst" as const,           label: "GST %",              required: false },
-                ].map(({ key, label, required }) => (
-                  <div key={key} className="space-y-1.5">
+                <div className="grid grid-cols-2 gap-4">
+                  {/* Price */}
+                  <div className="space-y-1.5">
                     <label className="block text-sm font-medium text-gray-700">
-                      {label}{required && <span className="text-red-500 ml-0.5">*</span>}
+                      Price (₹) <span className="text-red-500">*</span>
                     </label>
                     <input
-                      type={key === "hsn" ? "text" : "number"}
-                      value={form[key]}
-                      onChange={(e) => setField(key, e.target.value)}
-                      min={key !== "hsn" ? "0" : undefined}
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      value={form.price}
+                      onChange={(e) => setField("price", e.target.value)}
                       className={cn(
                         "w-full h-10 rounded-md border px-3 py-2 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500",
-                        fieldErrors[key] ? "border-red-400" : "border-gray-300"
+                        fieldErrors.price ? "border-red-400" : "border-gray-300"
                       )}
                     />
-                    {fieldErrors[key] && <p className="text-xs text-red-500">{fieldErrors[key]}</p>}
+                    {fieldErrors.price && <p className="text-xs text-red-500">{fieldErrors.price}</p>}
                   </div>
-                ))}
+
+                  {/* Compare Price */}
+                  <div className="space-y-1.5">
+                    <label className="block text-sm font-medium text-gray-700">Compare At (₹)</label>
+                    <input
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      value={form.comparePrice}
+                      onChange={(e) => setField("comparePrice", e.target.value)}
+                      placeholder="Original price"
+                      className="w-full h-10 rounded-md border border-gray-300 px-3 py-2 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    />
+                  </div>
+
+                  {/* Cost */}
+                  <div className="space-y-1.5">
+                    <label className="block text-sm font-medium text-gray-700">Cost (₹)</label>
+                    <input
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      value={form.cost}
+                      onChange={(e) => setField("cost", e.target.value)}
+                      placeholder="Cost of goods"
+                      className="w-full h-10 rounded-md border border-gray-300 px-3 py-2 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    />
+                  </div>
+
+                  {/* Stock */}
+                  <div className="space-y-1.5">
+                    <label className="block text-sm font-medium text-gray-700">
+                      Stock <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      type="number"
+                      min="0"
+                      step="1"
+                      value={form.stock}
+                      onChange={(e) => setField("stock", e.target.value)}
+                      className={cn(
+                        "w-full h-10 rounded-md border px-3 py-2 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500",
+                        fieldErrors.stock ? "border-red-400" : "border-gray-300"
+                      )}
+                    />
+                    {fieldErrors.stock && <p className="text-xs text-red-500">{fieldErrors.stock}</p>}
+                  </div>
+
+                  {/* HSN */}
+                  <div className="space-y-1.5">
+                    <label className="block text-sm font-medium text-gray-700">
+                      HSN Code <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      value={form.hsn}
+                      onChange={(e) => setField("hsn", e.target.value)}
+                      placeholder="e.g. 5208"
+                      className={cn(
+                        "w-full h-10 rounded-md border px-3 py-2 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500",
+                        fieldErrors.hsn ? "border-red-400" : "border-gray-300"
+                      )}
+                    />
+                    {fieldErrors.hsn && <p className="text-xs text-red-500">{fieldErrors.hsn}</p>}
+                  </div>
+
+                  {/* GST */}
+                  <div className="space-y-1.5">
+                    <label className="block text-sm font-medium text-gray-700">GST (%)</label>
+                    <select
+                      value={form.gst}
+                      onChange={(e) => setField("gst", e.target.value)}
+                      className="w-full h-10 rounded-md border border-gray-300 px-3 py-2 text-sm bg-white shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    >
+                      {[0, 5, 12, 18, 28].map((r) => (
+                        <option key={r} value={r}>{r}%</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
               </div>
             )}
 
             {/* ── STEP 3: Content ───────────────────────────────────────── */}
             {currentStep === 3 && (
               <div className="space-y-4">
+                {/* Description */}
                 <div className="space-y-1.5">
                   <label className="block text-sm font-medium text-gray-700">
                     Description <span className="text-red-500">*</span>
@@ -1524,13 +1605,16 @@ export default function ProductManagement() {
                     rows={5}
                     value={form.description}
                     onChange={(e) => setField("description", e.target.value)}
+                    placeholder="Detailed product description..."
                     className={cn(
-                      "w-full rounded-md border px-3 py-2 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 resize-y",
+                      "w-full rounded-md border px-3 py-2 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 resize-none",
                       fieldErrors.description ? "border-red-400" : "border-gray-300"
                     )}
                   />
                   {fieldErrors.description && <p className="text-xs text-red-500">{fieldErrors.description}</p>}
                 </div>
+
+                {/* SEO Title */}
                 <div className="space-y-1.5">
                   <label className="block text-sm font-medium text-gray-700">
                     SEO Title <span className="text-red-500">*</span>
@@ -1539,6 +1623,7 @@ export default function ProductManagement() {
                     type="text"
                     value={form.seoTitle}
                     onChange={(e) => setField("seoTitle", e.target.value)}
+                    placeholder="Page title for search engines"
                     className={cn(
                       "w-full h-10 rounded-md border px-3 py-2 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500",
                       fieldErrors.seoTitle ? "border-red-400" : "border-gray-300"
@@ -1546,6 +1631,8 @@ export default function ProductManagement() {
                   />
                   {fieldErrors.seoTitle && <p className="text-xs text-red-500">{fieldErrors.seoTitle}</p>}
                 </div>
+
+                {/* SEO Description */}
                 <div className="space-y-1.5">
                   <label className="block text-sm font-medium text-gray-700">
                     SEO Description <span className="text-red-500">*</span>
@@ -1554,64 +1641,57 @@ export default function ProductManagement() {
                     rows={3}
                     value={form.seoDescription}
                     onChange={(e) => setField("seoDescription", e.target.value)}
+                    placeholder="Meta description for search engines (150-160 chars)"
                     className={cn(
-                      "w-full rounded-md border px-3 py-2 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 resize-y",
+                      "w-full rounded-md border px-3 py-2 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 resize-none",
                       fieldErrors.seoDescription ? "border-red-400" : "border-gray-300"
                     )}
                   />
                   {fieldErrors.seoDescription && <p className="text-xs text-red-500">{fieldErrors.seoDescription}</p>}
                 </div>
 
-                {/* ── Model Information (Phase 1B) ──────────────────────── */}
-                <div className="pt-2 border-t border-gray-100">
-                  <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">
-                    Model Information
-                  </p>
+                {/* Phase 1B — Model & Fit Information */}
+                <div className="rounded-lg border border-gray-200 bg-gray-50 p-4 space-y-4">
+                  <div className="flex items-center gap-2">
+                    <TrendingUp className="h-4 w-4 text-indigo-500" />
+                    <h3 className="text-sm font-semibold text-gray-700">Model &amp; Fit Information</h3>
+                  </div>
 
-                  {/* Model Info — full-width */}
+                  {/* Model Info — FIX: removed smart quote from placeholder */}
                   <div className="space-y-1.5">
-                    <label className="block text-sm font-medium text-gray-700">
-                      Model Info
-                    </label>
+                    <label className="block text-sm font-medium text-gray-700">Model Info</label>
                     <input
                       type="text"
                       value={form.spec_modelInfo}
                       onChange={(e) => setField("spec_modelInfo", e.target.value)}
-                      placeholder="Model is 5'7\", Measurements: 34-26-36"
+                      placeholder="e.g. Model is 5ft 7in, Measurements: 34-26-36"
+                      className="w-full h-10 rounded-md border border-gray-300 px-3 py-2 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    />
+                    <p className="text-xs text-gray-400">Displayed on PDP to help customers size correctly</p>
+                  </div>
+
+                  {/* Size Worn */}
+                  <div className="space-y-1.5">
+                    <label className="block text-sm font-medium text-gray-700">Size Worn</label>
+                    <input
+                      type="text"
+                      value={form.spec_sizeWorn}
+                      onChange={(e) => setField("spec_sizeWorn", e.target.value)}
+                      placeholder="e.g. Model is wearing size S"
                       className="w-full h-10 rounded-md border border-gray-300 px-3 py-2 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
                     />
                   </div>
 
-                  {/* Size Worn + Fit Guidance — side by side */}
-                  <div className="flex gap-3 mt-3">
-                    {/* Size Worn — short */}
-                    <div className="space-y-1.5 w-28 flex-shrink-0">
-                      <label className="block text-sm font-medium text-gray-700">
-                        Size Worn
-                      </label>
-                      <input
-                        type="text"
-                        value={form.spec_sizeWorn}
-                        onChange={(e) => setField("spec_sizeWorn", e.target.value)}
-                        placeholder="S"
-                        className="w-full h-10 rounded-md border border-gray-300 px-3 py-2 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                      />
-                    </div>
-
-                    {/* Fit Guidance — fills remaining width */}
-                    <div className="space-y-1.5 flex-1">
-                      <label className="block text-sm font-medium text-gray-700">
-                        Fit Guidance
-                        <span className="ml-1 font-normal text-gray-400">(optional)</span>
-                      </label>
-                      <input
-                        type="text"
-                        value={form.spec_fitGuidance}
-                        onChange={(e) => setField("spec_fitGuidance", e.target.value)}
-                        placeholder="Regular fit. If between sizes, choose one size larger."
-                        className="w-full h-10 rounded-md border border-gray-300 px-3 py-2 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                      />
-                    </div>
+                  {/* Fit Guidance */}
+                  <div className="space-y-1.5">
+                    <label className="block text-sm font-medium text-gray-700">Fit Guidance</label>
+                    <input
+                      type="text"
+                      value={form.spec_fitGuidance}
+                      onChange={(e) => setField("spec_fitGuidance", e.target.value)}
+                      placeholder="e.g. Slim fit, size up if between sizes"
+                      className="w-full h-10 rounded-md border border-gray-300 px-3 py-2 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    />
                   </div>
                 </div>
               </div>
@@ -1620,76 +1700,49 @@ export default function ProductManagement() {
             {/* ── STEP 4: Visibility ────────────────────────────────────── */}
             {currentStep === 4 && (
               <div className="space-y-4">
-                <p className="text-sm text-gray-500">
-                  Control how this product appears on the website. Featured and Best Seller products
-                  appear automatically in their respective homepage sections.
-                </p>
-
                 <ToggleSwitch
                   checked={form.active}
                   onChange={(v) => setField("active", v)}
-                  label="Active / Published"
-                  description="Product is visible on the website to customers."
+                  label="Active"
+                  description="Product is visible to customers"
                 />
-
                 <ToggleSwitch
                   checked={form.featured}
                   onChange={(v) => setField("featured", v)}
                   label="Featured"
-                  description="Appears in the Featured Products section on the homepage."
+                  description="Show in featured sections on homepage"
                 />
-
-                <ToggleSwitch
-                  checked={form.bestSeller}
-                  onChange={(v) => setField("bestSeller", v)}
-                  label="Best Seller"
-                  description="Appears in the Best Sellers section on the homepage."
-                />
-
                 <ToggleSwitch
                   checked={form.newArrival}
                   onChange={(v) => setField("newArrival", v)}
                   label="New Arrival"
-                  description="Appears in the New Arrivals section on the homepage."
+                  description="Tag product as a new arrival"
                 />
-
-                {/* Summary */}
-                <div className="rounded-lg bg-gray-50 border border-gray-200 p-4 space-y-2">
-                  <p className="text-xs font-semibold text-gray-600 uppercase tracking-wide">Summary</p>
-                  {[
-                    ["Name", form.name],
-                    ["SKU", form.sku],
-                    ["Category", form.category],
-                    ["Collection", form.collection],
-                    ["Price", form.price ? `₹${Number(form.price).toLocaleString("en-IN")}` : "—"],
-                    ["Stock", form.stock],
-                    ["Images", String(form.images.length)],
-                  ].map(([k, v]) => (
-                    <div key={k} className="flex justify-between text-sm">
-                      <span className="text-gray-500">{k}</span>
-                      <span className="font-medium text-gray-800 text-right max-w-[60%] truncate">{v || "—"}</span>
-                    </div>
-                  ))}
-                </div>
+                <ToggleSwitch
+                  checked={form.bestSeller}
+                  onChange={(v) => setField("bestSeller", v)}
+                  label="Best Seller"
+                  description="Tag product as a best seller"
+                />
               </div>
             )}
           </div>
 
-          {/* Footer nav */}
-          <SheetFooter className="sticky bottom-0 bg-white border-t border-gray-200 px-6 py-4 flex items-center justify-between gap-3">
+          {/* ── Sheet footer ─────────────────────────────────────────────── */}
+          <SheetFooter className="sticky bottom-0 bg-white border-t border-gray-200 px-6 py-4 flex flex-row items-center justify-between gap-3">
             <Button
               type="button"
               variant="outline"
               onClick={handleBack}
               disabled={currentStep === 0}
-              className="flex items-center gap-1.5"
+              className="flex items-center gap-1"
             >
               <ChevronLeft className="h-4 w-4" /> Back
             </Button>
 
             <div className="flex gap-2">
               {currentStep < STEPS.length - 1 ? (
-                <Button type="button" onClick={handleNext} className="bg-indigo-600 hover:bg-indigo-700 flex items-center gap-1.5">
+                <Button type="button" onClick={handleNext} className="flex items-center gap-1 bg-indigo-600 hover:bg-indigo-700">
                   Next <ChevronRight className="h-4 w-4" />
                 </Button>
               ) : (
@@ -1699,20 +1752,18 @@ export default function ProductManagement() {
                     variant="outline"
                     onClick={() => handleSave(false)}
                     disabled={isSaving || isPublishing}
-                    className="flex items-center gap-1.5"
                   >
-                    {isSaving && <Loader2 className="h-4 w-4 animate-spin" />}
+                    {isSaving ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : null}
                     Save Draft
                   </Button>
                   <Button
                     type="button"
                     onClick={() => handleSave(true)}
                     disabled={isSaving || isPublishing}
-                    className="bg-indigo-600 hover:bg-indigo-700 flex items-center gap-1.5"
+                    className="bg-green-600 hover:bg-green-700 flex items-center gap-1"
                   >
-                    {isPublishing && <Loader2 className="h-4 w-4 animate-spin" />}
-                    <CheckCircle2 className="h-4 w-4" />
-                    {editProduct ? "Update & Publish" : "Create & Publish"}
+                    {isPublishing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
+                    Publish
                   </Button>
                 </>
               )}
@@ -1721,73 +1772,147 @@ export default function ProductManagement() {
         </SheetContent>
       </Sheet>
 
-      {/* ── Delete Confirmation ─────────────────────────────────────────────── */}
+      {/* ── Delete Dialog ───────────────────────────────────────────────────── */}
       <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
-        <DialogContent>
+        <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>Delete Product</DialogTitle>
+            <DialogTitle className="flex items-center gap-2 text-red-600">
+              <AlertTriangle className="h-5 w-5" />
+              Delete Product
+            </DialogTitle>
             <DialogDescription>
-              Are you sure you want to delete &ldquo;{productToDelete?.name}&rdquo;? This will set it inactive.
+              Are you sure you want to delete{" "}
+              <span className="font-semibold text-gray-900">{productToDelete?.name}</span>?
+              This action cannot be undone.
             </DialogDescription>
           </DialogHeader>
-          <DialogFooter>
+          <DialogFooter className="flex gap-2 sm:justify-end">
             <Button variant="outline" onClick={() => setDeleteDialogOpen(false)} disabled={isDeleting}>
               Cancel
             </Button>
-            <Button variant="destructive" onClick={handleDelete} disabled={isDeleting}>
-              {isDeleting && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
+            <Button
+              variant="destructive"
+              onClick={handleDelete}
+              disabled={isDeleting}
+              className="flex items-center gap-1"
+            >
+              {isDeleting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
               Delete
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
-      {/* ── View Dialog ─────────────────────────────────────────────────────── */}
-      <Dialog open={viewDialogOpen} onOpenChange={setViewDialogOpen}>
-        <DialogContent className="max-w-lg">
-          <DialogHeader>
-            <DialogTitle>{viewProduct?.name}</DialogTitle>
-            <DialogDescription>{viewProduct?.sku}</DialogDescription>
-          </DialogHeader>
-          {viewProduct && (
-            <div className="space-y-3 text-sm">
+      {/* ── View Dialog ────────────────────────────────────────────────────── */}
+      {viewProduct && (
+        <Dialog open={viewDialogOpen} onOpenChange={setViewDialogOpen}>
+          <DialogContent className="sm:max-w-lg overflow-y-auto max-h-[90vh]">
+            <DialogHeader>
+              <DialogTitle>{viewProduct.name}</DialogTitle>
+              <DialogDescription className="text-xs text-gray-500">
+                {viewProduct.sku} · {viewProduct.category} · {viewProduct.collection}
+              </DialogDescription>
+            </DialogHeader>
+
+            <div className="space-y-4">
+              {/* Image */}
               {viewProduct.images[0] && (
                 <div className="aspect-video relative rounded-lg overflow-hidden bg-gray-100">
-                  <Image src={viewProduct.images[0].url} alt={viewProduct.images[0].alt} fill className="object-cover" sizes="480px" />
+                  <Image
+                    src={viewProduct.images[0].url}
+                    alt={viewProduct.images[0].alt}
+                    fill
+                    className="object-cover"
+                    sizes="512px"
+                  />
                 </div>
               )}
-              <div className="grid grid-cols-2 gap-2">
-                {[
-                  ["Category", viewProduct.category],
-                  ["Collection", viewProduct.collection],
-                  ["Fabric", viewProduct.fabric],
-                  ["Color", viewProduct.color],
-                  ["Price", `₹${viewProduct.price.toLocaleString("en-IN")}`],
-                  ["Stock", String(viewProduct.stock)],
-                  ["Featured", viewProduct.featured ? "Yes" : "No"],
-                  ["Best Seller", viewProduct.bestSeller ? "Yes" : "No"],
-                  ["New Arrival", viewProduct.newArrival ? "Yes" : "No"],
-                  ["Active", viewProduct.active ? "Yes" : "No"],
-                ].map(([k, v]) => (
-                  <div key={k} className="flex flex-col">
-                    <span className="text-xs text-gray-400">{k}</span>
-                    <span className="font-medium text-gray-800">{v}</span>
+
+              {/* Details grid */}
+              <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
+                <div>
+                  <span className="text-gray-500">Price</span>
+                  <p className="font-semibold">₹{viewProduct.price.toLocaleString("en-IN")}</p>
+                </div>
+                {viewProduct.comparePrice && (
+                  <div>
+                    <span className="text-gray-500">Compare at</span>
+                    <p className="font-semibold line-through text-gray-400">₹{viewProduct.comparePrice.toLocaleString("en-IN")}</p>
                   </div>
-                ))}
+                )}
+                <div>
+                  <span className="text-gray-500">Stock</span>
+                  <p className={cn("font-semibold", viewProduct.stock === 0 ? "text-red-600" : viewProduct.stock <= LOW_STOCK_THRESHOLD ? "text-yellow-600" : "text-gray-900")}>
+                    {viewProduct.stock}
+                  </p>
+                </div>
+                <div>
+                  <span className="text-gray-500">Brand</span>
+                  <p className="font-medium">{viewProduct.brand}</p>
+                </div>
+                <div>
+                  <span className="text-gray-500">Fabric</span>
+                  <p className="font-medium">{viewProduct.fabric}</p>
+                </div>
+                <div>
+                  <span className="text-gray-500">Color</span>
+                  <p className="font-medium">{viewProduct.color}</p>
+                </div>
+                <div>
+                  <span className="text-gray-500">Sizes</span>
+                  <p className="font-medium">{viewProduct.sizes.join(", ")}</p>
+                </div>
+                <div>
+                  <span className="text-gray-500">HSN / GST</span>
+                  <p className="font-medium">{viewProduct.hsn} / {viewProduct.gst}%</p>
+                </div>
               </div>
+
+              {/* Badges */}
+              <div className="flex flex-wrap gap-2">
+                {viewProduct.active    && <Badge className="bg-green-100 text-green-700">Active</Badge>}
+                {!viewProduct.active   && <Badge className="bg-gray-100 text-gray-500">Inactive</Badge>}
+                {viewProduct.featured  && <Badge className="bg-indigo-100 text-indigo-700">Featured</Badge>}
+                {viewProduct.bestSeller && <Badge className="bg-orange-100 text-orange-700">Best Seller</Badge>}
+                {viewProduct.newArrival && <Badge className="bg-green-100 text-green-700">New Arrival</Badge>}
+              </div>
+
+              {/* Description */}
               {viewProduct.description && (
-                <p className="text-gray-600 text-sm">{viewProduct.description.slice(0, 200)}{viewProduct.description.length > 200 ? "…" : ""}</p>
+                <div>
+                  <p className="text-sm font-medium text-gray-700 mb-1">Description</p>
+                  <p className="text-sm text-gray-600 leading-relaxed">{viewProduct.description}</p>
+                </div>
+              )}
+
+              {/* Specifications (Phase 1B) */}
+              {viewProduct.specifications && (
+                Object.values(viewProduct.specifications).some(Boolean)
+              ) && (
+                <div className="rounded-lg border border-gray-200 bg-gray-50 p-3 space-y-1">
+                  <p className="text-sm font-medium text-gray-700">Model &amp; Fit</p>
+                  {viewProduct.specifications.modelInfo  && <p className="text-xs text-gray-600">{viewProduct.specifications.modelInfo}</p>}
+                  {viewProduct.specifications.sizeWorn   && <p className="text-xs text-gray-500">Wearing: {viewProduct.specifications.sizeWorn}</p>}
+                  {viewProduct.specifications.fitGuidance && <p className="text-xs text-gray-500">Fit: {viewProduct.specifications.fitGuidance}</p>}
+                </div>
               )}
             </div>
-          )}
-          <DialogFooter>
-            <Button variant="outline" onClick={() => { setViewDialogOpen(false); if (viewProduct) openEdit(viewProduct); }}>
-              <Edit className="h-4 w-4 mr-1.5" /> Edit
-            </Button>
-            <Button onClick={() => setViewDialogOpen(false)}>Close</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setViewDialogOpen(false)}>Close</Button>
+              <Button
+                onClick={() => {
+                  setViewDialogOpen(false);
+                  openEdit(viewProduct);
+                }}
+                className="bg-indigo-600 hover:bg-indigo-700"
+              >
+                <Edit className="h-4 w-4 mr-1" /> Edit
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      )}
     </div>
   );
 }
