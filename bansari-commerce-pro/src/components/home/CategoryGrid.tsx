@@ -1,23 +1,17 @@
-"use client";
+/**
+ * CategoryGrid — Server Component
+ * Luxury editorial category navigation.
+ * Benchmark: Nykaa Fashion, Pernia's Pop-Up Shop.
+ *
+ * Desktop: 5-column equal grid.
+ * Mobile: 2-column grid.
+ * Interaction: CSS-only scale + overlay opacity on hover.
+ * No "use client", no JS hover handlers.
+ */
+import Link from 'next/link';
+import ImageWithFallback from '@/components/ui/ImageWithFallback';
 
-import Image from "next/image";
-import Link from "next/link";
-
-/* ------------------------------------------------------------------
-   CATEGORY DATA
-   occasion: occasion-led label (not marketing copy)
-   objectPosition: tuned per garment for face → embroidery priority
------------------------------------------------------------------- */
-const featured = {
-  title: "Sarees",
-  occasion: "Wedding & Celebration",
-  image: "/categories/sarees.png",
-  alt: "Model in embroidered silk saree — face, neck embroidery and pallu border visible",
-  link: "/shop?category=sarees",
-  objectPosition: "center top",
-};
-
-const supporting: {
+const categories: {
   title: string;
   occasion: string;
   image: string;
@@ -26,354 +20,213 @@ const supporting: {
   objectPosition: string;
 }[] = [
   {
-    title: "Kurta Sets",
-    occasion: "Contemporary Ease",
-    image: "/categories/kurta.png",
-    alt: "Model in embroidered kurta set — yoke embroidery and sleeve detail visible",
-    link: "/shop?category=kurta-sets",
-    objectPosition: "center 20%",
+    title: 'Sarees',
+    occasion: 'Wedding & Celebration',
+    image: '/categories/sarees.png',
+    alt: 'Bansari — model in embroidered silk saree with gold pallu border',
+    link: '/shop?category=sarees',
+    objectPosition: 'center top',
   },
   {
-    title: "Co-ord Sets",
-    occasion: "Modern Ease",
-    image: "/categories/coords.png",
-    alt: "Model in co-ord set — full silhouette and garment composition visible",
-    link: "/shop?category=co-ord-sets",
-    objectPosition: "center center",
+    title: 'Kurta Sets',
+    occasion: 'Contemporary Ease',
+    image: '/categories/kurta.png',
+    alt: 'Bansari — model in embroidered kurta set with yoke detail',
+    link: '/shop?category=kurta-sets',
+    objectPosition: 'center 20%',
   },
   {
-    title: "Anarkali",
-    occasion: "Timeless Grace",
-    image: "/categories/anarkali.png",
-    alt: "Model in Anarkali — face, neck embroidery and flared silhouette visible",
-    link: "/shop?category=anarkali",
-    objectPosition: "center top",
+    title: 'Co-ord Sets',
+    occasion: 'Modern Ease',
+    image: '/categories/coords.png',
+    alt: 'Bansari — model in co-ord set, full silhouette',
+    link: '/shop?category=co-ord-sets',
+    objectPosition: 'center center',
   },
   {
-    title: "Western Wear",
-    occasion: "Modern Silhouettes",
-    image: "/categories/western-wear.png",
-    alt: "Model in western wear — full silhouette and garment cut visible",
-    link: "/shop?category=western-wear",
-    objectPosition: "center center",
+    title: 'Anarkali',
+    occasion: 'Timeless Grace',
+    image: '/categories/anarkali.png',
+    alt: 'Bansari — model in Anarkali with flared silhouette and neck embroidery',
+    link: '/shop?category=anarkali',
+    objectPosition: 'center top',
+  },
+  {
+    title: 'Western Wear',
+    occasion: 'Modern Silhouettes',
+    image: '/categories/western-wear.png',
+    alt: 'Bansari — model in contemporary western silhouette',
+    link: '/shop?category=western-wear',
+    objectPosition: 'center 20%',
   },
 ];
 
-const closing = {
-  title: "Ethnic Glory",
-  occasion: "Heritage Craft",
-  image: "/categories/ethnic-glory.png",
-  alt: "Model in ethnic ensemble — border embroidery and garment heritage detail visible",
-  link: "/shop?category=ethnic-glory",
-  objectPosition: "center 30%",
-};
-
-/* ------------------------------------------------------------------
-   TILE LABEL OVERLAY
-   Sits inside the image plane at the bottom.
-   No external card div. No shadow. No radius.
------------------------------------------------------------------- */
-function TileLabel({
-  title,
-  occasion,
-  cta = true,
-}: {
-  title: string;
-  occasion: string;
-  cta?: boolean;
-}) {
-  return (
-    <div
-      className="absolute inset-x-0 bottom-0 flex flex-col gap-0.5 px-5 pb-5 pt-10"
-      style={{
-        background:
-          `linear-gradient(to top, var(--bc-surface-overlay-deep) 0%, rgba(29,16,24,0.28) 60%, transparent 100%)`,
-      }}
-    >
-      <span
-        style={{
-          fontFamily: "var(--font-inter), sans-serif",
-          fontSize: "var(--bc-text-xs)",
-          color: "var(--bc-text-gold)",
-          letterSpacing: "0.14em",
-          textTransform: "uppercase",
-          display: "block",
-        }}
-      >
-        {occasion}
-      </span>
-      <span
-        style={{
-          fontFamily: "var(--font-playfair), serif",
-          fontSize: "var(--bc-text-lg)",
-          color: "var(--bc-text-inverse)",
-          fontWeight: 500,
-          lineHeight: 1.15,
-          display: "block",
-        }}
-      >
-        {title}
-      </span>
-      {cta && (
-        <span
-          style={{
-            fontFamily: "var(--font-inter), sans-serif",
-            fontSize: "var(--bc-text-sm)",
-            color: "var(--bc-text-inverse)",
-            opacity: 0.72,
-            marginTop: "var(--bc-space-1)",
-            display: "block",
-          }}
-        >
-          Discover →
-        </span>
-      )}
-    </div>
-  );
-}
-
-/* ------------------------------------------------------------------
-   IMAGE TILE
-   overflow-hidden on the outer Link clips the scale transform.
-   No shadow. No radius. Scale 1 → 1.025 over 700 ms ease-out only.
------------------------------------------------------------------- */
-function ImageTile({
-  title,
-  occasion,
-  image,
-  alt,
-  link,
-  objectPosition,
-  priority = false,
-  className = "",
-  sizes = "50vw",
-}: {
-  title: string;
-  occasion: string;
-  image: string;
-  alt: string;
-  link: string;
-  objectPosition: string;
-  priority?: boolean;
-  className?: string;
-  sizes?: string;
-}) {
-  return (
-    <Link
-      href={link}
-      aria-label={`Shop ${title} — ${occasion}`}
-      className={`relative block overflow-hidden${className ? ` ${className}` : ""}`}
-    >
-      <div
-        className="h-full w-full"
-        style={{ transition: "transform 700ms ease-out" }}
-        onMouseEnter={(e) => {
-          (e.currentTarget as HTMLDivElement).style.transform = "scale(1.025)";
-        }}
-        onMouseLeave={(e) => {
-          (e.currentTarget as HTMLDivElement).style.transform = "scale(1)";
-        }}
-      >
-        <Image
-          src={image}
-          alt={alt}
-          fill
-          sizes={sizes}
-          priority={priority}
-          className="object-cover"
-          style={{ objectPosition }}
-        />
-      </div>
-      <TileLabel title={title} occasion={occasion} />
-    </Link>
-  );
-}
-
-/* ------------------------------------------------------------------
-   CATEGORY GRID — LUXURY EDITORIAL v2
-   Desktop: featured (left, ~60%) + 2×2 supporting grid (right, ~40%)
-   Closing: full-width editorial band for Ethnic Glory
-   Mobile: natural single-column stack — no carousel
-   Gap: 1px (flush, editorial — closer to Massimo Dutti)
------------------------------------------------------------------- */
 export default function CategoryGrid() {
   return (
-    <section
-      aria-label="Shop The Edit — curated category discovery"
-      style={{
-        backgroundColor: "var(--bc-surface-warm)",
-        paddingBlock: "var(--bc-section-padding)",
-      }}
-    >
-      <div
-        className="mx-auto"
-        style={{
-          maxWidth: "var(--bc-content-wide)",
-          paddingInline: "var(--bc-gutter)",
-        }}
-      >
-        {/* ── Section heading ── */}
-        <div
-          style={{
-            marginBottom: "var(--bc-space-10)",
-            borderBottom: "1px solid var(--bc-border-soft)",
-            paddingBottom: "var(--bc-space-6)",
-          }}
-        >
-          <p
-            style={{
-              fontFamily: "var(--font-inter), sans-serif",
-              fontSize: "var(--bc-text-xs)",
-              fontWeight: 500,
-              letterSpacing: "0.18em",
-              textTransform: "uppercase",
-              color: "var(--bc-text-gold)",
-              marginBottom: "var(--bc-space-2)",
-            }}
-          >
-            The Edit
-          </p>
-          <h2
-            style={{
-              fontFamily: "var(--font-playfair), serif",
-              fontSize: "var(--bc-text-xl)",
-              fontWeight: 400,
-              color: "var(--bc-text-primary)",
-              lineHeight: 1.12,
-              letterSpacing: "-0.01em",
-            }}
-          >
-            Curated for You
+    <section aria-label="Shop By Category" className="bc-cg-section">
+      <div className="bc-cg-container">
+        <div className="bc-cg-header">
+          <p className="bc-cg-eyebrow">Curated For You</p>
+          <h2 className="bc-cg-title">
+            Shop By <em className="bc-cg-title-em">Category</em>
           </h2>
         </div>
 
-        {/* ── Main layout: featured left + 2×2 supporting right ── */}
-        <div className="grid gap-px md:grid-cols-[3fr_2fr]">
-          {/* Featured tile — Sarees */}
-          <ImageTile
-            {...featured}
-            priority
-            sizes="(min-width: 768px) 60vw, 100vw"
-            className="min-h-[420px] md:min-h-[680px]"
-          />
-
-          {/* Supporting 2×2 grid */}
-          <div className="grid grid-cols-2 gap-px">
-            {supporting.map((cat) => (
-              <ImageTile
-                key={cat.title}
-                {...cat}
-                priority={false}
-                sizes="(min-width: 768px) 20vw, 50vw"
-                className="min-h-[200px] md:min-h-[336px]"
-              />
-            ))}
-          </div>
-        </div>
-
-        {/* ── Closing editorial band — Ethnic Glory ── */}
-        <div
-          className="mt-px grid md:grid-cols-[1fr_2fr] items-center"
-          style={{
-            borderTop: "1px solid var(--bc-border-soft)",
-            borderBottom: "1px solid var(--bc-border-soft)",
-            backgroundColor: "var(--bc-surface-cream)",
-          }}
-        >
-          {/* Editorial text side */}
-          <div
-            className="flex flex-col justify-center"
-            style={{ padding: "var(--bc-space-10) var(--bc-space-8)" }}
-          >
-            <p
-              style={{
-                fontFamily: "var(--font-inter), sans-serif",
-                fontSize: "var(--bc-text-xs)",
-                fontWeight: 500,
-                letterSpacing: "0.18em",
-                textTransform: "uppercase",
-                color: "var(--bc-text-gold)",
-                marginBottom: "var(--bc-space-3)",
-              }}
-            >
-              {closing.occasion}
-            </p>
-            <h3
-              style={{
-                fontFamily: "var(--font-playfair), serif",
-                fontSize: "var(--bc-text-xl)",
-                fontWeight: 400,
-                color: "var(--bc-text-primary)",
-                lineHeight: 1.12,
-                letterSpacing: "-0.01em",
-                marginBottom: "var(--bc-space-4)",
-              }}
-            >
-              {closing.title}
-            </h3>
-            <p
-              style={{
-                fontFamily: "var(--font-inter), sans-serif",
-                fontSize: "var(--bc-text-sm)",
-                color: "var(--bc-text-muted)",
-                maxWidth: "32ch",
-                lineHeight: 1.75,
-                marginBottom: "var(--bc-space-6)",
-              }}
-            >
-              Craftsmanship rooted in tradition. Each piece honours the artisans
-              behind every stitch.
-            </p>
-            <Link
-              href={closing.link}
-              aria-label={`Shop ${closing.title} — ${closing.occasion}`}
-              style={{
-                fontFamily: "var(--font-inter), sans-serif",
-                fontSize: "var(--bc-text-xs)",
-                fontWeight: 500,
-                letterSpacing: "0.12em",
-                textTransform: "uppercase",
-                color: "var(--bc-text-secondary)",
-                borderBottom: "1px solid var(--bc-border-gold)",
-                paddingBottom: "2px",
-                display: "inline-flex",
-                alignItems: "center",
-                gap: "var(--bc-space-1)",
-                width: "fit-content",
-                transition: "color var(--bc-transition-base), border-color var(--bc-transition-base)",
-              }}
-            >
-              Discover the collection
-            </Link>
-          </div>
-
-          {/* Image side */}
-          <div
-            className="relative overflow-hidden"
-            style={{ height: "clamp(260px, 36vw, 480px)" }}
-          >
-            <div
-              className="h-full w-full"
-              style={{ transition: "transform 700ms ease-out" }}
-              onMouseEnter={(e) => {
-                (e.currentTarget as HTMLDivElement).style.transform = "scale(1.025)";
-              }}
-              onMouseLeave={(e) => {
-                (e.currentTarget as HTMLDivElement).style.transform = "scale(1)";
-              }}
-            >
-              <Image
-                src={closing.image}
-                alt={closing.alt}
-                fill
-                sizes="(min-width: 768px) 66vw, 100vw"
-                className="object-cover"
-                style={{ objectPosition: closing.objectPosition }}
-              />
-            </div>
-          </div>
-        </div>
+        <ul role="list" className="bc-cg-grid">
+          {categories.map((cat, index) => (
+            <li key={cat.title} className="bc-cg-tile">
+              <Link
+                href={cat.link}
+                aria-label={`Shop ${cat.title} — ${cat.occasion}`}
+                className="bc-cg-link"
+              >
+                <div className="bc-cg-img-wrap">
+                  <ImageWithFallback
+                    src={cat.image}
+                    alt={cat.alt}
+                    fill
+                    priority={index < 2}
+                    sizes="(max-width: 767px) 50vw, (max-width: 1023px) 33vw, 20vw"
+                    className="bc-cg-img"
+                    style={{ objectPosition: cat.objectPosition }}
+                  />
+                  <div className="bc-cg-gradient" aria-hidden="true" />
+                </div>
+                <div className="bc-cg-copy">
+                  <span className="bc-cg-occasion">{cat.occasion}</span>
+                  <h3 className="bc-cg-card-title">{cat.title}</h3>
+                </div>
+              </Link>
+            </li>
+          ))}
+        </ul>
       </div>
+
+      <style>{`
+        .bc-cg-section {
+          background-color: var(--bc-surface-cream);
+          padding-block: var(--bc-section-padding);
+          border-top: 1px solid var(--bc-border-soft);
+        }
+        .bc-cg-container {
+          max-width: var(--bc-content-wide);
+          margin-inline: auto;
+          padding-inline: var(--bc-gutter);
+        }
+        .bc-cg-header {
+          margin-bottom: var(--bc-space-10);
+        }
+        .bc-cg-eyebrow {
+          font-family: var(--font-inter), sans-serif;
+          font-size: var(--bc-text-xs);
+          font-weight: 500;
+          letter-spacing: 0.18em;
+          text-transform: uppercase;
+          color: var(--bc-text-gold);
+          margin-bottom: var(--bc-space-2);
+        }
+        .bc-cg-title {
+          font-family: var(--font-playfair), serif;
+          font-size: var(--bc-text-2xl);
+          font-weight: 400;
+          line-height: 1.1;
+          letter-spacing: -0.015em;
+          color: var(--bc-text-primary);
+        }
+        .bc-cg-title-em {
+          font-style: italic;
+          color: var(--bc-brand-mauve);
+        }
+
+        /* GRID */
+        .bc-cg-grid {
+          list-style: none;
+          padding: 0;
+          margin: 0;
+          display: grid;
+          gap: 1px;
+          background-color: var(--bc-border-soft);
+          grid-template-columns: repeat(2, 1fr);
+        }
+        @media (min-width: 640px) {
+          .bc-cg-grid { grid-template-columns: repeat(3, 1fr); }
+        }
+        @media (min-width: 1024px) {
+          .bc-cg-grid { grid-template-columns: repeat(5, 1fr); }
+        }
+
+        /* TILE */
+        .bc-cg-tile {
+          background-color: var(--bc-surface-cream);
+          overflow: hidden;
+        }
+        .bc-cg-link {
+          display: block;
+          text-decoration: none;
+          color: inherit;
+        }
+
+        /* IMAGE */
+        .bc-cg-img-wrap {
+          position: relative;
+          overflow: hidden;
+          height: clamp(220px, 35vw, 400px);
+        }
+        @media (min-width: 1024px) {
+          .bc-cg-img-wrap { height: clamp(260px, 24vw, 440px); }
+        }
+        .bc-cg-img {
+          object-fit: cover;
+          transition: transform 700ms cubic-bezier(0.16, 1, 0.3, 1);
+        }
+        .bc-cg-link:hover .bc-cg-img,
+        .bc-cg-link:focus-visible .bc-cg-img {
+          transform: scale(1.05);
+        }
+        .bc-cg-gradient {
+          position: absolute;
+          inset: 0;
+          background: linear-gradient(
+            to top,
+            oklch(0.10 0.02 340 / 0.72) 0%,
+            transparent 55%
+          );
+          pointer-events: none;
+        }
+
+        /* COPY */
+        .bc-cg-copy {
+          padding: var(--bc-space-4) var(--bc-space-4) var(--bc-space-5);
+          background-color: var(--bc-surface-cream);
+          border-top: 1px solid var(--bc-border-soft);
+        }
+        .bc-cg-occasion {
+          display: block;
+          font-family: var(--font-inter), sans-serif;
+          font-size: var(--bc-text-xs);
+          letter-spacing: 0.12em;
+          text-transform: uppercase;
+          color: var(--bc-text-muted);
+          margin-bottom: var(--bc-space-1);
+        }
+        .bc-cg-card-title {
+          font-family: var(--font-playfair), serif;
+          font-size: var(--bc-text-lg);
+          font-weight: 400;
+          color: var(--bc-text-primary);
+          letter-spacing: -0.01em;
+          line-height: 1.2;
+        }
+        .bc-cg-link:hover .bc-cg-card-title,
+        .bc-cg-link:focus-visible .bc-cg-card-title {
+          color: var(--bc-brand-mauve);
+          transition: color 200ms ease;
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+          .bc-cg-img { transition: none; }
+        }
+      `}</style>
     </section>
   );
 }
