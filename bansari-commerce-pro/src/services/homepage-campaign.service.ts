@@ -43,7 +43,7 @@ export async function getActiveCampaigns(): Promise<HomepageCampaign[]> {
     .order('sort_order', { ascending: true });
 
   if (error) throw new CampaignError(error.message, 'INTERNAL');
-  return ((data ?? []) as DbHomepageCampaign[]).map(mapCampaign);
+  return ((data ?? []) as unknown as DbHomepageCampaign[]).map(mapCampaign);
 }
 
 // ─── Admin: list all ──────────────────────────────────────────────────────────
@@ -54,7 +54,7 @@ export async function listAllCampaigns(): Promise<HomepageCampaign[]> {
     .select(COLS)
     .order('sort_order', { ascending: true });
   if (error) throw new CampaignError(error.message, 'INTERNAL');
-  return ((data ?? []) as DbHomepageCampaign[]).map(mapCampaign);
+  return ((data ?? []) as unknown as DbHomepageCampaign[]).map(mapCampaign);
 }
 
 // ─── Admin: get by id ─────────────────────────────────────────────────────────
@@ -67,7 +67,7 @@ export async function getCampaignById(id: string): Promise<HomepageCampaign> {
     .maybeSingle();
   if (error) throw new CampaignError(error.message, 'INTERNAL');
   if (!data) throw new CampaignError(`Campaign ${id} not found`, 'NOT_FOUND');
-  return mapCampaign(data as DbHomepageCampaign);
+  return mapCampaign(data as unknown as DbHomepageCampaign);
 }
 
 // ─── Admin: create ────────────────────────────────────────────────────────────
@@ -86,7 +86,7 @@ export async function createCampaign(
     .select(COLS)
     .single();
   if (error) throw new CampaignError(error.message, 'INTERNAL');
-  return mapCampaign(data as DbHomepageCampaign);
+  return mapCampaign(data as unknown as DbHomepageCampaign);
 }
 
 // ─── Admin: update ────────────────────────────────────────────────────────────
@@ -100,10 +100,10 @@ export async function updateCampaign(
     .update({ ...payload, updated_at: new Date().toISOString() })
     .eq('id', id)
     .select(COLS)
-    .single();
+    .single<DbHomepageCampaign>();
   if (error) throw new CampaignError(error.message, 'INTERNAL');
   if (!data) throw new CampaignError(`Campaign ${id} not found`, 'NOT_FOUND');
-  return mapCampaign(data as DbHomepageCampaign);
+  return mapCampaign(data);
 }
 
 // ─── Admin: delete ────────────────────────────────────────────────────────────

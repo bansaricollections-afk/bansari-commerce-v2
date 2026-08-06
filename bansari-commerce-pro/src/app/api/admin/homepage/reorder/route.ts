@@ -3,7 +3,7 @@
  * Body: { items: { id: string; sort_order: number }[] }
  */
 import { NextRequest, NextResponse } from 'next/server';
-import { requireAdmin } from '@/lib/auth/requireAdmin';
+import { requireAdminSession } from '@/lib/auth/requireAdmin';
 import { reorderCampaigns } from '@/services/homepage-campaign.service';
 import { CampaignError } from '@/lib/campaign-errors';
 
@@ -11,7 +11,8 @@ export const dynamic = 'force-dynamic';
 
 export async function PATCH(req: NextRequest) {
   try {
-    await requireAdmin();
+    const auth = await requireAdminSession(req);
+    if (auth instanceof NextResponse) return auth;
     const { items } = await req.json();
     if (!Array.isArray(items)) {
       return NextResponse.json({ error: '`items` must be an array' }, { status: 400 });

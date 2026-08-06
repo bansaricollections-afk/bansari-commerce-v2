@@ -17,7 +17,7 @@ import TrendingSection from '@/components/search/TrendingSection';
 import SearchInput from '@/components/search/SearchInput';
 import { searchProducts } from '@/services/search.service';
 import { getTrendingSearches } from '@/services/search.service';
-import type { FilterParams, SortOption } from '@/types/filter-params';
+import type { FilterParams, PaginationMeta, SortOption } from '@/types/filter-params';
 
 export const dynamic = 'force-dynamic';
 
@@ -99,7 +99,14 @@ export default async function SearchPage({
   ]);
 
   const products    = searchResult?.products ?? [];
-  const meta        = searchResult?.meta;
+  const rawMeta     = searchResult?.meta;
+  const meta: PaginationMeta | null = rawMeta
+    ? {
+        ...rawMeta,
+        hasNextPage: rawMeta.page < rawMeta.totalPages,
+        hasPrevPage: rawMeta.page > 1,
+      }
+    : null;
   const totalPages  = meta?.totalPages ?? 0;
   const currentPage = filterParams.page ?? 1;
 
@@ -136,7 +143,7 @@ export default async function SearchPage({
             <div className="flex gap-8">
               {/* Sidebar — desktop */}
               <aside className="hidden w-56 shrink-0 lg:block" aria-label="Filters">
-                <FilterSidebar filterParams={filterParams} />
+                <FilterSidebar />
               </aside>
 
               {/* Main content column */}
@@ -148,13 +155,13 @@ export default async function SearchPage({
                 />
 
                 {/* Active filter chips */}
-                <ActiveFilters filterParams={filterParams} />
+                <ActiveFilters />
 
                 {/* Result count summary */}
                 {meta && meta.total > 0 && (
                   <p className="mb-6 text-xs text-slate-500">
                     {meta.total.toLocaleString()} result{meta.total !== 1 ? 's' : ''}
-                    {' '}for “{meta.query}”
+                    {' '}for “{rawQuery}”
                   </p>
                 )}
 
@@ -166,13 +173,9 @@ export default async function SearchPage({
                 )}
 
                 {/* Pagination */}
-                {totalPages > 1 && (
+                {totalPages > 1 && meta && (
                   <div className="mt-12">
-                    <Pagination
-                      currentPage={currentPage}
-                      totalPages={totalPages}
-                      filterParams={filterParams}
-                    />
+                    <Pagination meta={meta} />
                   </div>
                 )}
               </div>

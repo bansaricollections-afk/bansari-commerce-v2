@@ -6,7 +6,7 @@
  * Returns { url } — the public CDN URL.
  */
 import { NextRequest, NextResponse } from 'next/server';
-import { requireAdmin } from '@/lib/auth/requireAdmin';
+import { requireAdminSession } from '@/lib/auth/requireAdmin';
 import { createServiceRoleClient } from '@/lib/supabase/service';
 import { CampaignError } from '@/lib/campaign-errors';
 
@@ -19,7 +19,8 @@ const ALLOWED_TYPES = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp', 'im
 
 export async function POST(req: NextRequest) {
   try {
-    await requireAdmin();
+    const auth = await requireAdminSession(req);
+    if (auth instanceof NextResponse) return auth;
 
     const form = await req.formData();
     const file = form.get('file') as File | null;
