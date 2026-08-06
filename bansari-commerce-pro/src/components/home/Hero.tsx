@@ -1,37 +1,44 @@
 /**
  * Hero.tsx — CMS-driven Campaign Renderer
  *
- * Pure renderer. Zero hardcoded copy, images, or CTAs.
- * All content sourced from homepage_campaigns via the service layer.
+ * Pure renderer. Zero hardcoded copy, zero hardcoded images,
+ * zero hardcoded CTAs — except the production fallback which
+ * is shown only when the DB has no published campaigns.
  *
- * Fallback strategy:
- *   - No published campaigns → FALLBACK campaign with local /hero-emergency.jpg
- *   - NEVER uses Pexels, Unsplash, or any external stock URL
+ * Features:
+ *   - Crossfade slider (HeroSlider client component)
+ *   - LCP optimised: first slide preloaded, rest lazy
+ *   - Silent DB error fallback — homepage never crashes
  */
 import { getActiveCampaigns } from '@/services/homepage-campaign.service';
 import type { HomepageCampaign } from '@/types/homepage-campaign';
 import { HeroSlider } from './HeroSlider';
 
-// ─── Local emergency fallback — no external dependencies ─────────────────────
+/**
+ * Production fallback — shown when DB has zero published campaigns.
+ * Uses /images/hero-default.jpg — a high-quality editorial image
+ * that must exist in /public/images/hero-default.jpg.
+ * Copy is brand-authentic and non-generic.
+ */
 const FALLBACK: HomepageCampaign = {
   id: 'fallback',
   title: 'Bansari Collections',
-  headlineLine1: 'Where Heritage',
-  headlineHighlight: 'Becomes',
-  headlineLine2: 'Your Story',
+  headlineLine1: 'The New Festive Edit',
+  headlineHighlight: 'Has Arrived',
+  headlineLine2: '',
   description:
-    'Couture ethnic wear for weddings, festivities and every chapter of celebration — crafted for the modern Indian woman.',
+    'Handpicked silhouettes for the season — from silk sarees and embroidered lehengas to contemporary kurta sets. Crafted for the modern Indian woman who celebrates with intention.',
   ctaPrimaryText: 'Shop The Edit',
   ctaPrimaryLink: '/shop',
-  ctaSecondaryText: 'View Collections',
+  ctaSecondaryText: 'Explore Collections',
   ctaSecondaryLink: '/collections',
-  desktopImage: '/hero-emergency.jpg',
-  tabletImage: '/hero-emergency.jpg',
-  mobileImage: '/hero-emergency.jpg',
+  desktopImage: '/images/hero-default.jpg',
+  tabletImage: '/images/hero-default.jpg',
+  mobileImage: '/images/hero-default.jpg',
   videoUrl: '',
-  imageAlt: 'Bansari Collections — Heritage fashion editorial',
-  overlayColor: '#000000',
-  overlayOpacity: 0.35,
+  imageAlt: 'Bansari Collections — festive editorial, model in embroidered silk lehenga',
+  overlayColor: '#1a0a12',
+  overlayOpacity: 0.08,
   textAlignment: 'left',
   imagePosition: 'center',
   buttonStyle: 'filled',
@@ -50,10 +57,6 @@ export default async function Hero() {
     campaigns = await getActiveCampaigns();
   } catch {
     // Silent fallback — never crash the homepage
-  }
-
-  if (campaigns.length === 0) {
-    console.warn('[Homepage] No published campaign found. Using emergency hero.');
   }
 
   const slides = campaigns.length > 0 ? campaigns : [FALLBACK];
