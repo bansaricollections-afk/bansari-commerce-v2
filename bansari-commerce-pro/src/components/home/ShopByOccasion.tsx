@@ -1,12 +1,12 @@
 /**
  * ShopByOccasion — Server Component
  * Luxury editorial occasion grid.
- * Benchmark: Aza Fashions, Pernia's Pop-Up Shop.
+ * Benchmark: Pernia's Pop-Up Shop, Aza Fashions occasion landing.
  *
- * Desktop: asymmetric 2-column — 1 tall editorial hero tile (left)
- *          + 3 portrait tiles stacked/arranged (right).
- * Mobile: 2-column grid with natural aspect ratios.
- * Hover: CSS only (scale + overlay opacity). Zero JS.
+ * Desktop: 2-col asymmetric — large editorial tile left (Wedding),
+ *          3 portrait tiles stacked right (Festive / Office / Party)
+ * Tablet:  2×2 equal grid
+ * Mobile:  single-column full-bleed stack
  */
 import Link from 'next/link';
 import ImageWithFallback from '@/components/ui/ImageWithFallback';
@@ -14,329 +14,292 @@ import ImageWithFallback from '@/components/ui/ImageWithFallback';
 const occasions = [
   {
     title: 'Wedding',
-    occasion: 'Bridal & Celebration',
-    description: 'Lehengas, sarees and ceremonial sets for every ritual.',
-    image: '/images/occasions/wedding.jpg',
-    alt: 'Bansari — bridal lehenga in ivory and gold zari embroidery',
+    eyebrow: 'Bridal & Celebrations',
+    subtitle: 'Couture crafted for the most cherished moments.',
+    image: '/occasions/wedding.jpg',
     href: '/shop?occasion=wedding',
-    hero: true,
+    featured: true,
   },
   {
     title: 'Festive',
-    occasion: 'Diwali & Navratri',
-    description: 'Vibrant silks and embroidered anarkalis for the festival season.',
-    image: '/images/occasions/festive.jpg',
-    alt: 'Bansari — crimson silk saree with gold zari border',
+    eyebrow: 'Heritage Celebrations',
+    subtitle: 'Traditional elegance for every festival.',
+    image: '/occasions/festive.jpg',
     href: '/shop?occasion=festive',
-    hero: false,
+    featured: false,
   },
   {
     title: 'Office',
-    occasion: 'Everyday Elegance',
-    description: 'Refined kurta sets and co-ords for the contemporary workplace.',
-    image: '/images/occasions/office.jpg',
-    alt: 'Bansari — ivory embroidered kurta set, office-wear',
+    eyebrow: 'Contemporary Workwear',
+    subtitle: 'Refined ethnic ease, nine to five.',
+    image: '/occasions/office.jpg',
     href: '/shop?occasion=office',
-    hero: false,
+    featured: false,
   },
   {
-    title: 'Evening',
-    occasion: 'Soirees & Galas',
-    description: 'Sculptured gowns and draped silhouettes for after-dark moments.',
-    image: '/images/occasions/evening.jpg',
-    alt: 'Bansari — midnight blue georgette draped gown',
-    href: '/shop?occasion=evening',
-    hero: false,
+    title: 'Party',
+    eyebrow: 'Evening Wear',
+    subtitle: 'Make every entrance unforgettable.',
+    image: '/occasions/party.jpg',
+    href: '/shop?occasion=party',
+    featured: false,
   },
-];
+] as const;
 
 export default function ShopByOccasion() {
-  const heroOccasion = occasions[0];
-  const supportingOccasions = occasions.slice(1);
+  const [featured, ...supporting] = occasions;
 
   return (
-    <section
-      aria-label="Shop By Occasion"
-      className="bc-sbo-section"
-    >
-      <div className="bc-sbo-container">
-        {/* ── Section heading ── */}
-        <div className="bc-sbo-header">
-          <p className="bc-sbo-eyebrow">Dress For Every Chapter</p>
-          <h2 className="bc-sbo-title">
-            Shop By{' '}
-            <em className="bc-sbo-title-em">Occasion</em>
+    <section aria-label="Shop by Occasion" className="bc-occ-section">
+      {/* ── Section header ── */}
+      <div className="bc-occ-container">
+        <div className="bc-occ-header">
+          <p className="bc-occ-eyebrow">The Occasion Edit</p>
+          <h2 className="bc-occ-title">
+            Dressed for <em className="bc-occ-title-em">every chapter.</em>
           </h2>
-          <p className="bc-sbo-subtitle">
-            From bridal ceremonies to boardroom mornings — each silhouette
-            considered for the moment it will inhabit.
-          </p>
         </div>
 
-        {/* ── Occasion grid ── */}
-        <ul role="list" className="bc-sbo-grid">
-          {/* Hero tile — tall, left column on desktop */}
-          <li className="bc-sbo-tile bc-sbo-tile--hero">
-            <Link
-              href={heroOccasion.href}
-              aria-label={`Shop ${heroOccasion.title} — ${heroOccasion.occasion}`}
-              className="bc-sbo-link"
-            >
-              <div className="bc-sbo-img-wrap">
-                <ImageWithFallback
-                  src={heroOccasion.image}
-                  alt={heroOccasion.alt}
-                  fill
-                  priority
-                  sizes="(max-width: 767px) 100vw, (max-width: 1023px) 50vw, 40vw"
-                  className="bc-sbo-img"
-                />
-                <div className="bc-sbo-gradient" aria-hidden="true" />
-              </div>
-              <div className="bc-sbo-copy">
-                <span className="bc-sbo-occasion-label">{heroOccasion.occasion}</span>
-                <h3 className="bc-sbo-card-title">{heroOccasion.title}</h3>
-                <p className="bc-sbo-card-desc">{heroOccasion.description}</p>
-                <span className="bc-sbo-cta" aria-hidden="true">Discover &rarr;</span>
-              </div>
-            </Link>
-          </li>
+        {/* ── Asymmetric grid ── */}
+        <div className="bc-occ-grid" role="list">
 
-          {/* Supporting tiles — 3-up on desktop right column */}
-          {supportingOccasions.map((item) => (
-            <li key={item.title} className="bc-sbo-tile bc-sbo-tile--support">
+          {/* Large featured tile — Wedding */}
+          <Link
+            href={featured.href}
+            aria-label={`Shop ${featured.title} — ${featured.eyebrow}`}
+            className="bc-occ-tile bc-occ-tile--featured"
+            role="listitem"
+          >
+            <div className="bc-occ-img-wrap">
+              <ImageWithFallback
+                src={featured.image}
+                alt={`${featured.title} — ${featured.eyebrow}`}
+                fill
+                priority
+                sizes="(max-width: 767px) 100vw, (max-width: 1023px) 50vw, 55vw"
+                className="bc-occ-img"
+              />
+            </div>
+            <div className="bc-occ-overlay" />
+            <div className="bc-occ-label bc-occ-label--lg">
+              <span className="bc-occ-label-eyebrow">{featured.eyebrow}</span>
+              <span className="bc-occ-label-title">{featured.title}</span>
+              <span className="bc-occ-label-subtitle">{featured.subtitle}</span>
+              <span className="bc-occ-cta">Explore Edit &rarr;</span>
+            </div>
+          </Link>
+
+          {/* Supporting 3 tiles — stacked column */}
+          <div className="bc-occ-col" role="list">
+            {supporting.map((occ) => (
               <Link
-                href={item.href}
-                aria-label={`Shop ${item.title} — ${item.occasion}`}
-                className="bc-sbo-link"
+                key={occ.title}
+                href={occ.href}
+                aria-label={`Shop ${occ.title} — ${occ.eyebrow}`}
+                className="bc-occ-tile bc-occ-tile--sm"
+                role="listitem"
               >
-                <div className="bc-sbo-img-wrap">
+                <div className="bc-occ-img-wrap">
                   <ImageWithFallback
-                    src={item.image}
-                    alt={item.alt}
+                    src={occ.image}
+                    alt={`${occ.title} — ${occ.eyebrow}`}
                     fill
-                    sizes="(max-width: 767px) 50vw, (max-width: 1023px) 50vw, 30vw"
-                    className="bc-sbo-img"
+                    sizes="(max-width: 767px) 100vw, (max-width: 1023px) 50vw, 25vw"
+                    className="bc-occ-img"
                   />
-                  <div className="bc-sbo-gradient" aria-hidden="true" />
                 </div>
-                <div className="bc-sbo-copy">
-                  <span className="bc-sbo-occasion-label">{item.occasion}</span>
-                  <h3 className="bc-sbo-card-title">{item.title}</h3>
-                  <span className="bc-sbo-cta" aria-hidden="true">Discover &rarr;</span>
+                <div className="bc-occ-overlay" />
+                <div className="bc-occ-label">
+                  <span className="bc-occ-label-eyebrow">{occ.eyebrow}</span>
+                  <span className="bc-occ-label-title">{occ.title}</span>
                 </div>
               </Link>
-            </li>
-          ))}
-        </ul>
+            ))}
+          </div>
+        </div>
+
+        {/* ── Footer CTA ── */}
+        <div className="bc-occ-footer">
+          <Link href="/shop" className="bc-occ-viewall">
+            View All Occasions &rarr;
+          </Link>
+        </div>
       </div>
 
       <style>{`
-        /* SECTION */
-        .bc-sbo-section {
-          background-color: var(--bc-surface-cream);
+        .bc-occ-section {
+          background-color: var(--bc-surface-warm);
           padding-block: var(--bc-section-padding);
           border-top: 1px solid var(--bc-border-soft);
         }
-        .bc-sbo-container {
+        .bc-occ-container {
           max-width: var(--bc-content-wide);
           margin-inline: auto;
           padding-inline: var(--bc-gutter);
         }
-
-        /* HEADER */
-        .bc-sbo-header {
-          margin-bottom: var(--bc-space-12);
+        /* Header */
+        .bc-occ-header {
+          margin-bottom: var(--bc-space-10);
           padding-bottom: var(--bc-space-6);
           border-bottom: 1px solid var(--bc-border-soft);
-          max-width: 56ch;
         }
-        .bc-sbo-eyebrow {
+        .bc-occ-eyebrow {
           font-family: var(--font-inter), sans-serif;
           font-size: var(--bc-text-xs);
           font-weight: 500;
           letter-spacing: 0.18em;
           text-transform: uppercase;
           color: var(--bc-text-gold);
-          margin-bottom: var(--bc-space-3);
+          margin-bottom: var(--bc-space-2);
         }
-        .bc-sbo-title {
+        .bc-occ-title {
           font-family: var(--font-playfair), serif;
           font-size: var(--bc-text-2xl);
           font-weight: 400;
           line-height: 1.08;
           letter-spacing: -0.015em;
           color: var(--bc-text-primary);
-          margin-bottom: var(--bc-space-4);
         }
-        .bc-sbo-title-em {
+        .bc-occ-title-em {
           font-style: italic;
           color: var(--bc-brand-mauve);
         }
-        .bc-sbo-subtitle {
-          font-family: var(--font-inter), sans-serif;
-          font-size: var(--bc-text-sm);
-          color: var(--bc-text-muted);
-          line-height: 1.8;
-          max-width: 52ch;
-        }
-
-        /* GRID */
-        .bc-sbo-grid {
-          list-style: none;
-          padding: 0;
-          margin: 0;
+        /* Grid */
+        .bc-occ-grid {
           display: grid;
-          gap: 1px;
-          background-color: var(--bc-border-soft);
-          /* Mobile: 2 columns */
-          grid-template-columns: 1fr 1fr;
-          grid-template-rows: auto;
+          grid-template-columns: 1fr;
+          gap: 2px;
         }
-        @media (min-width: 1024px) {
-          .bc-sbo-grid {
-            /* Desktop: hero tile spans 2 rows left, 3 tiles stack right */
-            grid-template-columns: 5fr 7fr;
-            grid-template-rows: 1fr 1fr;
+        @media (min-width: 768px) {
+          .bc-occ-grid {
+            grid-template-columns: 1fr 1fr;
           }
         }
-
-        /* TILES */
-        .bc-sbo-tile {
-          background-color: var(--bc-surface-cream);
-          overflow: hidden;
+        @media (min-width: 1024px) {
+          .bc-occ-grid {
+            grid-template-columns: 55fr 45fr;
+          }
+        }
+        /* Supporting column */
+        .bc-occ-col {
+          display: grid;
+          grid-template-rows: 1fr 1fr 1fr;
+          gap: 2px;
+        }
+        /* Tiles */
+        .bc-occ-tile {
           position: relative;
-        }
-        .bc-sbo-tile--hero {
-          /* Mobile: full width above support tiles */
-          grid-column: 1 / -1;
-        }
-        @media (min-width: 1024px) {
-          .bc-sbo-tile--hero {
-            grid-column: 1 / 2;
-            grid-row: 1 / 3;
-          }
-          .bc-sbo-tile--support {
-            grid-column: 2 / 3;
-          }
-        }
-
-        /* LINK — fills tile, no underline */
-        .bc-sbo-link {
           display: block;
-          position: relative;
-          text-decoration: none;
-          height: 100%;
-          color: inherit;
-        }
-
-        /* IMAGE WRAPPER */
-        .bc-sbo-img-wrap {
-          position: relative;
           overflow: hidden;
-          /* Hero mobile */
-          height: clamp(320px, 60vw, 560px);
+          background-color: var(--bc-surface-offset);
         }
-        @media (min-width: 1024px) {
-          .bc-sbo-tile--hero .bc-sbo-img-wrap {
-            height: clamp(480px, 50vw, 720px);
-          }
-          .bc-sbo-tile--support .bc-sbo-img-wrap {
-            height: clamp(200px, 22vw, 320px);
-          }
+        .bc-occ-tile--featured { min-height: clamp(320px, 60vw, 680px); }
+        .bc-occ-tile--sm { min-height: clamp(120px, 16vw, 220px); }
+        /* Image */
+        .bc-occ-img-wrap {
+          position: absolute;
+          inset: 0;
+          transition: transform 700ms cubic-bezier(0.16,1,0.3,1);
         }
-
-        /* IMAGE — CSS zoom on hover */
-        .bc-sbo-img {
-          object-fit: cover;
-          transition: transform 800ms cubic-bezier(0.16, 1, 0.3, 1);
-        }
-        .bc-sbo-link:hover .bc-sbo-img,
-        .bc-sbo-link:focus-visible .bc-sbo-img {
-          transform: scale(1.04);
-        }
-
-        /* GRADIENT OVERLAY */
-        .bc-sbo-gradient {
+        .bc-occ-tile:hover .bc-occ-img-wrap { transform: scale(1.03); }
+        .bc-occ-img { object-fit: cover; object-position: center top; }
+        /* Overlay gradient */
+        .bc-occ-overlay {
           position: absolute;
           inset: 0;
           background: linear-gradient(
             to top,
-            oklch(0.12 0.02 340 / 0.82) 0%,
-            oklch(0.12 0.02 340 / 0.28) 45%,
-            transparent 72%
+            rgba(20,12,16,0.72) 0%,
+            rgba(20,12,16,0.24) 50%,
+            transparent 80%
           );
           pointer-events: none;
-          transition: opacity 400ms ease;
+          z-index: 1;
         }
-        .bc-sbo-link:hover .bc-sbo-gradient,
-        .bc-sbo-link:focus-visible .bc-sbo-gradient {
-          opacity: 0.88;
-        }
-
-        /* COPY BLOCK — overlaid on image */
-        .bc-sbo-copy {
+        /* Label */
+        .bc-occ-label {
           position: absolute;
-          inset-x: 0;
           bottom: 0;
-          padding: var(--bc-space-6) var(--bc-space-6) var(--bc-space-7);
+          left: 0;
+          right: 0;
+          padding: var(--bc-space-5) var(--bc-space-6);
           display: flex;
           flex-direction: column;
           gap: var(--bc-space-1);
           z-index: 2;
         }
-        .bc-sbo-occasion-label {
+        .bc-occ-label--lg {
+          padding: var(--bc-space-8) var(--bc-space-8);
+          gap: var(--bc-space-2);
+        }
+        .bc-occ-label-eyebrow {
           font-family: var(--font-inter), sans-serif;
           font-size: var(--bc-text-xs);
           font-weight: 500;
           letter-spacing: 0.16em;
           text-transform: uppercase;
-          color: var(--bc-gold-warm);
+          color: var(--bc-gold-light);
+          display: block;
         }
-        .bc-sbo-card-title {
+        .bc-occ-label-title {
           font-family: var(--font-playfair), serif;
           font-size: var(--bc-text-xl);
           font-weight: 400;
-          color: #fff;
-          line-height: 1.1;
-          letter-spacing: -0.01em;
-          margin: 0;
+          color: var(--bc-text-inverse);
+          line-height: 1.12;
+          display: block;
         }
-        @media (min-width: 1024px) {
-          .bc-sbo-tile--hero .bc-sbo-card-title {
-            font-size: var(--bc-text-2xl);
-          }
+        .bc-occ-tile--sm .bc-occ-label-title {
+          font-size: var(--bc-text-lg);
         }
-        .bc-sbo-card-desc {
+        .bc-occ-label-subtitle {
           font-family: var(--font-inter), sans-serif;
           font-size: var(--bc-text-sm);
-          color: rgba(255,255,255,0.78);
-          line-height: 1.7;
+          color: var(--bc-text-inverse);
+          opacity: 0.72;
           max-width: 36ch;
+          line-height: 1.5;
+          display: block;
           margin-top: var(--bc-space-1);
-          display: none;
         }
-        @media (min-width: 1024px) {
-          .bc-sbo-card-desc { display: block; }
-        }
-        .bc-sbo-cta {
+        .bc-occ-cta {
           font-family: var(--font-inter), sans-serif;
           font-size: var(--bc-text-xs);
           font-weight: 500;
-          letter-spacing: 0.1em;
+          letter-spacing: 0.12em;
           text-transform: uppercase;
-          color: rgba(255,255,255,0.72);
-          margin-top: var(--bc-space-2);
-          transition: color 200ms ease;
+          color: var(--bc-gold-light);
+          display: inline-block;
+          margin-top: var(--bc-space-4);
+          border-bottom: 1px solid rgba(196,149,42,0.4);
+          padding-bottom: 2px;
+          transition: border-color var(--bc-transition-fast);
         }
-        .bc-sbo-link:hover .bc-sbo-cta,
-        .bc-sbo-link:focus-visible .bc-sbo-cta {
-          color: var(--bc-gold-warm);
+        .bc-occ-tile:hover .bc-occ-cta { border-color: var(--bc-gold-light); }
+        /* Footer */
+        .bc-occ-footer {
+          margin-top: var(--bc-space-8);
+          text-align: center;
         }
-
+        .bc-occ-viewall {
+          font-family: var(--font-inter), sans-serif;
+          font-size: var(--bc-text-xs);
+          font-weight: 500;
+          letter-spacing: 0.12em;
+          text-transform: uppercase;
+          color: var(--bc-text-secondary);
+          border-bottom: 1px solid var(--bc-border-default);
+          padding-bottom: 2px;
+          text-decoration: none;
+          transition: color var(--bc-transition-fast), border-color var(--bc-transition-fast);
+        }
+        .bc-occ-viewall:hover {
+          color: var(--bc-brand-mauve);
+          border-color: var(--bc-brand-mauve);
+        }
         @media (prefers-reduced-motion: reduce) {
-          .bc-sbo-img { transition: none; }
-          .bc-sbo-gradient { transition: none; }
+          .bc-occ-img-wrap { transition: none; }
+          .bc-occ-tile:hover .bc-occ-img-wrap { transform: none; }
         }
       `}</style>
     </section>
