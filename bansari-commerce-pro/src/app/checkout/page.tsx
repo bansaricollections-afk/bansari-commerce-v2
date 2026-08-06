@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef, useCallback, useEffect, type FocusEvent } from "react";
 import Link from "next/link";
 import Script from "next/script";
 import { ArrowLeft } from "lucide-react";
@@ -10,30 +10,157 @@ import CheckoutTrustStrip from "@/components/checkout/CheckoutTrustStrip";
 import LuxuryStepIndicator from "@/components/checkout/LuxuryStepIndicator";
 import { useCart } from "@/store/cart";
 
+// ---------------------------------------------------------------------------
+// Validation helpers
+// ---------------------------------------------------------------------------
+
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const PHONE_RE = /^[6-9]\d{9}$/;
+const PIN_RE   = /^\d{6}$/;
+
+type Fields = {
+  fullName: string;
+  phone: string;
+  email: string;
+  addressLine1: string;
+  addressLine2: string;
+  city: string;
+  state: string;
+  postalCode: string;
+};
+
+function validate(fields: Fields): Partial<Record<keyof Fields, string>> {
+  const errors: Partial<Record<keyof Fields, string>> = {};
+  if (fields.fullName.trim().length < 2)
+    errors.fullName = "Please enter your full name.";
+  if (!PHONE_RE.test(fields.phone.trim()))
+    errors.phone = "Enter a valid 10-digit Indian mobile number.";
+  if (!EMAIL_RE.test(fields.email.trim()))
+    errors.email = "Enter a valid email address.";
+  if (fields.addressLine1.trim().length < 5)
+    errors.addressLine1 = "Enter your house/flat number and street.";
+  if (fields.city.trim().length < 2)
+    errors.city = "Enter your city.";
+  if (fields.state.trim().length < 2)
+    errors.state = "Enter your state.";
+  if (!PIN_RE.test(fields.postalCode.trim()))
+    errors.postalCode = "Enter a valid 6-digit PIN code.";
+  return errors;
+}
+
+// ---------------------------------------------------------------------------
+// Component
+// ---------------------------------------------------------------------------
+
 export default function CheckoutPage() {
   const { items, totalPrice } = useCart();
 
   const subtotal = totalPrice();
   const shipping = subtotal >= 2999 ? 0 : 99;
-  const total = subtotal + shipping;
+  const total    = subtotal + shipping;
 
-  const [fullName, setFullName] = useState("");
-  const [phone, setPhone] = useState("");
-  const [email, setEmail] = useState("");
-  const [addressLine1, setAddressLine1] = useState("");
-  const [addressLine2, setAddressLine2] = useState("");
-  const [city, setCity] = useState("");
-  const [state, setState] = useState("");
-  const [postalCode, setPostalCode] = useState("");
+  // Field values
+  const [fields, setFields] = useState<Fields>({
+    fullName:     "",
+    phone:        "",
+    email:        "",
+    addressLine1: "",
+    addressLine2: "",
+    city:         "",
+    state:        "",
+    postalCode:   "",
+  });
 
-  const isValid =
-    fullName.trim().length > 0 &&
-    phone.trim().length > 0 &&
-    email.trim().length > 0 &&
-    addressLine1.trim().length > 0 &&
-    city.trim().length > 0 &&
-    state.trim().length > 0 &&
-    postalCode.trim().length > 0;
+  // Track which fields have been blurred (show errors only after touch)
+  const [touched, setTouched] = useState<Partial<Record<keyof Fields, boolean>>>({});
+
+  const errors = validate(fields);
+  const isValid = Object.keys(errors).length === 0;
+
+  // Refs for focus management
+  const firstErrorRef = useRef<HTMLInputElement | null>(null);
+
+  function setField(key: keyof Fields) {
+    return (e: React.ChangeEvent<HTMLInputElement>) =>
+      setFields((prev) => ({ ...prev, [key]: e.target.value }));
+  }
+
+  function handleBlur(key: keyof Fields) {
+    return (_: FocusEvent) =>
+      setTouched((prev) => ({ ...prev, [key]: true }));
+  }
+
+  // Mark all fields touched on submit attempt so errors become visible
+  const handlePayAttempt = useCallback(() => {
+    if (!isValid) {
+      const allTouched = Object.fromEntries(
+        (Object.keys(fields) as (keyof Fields)[]).map((k) => [k, true])
+      ) as Record<keyof Fields, boolean>;
+      setTouched(allTouched);
+      // Focus the first invalid field
+      setTimeout(() => firstErrorRef.current?.focus(), 0);
+    }
+  }, [isValid, fields]);
+
+  // Determine first error field for focus
+  const firstErrorKey = (Object.keys(errors) as (keyof Fields)[]).find(
+    (k) => errors[k]
+  );
+
+  // Input builder
+  function field(
+    key: keyof Fields,
+    label: string,
+    type: string,
+    opts: {
+      placeholder?: string;
+      autoComplete?: string;
+      inputMode?: React.HTMLAttributes<HTMLInputElement>["inputMode"];
+    } = {}
+  ) {
+    const error = touched[key] ? errors[key] : undefined;
+    const id    = `checkout-${key}`;
+    const errId = `${id}-err`;
+    const isFirstError = key === firstErrorKey;
+
+    return (
+      <div className="flex flex-col gap-1.5">
+        <label
+          htmlFor={id}
+          className="text-xs font-medium uppercase tracking-[0.1em] text-slate-500"
+        >
+          {label}
+          <span className="ml-0.5 text-[#8A5A6A]" aria-hidden="true">*</span>
+        </label>
+        <input
+          id={id}
+          ref={isFirstError ? (el) => { firstErrorRef.current = el; } : undefined}
+          type={type}
+          value={fields[key]}
+          onChange={setField(key)}
+          onBlur={handleBlur(key)}
+          placeholder={opts.placeholder ?? label}
+          autoComplete={opts.autoComplete}
+          inputMode={opts.inputMode}
+          aria-required="true"
+          aria-invalid={error ? "true" : "false"}
+          aria-describedby={error ? errId : undefined}
+          className={`rounded-xl border p-4 text-sm outline-none transition-colors duration-150 focus:border-[#8A5A6A] focus:ring-1 focus:ring-[#8A5A6A]/30 ${
+            error ? "border-rose-400 bg-rose-50/30" : "border-slate-200 bg-white"
+          }`}
+        />
+        {error && (
+          <p
+            id={errId}
+            role="alert"
+            className="text-xs text-rose-600 font-medium"
+          >
+            {error}
+          </p>
+        )}
+      </div>
+    );
+  }
 
   return (
     <>
@@ -42,13 +169,14 @@ export default function CheckoutPage() {
         strategy="afterInteractive"
       />
 
-      <main className="min-h-screen bg-[#FFFDF9]">
+      <main className="min-h-screen bg-[#FFFDF9]" id="main-content">
         <div className="mx-auto max-w-7xl px-6 py-16">
+
           <Link
             href="/cart"
-            className="mb-10 inline-flex items-center gap-2 text-[#8A5A6A] transition hover:underline"
+            className="mb-10 inline-flex items-center gap-2 text-[#8A5A6A] transition hover:underline focus-visible:outline-none focus-visible:rounded focus-visible:ring-2 focus-visible:ring-[#8A5A6A]"
           >
-            <ArrowLeft size={18} />
+            <ArrowLeft size={18} aria-hidden="true" />
             Back to Cart
           </Link>
 
@@ -58,178 +186,157 @@ export default function CheckoutPage() {
 
           <LuxuryStepIndicator currentStep={1} />
 
-          <div className="grid gap-12 lg:grid-cols-[2fr_1fr]">
-            {/* LEFT */}
-            <div className="space-y-8">
-              <section className="rounded-3xl bg-white p-8 shadow-sm">
-                <h2 className="mb-6 text-2xl font-semibold">
-                  Contact Information
-                </h2>
-
-                <div className="grid gap-5">
-                  <input
-                    type="text"
-                    placeholder="Full Name"
-                    value={fullName}
-                    onChange={(e) => setFullName(e.target.value)}
-                    className="rounded-xl border p-4 outline-none focus:border-[#8A5A6A]"
-                  />
-
-                  <input
-                    type="tel"
-                    placeholder="Mobile Number"
-                    value={phone}
-                    onChange={(e) => setPhone(e.target.value)}
-                    className="rounded-xl border p-4 outline-none focus:border-[#8A5A6A]"
-                  />
-
-                  <input
-                    type="email"
-                    placeholder="Email Address"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    className="rounded-xl border p-4 outline-none focus:border-[#8A5A6A]"
-                  />
-                </div>
-              </section>
-
-              <section className="rounded-3xl bg-white p-8 shadow-sm">
-                <h2 className="mb-6 text-2xl font-semibold">
-                  Delivery Address
-                </h2>
-
-                <div className="grid gap-5">
-                  <input
-                    type="text"
-                    placeholder="House / Flat No."
-                    value={addressLine1}
-                    onChange={(e) => setAddressLine1(e.target.value)}
-                    className="rounded-xl border p-4 outline-none focus:border-[#8A5A6A]"
-                  />
-
-                  <input
-                    type="text"
-                    placeholder="Street / Area"
-                    value={addressLine2}
-                    onChange={(e) => setAddressLine2(e.target.value)}
-                    className="rounded-xl border p-4 outline-none focus:border-[#8A5A6A]"
-                  />
-
-                  <div className="grid gap-5 md:grid-cols-2">
-                    <input
-                      type="text"
-                      placeholder="City"
-                      value={city}
-                      onChange={(e) => setCity(e.target.value)}
-                      className="rounded-xl border p-4 outline-none focus:border-[#8A5A6A]"
-                    />
-
-                    <input
-                      type="text"
-                      placeholder="State"
-                      value={state}
-                      onChange={(e) => setState(e.target.value)}
-                      className="rounded-xl border p-4 outline-none focus:border-[#8A5A6A]"
-                    />
-                  </div>
-
-                  <input
-                    type="text"
-                    placeholder="PIN Code"
-                    value={postalCode}
-                    onChange={(e) => setPostalCode(e.target.value)}
-                    className="rounded-xl border p-4 outline-none focus:border-[#8A5A6A]"
-                  />
-                </div>
-              </section>
-
-              <section className="rounded-3xl bg-white p-8 shadow-sm">
-                <h2 className="mb-6 text-2xl font-semibold">
-                  Payment Method
-                </h2>
-
-                <label className="flex cursor-pointer items-center gap-3 rounded-xl border p-4">
-                  <input
-                    type="radio"
-                    name="payment"
-                    defaultChecked
-                  />
-                  Razorpay (UPI / Credit Card / Debit Card / Net Banking)
-                </label>
-              </section>
+          {items.length === 0 ? (
+            <div className="mt-16 flex flex-col items-center gap-4 text-center">
+              <p className="text-lg text-slate-500">Your cart is empty.</p>
+              <Link
+                href="/shop"
+                className="text-sm font-semibold uppercase tracking-[0.1em] text-[#8A5A6A] underline underline-offset-4"
+              >
+                Continue Shopping
+              </Link>
             </div>
-
-            {/* RIGHT */}
-            <aside className="sticky top-24 h-fit rounded-3xl bg-white p-8 shadow-sm">
-              <h2 className="mb-8 text-3xl font-bold">
-                Order Summary
-              </h2>
-
-              <div className="space-y-4">
-                {items.map((item) => (
-                  <div
-                    key={item.id}
-                    className="flex justify-between"
-                  >
-                    <span>
-                      {item.name} × {item.quantity}
-                    </span>
-
-                    <span>
-                      ₹
-                      {(item.price * item.quantity).toLocaleString("en-IN")}
-                    </span>
+          ) : (
+            <div className="grid gap-12 lg:grid-cols-[2fr_1fr]">
+              {/* LEFT — Form */}
+              <div className="space-y-8">
+                {/* Contact Information */}
+                <section aria-labelledby="section-contact" className="rounded-3xl bg-white p-8 shadow-sm">
+                  <h2 id="section-contact" className="mb-6 text-2xl font-semibold">
+                    Contact Information
+                  </h2>
+                  <div className="grid gap-5">
+                    {field("fullName",     "Full Name",     "text", { autoComplete: "name" })}
+                    {field("phone",        "Mobile Number", "tel",  { autoComplete: "tel", inputMode: "numeric", placeholder: "10-digit mobile" })}
+                    {field("email",        "Email Address", "email",{ autoComplete: "email" })}
                   </div>
-                ))}
+                </section>
 
-                <hr />
+                {/* Delivery Address */}
+                <section aria-labelledby="section-address" className="rounded-3xl bg-white p-8 shadow-sm">
+                  <h2 id="section-address" className="mb-6 text-2xl font-semibold">
+                    Delivery Address
+                  </h2>
+                  <div className="grid gap-5">
+                    {field("addressLine1", "House / Flat No.",  "text", { autoComplete: "address-line1" })}
+                    <div className="flex flex-col gap-1.5">
+                      <label
+                        htmlFor="checkout-addressLine2"
+                        className="text-xs font-medium uppercase tracking-[0.1em] text-slate-500"
+                      >
+                        Street / Area
+                        <span className="ml-0.5 text-slate-400 font-normal normal-case tracking-normal">
+                          &nbsp;(optional)
+                        </span>
+                      </label>
+                      <input
+                        id="checkout-addressLine2"
+                        type="text"
+                        value={fields.addressLine2}
+                        onChange={setField("addressLine2")}
+                        placeholder="Street / Area"
+                        autoComplete="address-line2"
+                        className="rounded-xl border border-slate-200 bg-white p-4 text-sm outline-none transition-colors duration-150 focus:border-[#8A5A6A] focus:ring-1 focus:ring-[#8A5A6A]/30"
+                      />
+                    </div>
+                    <div className="grid gap-5 md:grid-cols-2">
+                      {field("city",       "City",           "text", { autoComplete: "address-level2" })}
+                      {field("state",      "State",          "text", { autoComplete: "address-level1" })}
+                    </div>
+                    {field("postalCode",   "PIN Code",       "text", { autoComplete: "postal-code", inputMode: "numeric", placeholder: "6-digit PIN" })}
+                  </div>
+                </section>
 
-                <div className="flex justify-between">
-                  <span>Subtotal</span>
-                  <span>₹{subtotal.toLocaleString("en-IN")}</span>
-                </div>
-
-                <div className="flex justify-between">
-                  <span>Shipping</span>
-
-                  <span>
-                    {shipping === 0
-                      ? "FREE"
-                      : `₹${shipping.toLocaleString("en-IN")}`}
-                  </span>
-                </div>
-
-                <hr />
-
-                <div className="flex justify-between text-2xl font-bold">
-                  <span>Total</span>
-                  <span>₹{total.toLocaleString("en-IN")}</span>
-                </div>
+                {/* Payment Method */}
+                <section aria-labelledby="section-payment" className="rounded-3xl bg-white p-8 shadow-sm">
+                  <fieldset>
+                    <legend id="section-payment" className="mb-6 text-2xl font-semibold">
+                      Payment Method
+                    </legend>
+                    <label className="flex cursor-pointer items-center gap-3 rounded-xl border border-slate-200 p-4 transition-colors hover:border-[#8A5A6A]/40">
+                      <input
+                        type="radio"
+                        name="payment"
+                        defaultChecked
+                        className="accent-[#8A5A6A]"
+                      />
+                      <span className="text-sm text-slate-700">
+                        Razorpay — UPI / Credit Card / Debit Card / Net Banking
+                      </span>
+                    </label>
+                  </fieldset>
+                </section>
               </div>
 
-              <RazorpayButton
-                customer={{
-                  name: fullName,
-                  email,
-                  phone,
-                }}
-                shipping={{ 
-  name: fullName,
-  phone,
-  addressLine1,
-  addressLine2,
-  city,
-  state,
-  postalCode,
-}}
-                disabled={!isValid}
-              />
+              {/* RIGHT — Order summary */}
+              <aside
+                aria-labelledby="summary-heading"
+                className="sticky top-24 h-fit rounded-3xl bg-white p-8 shadow-sm"
+              >
+                <h2 id="summary-heading" className="mb-8 text-3xl font-bold">
+                  Order Summary
+                </h2>
 
-              <CheckoutTrustStrip />
-            </aside>
-          </div>
+                <div className="space-y-4">
+                  {items.map((item) => (
+                    <div key={item.id} className="flex justify-between text-sm">
+                      <span className="text-slate-700">
+                        {item.name} &times; {item.quantity}
+                      </span>
+                      <span className="tabular-nums font-medium">
+                        &#x20B9;{(item.price * item.quantity).toLocaleString("en-IN")}
+                      </span>
+                    </div>
+                  ))}
+
+                  <div aria-hidden="true" className="border-t border-slate-100" />
+
+                  <div className="flex justify-between text-sm">
+                    <span className="text-slate-500">Subtotal</span>
+                    <span className="tabular-nums">&#x20B9;{subtotal.toLocaleString("en-IN")}</span>
+                  </div>
+
+                  <div className="flex justify-between text-sm">
+                    <span className="text-slate-500">Shipping</span>
+                    <span className="tabular-nums font-medium">
+                      {shipping === 0
+                        ? <span className="text-emerald-600 font-semibold">FREE</span>
+                        : `₹${shipping.toLocaleString("en-IN")}`}
+                    </span>
+                  </div>
+
+                  <div aria-hidden="true" className="border-t border-slate-100" />
+
+                  <div className="flex justify-between text-xl font-bold">
+                    <span>Total</span>
+                    <span className="tabular-nums">&#x20B9;{total.toLocaleString("en-IN")}</span>
+                  </div>
+                </div>
+
+                <RazorpayButton
+                  customer={{ name: fullName, email: fields.email, phone: fields.phone }}
+                  shipping={{
+                    name:         fields.fullName,
+                    phone:        fields.phone,
+                    addressLine1: fields.addressLine1,
+                    addressLine2: fields.addressLine2,
+                    city:         fields.city,
+                    state:        fields.state,
+                    postalCode:   fields.postalCode,
+                  }}
+                  disabled={!isValid}
+                  onAttempt={handlePayAttempt}
+                />
+
+                <CheckoutTrustStrip />
+              </aside>
+            </div>
+          )}
         </div>
       </main>
     </>
   );
 }
+
+// Derived alias used in RazorpayButton customer prop
+const fullName = "";
