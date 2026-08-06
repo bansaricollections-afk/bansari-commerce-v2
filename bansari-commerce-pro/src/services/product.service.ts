@@ -222,8 +222,9 @@ export async function getFilteredProducts(
   // We use a helper to apply identical filters to both the data query and the
   // count query, so the total count always matches the returned page.
 
-  function applyFilters<T extends ReturnType<typeof supabase.from>>(q: T): T {
-    let query = (q as any).eq('active', true);
+  function applyFilters<T>(q: T): T {
+    let query = q as any;
+    query = query.eq('active', true);
 
     if (category)   query = query.eq('category', category);
     if (collection) query = query.eq('collection', collection);
