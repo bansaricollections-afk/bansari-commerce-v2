@@ -3,7 +3,7 @@
 import { useState, useRef, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { ChevronDown, Grid2X2, LayoutGrid, Rows3 } from "lucide-react";
-import type { SortOption } from "@/types/filter-params";
+import type { FilterParams, SortOption } from "@/types/filter-params";
 
 const SORT_OPTIONS: { value: SortOption; label: string }[] = [
   { value: "newest",     label: "Newest First" },
@@ -16,6 +16,7 @@ const SORT_OPTIONS: { value: SortOption; label: string }[] = [
 interface ShopToolbarProps {
   /** Total product count to display — sourced from PaginationMeta. */
   total?: number;
+  filterParams?: FilterParams;
 }
 
 export default function ShopToolbar({ total }: ShopToolbarProps) {

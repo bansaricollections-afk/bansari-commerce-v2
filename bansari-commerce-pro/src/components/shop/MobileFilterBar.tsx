@@ -3,7 +3,11 @@
 import { useState, useCallback, useEffect, Suspense } from "react";
 import { useRouter, useSearchParams, usePathname } from "next/navigation";
 import { SlidersHorizontal, X, ChevronDown } from "lucide-react";
-import type { SortOption } from "@/types/filter-params";
+import type { FilterParams, SortOption } from "@/types/filter-params";
+
+interface Props {
+  filterParams?: FilterParams;
+}
 
 const SORT_OPTIONS: { value: SortOption; label: string }[] = [
   { value: "newest",     label: "Newest" },
@@ -411,7 +415,7 @@ function Pill({ label, active, onClick }: { label: string; active: boolean; onCl
   );
 }
 
-export default function MobileFilterBar() {
+export default function MobileFilterBar({ filterParams }: Props) {
   return (
     <Suspense fallback={null}>
       <MobileFilterBarInner />

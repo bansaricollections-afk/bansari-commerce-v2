@@ -39,6 +39,7 @@
     "**/*.mts"
   ],
   "exclude": [
-    "public/node_modules"
+    "public/node_modules",
+    "perplexity-ext"
   ]
 }

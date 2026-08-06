@@ -3,7 +3,7 @@
  * DELETE /api/admin/homepage/[id]  — delete campaign
  */
 import { NextRequest, NextResponse } from 'next/server';
-import { requireAdmin } from '@/lib/auth/requireAdmin';
+import { requireAdminSession } from '@/lib/auth/requireAdmin';
 import { updateCampaign, deleteCampaign } from '@/services/homepage-campaign.service';
 import { CampaignError } from '@/lib/campaign-errors';
 
@@ -36,7 +36,8 @@ type Params = { params: Promise<{ id: string }> };
 
 export async function PUT(req: NextRequest, { params }: Params) {
   try {
-    await requireAdmin();
+    const auth = await requireAdminSession(req);
+    if (auth instanceof NextResponse) return auth;
     const { id } = await params;
     const payload = await req.json();
 
@@ -59,7 +60,8 @@ export async function PUT(req: NextRequest, { params }: Params) {
 
 export async function DELETE(_req: NextRequest, { params }: Params) {
   try {
-    await requireAdmin();
+    const auth = await requireAdminSession(_req);
+    if (auth instanceof NextResponse) return auth;
     const { id } = await params;
     await deleteCampaign(id);
     return NextResponse.json({ success: true });
