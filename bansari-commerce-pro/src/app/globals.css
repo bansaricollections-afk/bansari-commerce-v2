@@ -130,7 +130,6 @@
   --bc-z-toast:    500;
 
   /* ── Legacy compat ── */
-  --bc-brand-mauve-faint:  #F7F1F3;
   --bc-surface-cream:      #FFFDF9;
   --bc-surface-warm:       #F6F0EB;
   --bc-surface-blush:      #F8F2F0;
@@ -140,17 +139,8 @@
   --bc-surface-overlay-deep: rgba(26,15,22,0.72);
   --bc-text-primary:       #1A0F16;
   --bc-text-secondary:     #4B3A43;
-  --bc-text-muted:         #7A6872;
-  --bc-text-faint:         #B09AA4;
-  --bc-text-inverse:       #FFFDF9;
-  --bc-text-gold:          #C9A96E;
   --bc-gold-warm:          #C9A96E;
-  --bc-gold-faint:         #F9F3E8;
-  --bc-gold-dark:          #9E7B47;
   --bc-border-default:     #EDE6DC;
-  --bc-border-soft:        #F4EDE3;
-  --bc-border-gold:        #D4AF6B;
-  --bc-border-dark:        rgba(255,253,249,0.10);
   --bc-space-1: 0.25rem; --bc-space-2: 0.5rem; --bc-space-3: 0.75rem;
   --bc-space-4: 1rem;    --bc-space-5: 1.25rem; --bc-space-6: 1.5rem;
   --bc-space-8: 2rem;    --bc-space-10: 2.5rem; --bc-space-12: 3rem;
@@ -160,7 +150,6 @@
   --bc-content-default: 1080px;
   --bc-content-wide: 1360px;
   --bc-section-padding: clamp(4rem, 8vw, 9rem);
-  --bc-gutter: clamp(1.25rem, 5vw, 5rem);
   --bc-announcement-h: 2.5rem;
   --bc-transition-fast: 180ms cubic-bezier(0.16,1,0.3,1);
   --bc-transition-base: 320ms cubic-bezier(0.16,1,0.3,1);
@@ -219,6 +208,154 @@ button { cursor: pointer; transition: all var(--bc-base-t); border: none; backgr
 ::-webkit-scrollbar-thumb { background: var(--bc-brand-mauve); border-radius: 999px; }
 ::-webkit-scrollbar-thumb:hover { background: var(--bc-brand-mauve-dark); }
 
+/* ==========================================
+   CANONICAL CTA SYSTEM
+   Single source of truth for all homepage CTAs.
+   Every primary and ghost button must use these.
+   ========================================== */
+
+/*
+  .bc-cta-primary
+  Filled gold button — used for all primary homepage actions.
+  Dimensions: 0.875rem padding vertical, 2rem horizontal.
+  Typography: 0.75rem / Inter / 600 / 0.14em tracking / uppercase.
+  Hover: gold-light fill + 2px lift.
+  Focus: visible gold outline, no layout shift.
+*/
+.bc-cta-primary {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.625rem;
+  background: var(--bc-gold);
+  color: var(--bc-dark);
+  font-family: var(--font-inter), 'Inter', sans-serif;
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  padding: 0.9375rem 2.25rem;
+  border: none;
+  cursor: pointer;
+  text-decoration: none;
+  transition:
+    background var(--bc-base-t),
+    transform var(--bc-base-t),
+    box-shadow var(--bc-base-t);
+  white-space: nowrap;
+  line-height: 1;
+}
+
+.bc-cta-primary:hover {
+  background: var(--bc-gold-light);
+  transform: translateY(-2px);
+  box-shadow: 0 6px 24px rgba(200,165,110,0.25);
+}
+
+.bc-cta-primary:focus-visible {
+  outline: 2px solid var(--bc-gold);
+  outline-offset: 3px;
+  background: var(--bc-gold-light);
+}
+
+.bc-cta-primary:active {
+  transform: translateY(0);
+  box-shadow: none;
+}
+
+/*
+  .bc-cta-ghost
+  Ghost underline link — used for secondary homepage actions.
+  Typically placed alongside bc-cta-primary.
+  Hover: full opacity, underline strengthens.
+*/
+.bc-cta-ghost {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  color: var(--bc-text-ink);
+  font-family: var(--font-inter), 'Inter', sans-serif;
+  font-size: 0.75rem;
+  font-weight: 500;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  text-decoration: none;
+  border-bottom: 1px solid currentColor;
+  padding-bottom: 0.125rem;
+  opacity: 0.6;
+  transition:
+    opacity var(--bc-base-t),
+    color var(--bc-base-t);
+  line-height: 1;
+}
+
+.bc-cta-ghost:hover {
+  opacity: 1;
+  color: var(--bc-text-ink);
+}
+
+.bc-cta-ghost:focus-visible {
+  outline: 2px solid var(--bc-gold);
+  outline-offset: 3px;
+  opacity: 1;
+  border-radius: 1px;
+}
+
+/*
+  .bc-cta-ghost--inverse
+  Ghost CTA for use on dark backgrounds (hero, story, newsletter).
+*/
+.bc-cta-ghost--inverse {
+  color: var(--bc-cream);
+  border-bottom-color: rgba(255,253,249,0.4);
+  opacity: 0.8;
+}
+
+.bc-cta-ghost--inverse:hover {
+  opacity: 1;
+  color: var(--bc-cream);
+  border-bottom-color: var(--bc-cream);
+}
+
+.bc-cta-ghost--inverse:focus-visible {
+  outline-color: var(--bc-gold);
+}
+
+/* ==========================================
+   ACCESSIBILITY
+   ========================================== */
+
+/*
+  .skip-to-content
+  Visually hidden by default. Becomes visible on keyboard focus.
+  Allows screen reader / keyboard users to skip the header.
+  Zero layout shift — absolutely positioned, does not affect flow.
+*/
+.skip-to-content {
+  position: absolute;
+  top: -100%;
+  left: 1rem;
+  z-index: var(--bc-z-toast);
+  display: inline-flex;
+  align-items: center;
+  padding: 0.75rem 1.5rem;
+  background: var(--bc-gold);
+  color: var(--bc-dark);
+  font-family: var(--font-inter), 'Inter', sans-serif;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  text-decoration: none;
+  transition: top var(--bc-fast);
+  border: none;
+}
+
+.skip-to-content:focus-visible {
+  top: 1rem;
+  outline: 2px solid var(--bc-dark);
+  outline-offset: 2px;
+}
+
 /* ── Luxury utility classes ── */
 .bc-container {
   width: 100%;
@@ -259,7 +396,7 @@ button { cursor: pointer; transition: all var(--bc-base-t); border: none; backgr
 
 .bc-rule--wide { width: 5rem; }
 
-/* ── Luxury fade-in animation ── */
+/* ── Luxury animations ── */
 @keyframes bc-fade-up {
   from { opacity: 0; transform: translateY(28px); }
   to   { opacity: 1; transform: translateY(0); }
@@ -302,5 +439,8 @@ button { cursor: pointer; transition: all var(--bc-base-t); border: none; backgr
     --bc-transition-fast: 0ms; --bc-transition-base: 0ms;
     --bc-transition-slow: 0ms; --bc-transition-reveal: 0ms;
   }
-  *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
 }

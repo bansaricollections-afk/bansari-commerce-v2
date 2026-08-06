@@ -22,49 +22,57 @@ export const metadata = {
 export default function HomePage() {
   return (
     <>
+      {/* Skip to main content — accessible keyboard shortcut */}
+      <a href="#main-content" className="skip-to-content">
+        Skip to main content
+      </a>
+
       {/* ── 1. Announcement Bar ── */}
       <AnnouncementBar />
 
       {/* ── 2. Header is in layout ── */}
 
-      {/* ── 3. Editorial Hero ── */}
-      <EditorialHero />
+      {/* ── 3–13. Homepage sections ── */}
+      <main id="main-content">
+        {/* ── 3. Editorial Hero ── */}
+        <EditorialHero />
 
-      {/* ── 4. Shop by Category ── */}
-      <Suspense>
-        <CategoryShowcase />
-      </Suspense>
+        {/* ── 4. Shop by Category ── */}
+        <Suspense>
+          <CategoryShowcase />
+        </Suspense>
 
-      {/* ── 5. Trending Collections ── */}
-      <TrendingCollections />
+        {/* ── 5. Trending Collections ── */}
+        <TrendingCollections />
 
-      {/* ── 6. New Arrivals ── */}
-      <Suspense>
-        <NewArrivals />
-      </Suspense>
+        {/* ── 6. New Arrivals ── */}
+        <Suspense>
+          <NewArrivals />
+        </Suspense>
 
-      {/* ── 7. Best Sellers ── */}
-      <Suspense>
-        <BestSellers />
-      </Suspense>
+        {/* ── 7. Best Sellers ── */}
+        <Suspense>
+          <BestSellers />
+        </Suspense>
 
-      {/* ── 8. Featured Collections ── */}
-      <FeaturedCollections />
+        {/* ── 8. Featured Collections ── */}
+        <FeaturedCollections />
 
-      {/* ── 9. Shop by Occasion ── */}
-      <OccasionEdit />
+        {/* ── 9. Shop by Occasion ── */}
+        <OccasionEdit />
 
-      {/* ── 10. Craftsmanship Story ── */}
-      <CraftsmanshipStory />
+        {/* ── 10. Craftsmanship Story ── */}
+        <CraftsmanshipStory />
 
-      {/* ── 11. Why Bansari ── */}
-      <WhyBansari />
+        {/* ── 11. Why Bansari ── */}
+        <WhyBansari />
 
-      {/* ── 12. Customer Stories ── */}
-      <CustomerStories />
+        {/* ── 12. Customer Stories ── */}
+        <CustomerStories />
 
-      {/* ── 13. Newsletter ── */}
-      <LuxuryNewsletter />
+        {/* ── 13. Newsletter ── */}
+        <LuxuryNewsletter />
+      </main>
     </>
   );
 }
