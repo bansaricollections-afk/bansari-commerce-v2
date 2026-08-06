@@ -1,53 +1,45 @@
-import BrandStory from "@/components/home/BrandStory";
-import CampaignBanner from "@/components/home/CampaignBanner";
-import CategoryGrid from "@/components/home/CategoryGrid";
-import CelebrationEdit from "@/components/home/CelebrationEdit";
-import FeaturedProducts from "@/components/home/FeaturedProducts";
-import Hero from "@/components/home/Hero";
-import HomeTrustStrip from "@/components/home/HomeTrustStrip";
-import InstagramGallery from "@/components/home/InstagramGallery";
-import Newsletter from "@/components/home/Newsletter";
-import ShopByOccasion from "@/components/home/ShopByOccasion";
-import Testimonials from "@/components/home/Testimonials";
-import WhyChooseUs from "@/components/home/WhyChooseUs";
+import { Suspense } from 'react';
+
+import BrandStory from '@/components/home/BrandStory';
+import CampaignBanner from '@/components/home/CampaignBanner';
+import CategoryGrid from '@/components/home/CategoryGrid';
+import FeaturedProducts, {
+  FeaturedProductsSkeleton,
+} from '@/components/home/FeaturedProducts';
+import Hero from '@/components/home/Hero';
+import HomeTrustStrip from '@/components/home/HomeTrustStrip';
+import Newsletter from '@/components/home/Newsletter';
+import ShopByOccasion from '@/components/home/ShopByOccasion';
+import Testimonials from '@/components/home/Testimonials';
+import WhyChooseUs from '@/components/home/WhyChooseUs';
 
 export default function Home() {
   return (
     <main>
-      {/* ── Hero ── */}
+      {/* ─── Above the fold ─── */}
       <Hero />
-
-      {/* ── Campaign Banner ── */}
       <CampaignBanner />
-
-      {/* ── Trust Strip ── */}
       <HomeTrustStrip />
 
-      {/* ── Shop by Category ── */}
+      {/* ─── Discovery ─── */}
       <CategoryGrid />
 
-      {/* ── The House Edit (Featured / Best Sellers) ── */}
-      <FeaturedProducts />
+      {/* ─── Merchandising ─── */}
+      <Suspense fallback={<FeaturedProductsSkeleton />}>
+        <FeaturedProducts />
+      </Suspense>
 
-      {/* ── Shop by Occasion (Wedding Edit) ── */}
+      {/* ─── Occasion navigation ─── */}
       <ShopByOccasion />
 
-      {/* ── Celebration Edit (New Arrivals) ── */}
-      <CelebrationEdit />
-
-      {/* ── Why Choose Us ── */}
+      {/* ─── Trust & brand ─── */}
       <WhyChooseUs />
-
-      {/* ── Luxury Brand Story ── */}
       <BrandStory />
 
-      {/* ── Testimonials (Editor's Picks social proof) ── */}
+      {/* ─── Social proof ─── */}
       <Testimonials />
 
-      {/* ── Instagram Gallery ── */}
-      <InstagramGallery />
-
-      {/* ── Newsletter ── */}
+      {/* ─── Retention ─── */}
       <Newsletter />
     </main>
   );

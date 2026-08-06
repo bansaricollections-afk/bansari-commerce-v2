@@ -1,206 +1,182 @@
-"use client";
+/**
+ * AsWorn — Server Component
+ * Editorial "As Worn" gallery linking to the brand's Instagram profile.
+ * Does NOT claim to be a live Instagram feed.
+ * CSS-only hover. Zero JS. Zero hydration cost.
+ *
+ * Replace Unsplash images with actual Bansari editorial photography
+ * by updating the `gallery` array with Supabase Storage URLs.
+ */
+import Link from 'next/link';
+import ImageWithFallback from '@/components/ui/ImageWithFallback';
 
-import { useState } from "react";
-import Image from "next/image";
-import Link from "next/link";
-
-/* ------------------------------------------------------------------
-   INSTAGRAM GALLERY — LUXURY EDITORIAL v4
-   Benchmark: Aza Fashions · Pernia's Pop-Up Shop social sections
-
-   Handle: @bansari_collections  (with underscore)
-
-   Images: Unsplash ethnic fashion (free commercial use)
-   Domain "images.unsplash.com" is in next.config.ts remotePatterns ✓
-   next/image optimisation is ENABLED (unoptimized flag removed).
-
-   onError: branded placeholder — never a broken-image icon.
------------------------------------------------------------------- */
-
-const INSTAGRAM_URL = "https://instagram.com/bansari_collections";
-const INSTAGRAM_HANDLE = "@bansari_collections";
+const INSTAGRAM_URL = 'https://instagram.com/bansari_collections';
+const INSTAGRAM_HANDLE = '@bansari_collections';
 
 const gallery = [
   {
-    src: "https://images.unsplash.com/photo-1610030469983-98e550d6193c?auto=format&fit=crop&w=600&q=80",
-    alt: "Bansari — crimson silk saree with gold zari border",
+    src: '/images/editorial/asworn-1.jpg',
+    alt: 'Bansari Collections — crimson silk saree with gold zari border',
   },
   {
-    src: "https://images.unsplash.com/photo-1583391733956-3750e0ff4e8b?auto=format&fit=crop&w=600&q=80",
-    alt: "Bansari — ivory embroidered kurta set",
+    src: '/images/editorial/asworn-2.jpg',
+    alt: 'Bansari Collections — ivory embroidered kurta set',
   },
   {
-    src: "https://images.unsplash.com/photo-1559563458-527698bf5295?auto=format&fit=crop&w=600&q=80",
-    alt: "Bansari — rose anarkali gown for festive occasion",
+    src: '/images/editorial/asworn-3.jpg',
+    alt: 'Bansari Collections — rose anarkali gown for festive occasion',
   },
   {
-    src: "https://images.unsplash.com/photo-1595777457583-95e059d581b8?auto=format&fit=crop&w=600&q=80",
-    alt: "Bansari — teal chanderi co-ord set",
+    src: '/images/editorial/asworn-4.jpg',
+    alt: 'Bansari Collections — teal chanderi co-ord set',
   },
   {
-    src: "https://images.unsplash.com/photo-1619086303291-0ef7699e4b31?auto=format&fit=crop&w=600&q=80",
-    alt: "Bansari — ivory and gold bridal lehenga",
+    src: '/images/editorial/asworn-5.jpg',
+    alt: 'Bansari Collections — ivory and gold bridal lehenga',
   },
   {
-    src: "https://images.unsplash.com/photo-1617627143750-d86bc21e42bb?auto=format&fit=crop&w=600&q=80",
-    alt: "Bansari — midnight blue georgette saree",
+    src: '/images/editorial/asworn-6.jpg',
+    alt: 'Bansari Collections — midnight blue georgette saree',
   },
 ];
-
-function GalleryTile({ src, alt }: { src: string; alt: string }) {
-  const [errored, setErrored] = useState(false);
-
-  return (
-    <Link
-      href={INSTAGRAM_URL}
-      target="_blank"
-      rel="noopener noreferrer"
-      aria-label={alt}
-      className="bc-instagram-tile relative block aspect-square overflow-hidden"
-    >
-      <div
-        className="bc-instagram-tile__inner h-full w-full"
-        style={{ transition: "transform 700ms ease-out" }}
-        onMouseEnter={(e) => {
-          (e.currentTarget as HTMLDivElement).style.transform = "scale(1.025)";
-        }}
-        onMouseLeave={(e) => {
-          (e.currentTarget as HTMLDivElement).style.transform = "scale(1)";
-        }}
-      >
-        {errored ? (
-          <div
-            style={{
-              position: "absolute",
-              inset: 0,
-              backgroundColor: "#F5F0EB",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              color: "#C4A882",
-              fontSize: "0.625rem",
-              fontFamily: "var(--font-inter), sans-serif",
-              letterSpacing: "0.14em",
-              textTransform: "uppercase",
-            }}
-            aria-label={alt}
-          >
-            Bansari
-          </div>
-        ) : (
-          <Image
-            src={src}
-            alt={alt}
-            fill
-            sizes="(min-width: 768px) 33vw, 50vw"
-            className="object-cover"
-            onError={() => setErrored(true)}
-          />
-        )}
-      </div>
-    </Link>
-  );
-}
 
 export default function InstagramGallery() {
   return (
     <section
-      aria-label="As Worn — Instagram gallery"
-      style={{
-        backgroundColor: "var(--bc-surface-cream)",
-        paddingBlock: "var(--bc-section-padding)",
-        borderTop: "1px solid var(--bc-border-soft)",
-      }}
+      aria-label="As Worn — Bansari editorial gallery"
+      className="bc-aw-section"
     >
-      <div
-        className="mx-auto"
-        style={{
-          maxWidth: "var(--bc-content-wide)",
-          paddingInline: "var(--bc-gutter)",
-        }}
-      >
-        {/* ── Header ── */}
-        <div
-          style={{
-            marginBottom: "var(--bc-space-10)",
-            borderBottom: "1px solid var(--bc-border-soft)",
-            paddingBottom: "var(--bc-space-6)",
-            display: "flex",
-            alignItems: "flex-end",
-            justifyContent: "space-between",
-            flexWrap: "wrap",
-            gap: "var(--bc-space-4)",
-          }}
-        >
+      <div className="bc-aw-container">
+        {/* Header */}
+        <div className="bc-aw-header">
           <div>
-            <p
-              style={{
-                fontFamily: "var(--font-inter), sans-serif",
-                fontSize: "var(--bc-text-xs)",
-                fontWeight: 500,
-                letterSpacing: "0.18em",
-                textTransform: "uppercase",
-                color: "var(--bc-text-gold)",
-                marginBottom: "var(--bc-space-2)",
-              }}
-            >
-              {INSTAGRAM_HANDLE}
-            </p>
-            <h2
-              style={{
-                fontFamily: "var(--font-playfair), serif",
-                fontSize: "var(--bc-text-xl)",
-                fontWeight: 400,
-                lineHeight: 1.1,
-                letterSpacing: "-0.01em",
-                color: "var(--bc-text-primary)",
-              }}
-            >
-              As Worn
-            </h2>
+            <p className="bc-aw-eyebrow">{INSTAGRAM_HANDLE}</p>
+            <h2 className="bc-aw-title">As Worn</h2>
           </div>
-
           <Link
             href={INSTAGRAM_URL}
             target="_blank"
             rel="noopener noreferrer"
             aria-label="Follow Bansari Collections on Instagram"
-            style={{
-              fontFamily: "var(--font-inter), sans-serif",
-              fontSize: "var(--bc-text-xs)",
-              fontWeight: 500,
-              letterSpacing: "0.14em",
-              textTransform: "uppercase",
-              color: "var(--bc-brand-mauve)",
-              border: "1px solid var(--bc-brand-mauve)",
-              borderRadius: "var(--bc-radius-full)",
-              padding: "0.625rem 1.5rem",
-              display: "inline-flex",
-              alignItems: "center",
-              gap: "var(--bc-space-2)",
-              transition: "background-color var(--bc-transition-base)",
-              flexShrink: 0,
-            }}
-            className="bc-instagram-follow"
+            className="bc-aw-follow"
           >
             Follow on Instagram
           </Link>
         </div>
 
-        {/* ── Gallery grid ── */}
-        <div className="grid grid-cols-2 gap-px md:grid-cols-3">
+        {/* Grid */}
+        <ul role="list" className="bc-aw-grid">
           {gallery.map(({ src, alt }, index) => (
-            <GalleryTile key={index} src={src} alt={alt} />
+            <li key={index} className="bc-aw-tile">
+              <Link
+                href={INSTAGRAM_URL}
+                target="_blank"
+                rel="noopener noreferrer"
+                aria-label={alt}
+                className="bc-aw-tile-link"
+              >
+                <ImageWithFallback
+                  src={src}
+                  alt={alt}
+                  fill
+                  sizes="(max-width: 767px) 50vw, 33vw"
+                  className="bc-aw-img"
+                />
+              </Link>
+            </li>
           ))}
-        </div>
+        </ul>
       </div>
 
       <style>{`
-        .bc-instagram-follow:hover {
+        .bc-aw-section {
+          background-color: var(--bc-surface-cream);
+          padding-block: var(--bc-section-padding);
+          border-top: 1px solid var(--bc-border-soft);
+        }
+        .bc-aw-container {
+          max-width: var(--bc-content-wide);
+          margin-inline: auto;
+          padding-inline: var(--bc-gutter);
+        }
+        .bc-aw-header {
+          display: flex;
+          align-items: flex-end;
+          justify-content: space-between;
+          flex-wrap: wrap;
+          gap: var(--bc-space-4);
+          margin-bottom: var(--bc-space-10);
+          padding-bottom: var(--bc-space-6);
+          border-bottom: 1px solid var(--bc-border-soft);
+        }
+        .bc-aw-eyebrow {
+          font-family: var(--font-inter), sans-serif;
+          font-size: var(--bc-text-xs);
+          font-weight: 500;
+          letter-spacing: 0.18em;
+          text-transform: uppercase;
+          color: var(--bc-text-gold);
+          margin-bottom: var(--bc-space-2);
+        }
+        .bc-aw-title {
+          font-family: var(--font-playfair), serif;
+          font-size: var(--bc-text-xl);
+          font-weight: 400;
+          line-height: 1.1;
+          letter-spacing: -0.01em;
+          color: var(--bc-text-primary);
+        }
+        .bc-aw-follow {
+          font-family: var(--font-inter), sans-serif;
+          font-size: var(--bc-text-xs);
+          font-weight: 500;
+          letter-spacing: 0.14em;
+          text-transform: uppercase;
+          color: var(--bc-brand-mauve);
+          border: 1px solid var(--bc-brand-mauve);
+          padding: 0.625rem 1.5rem;
+          display: inline-flex;
+          align-items: center;
+          text-decoration: none;
+          flex-shrink: 0;
+          transition: background-color var(--bc-transition-base);
+        }
+        .bc-aw-follow:hover,
+        .bc-aw-follow:focus-visible {
           background-color: var(--bc-brand-mauve-faint);
         }
-        .bc-instagram-tile {
-          border-radius: 0;
+        .bc-aw-grid {
+          list-style: none;
+          padding: 0;
+          margin: 0;
+          display: grid;
+          gap: 1px;
+          background-color: var(--bc-border-soft);
+          grid-template-columns: repeat(2, 1fr);
+        }
+        @media (min-width: 768px) {
+          .bc-aw-grid { grid-template-columns: repeat(3, 1fr); }
+        }
+        .bc-aw-tile {
+          overflow: hidden;
+          background-color: var(--bc-surface-cream);
+        }
+        .bc-aw-tile-link {
+          display: block;
+          position: relative;
+          aspect-ratio: 1 / 1;
+          overflow: hidden;
+        }
+        .bc-aw-img {
+          object-fit: cover;
+          transition: transform 700ms cubic-bezier(0.16, 1, 0.3, 1);
+        }
+        .bc-aw-tile-link:hover .bc-aw-img,
+        .bc-aw-tile-link:focus-visible .bc-aw-img {
+          transform: scale(1.04);
+        }
+        @media (prefers-reduced-motion: reduce) {
+          .bc-aw-img { transition: none; }
         }
       `}</style>
     </section>
