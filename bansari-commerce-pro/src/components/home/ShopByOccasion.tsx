@@ -1,5 +1,5 @@
-import Image from "next/image";
 import Link from "next/link";
+import ImageWithFallback from '@/components/ui/ImageWithFallback';
 
 const occasions = [
   {
@@ -55,7 +55,7 @@ export default function ShopByOccasion() {
               className="group overflow-hidden rounded-[32px]"
             >
               <div className="relative h-[420px]">
-                <Image
+                <ImageWithFallback
                   src={item.image}
                   alt={item.title}
                   fill

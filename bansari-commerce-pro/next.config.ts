@@ -23,19 +23,19 @@ const nextConfig: NextConfig = {
       },
       {
         protocol: 'https',
-        hostname: 'images.unsplash.com',
+        hostname: '*.supabase.co',
+        port: '',
+        pathname: '/storage/v1/object/**',
       },
       {
         protocol: 'https',
-        hostname: 'images.pexels.com',
-      },
-      {
-        protocol: 'https',
-        hostname: 'cdn.shopify.com',
+        hostname: '*.supabase.co',
+        port: '',
+        pathname: '/**',
       },
     ],
-    formats: ['image/avif', 'image/webp'],
-    minimumCacheTTL: 60,
+    deviceSizes: [375, 640, 750, 828, 1080, 1200, 1920, 2048, 3840],
+    contentDispositionType: 'inline',
   },
 
   async headers() {
