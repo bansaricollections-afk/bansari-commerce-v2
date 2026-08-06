@@ -371,7 +371,7 @@ export async function getFeaturedProducts(): Promise<Product[]> {
   const t0 = Date.now();
 
   const { data, error } = await supabase
-    .from('products')\
+    .from('products')
     .select(PRODUCT_SELECT)
     .eq('active', true)
     .eq('featured', true)
