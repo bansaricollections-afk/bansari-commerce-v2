@@ -164,6 +164,7 @@ button {
      SURFACE SCALE — SPRINT 6 HOMEPAGE
   -------------------------------------------------- */
   --bc-surface-cream:      #FFFDF9;   /* mirrors --background */
+  --bc-surface-ivory:      #FFFDF9;   /* alias for --bc-surface-cream; used by BrandStory + FeaturedProducts */
   --bc-surface-warm:       #F6F0EB;   /* mirrors --surface */
   --bc-surface-blush:      #F8F1F0;   /* blush-tinted section background */
   --bc-surface-sand:       #F5EFE6;   /* warm sand section background */
@@ -243,14 +244,14 @@ button {
      Fluid clamp() scale. No existing typography rules changed.
      These tokens are used only by new Sprint 6 components.
   -------------------------------------------------- */
-  --bc-text-xs:    clamp(0.75rem,  0.7rem  + 0.25vw, 0.875rem); /* 12–14px */
-  --bc-text-sm:    clamp(0.875rem, 0.8rem  + 0.35vw, 1rem);     /* 14–16px */
-  --bc-text-base:  clamp(1rem,     0.95rem + 0.25vw, 1.125rem); /* 16–18px */
-  --bc-text-lg:    clamp(1.125rem, 1rem    + 0.75vw, 1.5rem);   /* 18–24px */
-  --bc-text-xl:    clamp(1.5rem,   1.2rem  + 1.25vw, 2.25rem);  /* 24–36px */
-  --bc-text-2xl:   clamp(2rem,     1.2rem  + 2.5vw,  3.5rem);   /* 32–56px */
-  --bc-text-3xl:   clamp(2.5rem,   1rem    + 4vw,    5rem);      /* 40–80px */
-  --bc-text-hero:  clamp(3rem,     0.5rem  + 7vw,    8rem);      /* 48–128px */
+  --bc-text-xs:    clamp(0.75rem,  0.7rem  + 0.25vw, 0.875rem); /* 12-14px */
+  --bc-text-sm:    clamp(0.875rem, 0.8rem  + 0.35vw, 1rem);     /* 14-16px */
+  --bc-text-base:  clamp(1rem,     0.95rem + 0.25vw, 1.125rem); /* 16-18px */
+  --bc-text-lg:    clamp(1.125rem, 1rem    + 0.75vw, 1.5rem);   /* 18-24px */
+  --bc-text-xl:    clamp(1.5rem,   1.2rem  + 1.25vw, 2.25rem);  /* 24-36px */
+  --bc-text-2xl:   clamp(2rem,     1.2rem  + 2.5vw,  3.5rem);   /* 32-56px */
+  --bc-text-3xl:   clamp(2.5rem,   1rem    + 4vw,    5rem);      /* 40-80px */
+  --bc-text-hero:  clamp(3rem,     0.5rem  + 7vw,    8rem);      /* 48-128px */
 
   /* --------------------------------------------------
      SECTION LAYOUT — SPRINT 6
@@ -260,7 +261,7 @@ button {
   --bc-content-wide:    1200px;
   --bc-section-padding: clamp(var(--bc-space-12), 6vw, var(--bc-space-24));
   --bc-gutter:          clamp(var(--bc-space-4), 4vw, var(--bc-space-8));
-  --bc-announcement-h:  2.25rem;  /* 36px — static height token for AnnouncementBar */
+  --bc-announcement-h:  2.25rem;  /* 36px - static height token for AnnouncementBar */
 
   /* --------------------------------------------------
      Z-INDEX SCALE — SPRINT 6
@@ -275,7 +276,7 @@ button {
 }
 
 /* --------------------------------------------------
-   SPRINT 6 — REDUCED MOTION SAFETY NET
+   SPRINT 6 - REDUCED MOTION SAFETY NET
    Ensure no Sprint 6 animation token causes motion
    issues for users who prefer reduced motion.
 -------------------------------------------------- */
