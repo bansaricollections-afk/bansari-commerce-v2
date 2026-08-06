@@ -223,9 +223,7 @@ export async function getFilteredProducts(
   // count query, so the total count always matches the returned page.
 
   function applyFilters<T extends ReturnType<typeof supabase.from>>(q: T): T {
-    // @ts-expect-error — Supabase generic chain types do not widen cleanly;
-    // the runtime behaviour is correct and tested.
-    let query = q.eq('active', true);
+    let query = (q as any).eq('active', true);
 
     if (category)   query = query.eq('category', category);
     if (collection) query = query.eq('collection', collection);
@@ -254,20 +252,16 @@ export async function getFilteredProducts(
     let query = q;
     switch (sortOption) {
       case 'newest':
-        // @ts-expect-error — Supabase generic chain types do not widen cleanly
         query = (query as any).order('created_at', { ascending: false });
         break;
       case 'price_asc':
-        // @ts-expect-error — Supabase generic chain types do not widen cleanly
         query = (query as any).order('price', { ascending: true });
         break;
       case 'price_desc':
-        // @ts-expect-error — Supabase generic chain types do not widen cleanly
         query = (query as any).order('price', { ascending: false });
         break;
       case 'bestseller':
         // best_seller flag first, then newest within that group
-        // @ts-expect-error — Supabase generic chain types do not widen cleanly
         query = (query as any)
           .order('best_seller', { ascending: false })
           .order('created_at', { ascending: false });
@@ -278,7 +272,6 @@ export async function getFilteredProducts(
         // client, so we order by compare_price DESC as the closest proxy —
         // products with a higher compare_price tend to have a larger discount.
         // A proper computed sort requires a DB view or RPC (Sprint 9C candidate).
-        // @ts-expect-error — Supabase generic chain types do not widen cleanly
         query = (query as any)
           .order('compare_price', { ascending: false })
           .order('price', { ascending: true });
