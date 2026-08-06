@@ -1,290 +1,205 @@
-@import "tailwindcss";
+/* ============================================================
+   Bansari Commerce — Global CSS
+   Design token system for luxury Indian ethnic wear storefront.
+   DO NOT add component styles here — use component <style> blocks.
+   ============================================================ */
 
-/* ==========================================
-   BANSARI COLLECTIONS DESIGN SYSTEM v1.0
-   ========================================== */
+/* ── Google Fonts ── */
+@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,500;0,600;1,400;1,500&family=Inter:wght@300;400;500;600&display=swap');
 
-:root {
-  /* Brand Colors */
-  --primary: #8A5A6A;
-  --primary-dark: #714857;
-  --gold: #C9A96E;
-
-  /* Backgrounds */
-  --background: #FFFDF9;
-  --surface: #F6F0EB;
-
-  /* Text */
-  --text: #1D1D1D;
-  --text-light: #6B7280;
-
-  /* Borders */
-  --border: #ECE7E2;
-
-  /* Success */
-  --success: #16A34A;
-
-  /* Radius */
-  --radius-card: 24px;
-  --radius-button: 9999px;
-}
-
-/* ==========================================
-   GLOBAL STYLES
-   ========================================== */
-
+/* ── Reset ── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 html {
   scroll-behavior: smooth;
-}
-
-body {
-  margin: 0;
-  padding: 0;
-
-  font-family: var(--font-inter), sans-serif;
-
-  background: var(--background);
-  color: var(--text);
-
-  text-rendering: optimizeLegibility;
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
   -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  hanging-punctuation: first last;
 }
-
-/* ==========================================
-   TYPOGRAPHY
-   ========================================== */
-
-h1,
-h2,
-h3,
-h4,
-h5,
-h6 {
-  margin: 0;
-
-  font-family: var(--font-playfair), serif;
-
-  color: var(--text);
-
-  line-height: 1.15;
+body {
+  min-height: 100dvh;
+  line-height: 1.6;
+  color: var(--bc-text-primary);
+  background-color: var(--bc-bg);
+  font-family: var(--font-inter), 'Inter', sans-serif;
 }
+img, picture, video, canvas, svg { display: block; max-width: 100%; }
+input, button, textarea, select { font: inherit; color: inherit; }
+h1,h2,h3,h4,h5,h6 { text-wrap: balance; line-height: 1.15; }
+p, li, figcaption { text-wrap: pretty; max-width: 72ch; }
+ul[role="list"], ol[role="list"] { list-style: none; }
 
-p {
-  line-height: 1.8;
-}
-
-/* ==========================================
-   LINKS
-   ========================================== */
-
-a {
-  color: inherit;
+/* ── Skip link ── */
+.bc-skip-link {
+  position: absolute;
+  top: -9999px;
+  left: var(--bc-space-4);
+  background: var(--bc-surface-dark);
+  color: var(--bc-text-inverse);
+  padding: var(--bc-space-3) var(--bc-space-6);
+  font-size: var(--bc-text-sm);
+  z-index: 9999;
   text-decoration: none;
+}
+.bc-skip-link:focus { top: var(--bc-space-4); }
 
-  transition: all 0.3s ease;
+/* ── Focus visible ── */
+:focus-visible {
+  outline: 2px solid var(--bc-brand-mauve);
+  outline-offset: 3px;
+  border-radius: 2px;
 }
 
-/* ==========================================
-   IMAGES
-   ========================================== */
-
-img {
-  display: block;
-  max-width: 100%;
-}
-
-/* ==========================================
-   BUTTONS
-   ========================================== */
-
-button {
-  cursor: pointer;
-
-  transition: all 0.3s ease;
-}
-
-/* ==========================================
-   SELECTION
-   ========================================== */
-
+/* ── Selection ── */
 ::selection {
-  background: var(--primary);
-  color: white;
+  background: color-mix(in oklab, var(--bc-brand-mauve) 20%, transparent);
+  color: var(--bc-text-primary);
 }
 
-/* ==========================================
-   SCROLLBAR
-   ========================================== */
-
-::-webkit-scrollbar {
-  width: 8px;
-}
-
-::-webkit-scrollbar-track {
-  background: #f5f5f5;
-}
-
-::-webkit-scrollbar-thumb {
-  background: var(--primary);
-  border-radius: 999px;
-}
-
-::-webkit-scrollbar-thumb:hover {
-  background: var(--primary-dark);
-}
-
-/* ==========================================
-   SPRINT 6 — LUXURY TOKENS v1.0
-   Additive only. Do not modify tokens above.
-   All new tokens are prefixed --bc- to avoid
-   collisions with existing design system.
-   ========================================== */
-
+/* ============================================================
+   DESIGN TOKENS
+   ============================================================ */
 :root {
-  /* --------------------------------------------------
-     BRAND PALETTE — SPRINT 6
-     Primary mauve, deep plum, champagne gold tones
-  -------------------------------------------------- */
-  --bc-brand-mauve:        #8A5A6A;   /* mirrors --primary for sprint 6 components */
-  --bc-brand-mauve-dark:   #714857;   /* mirrors --primary-dark */
-  --bc-brand-mauve-light:  #B88A97;   /* lighter tint for hover states */
-  --bc-brand-mauve-faint:  #F3ECEe;   /* near-white tint for soft backgrounds */
-  --bc-brand-plum:         #3D2535;   /* deep plum — headers, overlays */
-  --bc-brand-plum-light:   #5C3A4F;   /* hover state for plum elements */
+  /* ── Typography ── */
+  --bc-text-xs:   clamp(0.7rem,   0.65rem + 0.2vw,  0.8125rem);  /* 11px → 13px */
+  --bc-text-sm:   clamp(0.8125rem,0.75rem + 0.3vw,  0.9375rem);  /* 13px → 15px */
+  --bc-text-base: clamp(0.9375rem,0.875rem + 0.3vw, 1.0625rem);  /* 15px → 17px */
+  --bc-text-lg:   clamp(1.0625rem,0.95rem  + 0.7vw, 1.375rem);   /* 17px → 22px */
+  --bc-text-xl:   clamp(1.25rem,  1rem     + 1.2vw, 1.875rem);   /* 20px → 30px */
+  --bc-text-2xl:  clamp(1.625rem, 1rem     + 2.5vw, 3rem);       /* 26px → 48px */
+  --bc-text-3xl:  clamp(2rem,     0.75rem  + 4.5vw, 4.5rem);     /* 32px → 72px */
 
-  /* --------------------------------------------------
-     GOLD / CHAMPAGNE SCALE
-  -------------------------------------------------- */
-  --bc-gold-warm:          #C9A96E;   /* mirrors --gold */
-  --bc-gold-light:         #E2C98E;   /* lighter champagne */
-  --bc-gold-faint:         #F7F0E2;   /* near-white gold tint for section backgrounds */
-  --bc-gold-dark:          #9E7B47;   /* deep gold for borders, accents */
+  /* ── Spacing (4px base) ── */
+  --bc-space-1:  0.25rem;
+  --bc-space-2:  0.5rem;
+  --bc-space-3:  0.75rem;
+  --bc-space-4:  1rem;
+  --bc-space-5:  1.25rem;
+  --bc-space-6:  1.5rem;
+  --bc-space-8:  2rem;
+  --bc-space-10: 2.5rem;
+  --bc-space-12: 3rem;
+  --bc-space-16: 4rem;
+  --bc-space-20: 5rem;
+  --bc-space-24: 6rem;
+  --bc-space-32: 8rem;
 
-  /* --------------------------------------------------
-     SURFACE SCALE — SPRINT 6 HOMEPAGE
-  -------------------------------------------------- */
-  --bc-surface-cream:      #FFFDF9;   /* mirrors --background */
-  --bc-surface-ivory:      #FFFDF9;   /* alias for --bc-surface-cream; used by BrandStory + FeaturedProducts */
-  --bc-surface-warm:       #F6F0EB;   /* mirrors --surface */
-  --bc-surface-blush:      #F8F1F0;   /* blush-tinted section background */
-  --bc-surface-sand:       #F5EFE6;   /* warm sand section background */
-  --bc-surface-dark:       #1A1018;   /* dark mode section background */
-  --bc-surface-overlay:    rgba(29, 16, 24, 0.48); /* hero/image overlay */
-  --bc-surface-overlay-deep: rgba(29, 16, 24, 0.72); /* deep overlay for image tile gradient bases */
-
-  /* --------------------------------------------------
-     TEXT SCALE — SPRINT 6
-  -------------------------------------------------- */
-  --bc-text-primary:       #1D1D1D;   /* mirrors --text */
-  --bc-text-secondary:     #4B3F45;   /* rich dark brown for subheadings */
-  --bc-text-muted:         #6B7280;   /* mirrors --text-light */
-  --bc-text-faint:         #A89CA0;   /* disabled / placeholder */
-  --bc-text-inverse:       #FFFDF9;   /* text on dark backgrounds */
-  --bc-text-gold:          #C9A96E;   /* gold text for accent labels */
-
-  /* --------------------------------------------------
-     BORDER SCALE — SPRINT 6
-  -------------------------------------------------- */
-  --bc-border-default:     #ECE7E2;   /* mirrors --border */
-  --bc-border-soft:        #F0ECEA;   /* very soft, minimal dividers */
-  --bc-border-gold:        #D9BC8A;   /* gold separator for luxury sections */
-  --bc-border-dark:        rgba(255, 253, 249, 0.12); /* border on dark backgrounds */
-
-  /* --------------------------------------------------
-     SPACING SCALE — SPRINT 6
-     4px base grid, matches existing Tailwind scale
-  -------------------------------------------------- */
-  --bc-space-1:   0.25rem;  /*  4px */
-  --bc-space-2:   0.5rem;   /*  8px */
-  --bc-space-3:   0.75rem;  /* 12px */
-  --bc-space-4:   1rem;     /* 16px */
-  --bc-space-5:   1.25rem;  /* 20px */
-  --bc-space-6:   1.5rem;   /* 24px */
-  --bc-space-8:   2rem;     /* 32px */
-  --bc-space-10:  2.5rem;   /* 40px */
-  --bc-space-12:  3rem;     /* 48px */
-  --bc-space-16:  4rem;     /* 64px */
-  --bc-space-20:  5rem;     /* 80px */
-  --bc-space-24:  6rem;     /* 96px */
-  --bc-space-32:  8rem;     /* 128px */
-
-  /* --------------------------------------------------
-     RADIUS SCALE — SPRINT 6
-  -------------------------------------------------- */
-  --bc-radius-xs:   0.25rem;  /*  4px — tight badges */
-  --bc-radius-sm:   0.375rem; /*  6px — inputs, small elements */
-  --bc-radius-md:   0.5rem;   /*  8px — buttons, chips */
-  --bc-radius-lg:   0.75rem;  /* 12px — cards */
-  --bc-radius-xl:   1rem;     /* 16px — large cards */
-  --bc-radius-2xl:  1.5rem;   /* 24px — mirrors --radius-card */
-  --bc-radius-full: 9999px;   /* mirrors --radius-button */
-
-  /* --------------------------------------------------
-     ELEVATION / SHADOWS — SPRINT 6
-     Tone-matched to warm cream surfaces
-  -------------------------------------------------- */
-  --bc-shadow-xs:   0 1px 2px rgba(90, 45, 60, 0.06);
-  --bc-shadow-sm:   0 2px 8px rgba(90, 45, 60, 0.08);
-  --bc-shadow-md:   0 4px 16px rgba(90, 45, 60, 0.10);
-  --bc-shadow-lg:   0 8px 32px rgba(90, 45, 60, 0.12);
-  --bc-shadow-xl:   0 16px 48px rgba(90, 45, 60, 0.16);
-  --bc-shadow-card: 0 2px 8px rgba(90, 45, 60, 0.08),
-                    0 8px 24px rgba(90, 45, 60, 0.06);
-
-  /* --------------------------------------------------
-     TRANSITIONS — SPRINT 6
-  -------------------------------------------------- */
-  --bc-transition-fast:    150ms cubic-bezier(0.16, 1, 0.3, 1);
-  --bc-transition-base:    250ms cubic-bezier(0.16, 1, 0.3, 1);
-  --bc-transition-slow:    400ms cubic-bezier(0.16, 1, 0.3, 1);
-  --bc-transition-reveal:  600ms cubic-bezier(0.16, 1, 0.3, 1);
-
-  /* --------------------------------------------------
-     TYPE SCALE — SPRINT 6
-     Fluid clamp() scale. No existing typography rules changed.
-     These tokens are used only by new Sprint 6 components.
-  -------------------------------------------------- */
-  --bc-text-xs:    clamp(0.75rem,  0.7rem  + 0.25vw, 0.875rem); /* 12-14px */
-  --bc-text-sm:    clamp(0.875rem, 0.8rem  + 0.35vw, 1rem);     /* 14-16px */
-  --bc-text-base:  clamp(1rem,     0.95rem + 0.25vw, 1.125rem); /* 16-18px */
-  --bc-text-lg:    clamp(1.125rem, 1rem    + 0.75vw, 1.5rem);   /* 18-24px */
-  --bc-text-xl:    clamp(1.5rem,   1.2rem  + 1.25vw, 2.25rem);  /* 24-36px */
-  --bc-text-2xl:   clamp(2rem,     1.2rem  + 2.5vw,  3.5rem);   /* 32-56px */
-  --bc-text-3xl:   clamp(2.5rem,   1rem    + 4vw,    5rem);      /* 40-80px */
-  --bc-text-hero:  clamp(3rem,     0.5rem  + 7vw,    8rem);      /* 48-128px */
-
-  /* --------------------------------------------------
-     SECTION LAYOUT — SPRINT 6
-  -------------------------------------------------- */
-  --bc-content-narrow:  640px;
+  /* ── Layout ── */
+  --bc-content-narrow: 640px;
   --bc-content-default: 960px;
-  --bc-content-wide:    1200px;
-  --bc-section-padding: clamp(var(--bc-space-12), 6vw, var(--bc-space-24));
-  --bc-gutter:          clamp(var(--bc-space-4), 4vw, var(--bc-space-8));
-  --bc-announcement-h:  2.25rem;  /* 36px - static height token for AnnouncementBar */
+  --bc-content-wide: 1280px;
+  --bc-gutter: clamp(1rem, 4vw, 3rem);
+  --bc-section-padding: clamp(4rem, 8vw, 8rem);
 
-  /* --------------------------------------------------
-     Z-INDEX SCALE — SPRINT 6
-  -------------------------------------------------- */
-  --bc-z-base:        0;
-  --bc-z-raised:     10;
-  --bc-z-dropdown:   100;
-  --bc-z-sticky:     200;
-  --bc-z-overlay:    300;
-  --bc-z-modal:      400;
-  --bc-z-toast:      500;
+  /* ── Brand Palette ── */
+  /* Mauve — primary luxury accent */
+  --bc-brand-mauve:       #8B6B7A;
+  --bc-brand-mauve-light: #C4A0B1;
+  --bc-brand-mauve-faint: #F5EEF1;   /* avatar bg, tinted highlights */
+
+  /* Gold */
+  --bc-gold-warm:  #C4952A;
+  --bc-gold-light: #E8C97A;
+  --bc-gold-dark:  #9A6F15;          /* verified badge text */
+
+  /* Neutrals */
+  --bc-bg:              #FAFAF8;
+  --bc-surface-cream:   #FFFDF9;
+  --bc-surface-ivory:   #FFFDF9;     /* alias for BrandStory / FeaturedProducts */
+  --bc-surface-warm:    #F5F0EA;
+  --bc-surface-dark:    #1A1410;
+  --bc-surface-offset:  #F0EDE8;
+
+  /* Text */
+  --bc-text-primary: #1A1410;
+  --bc-text-secondary: #3D3530;
+  --bc-text-muted:   #7A6E68;
+  --bc-text-faint:   #B5ADA8;
+  --bc-text-inverse: #FAF8F5;
+  --bc-text-gold:    #9A6F15;
+
+  /* Borders */
+  --bc-border-soft:    rgba(26, 20, 16, 0.08);
+  --bc-border-default: rgba(26, 20, 16, 0.14);
+  --bc-border-dark:    rgba(250, 248, 245, 0.14);
+
+  /* ── Aspect Ratio Locks (CLS prevention) ── */
+  --bc-ar-category:  3/4;   /* category card portrait */
+  --bc-ar-product:   4/5;   /* product card portrait */
+  --bc-ar-hero:      16/9;  /* hero banner */
+  --bc-ar-occasion:  2/3;   /* occasion card tall */
+  --bc-ar-brand:     3/2;   /* brand story landscape */
+
+  /* ── Transitions ── */
+  --bc-transition-fast:   150ms cubic-bezier(0.16, 1, 0.3, 1);
+  --bc-transition-medium: 280ms cubic-bezier(0.16, 1, 0.3, 1);
+  --bc-transition-slow:   420ms cubic-bezier(0.16, 1, 0.3, 1);
+
+  /* ── Shadows ── */
+  --bc-shadow-sm:  0 1px 3px  rgba(26, 20, 16, 0.06);
+  --bc-shadow-md:  0 4px 16px rgba(26, 20, 16, 0.08);
+  --bc-shadow-lg:  0 12px 40px rgba(26, 20, 16, 0.12);
+
+  /* ── Radius ── */
+  --bc-radius-sm:   0.25rem;
+  --bc-radius-md:   0.5rem;
+  --bc-radius-lg:   0.75rem;
+  --bc-radius-full: 9999px;
 }
 
-/* --------------------------------------------------
-   SPRINT 6 - REDUCED MOTION SAFETY NET
-   Ensure no Sprint 6 animation token causes motion
-   issues for users who prefer reduced motion.
--------------------------------------------------- */
+/* ============================================================
+   PERFORMANCE — below-fold paint deferral
+   content-visibility: auto lets the browser skip paint for
+   off-screen sections until they near the viewport.
+   contain-intrinsic-size prevents layout shift on defer.
+   Applied to every section except Hero (above fold).
+   ============================================================ */
+.bc-below-fold {
+  content-visibility: auto;
+  contain-intrinsic-size: 0 600px;
+}
+
+/* ============================================================
+   REDUCED MOTION
+   Disable all transitions/animations when user prefers.
+   ============================================================ */
 @media (prefers-reduced-motion: reduce) {
-  :root {
-    --bc-transition-fast:   0ms;
-    --bc-transition-base:   0ms;
-    --bc-transition-slow:   0ms;
-    --bc-transition-reveal: 0ms;
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
   }
 }
+
+/* ============================================================
+   UTILITY
+   ============================================================ */
+.sr-only {
+  position: absolute; width: 1px; height: 1px;
+  padding: 0; margin: -1px; overflow: hidden;
+  clip: rect(0, 0, 0, 0); white-space: nowrap; border-width: 0;
+}
+
+/* Interactive transition defaults */
+a, button, [role="button"] {
+  transition:
+    color var(--bc-transition-fast),
+    background-color var(--bc-transition-fast),
+    border-color var(--bc-transition-fast),
+    box-shadow var(--bc-transition-fast),
+    opacity var(--bc-transition-fast);
+}
+
+/* Tap highlight removal on mobile */
+a, button { -webkit-tap-highlight-color: transparent; }
+
+/* Image defaults — prevents layout shift */
+img {
+  height: auto;
+  object-fit: cover;
+}
+
+/* Table defaults */
+table { border-collapse: collapse; width: 100%; }
