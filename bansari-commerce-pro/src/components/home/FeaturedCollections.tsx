@@ -66,16 +66,16 @@ export default function FeaturedCollections() {
 function FeaturedPanel({ col, index }: { col: FeaturedCollection; index: number }) {
   return (
     <section
+      className="bc-feat-panel"
       style={{
         background: col.bg,
-        padding: "0",
         overflow: "hidden",
       }}
     >
       <div
         style={{
           display: "grid",
-          gridTemplateColumns: col.reverse ? "1fr 1fr" : "1fr 1fr",
+          gridTemplateColumns: "1fr 1fr",
           minHeight: "clamp(520px, 70vh, 800px)",
         }}
       >
@@ -89,9 +89,9 @@ function FeaturedPanel({ col, index }: { col: FeaturedCollection; index: number 
         >
           <Image
             src={col.image}
-            alt={col.title}
+            alt={`${col.title} ${col.italic} — Bansari Collection`}
             fill
-            sizes="50vw"
+            sizes="(max-width: 768px) 100vw, 50vw"
             style={{
               objectFit: "cover",
               objectPosition: "center top",
@@ -99,9 +99,8 @@ function FeaturedPanel({ col, index }: { col: FeaturedCollection; index: number 
             }}
             className="bc-feat-img"
           />
-          <style>{`.bc-feat-img:hover { transform: scale(1.04); }`}</style>
 
-          {/* Issue number — editorial detail */}
+          {/* Editorial issue number */}
           <span
             style={{
               position: "absolute",
@@ -115,7 +114,9 @@ function FeaturedPanel({ col, index }: { col: FeaturedCollection; index: number 
               color: "rgba(255,253,249,0.5)",
               writingMode: "vertical-rl",
               transform: "rotate(180deg)",
+              userSelect: "none",
             }}
+            aria-hidden="true"
           >
             No. {String(index + 1).padStart(2, "0")} / 03
           </span>
@@ -132,50 +133,57 @@ function FeaturedPanel({ col, index }: { col: FeaturedCollection; index: number 
             gap: "1.75rem",
           }}
         >
-          <div>
+          {/* Tag label */}
+          <div style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
             <span
               style={{
-                display: "flex",
-                alignItems: "center",
-                gap: "0.75rem",
+                display: "block",
+                width: "2rem",
+                height: "1px",
+                background: "var(--bc-gold)",
+                flexShrink: 0,
+              }}
+            />
+            <span
+              style={{
                 fontFamily: "var(--font-inter), sans-serif",
                 fontSize: "0.6875rem",
                 letterSpacing: "0.2em",
                 textTransform: "uppercase",
                 color: "var(--bc-gold-dark)",
-                marginBottom: "1.25rem",
                 fontWeight: 500,
               }}
             >
-              <span style={{ display: "block", width: "2rem", height: "1px", background: "var(--bc-gold)" }} />
               {col.tag}
             </span>
-
-            <h2
-              style={{
-                fontFamily: "var(--font-playfair), 'Playfair Display', Georgia, serif",
-                fontSize: "clamp(2.5rem, 4.5vw, 5rem)",
-                fontWeight: 500,
-                color: "var(--bc-text-ink)",
-                lineHeight: 0.95,
-                letterSpacing: "-0.03em",
-                margin: 0,
-              }}
-            >
-              {col.title}
-              <br />
-              <em
-                style={{
-                  fontStyle: "italic",
-                  fontWeight: 400,
-                  color: "var(--bc-brand-mauve)",
-                }}
-              >
-                {col.italic}
-              </em>
-            </h2>
           </div>
 
+          {/* Headline */}
+          <h2
+            style={{
+              fontFamily: "var(--font-playfair), 'Playfair Display', Georgia, serif",
+              fontSize: "clamp(2.5rem, 4.5vw, 5rem)",
+              fontWeight: 500,
+              color: "var(--bc-text-ink)",
+              lineHeight: 0.95,
+              letterSpacing: "-0.03em",
+              margin: 0,
+            }}
+          >
+            {col.title}
+            <br />
+            <em
+              style={{
+                fontStyle: "italic",
+                fontWeight: 400,
+                color: "var(--bc-gold-light)",
+              }}
+            >
+              {col.italic}
+            </em>
+          </h2>
+
+          {/* Body */}
           <p
             style={{
               fontFamily: "var(--font-inter), sans-serif",
@@ -190,46 +198,38 @@ function FeaturedPanel({ col, index }: { col: FeaturedCollection; index: number 
             {col.body}
           </p>
 
-          <div style={{ display: "flex", alignItems: "center", gap: "1.5rem" }}>
-            <Link
-              href={col.href}
-              style={{
-                display: "inline-flex",
-                alignItems: "center",
-                gap: "0.75rem",
-                fontFamily: "var(--font-inter), sans-serif",
-                fontSize: "0.75rem",
-                letterSpacing: "0.14em",
-                textTransform: "uppercase",
-                fontWeight: 600,
-                color: "var(--bc-cream)",
-                background: "var(--bc-brand-plum)",
-                padding: "0.9375rem 2.25rem",
-                transition: "all var(--bc-base-t)",
-              }}
-              onMouseEnter={e => {
-                (e.currentTarget as HTMLElement).style.background = "var(--bc-brand-mauve)";
-                (e.currentTarget as HTMLElement).style.transform = "translateY(-2px)";
-              }}
-              onMouseLeave={e => {
-                (e.currentTarget as HTMLElement).style.background = "var(--bc-brand-plum)";
-                (e.currentTarget as HTMLElement).style.transform = "translateY(0)";
-              }}
-            >
+          {/* CTA — canonical bc-cta-primary */}
+          <div>
+            <Link href={col.href} className="bc-cta-primary">
               {col.cta}
-              <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-                <path d="M2.5 7h9M7.5 3l4 4-4 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+              <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true">
+                <path
+                  d="M2.5 7h9M7.5 3l4 4-4 4"
+                  stroke="currentColor"
+                  strokeWidth="1.5"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
               </svg>
             </Link>
           </div>
         </div>
       </div>
 
-      {/* Mobile: stack */}
       <style>{`
+        .bc-feat-img { transition: transform 800ms cubic-bezier(0.16,1,0.3,1); }
+        .bc-feat-panel:hover .bc-feat-img { transform: scale(1.04); }
         @media (max-width: 768px) {
-          .bc-feat-panel > div { grid-template-columns: 1fr !important; }
-          .bc-feat-panel [style*="order: 1"] { min-height: 360px; }
+          .bc-feat-panel > div {
+            grid-template-columns: 1fr !important;
+          }
+          .bc-feat-panel > div > div:first-child {
+            min-height: 360px;
+            order: 1 !important;
+          }
+          .bc-feat-panel > div > div:last-child {
+            order: 2 !important;
+          }
         }
       `}</style>
     </section>
