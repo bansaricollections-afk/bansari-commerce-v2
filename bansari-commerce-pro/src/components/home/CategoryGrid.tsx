@@ -2,6 +2,7 @@
 
 import Image from "next/image";
 import Link from "next/link";
+import ImageWithFallback from '@/components/ui/ImageWithFallback';
 
 /* ------------------------------------------------------------------
    CATEGORY DATA
@@ -52,7 +53,7 @@ const supporting: {
   {
     title: "Western Wear",
     occasion: "Modern Silhouettes",
-    image: "/categories/western wear.png",
+    image: "/categories/western-wear.png",
     alt: "Model in western wear — full silhouette and garment cut visible",
     link: "/shop?category=western-wear",
     objectPosition: "center center",
@@ -62,7 +63,7 @@ const supporting: {
 const closing = {
   title: "Ethnic Glory",
   occasion: "Heritage Craft",
-  image: "/categories/Ethnic Glory.png",
+    image: "/categories/ethnic-glory.png",
   alt: "Model in ethnic ensemble — border embroidery and garment heritage detail visible",
   link: "/shop?category=ethnic-glory",
   objectPosition: "center 30%",
@@ -174,7 +175,7 @@ function ImageTile({
           (e.currentTarget as HTMLDivElement).style.transform = "scale(1)";
         }}
       >
-        <Image
+        <ImageWithFallback
           src={image}
           alt={alt}
           fill

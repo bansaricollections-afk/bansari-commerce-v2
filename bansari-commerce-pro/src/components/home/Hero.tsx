@@ -40,12 +40,9 @@ const FALLBACK: HomepageCampaign = {
   ctaPrimaryLink: '/shop',
   ctaSecondaryText: 'View Collections',
   ctaSecondaryLink: '/collections',
-  desktopImage:
-    'https://images.pexels.com/photos/3014856/pexels-photo-3014856.jpeg?auto=compress&cs=tinysrgb&w=3840&h=2160&dpr=1',
-  tabletImage:
-    'https://images.pexels.com/photos/3014856/pexels-photo-3014856.jpeg?auto=compress&cs=tinysrgb&w=2048&h=1536&dpr=1',
-  mobileImage:
-    'https://images.pexels.com/photos/3014856/pexels-photo-3014856.jpeg?auto=compress&cs=tinysrgb&w=1440&h=1920&dpr=1',
+  desktopImage: '/hero-emergency.jpg',
+  tabletImage: '/hero-emergency.jpg',
+  mobileImage: '/hero-emergency.jpg',
   videoUrl: '',
   imageAlt: 'Bansari Collections — Heritage fashion editorial',
   overlayColor: '#000000',
