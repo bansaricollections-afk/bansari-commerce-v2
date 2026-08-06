@@ -284,7 +284,6 @@ export async function getFilteredProducts(
           .order('price', { ascending: true });
         break;
       default:
-        // @ts-expect-error — Supabase generic chain types do not widen cleanly
         query = (query as any).order('created_at', { ascending: false });
     }
     return query as T;
