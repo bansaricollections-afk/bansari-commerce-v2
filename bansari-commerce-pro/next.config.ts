@@ -34,9 +34,6 @@ const nextConfig: NextConfig = {
     // Device size breakpoints
     deviceSizes: [375, 640, 750, 828, 1080, 1200, 1920, 2048, 3840],
 
-    // Image quality
-    quality: 85,
-
     // Minimise layout shift — modern browsers only
     contentDispositionType: 'inline',
   },
@@ -68,12 +65,9 @@ const nextConfig: NextConfig = {
     ];
   },
 
-  // TypeScript and ESLint — errors surface at build time
+  // TypeScript — errors surface at build time
   typescript: {
     ignoreBuildErrors: false,
-  },
-  eslint: {
-    ignoreDuringBuilds: false,
   },
 };
 
