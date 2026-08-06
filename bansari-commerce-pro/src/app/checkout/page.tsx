@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useCallback, useEffect, type FocusEvent } from "react";
+import { useState, useRef, useCallback, type FocusEvent } from "react";
 import Link from "next/link";
 import Script from "next/script";
 import { ArrowLeft } from "lucide-react";
@@ -59,7 +59,6 @@ export default function CheckoutPage() {
   const shipping = subtotal >= 2999 ? 0 : 99;
   const total    = subtotal + shipping;
 
-  // Field values
   const [fields, setFields] = useState<Fields>({
     fullName:     "",
     phone:        "",
@@ -71,13 +70,10 @@ export default function CheckoutPage() {
     postalCode:   "",
   });
 
-  // Track which fields have been blurred (show errors only after touch)
   const [touched, setTouched] = useState<Partial<Record<keyof Fields, boolean>>>({});
 
-  const errors = validate(fields);
-  const isValid = Object.keys(errors).length === 0;
-
-  // Refs for focus management
+  const errors      = validate(fields);
+  const isValid     = Object.keys(errors).length === 0;
   const firstErrorRef = useRef<HTMLInputElement | null>(null);
 
   function setField(key: keyof Fields) {
@@ -90,24 +86,21 @@ export default function CheckoutPage() {
       setTouched((prev) => ({ ...prev, [key]: true }));
   }
 
-  // Mark all fields touched on submit attempt so errors become visible
+  // Called on every pay-button click — marks all fields touched so inline
+  // errors become visible even if the user never blurred individual inputs.
   const handlePayAttempt = useCallback(() => {
-    if (!isValid) {
-      const allTouched = Object.fromEntries(
-        (Object.keys(fields) as (keyof Fields)[]).map((k) => [k, true])
-      ) as Record<keyof Fields, boolean>;
-      setTouched(allTouched);
-      // Focus the first invalid field
-      setTimeout(() => firstErrorRef.current?.focus(), 0);
-    }
+    if (isValid) return;
+    const allTouched = Object.fromEntries(
+      (Object.keys(fields) as (keyof Fields)[]).map((k) => [k, true])
+    ) as Record<keyof Fields, boolean>;
+    setTouched(allTouched);
+    setTimeout(() => firstErrorRef.current?.focus(), 0);
   }, [isValid, fields]);
 
-  // Determine first error field for focus
   const firstErrorKey = (Object.keys(errors) as (keyof Fields)[]).find(
     (k) => errors[k]
   );
 
-  // Input builder
   function field(
     key: keyof Fields,
     label: string,
@@ -118,9 +111,9 @@ export default function CheckoutPage() {
       inputMode?: React.HTMLAttributes<HTMLInputElement>["inputMode"];
     } = {}
   ) {
-    const error = touched[key] ? errors[key] : undefined;
-    const id    = `checkout-${key}`;
-    const errId = `${id}-err`;
+    const error        = touched[key] ? errors[key] : undefined;
+    const id           = `checkout-${key}`;
+    const errId        = `${id}-err`;
     const isFirstError = key === firstErrorKey;
 
     return (
@@ -150,11 +143,7 @@ export default function CheckoutPage() {
           }`}
         />
         {error && (
-          <p
-            id={errId}
-            role="alert"
-            className="text-xs text-rose-600 font-medium"
-          >
+          <p id={errId} role="alert" className="text-xs font-medium text-rose-600">
             {error}
           </p>
         )}
@@ -198,36 +187,29 @@ export default function CheckoutPage() {
             </div>
           ) : (
             <div className="grid gap-12 lg:grid-cols-[2fr_1fr]">
+
               {/* LEFT — Form */}
               <div className="space-y-8">
-                {/* Contact Information */}
                 <section aria-labelledby="section-contact" className="rounded-3xl bg-white p-8 shadow-sm">
-                  <h2 id="section-contact" className="mb-6 text-2xl font-semibold">
-                    Contact Information
-                  </h2>
+                  <h2 id="section-contact" className="mb-6 text-2xl font-semibold">Contact Information</h2>
                   <div className="grid gap-5">
-                    {field("fullName",     "Full Name",     "text", { autoComplete: "name" })}
-                    {field("phone",        "Mobile Number", "tel",  { autoComplete: "tel", inputMode: "numeric", placeholder: "10-digit mobile" })}
-                    {field("email",        "Email Address", "email",{ autoComplete: "email" })}
+                    {field("fullName",     "Full Name",      "text",  { autoComplete: "name" })}
+                    {field("phone",        "Mobile Number",  "tel",   { autoComplete: "tel", inputMode: "numeric", placeholder: "10-digit mobile" })}
+                    {field("email",        "Email Address",  "email", { autoComplete: "email" })}
                   </div>
                 </section>
 
-                {/* Delivery Address */}
                 <section aria-labelledby="section-address" className="rounded-3xl bg-white p-8 shadow-sm">
-                  <h2 id="section-address" className="mb-6 text-2xl font-semibold">
-                    Delivery Address
-                  </h2>
+                  <h2 id="section-address" className="mb-6 text-2xl font-semibold">Delivery Address</h2>
                   <div className="grid gap-5">
-                    {field("addressLine1", "House / Flat No.",  "text", { autoComplete: "address-line1" })}
+                    {field("addressLine1", "House / Flat No.", "text", { autoComplete: "address-line1" })}
                     <div className="flex flex-col gap-1.5">
                       <label
                         htmlFor="checkout-addressLine2"
                         className="text-xs font-medium uppercase tracking-[0.1em] text-slate-500"
                       >
                         Street / Area
-                        <span className="ml-0.5 text-slate-400 font-normal normal-case tracking-normal">
-                          &nbsp;(optional)
-                        </span>
+                        <span className="ml-0.5 text-slate-400 font-normal normal-case tracking-normal">&nbsp;(optional)</span>
                       </label>
                       <input
                         id="checkout-addressLine2"
@@ -240,26 +222,18 @@ export default function CheckoutPage() {
                       />
                     </div>
                     <div className="grid gap-5 md:grid-cols-2">
-                      {field("city",       "City",           "text", { autoComplete: "address-level2" })}
-                      {field("state",      "State",          "text", { autoComplete: "address-level1" })}
+                      {field("city",       "City",   "text", { autoComplete: "address-level2" })}
+                      {field("state",      "State",  "text", { autoComplete: "address-level1" })}
                     </div>
-                    {field("postalCode",   "PIN Code",       "text", { autoComplete: "postal-code", inputMode: "numeric", placeholder: "6-digit PIN" })}
+                    {field("postalCode",   "PIN Code", "text", { autoComplete: "postal-code", inputMode: "numeric", placeholder: "6-digit PIN" })}
                   </div>
                 </section>
 
-                {/* Payment Method */}
                 <section aria-labelledby="section-payment" className="rounded-3xl bg-white p-8 shadow-sm">
                   <fieldset>
-                    <legend id="section-payment" className="mb-6 text-2xl font-semibold">
-                      Payment Method
-                    </legend>
+                    <legend id="section-payment" className="mb-6 text-2xl font-semibold">Payment Method</legend>
                     <label className="flex cursor-pointer items-center gap-3 rounded-xl border border-slate-200 p-4 transition-colors hover:border-[#8A5A6A]/40">
-                      <input
-                        type="radio"
-                        name="payment"
-                        defaultChecked
-                        className="accent-[#8A5A6A]"
-                      />
+                      <input type="radio" name="payment" defaultChecked className="accent-[#8A5A6A]" />
                       <span className="text-sm text-slate-700">
                         Razorpay — UPI / Credit Card / Debit Card / Net Banking
                       </span>
@@ -273,16 +247,12 @@ export default function CheckoutPage() {
                 aria-labelledby="summary-heading"
                 className="sticky top-24 h-fit rounded-3xl bg-white p-8 shadow-sm"
               >
-                <h2 id="summary-heading" className="mb-8 text-3xl font-bold">
-                  Order Summary
-                </h2>
+                <h2 id="summary-heading" className="mb-8 text-3xl font-bold">Order Summary</h2>
 
                 <div className="space-y-4">
                   {items.map((item) => (
                     <div key={item.id} className="flex justify-between text-sm">
-                      <span className="text-slate-700">
-                        {item.name} &times; {item.quantity}
-                      </span>
+                      <span className="text-slate-700">{item.name} &times; {item.quantity}</span>
                       <span className="tabular-nums font-medium">
                         &#x20B9;{(item.price * item.quantity).toLocaleString("en-IN")}
                       </span>
@@ -301,7 +271,7 @@ export default function CheckoutPage() {
                     <span className="tabular-nums font-medium">
                       {shipping === 0
                         ? <span className="text-emerald-600 font-semibold">FREE</span>
-                        : `₹${shipping.toLocaleString("en-IN")}`}
+                        : `\u20b9${shipping.toLocaleString("en-IN")}`}
                     </span>
                   </div>
 
@@ -313,20 +283,32 @@ export default function CheckoutPage() {
                   </div>
                 </div>
 
-                <RazorpayButton
-                  customer={{ name: fullName, email: fields.email, phone: fields.phone }}
-                  shipping={{
-                    name:         fields.fullName,
-                    phone:        fields.phone,
-                    addressLine1: fields.addressLine1,
-                    addressLine2: fields.addressLine2,
-                    city:         fields.city,
-                    state:        fields.state,
-                    postalCode:   fields.postalCode,
-                  }}
-                  disabled={!isValid}
-                  onAttempt={handlePayAttempt}
-                />
+                {/*
+                  Wrap RazorpayButton in a click-interceptor div.
+                  handlePayAttempt runs first (marks all fields touched,
+                  focuses first invalid input). RazorpayButton's own
+                  onClick fires next but is gated by disabled={!isValid},
+                  so payment only proceeds when the form is fully valid.
+                */}
+                <div onClick={handlePayAttempt}>
+                  <RazorpayButton
+                    customer={{
+                      name:  fields.fullName,
+                      email: fields.email,
+                      phone: fields.phone,
+                    }}
+                    shipping={{
+                      name:         fields.fullName,
+                      phone:        fields.phone,
+                      addressLine1: fields.addressLine1,
+                      addressLine2: fields.addressLine2,
+                      city:         fields.city,
+                      state:        fields.state,
+                      postalCode:   fields.postalCode,
+                    }}
+                    disabled={!isValid}
+                  />
+                </div>
 
                 <CheckoutTrustStrip />
               </aside>
@@ -337,6 +319,3 @@ export default function CheckoutPage() {
     </>
   );
 }
-
-// Derived alias used in RazorpayButton customer prop
-const fullName = "";
