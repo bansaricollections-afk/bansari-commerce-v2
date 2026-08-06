@@ -31,12 +31,14 @@ export default async function AdminLayout({ children }: Readonly<AdminLayoutProp
     /*
      * admin-shell: scoping class for all admin-only CSS overrides.
      *
-     * 1. [&_h1,...]:font-sans — resets the storefront globals.css Playfair serif
-     *    rule that targets h1–h6 globally, preventing it from bleeding into
-     *    shadcn Sheet titles (<h2> via Radix Dialog.Title) inside admin panels.
+     * 1. Six separate arbitrary-variant utilities apply font-sans individually
+     *    to h1, h2, h3, h4, h5, and h6 — one utility per heading level.
+     *    This resets the storefront globals.css Playfair serif rule that
+     *    targets all headings globally, preventing it from bleeding into
+     *    shadcn Sheet titles (h2 via Radix Dialog.Title) inside admin panels.
      *
      * 2. The <style> block below declares --color-popover / --color-popover-foreground
-     *    scoped under .admin-shell so Tailwind v4’s bg-popover utility resolves to
+     *    scoped under .admin-shell so Tailwind v4's bg-popover utility resolves to
      *    white (#FFFFFF) inside admin Sheets instead of its built-in near-black
      *    default (oklch(0.205 0 0)). These tokens MUST NOT live in globals.css :root
      *    because Tailwind v4 exposes every :root CSS variable as a design token,
