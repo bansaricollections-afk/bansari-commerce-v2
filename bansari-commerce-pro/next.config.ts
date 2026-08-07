@@ -33,6 +33,18 @@ const nextConfig: NextConfig = {
         port: '',
         pathname: '/**',
       },
+      {
+        protocol: 'https',
+        hostname: 'images.unsplash.com',
+        port: '',
+        pathname: '/**',
+      },
+      {
+        protocol: 'https',
+        hostname: 'images.pexels.com',
+        port: '',
+        pathname: '/**',
+      },
     ],
     deviceSizes: [375, 640, 750, 828, 1080, 1200, 1920, 2048, 3840],
     contentDispositionType: 'inline',
@@ -95,8 +107,8 @@ const nextConfig: NextConfig = {
         ],
       },
       {
-        // Cache static assets aggressively
-        source: '/(.*)\\.  (ico|png|jpg|jpeg|webp|avif|svg|woff|woff2)',
+        // Cache static assets aggressively — fixed: removed stray spaces in regex
+        source: '/(.*)\\.(ico|png|jpg|jpeg|webp|avif|svg|woff|woff2)',
         headers: [
           {
             key: 'Cache-Control',
