@@ -40,219 +40,312 @@ function StarRow({ rating, count }: { rating: number; count: number }) {
   );
 }
 
+// ─── Size Guide Modal ──────────────────────────────────────────────────────
+function SizeGuideModal({ onClose }: { onClose: () => void }) {
+  return (
+    <div
+      className="fixed inset-0 z-50 bg-black/60 flex items-end sm:items-center justify-center p-4"
+      role="dialog"
+      aria-label="Size guide"
+      aria-modal="true"
+      onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
+    >
+      <div className="bg-white w-full max-w-md rounded-sm shadow-2xl overflow-auto max-h-[85vh]">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100">
+          <h2 className="text-sm font-medium tracking-[0.12em] uppercase text-slate-900">Size Guide</h2>
+          <button
+            onClick={onClose}
+            aria-label="Close size guide"
+            className="text-slate-400 hover:text-slate-700 transition-colors p-1"
+          >
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+        <div className="px-6 py-5">
+          <p className="text-[11px] tracking-[0.18em] uppercase text-[#8A5A6A] font-medium mb-4">Indian Ethnic Sizing</p>
+          <table className="w-full text-sm text-slate-700">
+            <thead>
+              <tr className="border-b border-slate-100">
+                <th className="text-left text-[10px] tracking-widest uppercase text-slate-400 pb-2 font-medium">Size</th>
+                <th className="text-left text-[10px] tracking-widest uppercase text-slate-400 pb-2 font-medium">Bust (in)</th>
+                <th className="text-left text-[10px] tracking-widest uppercase text-slate-400 pb-2 font-medium">Waist (in)</th>
+                <th className="text-left text-[10px] tracking-widest uppercase text-slate-400 pb-2 font-medium">Hips (in)</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-50">
+              {[
+                ['XS', '32', '26', '36'],
+                ['S',  '34', '28', '38'],
+                ['M',  '36', '30', '40'],
+                ['L',  '38', '32', '42'],
+                ['XL', '40', '34', '44'],
+                ['XXL','42', '36', '46'],
+              ].map(([size, bust, waist, hips]) => (
+                <tr key={size}>
+                  <td className="py-2 font-medium text-slate-900">{size}</td>
+                  <td className="py-2 text-slate-600">{bust}</td>
+                  <td className="py-2 text-slate-600">{waist}</td>
+                  <td className="py-2 text-slate-600">{hips}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          <p className="mt-5 text-[11px] text-slate-400 leading-relaxed">
+            Measurements are in inches. For the best fit, measure over your fullest points.
+            If you are between sizes, size up. All garments are unstitched unless noted.
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function ProductInfo({ product, canonicalUrl }: Props) {
   const [quantity, setQuantity] = useState(1);
   const [selectedVariant, setSelectedVariant] = useState<ProductVariant | null>(null);
+  const [sizeGuideOpen, setSizeGuideOpen] = useState(false);
 
   const hasDiscount = product.oldPrice && product.oldPrice > product.price;
   const discountPct = hasDiscount
     ? Math.round(((product.oldPrice! - product.price) / product.oldPrice!) * 100)
     : 0;
+  const savedAmount = hasDiscount ? product.oldPrice! - product.price : 0;
   const isOutOfStock = !product.stock || product.stock === 0;
   const isLowStock = !isOutOfStock && (product.stock ?? 0) <= 5;
   const specs = product.specifications;
 
-  // Model info: pulled from specs if present, else null (hide strip entirely).
-  // Fields are typed on ProductSpecification — no cast required.
   const modelInfo = specs?.modelInfo;
   const sizeWorn = specs?.sizeWorn;
 
   return (
-    <div className="flex flex-col gap-6 lg:sticky lg:top-24 lg:self-start">
+    <>
+      {sizeGuideOpen && <SizeGuideModal onClose={() => setSizeGuideOpen(false)} />}
 
-      {/* ── Breadcrumb ── */}
-      <nav aria-label="Breadcrumb">
-        <ol className="flex flex-wrap items-center gap-1 text-[10px] tracking-[0.14em] uppercase text-slate-400">
-          <li><Link href="/" className="hover:text-[#8A5A6A] transition-colors">Home</Link></li>
-          <li aria-hidden><span className="mx-1">›</span></li>
-          <li><Link href="/shop" className="hover:text-[#8A5A6A] transition-colors">Shop</Link></li>
-          {product.category && (
-            <>
-              <li aria-hidden><span className="mx-1">›</span></li>
-              <li>
-                <Link
-                  href={`/collections/${product.category.toLowerCase().replace(/\s+/g, '-')}`}
-                  className="hover:text-[#8A5A6A] transition-colors"
-                >
-                  {product.category}
-                </Link>
-              </li>
-            </>
-          )}
-        </ol>
-      </nav>
+      <div className="flex flex-col gap-6 lg:sticky lg:top-24 lg:self-start">
 
-      {/* ── Collection label ── */}
-      {product.collection && (
-        <p className="text-[10px] tracking-[0.22em] uppercase text-[#8A5A6A] font-medium -mb-4">
-          {product.collection}
-        </p>
-      )}
+        {/* ── Breadcrumb ── */}
+        <nav aria-label="Breadcrumb">
+          <ol className="flex flex-wrap items-center gap-1 text-[10px] tracking-[0.14em] uppercase text-slate-400">
+            <li><Link href="/" className="hover:text-[#8A5A6A] transition-colors">Home</Link></li>
+            <li aria-hidden><span className="mx-1">›</span></li>
+            <li><Link href="/shop" className="hover:text-[#8A5A6A] transition-colors">Shop</Link></li>
+            {product.category && (
+              <>
+                <li aria-hidden><span className="mx-1">›</span></li>
+                <li>
+                  <Link
+                    href={`/collections/${product.category.toLowerCase().replace(/\s+/g, '-')}`}
+                    className="hover:text-[#8A5A6A] transition-colors"
+                  >
+                    {product.category}
+                  </Link>
+                </li>
+              </>
+            )}
+            <li aria-hidden><span className="mx-1">›</span></li>
+            {/* Current page — aria-current per WCAG 2.1 SC 2.4.8 */}
+            <li aria-current="page" className="text-slate-600 truncate max-w-[14ch]">
+              {product.name}
+            </li>
+          </ol>
+        </nav>
 
-      {/* ── Product name ── */}
-      <div>
-        <h1 className="text-[1.65rem] lg:text-3xl font-light text-slate-900 leading-snug tracking-tight">
-          {product.name}
-        </h1>
-        {product.reviewCount && product.reviewCount > 0 && product.rating ? (
-          <div className="mt-2">
-            <StarRow rating={product.rating} count={product.reviewCount} />
-          </div>
-        ) : null}
-      </div>
-
-      {/* ── Price row ── */}
-      <div className="border-t border-b border-slate-100 py-4 flex flex-col gap-2">
-        <div className="flex items-baseline gap-3">
-          <span className="text-2xl font-light text-slate-900">
-            ₹{product.price.toLocaleString('en-IN')}
-          </span>
-          {hasDiscount && (
-            <>
-              <span className="text-base text-slate-400 line-through font-light">
-                ₹{product.oldPrice!.toLocaleString('en-IN')}
-              </span>
-              <span className="text-xs font-semibold bg-green-50 text-green-700 px-2 py-0.5 rounded">
-                {discountPct}% off
-              </span>
-            </>
-          )}
-        </div>
-
-        {/* Returns reassurance — inline, always visible */}
-        <p className="text-[11px] text-slate-500 flex items-center gap-1.5">
-          <svg className="w-3.5 h-3.5 text-green-600 flex-shrink-0" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24" aria-hidden="true">
-            <path strokeLinecap="round" strokeLinejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182m0-4.991v4.99" />
-          </svg>
-          Free 7-day returns · Free pickup · Full refund
-        </p>
-
-        <p className="text-[11px] text-slate-400 tracking-wide">
-          Inclusive of all taxes · Free shipping on all orders
-        </p>
-
-        {/* Availability + Style Code */}
-        <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
-          {isOutOfStock ? (
-            <span className="flex items-center gap-1 text-[11px] text-red-500">
-              <span className="w-1.5 h-1.5 rounded-full bg-red-500 inline-block" />
-              Out of Stock
-            </span>
-          ) : isLowStock ? (
-            <span className="flex items-center gap-1 text-[11px] text-amber-600">
-              <span className="w-1.5 h-1.5 rounded-full bg-amber-500 inline-block" />
-              Only {product.stock} left
-            </span>
-          ) : (
-            <span className="flex items-center gap-1 text-[11px] text-green-600">
-              <span className="w-1.5 h-1.5 rounded-full bg-green-500 inline-block" />
-              In Stock
-            </span>
-          )}
-          {(product.sku || product.styleCode) && (
-            <span className="text-[11px] text-slate-400">
-              Style: {product.styleCode ?? product.sku}
-            </span>
-          )}
-        </div>
-      </div>
-
-      {/* ── Delivery Estimate ── */}
-      {!isOutOfStock && <DeliveryEstimate />}
-
-      {/* ── Model Info Strip ── */}
-      {(modelInfo || sizeWorn) && (
-        <div className="flex items-start gap-2 text-[11px] text-slate-500 bg-slate-50 border border-slate-100 rounded-sm px-3 py-2.5">
-          <svg
-            className="w-3.5 h-3.5 text-[#8A5A6A] flex-shrink-0 mt-px"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="1.5"
-            viewBox="0 0 24 24"
-            aria-hidden="true"
-          >
-            <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 6a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0zM4.501 20.118a7.5 7.5 0 0114.998 0A17.933 17.933 0 0112 21.75c-2.676 0-5.216-.584-7.499-1.632z" />
-          </svg>
-          <span>
-            {modelInfo && <span>{modelInfo}</span>}
-            {modelInfo && sizeWorn && <span className="mx-1">·</span>}
-            {sizeWorn && <span>Model wears size <strong className="text-slate-700">{sizeWorn}</strong></span>}
-          </span>
-        </div>
-      )}
-
-      {/* ── Size selector ── */}
-      {product.variants && product.variants.length > 0 && (
-        <ProductVariantSelector
-          variants={product.variants}
-          selected={selectedVariant}
-          onSelect={setSelectedVariant}
-        />
-      )}
-
-      {/* ── Quantity ── */}
-      {!isOutOfStock && (
-        <div className="flex flex-col gap-2">
-          <p className="text-[10px] tracking-[0.18em] uppercase text-slate-500 font-medium">
-            Quantity
+        {/* ── Collection label ── */}
+        {product.collection && (
+          <p className="text-[10px] tracking-[0.22em] uppercase text-[#8A5A6A] font-medium -mb-4">
+            {product.collection}
           </p>
-          <QuantitySelector value={quantity} onChange={setQuantity} max={product.stock} />
-        </div>
-      )}
+        )}
 
-      {/* ── Pincode delivery checker ── */}
-      <PincodeChecker />
-
-      {/* ── Action buttons ── */}
-      <ProductActions
-        product={product}
-        quantity={quantity}
-        selectedVariant={selectedVariant}
-      />
-
-      {/* ── Quick spec pills ── */}
-      {specs && (
-        <div className="grid grid-cols-2 gap-x-6 gap-y-2.5 pt-4 border-t border-slate-100">
-          {specs.fabric && (
-            <div>
-              <p className="text-[9px] tracking-[0.18em] uppercase text-slate-400 mb-0.5">Fabric</p>
-              <p className="text-sm text-slate-700 font-light">{specs.fabric}</p>
+        {/* ── Product name ── */}
+        <div>
+          <h1 className="text-[1.65rem] lg:text-3xl font-light text-slate-900 leading-snug tracking-tight">
+            {product.name}
+          </h1>
+          {product.reviewCount && product.reviewCount > 0 && product.rating ? (
+            <div className="mt-2">
+              <StarRow rating={product.rating} count={product.reviewCount} />
             </div>
-          )}
-          {specs.occasion && (
-            <div>
-              <p className="text-[9px] tracking-[0.18em] uppercase text-slate-400 mb-0.5">Occasion</p>
-              <p className="text-sm text-slate-700 font-light">
-                {Array.isArray(specs.occasion) ? specs.occasion.join(', ') : specs.occasion}
+          ) : null}
+        </div>
+
+        {/* ── Price row ── */}
+        <div className="border-t border-b border-slate-100 py-4 flex flex-col gap-2">
+          <div className="flex items-baseline gap-3 flex-wrap">
+            <span className="text-2xl font-light text-slate-900">
+              ₹{product.price.toLocaleString('en-IN')}
+            </span>
+            {hasDiscount && (
+              <>
+                <span className="text-base text-slate-400 line-through font-light">
+                  ₹{product.oldPrice!.toLocaleString('en-IN')}
+                </span>
+                <span className="text-xs font-semibold bg-green-50 text-green-700 px-2 py-0.5 rounded">
+                  {discountPct}% off
+                </span>
+                {/* Savings amount — explicit rupee value saves customer mental math */}
+                <span className="text-xs text-green-700 font-medium">
+                  You save ₹{savedAmount.toLocaleString('en-IN')}
+                </span>
+              </>
+            )}
+          </div>
+
+          {/* Returns reassurance — inline, always visible */}
+          <p className="text-[11px] text-slate-500 flex items-center gap-1.5">
+            <svg className="w-3.5 h-3.5 text-green-600 flex-shrink-0" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24" aria-hidden="true">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182m0-4.991v4.99" />
+            </svg>
+            Free 7-day returns · Free pickup · Full refund
+          </p>
+
+          <p className="text-[11px] text-slate-400 tracking-wide">
+            Inclusive of all taxes · Free shipping on all orders
+          </p>
+
+          {/* Availability + Style Code */}
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
+            {isOutOfStock ? (
+              <span className="flex items-center gap-1 text-[11px] text-red-500">
+                <span className="w-1.5 h-1.5 rounded-full bg-red-500 inline-block" />
+                Out of Stock
+              </span>
+            ) : isLowStock ? (
+              /* Urgency: pulsing dot + exact count */
+              <span className="flex items-center gap-1.5 text-[11px] font-medium text-amber-700">
+                <span className="relative flex h-2 w-2 flex-shrink-0">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75" />
+                  <span className="relative inline-flex h-2 w-2 rounded-full bg-amber-500" />
+                </span>
+                Only {product.stock} left — selling fast
+              </span>
+            ) : (
+              <span className="flex items-center gap-1 text-[11px] text-green-600">
+                <span className="w-1.5 h-1.5 rounded-full bg-green-500 inline-block" />
+                In Stock
+              </span>
+            )}
+            {(product.sku || product.styleCode) && (
+              <span className="text-[11px] text-slate-400">
+                Style: {product.styleCode ?? product.sku}
+              </span>
+            )}
+          </div>
+        </div>
+
+        {/* ── Delivery Estimate ── */}
+        {!isOutOfStock && <DeliveryEstimate />}
+
+        {/* ── Model Info Strip ── */}
+        {(modelInfo || sizeWorn) && (
+          <div className="flex items-start gap-2 text-[11px] text-slate-500 bg-slate-50 border border-slate-100 rounded-sm px-3 py-2.5">
+            <svg
+              className="w-3.5 h-3.5 text-[#8A5A6A] flex-shrink-0 mt-px"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.5"
+              viewBox="0 0 24 24"
+              aria-hidden="true"
+            >
+              <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 6a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0zM4.501 20.118a7.5 7.5 0 0114.998 0A17.933 17.933 0 0112 21.75c-2.676 0-5.216-.584-7.499-1.632z" />
+            </svg>
+            <span>
+              {modelInfo && <span>{modelInfo}</span>}
+              {modelInfo && sizeWorn && <span className="mx-1">·</span>}
+              {sizeWorn && <span>Model wears size <strong className="text-slate-700">{sizeWorn}</strong></span>}
+            </span>
+          </div>
+        )}
+
+        {/* ── Size selector + Size Guide affordance ── */}
+        {product.variants && product.variants.length > 0 && (
+          <div className="flex flex-col gap-2">
+            <div className="flex items-center justify-between">
+              <p className="text-[10px] tracking-[0.18em] uppercase text-slate-500 font-medium">
+                Size
               </p>
+              <button
+                type="button"
+                onClick={() => setSizeGuideOpen(true)}
+                className="text-[10px] tracking-[0.12em] uppercase text-[#8A5A6A] underline underline-offset-2 hover:text-[#6e3f50] transition-colors"
+              >
+                Size Guide
+              </button>
             </div>
-          )}
-          {specs.fit && (
-            <div>
-              <p className="text-[9px] tracking-[0.18em] uppercase text-slate-400 mb-0.5">Fit</p>
-              <p className="text-sm text-slate-700 font-light">{specs.fit}</p>
-            </div>
-          )}
-          {specs.neckline && (
-            <div>
-              <p className="text-[9px] tracking-[0.18em] uppercase text-slate-400 mb-0.5">Neckline</p>
-              <p className="text-sm text-slate-700 font-light">{specs.neckline}</p>
-            </div>
-          )}
-          {specs.sleeve && (
-            <div>
-              <p className="text-[9px] tracking-[0.18em] uppercase text-slate-400 mb-0.5">Sleeve</p>
-              <p className="text-sm text-slate-700 font-light">{specs.sleeve}</p>
-            </div>
-          )}
-          {specs.work && (
-            <div>
-              <p className="text-[9px] tracking-[0.18em] uppercase text-slate-400 mb-0.5">Work</p>
-              <p className="text-sm text-slate-700 font-light">{specs.work}</p>
-            </div>
-          )}
-        </div>
-      )}
-    </div>
+            <ProductVariantSelector
+              variants={product.variants}
+              selected={selectedVariant}
+              onSelect={setSelectedVariant}
+            />
+          </div>
+        )}
+
+        {/* ── Quantity ── */}
+        {!isOutOfStock && (
+          <div className="flex flex-col gap-2">
+            <p className="text-[10px] tracking-[0.18em] uppercase text-slate-500 font-medium">
+              Quantity
+            </p>
+            <QuantitySelector value={quantity} onChange={setQuantity} max={product.stock} />
+          </div>
+        )}
+
+        {/* ── Pincode delivery checker ── */}
+        <PincodeChecker />
+
+        {/* ── Action buttons ── */}
+        <ProductActions
+          product={product}
+          quantity={quantity}
+          selectedVariant={selectedVariant}
+        />
+
+        {/* ── Quick spec pills ── */}
+        {specs && (
+          <div className="grid grid-cols-2 gap-x-6 gap-y-2.5 pt-4 border-t border-slate-100">
+            {specs.fabric && (
+              <div>
+                <p className="text-[9px] tracking-[0.18em] uppercase text-slate-400 mb-0.5">Fabric</p>
+                <p className="text-sm text-slate-700 font-light">{specs.fabric}</p>
+              </div>
+            )}
+            {specs.occasion && (
+              <div>
+                <p className="text-[9px] tracking-[0.18em] uppercase text-slate-400 mb-0.5">Occasion</p>
+                <p className="text-sm text-slate-700 font-light">
+                  {Array.isArray(specs.occasion) ? specs.occasion.join(', ') : specs.occasion}
+                </p>
+              </div>
+            )}
+            {specs.fit && (
+              <div>
+                <p className="text-[9px] tracking-[0.18em] uppercase text-slate-400 mb-0.5">Fit</p>
+                <p className="text-sm text-slate-700 font-light">{specs.fit}</p>
+              </div>
+            )}
+            {specs.neckline && (
+              <div>
+                <p className="text-[9px] tracking-[0.18em] uppercase text-slate-400 mb-0.5">Neckline</p>
+                <p className="text-sm text-slate-700 font-light">{specs.neckline}</p>
+              </div>
+            )}
+            {specs.sleeve && (
+              <div>
+                <p className="text-[9px] tracking-[0.18em] uppercase text-slate-400 mb-0.5">Sleeve</p>
+                <p className="text-sm text-slate-700 font-light">{specs.sleeve}</p>
+              </div>
+            )}
+            {specs.work && (
+              <div>
+                <p className="text-[9px] tracking-[0.18em] uppercase text-slate-400 mb-0.5">Work</p>
+                <p className="text-sm text-slate-700 font-light">{specs.work}</p>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+    </>
   );
 }
