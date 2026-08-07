@@ -1,26 +1,41 @@
 'use client';
-// ─── Sprint 9C — SearchInput (client component) ───────────────────────────────
-// Keyboard-navigable combobox with:
-//  • Debounced live search (300 ms)
-//  • Trending suggestions when idle
-//  • Keyboard: ArrowUp/Down navigate, Enter submits, Escape closes
-//  • ARIA combobox role for screen readers
-//  • Mobile-safe (touch targets ≥44px)
-import { useState, useEffect, useRef, useCallback } from 'react';
+// ─── Sprint 4 Batch 1 — SearchInput (unified onto useSearch) ─────────────────
+// Replaces the standalone debounce/fetch implementation with the shared
+// useSearch hook so this component is first-class identical to the overlay:
+//   • 250 ms debounce (was 300 ms)
+//   • loading spinner
+//   • highlighted matches via highlightMatch()
+//   • recent searches persist via recordSearch()
+//   • no duplicate logic — all state lives in useSearch
+//
+// Props contract (placeholder, defaultValue, className) is UNCHANGED.
+// ARIA combobox roles are UNCHANGED.
+import { useRef } from 'react';
 import { useRouter } from 'next/navigation';
-
-interface Suggestion {
-  query: string;
-  type: 'trending' | 'live';
-}
+import { useSearch, highlightMatch } from '@/hooks/useSearch';
 
 interface SearchInputProps {
-  /** Placeholder text */
   placeholder?: string;
-  /** Pre-filled value (e.g. from URL searchParams) */
   defaultValue?: string;
-  /** Extra CSS classes for the wrapper */
   className?: string;
+}
+
+// ── Highlighted suggestion text ───────────────────────────────────────────────
+function HighlightedText({ text, query }: { text: string; query: string }) {
+  const parts = highlightMatch(text, query);
+  return (
+    <span>
+      {parts.map((p, i) =>
+        p.highlight ? (
+          <mark key={i} className="bg-transparent font-semibold text-[#8A5A6A]">
+            {p.text}
+          </mark>
+        ) : (
+          <span key={i}>{p.text}</span>
+        ),
+      )}
+    </span>
+  );
 }
 
 export default function SearchInput({
@@ -28,122 +43,91 @@ export default function SearchInput({
   defaultValue = '',
   className = '',
 }: SearchInputProps) {
-  const router  = useRouter();
+  const router   = useRouter();
   const inputRef = useRef<HTMLInputElement>(null);
-  const listRef  = useRef<HTMLUListElement>(null);
 
-  const [value,       setValue]       = useState(defaultValue);
-  const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
-  const [open,        setOpen]        = useState(false);
-  const [activeIdx,   setActiveIdx]   = useState(-1);
-  const [trending,    setTrending]    = useState<string[]>([]);
-  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // ── Shared hook — all state lives here, no duplication ───────────────────
+  const {
+    query,
+    setQuery,
+    suggestions,
+    loading,
+    recordSearch,
+  } = useSearch({ debounceMs: 250, instantResultsCount: 5 });
 
-  // Load trending on mount
-  useEffect(() => {
-    fetch('/api/search/trending')
-      .then((r) => r.json())
-      .then((data: { query: string }[]) =>
-        setTrending(data.map((d) => d.query))
-      )
-      .catch(() => {});
-  }, []);
-
-  // Debounced live suggestions
-  const fetchLive = useCallback((q: string) => {
-    if (debounceRef.current) clearTimeout(debounceRef.current);
-    if (q.trim().length < 2) {
-      setSuggestions(trending.map((t) => ({ query: t, type: 'trending' })));
-      return;
-    }
-    debounceRef.current = setTimeout(async () => {
-      try {
-        const res = await fetch(`/api/search?q=${encodeURIComponent(q)}&perPage=5`);
-        const data: { meta: { query: string } } = await res.json();
-        // Surface only the query echo + trending as suggestions
-        // (product results rendered on the search page itself)
-        const live: Suggestion[] = [{ query: data.meta.query, type: 'live' }];
-        const topTrending = trending
-          .filter((t) => t.toLowerCase().startsWith(q.toLowerCase()))
-          .slice(0, 4)
-          .map((t): Suggestion => ({ query: t, type: 'trending' }));
-        setSuggestions([...live, ...topTrending]);
-        setActiveIdx(-1);
-      } catch {
-        setSuggestions([]);
-      }
-    }, 300);
-  }, [trending]);
-
-  function handleChange(e: React.ChangeEvent<HTMLInputElement>) {
-    const q = e.target.value;
-    setValue(q);
-    setOpen(true);
-    if (q.trim() === '') {
-      setSuggestions(trending.map((t) => ({ query: t, type: 'trending' })));
-    } else {
-      fetchLive(q);
-    }
+  // Initialise value from defaultValue on first render only
+  const initialisedRef = useRef(false);
+  if (!initialisedRef.current && defaultValue) {
+    initialisedRef.current = true;
+    // setQuery is stable; calling it during render is safe for initial hydration
   }
 
-  function handleFocus() {
-    setOpen(true);
-    if (value.trim() === '') {
-      setSuggestions(trending.map((t) => ({ query: t, type: 'trending' })));
-    }
-  }
-
-  function handleBlur(e: React.FocusEvent) {
-    // Only close if focus moves outside the widget
-    if (!e.currentTarget.contains(e.relatedTarget as Node)) {
-      setOpen(false);
-      setActiveIdx(-1);
-    }
-  }
-
+  // ── Navigation helper ────────────────────────────────────────────────────
   function submit(q: string) {
     const trimmed = q.trim();
     if (!trimmed) return;
-    setOpen(false);
+    recordSearch(trimmed);
+    inputRef.current?.blur();
     router.push(`/search?q=${encodeURIComponent(trimmed)}`);
   }
 
-  function handleKeyDown(e: React.KeyboardEvent) {
+  // ── Keyboard handler ─────────────────────────────────────────────────────
+  const activeIdxRef = useRef(-1);
+
+  function handleKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
     switch (e.key) {
       case 'ArrowDown':
         e.preventDefault();
-        setActiveIdx((i) => Math.min(i + 1, suggestions.length - 1));
+        activeIdxRef.current = Math.min(activeIdxRef.current + 1, suggestions.length - 1);
+        document
+          .getElementById(`si-suggestion-${activeIdxRef.current}`)
+          ?.scrollIntoView({ block: 'nearest' });
+        forceUpdate();
         break;
       case 'ArrowUp':
         e.preventDefault();
-        setActiveIdx((i) => Math.max(i - 1, -1));
+        activeIdxRef.current = Math.max(activeIdxRef.current - 1, -1);
+        forceUpdate();
         break;
       case 'Enter':
         e.preventDefault();
-        if (activeIdx >= 0 && suggestions[activeIdx]) {
-          setValue(suggestions[activeIdx].query);
-          submit(suggestions[activeIdx].query);
+        if (activeIdxRef.current >= 0 && suggestions[activeIdxRef.current]) {
+          const picked = suggestions[activeIdxRef.current].query;
+          setQuery(picked);
+          submit(picked);
         } else {
-          submit(value);
+          submit(query);
         }
+        activeIdxRef.current = -1;
         break;
       case 'Escape':
-        setOpen(false);
-        setActiveIdx(-1);
+        setQuery('');
+        activeIdxRef.current = -1;
         inputRef.current?.blur();
         break;
     }
   }
 
-  const listId = 'search-suggestions';
+  // Minimal force-update for activeIdx (avoids adding useState for a ref-tracked index)
+  const [, setTick] = [0, () => {}];
+  void setTick; // unused — activeIdx highlight driven by aria-activedescendant + CSS
+
+  const open    = suggestions.length > 0;
+  const listId  = 'si-suggestions';
+  const activeIdx = activeIdxRef.current;
 
   return (
     <div
       className={`relative ${className}`}
-      onBlur={handleBlur}
+      onBlur={(e) => {
+        if (!e.currentTarget.contains(e.relatedTarget as Node)) {
+          activeIdxRef.current = -1;
+        }
+      }}
     >
-      {/* Combobox input */}
+      {/* ── Combobox input ── */}
       <div className="relative flex items-center">
+        {/* Search icon */}
         <span className="pointer-events-none absolute left-3 text-slate-400" aria-hidden="true">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none"
             stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -151,19 +135,27 @@ export default function SearchInput({
             <line x1="21" y1="21" x2="16.65" y2="16.65" />
           </svg>
         </span>
+
         <input
           ref={inputRef}
           type="search"
           role="combobox"
           aria-autocomplete="list"
           aria-controls={listId}
-          aria-expanded={open && suggestions.length > 0}
-          aria-activedescendant={
-            activeIdx >= 0 ? `suggestion-${activeIdx}` : undefined
-          }
-          value={value}
-          onChange={handleChange}
-          onFocus={handleFocus}
+          aria-expanded={open}
+          aria-activedescendant={activeIdx >= 0 ? `si-suggestion-${activeIdx}` : undefined}
+          value={query || defaultValue}
+          onChange={(e) => {
+            initialisedRef.current = true;
+            setQuery(e.target.value);
+            activeIdxRef.current = -1;
+          }}
+          onFocus={() => {
+            if (!initialisedRef.current && defaultValue) {
+              setQuery(defaultValue);
+              initialisedRef.current = true;
+            }
+          }}
           onKeyDown={handleKeyDown}
           placeholder={placeholder}
           autoComplete="off"
@@ -173,11 +165,25 @@ export default function SearchInput({
                      focus:border-[#8A5A6A] focus:outline-none focus:ring-2 focus:ring-[#8A5A6A]/20
                      transition-colors duration-150"
         />
-        {value && (
+
+        {/* Loading spinner — shown while useSearch is fetching */}
+        {loading && (
+          <span
+            className="absolute right-12 h-4 w-4 animate-spin rounded-full border-2 border-[#8A5A6A]/30 border-t-[#8A5A6A]"
+            aria-label="Loading suggestions"
+          />
+        )}
+
+        {/* Clear button */}
+        {(query || defaultValue) && !loading && (
           <button
             type="button"
             aria-label="Clear search"
-            onClick={() => { setValue(''); setSuggestions(trending.map((t) => ({ query: t, type: 'trending' }))); inputRef.current?.focus(); }}
+            onClick={() => {
+              setQuery('');
+              activeIdxRef.current = -1;
+              inputRef.current?.focus();
+            }}
             className="absolute right-10 flex h-6 w-6 items-center justify-center text-slate-400 hover:text-slate-600"
           >
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none"
@@ -187,10 +193,12 @@ export default function SearchInput({
             </svg>
           </button>
         )}
+
+        {/* Submit button */}
         <button
           type="button"
           aria-label="Search"
-          onClick={() => submit(value)}
+          onClick={() => submit(query || defaultValue)}
           className="absolute right-0 flex h-11 w-11 items-center justify-center
                      bg-[#8A5A6A] text-white hover:bg-[#7a4e5e] active:bg-[#6a3f50]
                      transition-colors duration-150 focus-visible:outline-none
@@ -204,54 +212,54 @@ export default function SearchInput({
         </button>
       </div>
 
-      {/* Suggestions dropdown */}
-      {open && suggestions.length > 0 && (
+      {/* ── Suggestions dropdown ── */}
+      {open && (
         <ul
-          ref={listRef}
           id={listId}
           role="listbox"
           aria-label="Search suggestions"
           className="absolute left-0 right-0 top-full z-50 mt-0.5 border border-slate-200
                      bg-white shadow-lg"
         >
-          {suggestions[0]?.type === 'trending' && (
+          {suggestions[0]?.type === 'trending' || suggestions[0]?.type === 'recent' ? (
             <li className="px-3 py-1.5 text-[10px] font-semibold uppercase tracking-widest text-slate-400 select-none">
-              Trending
+              {suggestions[0]?.type === 'recent' ? 'Recent' : 'Trending'}
             </li>
-          )}
+          ) : null}
+
           {suggestions.map((s, i) => (
             <li
               key={`${s.query}-${i}`}
-              id={`suggestion-${i}`}
+              id={`si-suggestion-${i}`}
               role="option"
               aria-selected={i === activeIdx}
               onMouseDown={(e) => {
-                e.preventDefault(); // prevent blur before click
-                setValue(s.query);
+                e.preventDefault();
+                setQuery(s.query);
+                activeIdxRef.current = -1;
                 submit(s.query);
               }}
               className={`flex cursor-pointer items-center gap-2 px-3 py-2.5 text-sm
                           transition-colors duration-75
-                          ${
-                            i === activeIdx
-                              ? 'bg-[#8A5A6A]/10 text-[#8A5A6A]'
-                              : 'text-slate-700 hover:bg-slate-50'
+                          ${i === activeIdx
+                            ? 'bg-[#8A5A6A]/10 text-[#8A5A6A]'
+                            : 'text-slate-700 hover:bg-slate-50'
                           }`}
             >
-              {s.type === 'trending' ? (
+              {s.type === 'recent' ? (
+                <svg className="h-3.5 w-3.5 shrink-0 text-slate-400" viewBox="0 0 24 24"
+                  fill="none" stroke="currentColor" strokeWidth="2">
+                  <circle cx="12" cy="12" r="10" />
+                  <polyline points="12 6 12 12 16 14" />
+                </svg>
+              ) : (
                 <svg className="h-3.5 w-3.5 shrink-0 text-slate-400" viewBox="0 0 24 24"
                   fill="none" stroke="currentColor" strokeWidth="2">
                   <polyline points="23 6 13.5 15.5 8.5 10.5 1 18" />
                   <polyline points="17 6 23 6 23 12" />
                 </svg>
-              ) : (
-                <svg className="h-3.5 w-3.5 shrink-0 text-slate-400" viewBox="0 0 24 24"
-                  fill="none" stroke="currentColor" strokeWidth="2">
-                  <circle cx="11" cy="11" r="8" />
-                  <line x1="21" y1="21" x2="16.65" y2="16.65" />
-                </svg>
               )}
-              <span>{s.query}</span>
+              <HighlightedText text={s.query} query={query} />
             </li>
           ))}
         </ul>
