@@ -23,6 +23,8 @@ export default function ProductActions({ product, quantity, selectedVariant }: P
   const [addedToCart, setAddedToCart] = useState(false);
   const [cartDrawerOpen, setCartDrawerOpen] = useState(false);
   const [shareCopied, setShareCopied] = useState(false);
+  const [sizeWarningShake, setSizeWarningShake] = useState(false);
+
   const inWishlist = isInWishlist(product.id);
   const isOutOfStock = !product.stock || product.stock === 0;
 
@@ -32,7 +34,14 @@ export default function ProductActions({ product, quantity, selectedVariant }: P
     selectedVariant === null;
 
   const handleAddToCart = () => {
-    if (isOutOfStock || requiresSizeSelection) return;
+    if (isOutOfStock) return;
+    if (requiresSizeSelection) {
+      // Trigger shake animation to draw attention to the warning
+      setSizeWarningShake(false);
+      requestAnimationFrame(() => setSizeWarningShake(true));
+      setTimeout(() => setSizeWarningShake(false), 400);
+      return;
+    }
     addToCart({ product, quantity, variant: selectedVariant });
     setAddedToCart(true);
     setCartDrawerOpen(true);
@@ -40,7 +49,13 @@ export default function ProductActions({ product, quantity, selectedVariant }: P
   };
 
   const handleBuyNow = () => {
-    if (isOutOfStock || requiresSizeSelection) return;
+    if (isOutOfStock) return;
+    if (requiresSizeSelection) {
+      setSizeWarningShake(false);
+      requestAnimationFrame(() => setSizeWarningShake(true));
+      setTimeout(() => setSizeWarningShake(false), 400);
+      return;
+    }
     addToCart({ product, quantity, variant: selectedVariant });
     router.push('/checkout');
   };
@@ -61,15 +76,28 @@ export default function ProductActions({ product, quantity, selectedVariant }: P
     }
   };
 
+  const hasDiscount = product.oldPrice && product.oldPrice > product.price;
+
   return (
     <>
       <CartDrawer open={cartDrawerOpen} onClose={() => setCartDrawerOpen(false)} />
 
       <div className="flex flex-col gap-3">
-        {/* Size selection required notice */}
+        {/* Size selection required notice — shakes on invalid attempt */}
         {requiresSizeSelection && (
-          <p role="alert" className="text-xs font-medium tracking-wide text-red-500">
-            Please select a size.
+          <p
+            role="alert"
+            className={[
+              'text-xs font-medium tracking-wide text-red-500 transition-all',
+              sizeWarningShake
+                ? '[animation:shake_0.35s_ease-in-out]'
+                : '',
+            ].join(' ')}
+            style={sizeWarningShake ? {
+              animation: 'shake 0.35s ease-in-out',
+            } : {}}
+          >
+            Please select a size to continue.
           </p>
         )}
 
@@ -78,30 +106,24 @@ export default function ProductActions({ product, quantity, selectedVariant }: P
           <NotifyMe productId={product.id} productName={product.name} />
         ) : (
           <>
-            {/* Primary CTAs */}
+            {/*
+             * Primary CTAs
+             * Hierarchy: Buy Now (filled rose) > Add to Cart (outlined) > Wishlist > Share
+             * Rationale: luxury fashion sites drive direct purchase; Add to Cart is
+             * a fallback for comparison shoppers, Buy Now is the conversion action.
+             */}
             <div className="flex gap-3">
+              {/* Buy Now — PRIMARY (filled, high visual weight) */}
               <button
-                onClick={handleAddToCart}
-                disabled={requiresSizeSelection}
-                aria-label={requiresSizeSelection ? 'Select a size first' : 'Add to cart'}
+                onClick={handleBuyNow}
+                aria-label={requiresSizeSelection ? 'Select a size first' : 'Buy now'}
                 className={`flex-1 h-12 text-sm tracking-[0.12em] uppercase font-medium transition-all duration-200 rounded-sm ${
                   requiresSizeSelection
                     ? 'bg-slate-100 text-slate-400 cursor-not-allowed'
-                    : addedToCart
-                    ? 'bg-green-700 text-white'
-                    : 'bg-slate-900 text-white hover:bg-[#8A5A6A]'
+                    : 'bg-[#8A5A6A] text-white hover:bg-[#6e3f50]'
                 }`}
               >
-                {addedToCart ? (
-                  <span className="flex items-center justify-center gap-2">
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-                    </svg>
-                    Added
-                  </span>
-                ) : (
-                  'Add to Cart'
-                )}
+                Buy Now
               </button>
 
               <button
@@ -140,17 +162,28 @@ export default function ProductActions({ product, quantity, selectedVariant }: P
               </button>
             </div>
 
-            {/* Buy Now */}
+            {/* Add to Cart — SECONDARY (outlined) */}
             <button
-              onClick={handleBuyNow}
-              disabled={requiresSizeSelection}
+              onClick={handleAddToCart}
+              aria-label={requiresSizeSelection ? 'Select a size first' : 'Add to cart'}
               className={`w-full h-12 text-sm tracking-[0.12em] uppercase font-medium border rounded-sm transition-all duration-200 ${
                 requiresSizeSelection
                   ? 'border-slate-200 text-slate-400 cursor-not-allowed'
+                  : addedToCart
+                  ? 'border-green-700 text-green-700 bg-green-50'
                   : 'border-slate-900 text-slate-900 hover:bg-slate-900 hover:text-white'
               }`}
             >
-              Buy Now
+              {addedToCart ? (
+                <span className="flex items-center justify-center gap-2">
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                  </svg>
+                  Added to Cart
+                </span>
+              ) : (
+                'Add to Cart'
+              )}
             </button>
           </>
         )}
@@ -169,14 +202,31 @@ export default function ProductActions({ product, quantity, selectedVariant }: P
           Enquire on WhatsApp
         </a>
 
-        {/* Sticky mobile CTA — only shown when product is in stock */}
+        {/*
+         * Sticky mobile bottom bar
+         * Now includes price on the left so customers see the price
+         * before tapping a CTA without needing to scroll.
+         */}
         {!isOutOfStock && (
-          <div className="fixed bottom-0 left-0 right-0 z-40 p-4 bg-white border-t border-slate-200 lg:hidden">
-            <div className="flex gap-3 max-w-lg mx-auto">
+          <div className="fixed bottom-0 left-0 right-0 z-40 bg-white border-t border-slate-200 lg:hidden">
+            <div className="flex items-center gap-3 max-w-lg mx-auto px-4 py-3">
+              {/* Price column */}
+              <div className="flex flex-col min-w-0">
+                <span className="text-base font-medium text-slate-900 leading-tight">
+                  ₹{product.price.toLocaleString('en-IN')}
+                </span>
+                {hasDiscount && (
+                  <span className="text-[10px] text-slate-400 line-through leading-tight">
+                    ₹{product.oldPrice!.toLocaleString('en-IN')}
+                  </span>
+                )}
+              </div>
+
+              {/* Wishlist */}
               <button
                 onClick={() => toggleWishlist(product.id)}
                 aria-label="Wishlist"
-                className={`h-12 w-12 flex items-center justify-center border rounded-sm flex-shrink-0 ${
+                className={`h-11 w-11 flex items-center justify-center border rounded-sm flex-shrink-0 ${
                   inWishlist ? 'border-[#8A5A6A] text-[#8A5A6A]' : 'border-slate-200 text-slate-500'
                 }`}
               >
@@ -184,27 +234,24 @@ export default function ProductActions({ product, quantity, selectedVariant }: P
                   <path strokeLinecap="round" strokeLinejoin="round" d="M21 8.25c0-2.485-2.099-4.5-4.688-4.5-1.935 0-3.597 1.126-4.312 2.733-.715-1.607-2.377-2.733-4.313-2.733C5.1 3.75 3 5.765 3 8.25c0 7.22 9 12 9 12s9-4.78 9-12z" />
                 </svg>
               </button>
+
+              {/* Add to Cart — secondary in sticky bar */}
               <button
                 onClick={handleAddToCart}
-                disabled={requiresSizeSelection}
-                className={`flex-1 h-12 text-sm tracking-[0.12em] uppercase font-medium rounded-sm transition-all duration-200 ${
-                  requiresSizeSelection
-                    ? 'bg-slate-100 text-slate-400 cursor-not-allowed'
-                    : addedToCart
-                    ? 'bg-green-700 text-white'
-                    : 'bg-slate-900 text-white'
+                disabled={false}
+                className={`flex-1 h-11 text-sm tracking-[0.1em] uppercase font-medium rounded-sm transition-all duration-200 border ${
+                  addedToCart
+                    ? 'border-green-700 text-green-700 bg-green-50'
+                    : 'border-slate-900 text-slate-900'
                 }`}
               >
                 {addedToCart ? 'Added ✓' : 'Add to Cart'}
               </button>
+
+              {/* Buy Now — primary in sticky bar */}
               <button
                 onClick={handleBuyNow}
-                disabled={requiresSizeSelection}
-                className={`flex-1 h-12 text-sm tracking-[0.12em] uppercase font-medium rounded-sm transition-all duration-200 ${
-                  requiresSizeSelection
-                    ? 'bg-slate-300 text-slate-400 cursor-not-allowed'
-                    : 'bg-[#8A5A6A] text-white'
-                }`}
+                className="flex-1 h-11 text-sm tracking-[0.1em] uppercase font-medium rounded-sm transition-all duration-200 bg-[#8A5A6A] text-white hover:bg-[#6e3f50]"
               >
                 Buy Now
               </button>
@@ -212,6 +259,17 @@ export default function ProductActions({ product, quantity, selectedVariant }: P
           </div>
         )}
       </div>
+
+      {/* Shake keyframe injected inline so no global CSS file is needed */}
+      <style>{`
+        @keyframes shake {
+          0%, 100% { transform: translateX(0); }
+          20%       { transform: translateX(-4px); }
+          40%       { transform: translateX(4px); }
+          60%       { transform: translateX(-3px); }
+          80%       { transform: translateX(3px); }
+        }
+      `}</style>
     </>
   );
 }
