@@ -4,24 +4,21 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
 
-interface RecentItem {
-  id: number;
-  name: string;
-  price: number;
-  image: string;
-  category?: string;
-}
+import { getRecentlyViewed } from '@/lib/recentlyViewed';
+import type { RecentItem } from '@/lib/recentlyViewed';
 
+/**
+ * RecentlyViewed
+ *
+ * Reads the recently-viewed list via getRecentlyViewed() exclusively.
+ * No direct sessionStorage access in this component.
+ * Displays at most 6 items (display cap, storage cap is 20).
+ */
 export default function RecentlyViewed() {
   const [items, setItems] = useState<RecentItem[]>([]);
 
   useEffect(() => {
-    try {
-      const raw = sessionStorage.getItem('recently_viewed');
-      if (raw) setItems(JSON.parse(raw).slice(0, 6));
-    } catch {
-      // sessionStorage unavailable or invalid JSON — silent fail
-    }
+    setItems(getRecentlyViewed().slice(0, 6));
   }, []);
 
   if (items.length === 0) return null;
