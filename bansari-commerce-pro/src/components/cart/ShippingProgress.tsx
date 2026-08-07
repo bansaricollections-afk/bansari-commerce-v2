@@ -1,19 +1,23 @@
 "use client";
 
+import {
+  SHIPPING_THRESHOLD,
+  getRemainingForFreeShipping,
+} from "@/lib/shipping";
+
 type Props = {
   totalAmount: number;
 };
 
-const FREE_SHIPPING_THRESHOLD = 2999;
-
 /**
  * ShippingProgress — shows how close the cart is to free shipping.
  * Fully client-side, no API calls.
+ * Threshold sourced from src/lib/shipping.ts (single source of truth).
  */
 export default function ShippingProgress({ totalAmount }: Props) {
-  const remaining = Math.max(0, FREE_SHIPPING_THRESHOLD - totalAmount);
-  const percent = Math.min(100, (totalAmount / FREE_SHIPPING_THRESHOLD) * 100);
-  const achieved = totalAmount >= FREE_SHIPPING_THRESHOLD;
+  const remaining = getRemainingForFreeShipping(totalAmount);
+  const percent = Math.min(100, (totalAmount / SHIPPING_THRESHOLD) * 100);
+  const achieved = remaining === 0;
 
   return (
     <div
