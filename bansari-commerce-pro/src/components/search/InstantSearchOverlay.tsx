@@ -1,9 +1,12 @@
 'use client';
-// ─── Sprint 1 — InstantSearchOverlay ────────────────────────────────────────
-// Full-screen search overlay for HeaderSearchInput.
-// Features: instant results, autocomplete, recent searches, trending,
-//           highlighted matched text, keyboard navigation, empty/no-result states.
-// Reuses useSearch hook — does NOT duplicate fetch logic.
+// ─── Sprint 4 Batch 2 — InstantSearchOverlay (idle suggestions enriched) ─────
+// Extends the idle-state panel with structured quick-link rows:
+//   • Popular categories
+//   • Popular collections
+//   • Popular fabrics
+//   • Popular occasions
+// Static config only — no new services, no new APIs, no duplicate logic.
+// Desktop top-panel and active-query layout are UNCHANGED.
 import { useEffect, useRef, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
@@ -15,6 +18,39 @@ interface Props {
   onClose: () => void;
 }
 
+// ── Static idle discovery config ──────────────────────────────────────────────
+const POPULAR_CATEGORIES = [
+  { label: 'Kurta Sets',      param: 'category', value: 'kurta-sets' },
+  { label: 'Sarees',          param: 'category', value: 'sarees' },
+  { label: 'Lehengas',        param: 'category', value: 'lehengas' },
+  { label: 'Dress Materials', param: 'category', value: 'dress-materials' },
+  { label: 'Co-ord Sets',     param: 'category', value: 'coord-sets' },
+];
+
+const POPULAR_COLLECTIONS = [
+  { label: 'Navratri Edit',   param: 'collection', value: 'navratri-edit' },
+  { label: 'Wedding Season',  param: 'collection', value: 'wedding-season' },
+  { label: 'Everyday Luxe',   param: 'collection', value: 'everyday-luxe' },
+  { label: 'Festive Hues',    param: 'collection', value: 'festive-hues' },
+];
+
+const POPULAR_FABRICS = [
+  { label: 'Pure Silk',   param: 'fabric', value: 'pure-silk' },
+  { label: 'Chanderi',    param: 'fabric', value: 'chanderi' },
+  { label: 'Georgette',   param: 'fabric', value: 'georgette' },
+  { label: 'Cotton',      param: 'fabric', value: 'cotton' },
+  { label: 'Kota Doria',  param: 'fabric', value: 'kota-doria' },
+];
+
+const POPULAR_OCCASIONS = [
+  { label: 'Festive',  param: 'occasion', value: 'festive' },
+  { label: 'Wedding',  param: 'occasion', value: 'wedding' },
+  { label: 'Casual',   param: 'occasion', value: 'casual' },
+  { label: 'Office',   param: 'occasion', value: 'office' },
+  { label: 'Party',    param: 'occasion', value: 'party' },
+];
+
+// ── Helpers ────────────────────────────────────────────────────────────────
 function formatPrice(p: number) {
   return new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(p);
 }
@@ -88,6 +124,37 @@ function ProductCard({ product, query, onClick }: { product: SearchProduct; quer
   );
 }
 
+// ── Pill row helper (reused for all 4 quick-link groups) ─────────────────────
+function PillRow({
+  label,
+  items,
+  onNavigate,
+}: {
+  label: string;
+  items: { label: string; param: string; value: string }[];
+  onNavigate: (url: string) => void;
+}) {
+  return (
+    <div className="px-4 pb-3 sm:px-6">
+      <p className="mb-1.5 text-[10px] font-semibold uppercase tracking-widest text-slate-400">{label}</p>
+      <div className="flex flex-wrap gap-1.5">
+        {items.map((item) => (
+          <button
+            key={item.value}
+            type="button"
+            onClick={() => onNavigate(`/search?q=${encodeURIComponent(item.label)}&${item.param}=${encodeURIComponent(item.value)}`)}
+            className="rounded-full border border-slate-200 px-3 py-1 text-xs text-slate-600
+                       transition-colors hover:border-[#8A5A6A] hover:text-[#8A5A6A]
+                       focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#8A5A6A]/40"
+          >
+            {item.label}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 export default function InstantSearchOverlay({ open, onClose }: Props) {
   const router = useRouter();
   const inputRef = useRef<HTMLInputElement>(null);
@@ -103,7 +170,6 @@ export default function InstantSearchOverlay({ open, onClose }: Props) {
     removeRecent,
   } = useSearch({ debounceMs: 250, instantResultsCount: 6 });
 
-  // Focus input when overlay opens
   useEffect(() => {
     if (open) {
       setTimeout(() => inputRef.current?.focus(), 50);
@@ -111,7 +177,6 @@ export default function InstantSearchOverlay({ open, onClose }: Props) {
     }
   }, [open, openIdle]);
 
-  // Lock body scroll
   useEffect(() => {
     if (open) {
       document.body.style.overflow = 'hidden';
@@ -121,7 +186,6 @@ export default function InstantSearchOverlay({ open, onClose }: Props) {
     return () => { document.body.style.overflow = ''; };
   }, [open]);
 
-  // Escape key closes
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
       if (e.key === 'Escape') onClose();
@@ -136,9 +200,18 @@ export default function InstantSearchOverlay({ open, onClose }: Props) {
       if (!trimmed) return;
       recordSearch(trimmed);
       onClose();
-      router.push(`/search?q=${encodeURIComponent(trimmed)}`);
+      router.push(q.startsWith('/') ? q : `/search?q=${encodeURIComponent(trimmed)}`);
     },
     [router, onClose, recordSearch],
+  );
+
+  // navigate() for PillRow passes a full URL directly
+  const navigateUrl = useCallback(
+    (url: string) => {
+      onClose();
+      router.push(url);
+    },
+    [router, onClose],
   );
 
   const handleKeyDown = useCallback(
@@ -150,11 +223,11 @@ export default function InstantSearchOverlay({ open, onClose }: Props) {
 
   if (!open) return null;
 
-  const hasQuery = query.trim().length >= 1;
+  const hasQuery   = query.trim().length >= 1;
   const hasResults = (instantResults?.products?.length ?? 0) > 0;
-  const hasRecent = recent.length > 0;
+  const hasRecent  = recent.length > 0;
   const trendingSugg = suggestions.filter((s) => s.type === 'trending' || s.type === 'popular');
-  const recentSugg = suggestions.filter((s) => s.type === 'recent');
+  const recentSugg   = suggestions.filter((s) => s.type === 'recent');
   const showNoResult = hasQuery && !loading && !hasResults;
 
   return (
@@ -166,14 +239,14 @@ export default function InstantSearchOverlay({ open, onClose }: Props) {
         aria-hidden="true"
       />
 
-      {/* Panel */}
+      {/* ── Panel (desktop top, mobile hidden — bottom sheet added in Batch 4) ── */}
       <div
         role="dialog"
         aria-modal="true"
         aria-label="Search"
         className="fixed left-0 right-0 top-0 z-50 flex max-h-[90dvh] flex-col bg-white shadow-2xl"
       >
-        {/* ── Input bar ── */}
+        {/* Input bar */}
         <div className="flex items-center gap-3 border-b border-slate-100 px-4 py-3 sm:px-6">
           <svg className="h-5 w-5 shrink-0 text-slate-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
             <circle cx="11" cy="11" r="8" />
@@ -219,94 +292,102 @@ export default function InstantSearchOverlay({ open, onClose }: Props) {
           </button>
         </div>
 
-        {/* ── Content area ── */}
+        {/* Content area */}
         <div className="flex-1 overflow-y-auto">
 
-          {/* ── Idle state: recent + trending ── */}
+          {/* ── IDLE STATE ── */}
           {!hasQuery && (
-            <div className="grid gap-0 sm:grid-cols-2">
-              {/* Recent searches */}
-              {hasRecent && (
-                <div className="px-4 py-4 sm:px-6">
-                  <div className="mb-2 flex items-center justify-between">
-                    <p className="text-[11px] font-semibold uppercase tracking-widest text-slate-400">Recent</p>
-                    <button
-                      type="button"
-                      onClick={() => { import('@/hooks/useSearch').then(m => m.clearRecent()); openIdle(); }}
-                      className="text-[11px] text-slate-400 underline-offset-2 hover:text-[#8A5A6A] hover:underline"
-                    >
-                      Clear all
-                    </button>
+            <>
+              <div className="grid gap-0 sm:grid-cols-2">
+                {/* Recent searches */}
+                {hasRecent && (
+                  <div className="px-4 py-4 sm:px-6">
+                    <div className="mb-2 flex items-center justify-between">
+                      <p className="text-[11px] font-semibold uppercase tracking-widest text-slate-400">Recent</p>
+                      <button
+                        type="button"
+                        onClick={() => { import('@/hooks/useSearch').then(m => m.clearRecent()); openIdle(); }}
+                        className="text-[11px] text-slate-400 underline-offset-2 hover:text-[#8A5A6A] hover:underline"
+                      >
+                        Clear all
+                      </button>
+                    </div>
+                    <ul className="space-y-0.5">
+                      {recentSugg.map((s) => (
+                        <li key={s.query} className="flex items-center gap-2">
+                          <button
+                            type="button"
+                            onClick={() => navigate(s.query)}
+                            className="flex flex-1 items-center gap-2.5 rounded-sm px-2 py-2 text-left text-sm text-slate-700 hover:bg-slate-50"
+                          >
+                            <svg className="h-3.5 w-3.5 shrink-0 text-slate-300" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                              <circle cx="12" cy="12" r="10" />
+                              <polyline points="12 6 12 12 16 14" />
+                            </svg>
+                            {s.query}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => removeRecent(s.query)}
+                            aria-label={`Remove ${s.query}`}
+                            className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-slate-300 hover:bg-slate-100 hover:text-slate-500"
+                          >
+                            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                              <line x1="18" y1="6" x2="6" y2="18" />
+                              <line x1="6" y1="6" x2="18" y2="18" />
+                            </svg>
+                          </button>
+                        </li>
+                      ))}
+                    </ul>
                   </div>
-                  <ul className="space-y-0.5">
-                    {recentSugg.map((s) => (
-                      <li key={s.query} className="flex items-center gap-2">
-                        <button
-                          type="button"
-                          onClick={() => navigate(s.query)}
-                          className="flex flex-1 items-center gap-2.5 rounded-sm px-2 py-2 text-left text-sm text-slate-700 hover:bg-slate-50"
-                        >
-                          <svg className="h-3.5 w-3.5 shrink-0 text-slate-300" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                            <circle cx="12" cy="12" r="10" />
-                            <polyline points="12 6 12 12 16 14" />
-                          </svg>
-                          {s.query}
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => removeRecent(s.query)}
-                          aria-label={`Remove ${s.query}`}
-                          className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-slate-300 hover:bg-slate-100 hover:text-slate-500"
-                        >
-                          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-                            <line x1="18" y1="6" x2="6" y2="18" />
-                            <line x1="6" y1="6" x2="18" y2="18" />
-                          </svg>
-                        </button>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              )}
+                )}
 
-              {/* Trending */}
-              {trendingSugg.length > 0 && (
-                <div className="px-4 py-4 sm:px-6">
-                  <p className="mb-2 text-[11px] font-semibold uppercase tracking-widest text-slate-400">Trending</p>
-                  <ul className="space-y-0.5">
-                    {trendingSugg.map((s) => (
-                      <li key={s.query}>
-                        <button
-                          type="button"
-                          onClick={() => navigate(s.query)}
-                          className="flex w-full items-center gap-2.5 rounded-sm px-2 py-2 text-left text-sm text-slate-700 hover:bg-slate-50"
-                        >
-                          <svg className="h-3.5 w-3.5 shrink-0 text-slate-300" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                            <polyline points="23 6 13.5 15.5 8.5 10.5 1 18" />
-                            <polyline points="17 6 23 6 23 12" />
-                          </svg>
-                          {s.query}
-                        </button>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              )}
+                {/* Trending */}
+                {trendingSugg.length > 0 && (
+                  <div className="px-4 py-4 sm:px-6">
+                    <p className="mb-2 text-[11px] font-semibold uppercase tracking-widest text-slate-400">Trending</p>
+                    <ul className="space-y-0.5">
+                      {trendingSugg.map((s) => (
+                        <li key={s.query}>
+                          <button
+                            type="button"
+                            onClick={() => navigate(s.query)}
+                            className="flex w-full items-center gap-2.5 rounded-sm px-2 py-2 text-left text-sm text-slate-700 hover:bg-slate-50"
+                          >
+                            <svg className="h-3.5 w-3.5 shrink-0 text-slate-300" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                              <polyline points="23 6 13.5 15.5 8.5 10.5 1 18" />
+                              <polyline points="17 6 23 6 23 12" />
+                            </svg>
+                            {s.query}
+                          </button>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
 
-              {/* Empty idle state */}
-              {!hasRecent && trendingSugg.length === 0 && (
-                <div className="col-span-2 px-6 py-12 text-center">
-                  <p className="text-sm text-slate-400">Start typing to search our collection</p>
-                  <p className="mt-1 text-xs text-slate-300">Kurtas · Sarees · Lehengas · Dress Materials</p>
-                </div>
-              )}
-            </div>
+                {!hasRecent && trendingSugg.length === 0 && (
+                  <div className="col-span-2 px-6 py-8 text-center">
+                    <p className="text-sm text-slate-400">Start typing to search our collection</p>
+                    <p className="mt-1 text-xs text-slate-300">Kurtas · Sarees · Lehengas · Dress Materials</p>
+                  </div>
+                )}
+              </div>
+
+              {/* ── NEW: Discovery quick-links ── */}
+              <div className="border-t border-slate-100 pt-4">
+                <PillRow label="Shop by Category"    items={POPULAR_CATEGORIES}  onNavigate={navigateUrl} />
+                <PillRow label="Featured Collections" items={POPULAR_COLLECTIONS} onNavigate={navigateUrl} />
+                <PillRow label="By Fabric"            items={POPULAR_FABRICS}     onNavigate={navigateUrl} />
+                <PillRow label="By Occasion"          items={POPULAR_OCCASIONS}   onNavigate={navigateUrl} />
+              </div>
+            </>
           )}
 
-          {/* ── Active query: suggestions + instant results ── */}
+          {/* ── ACTIVE QUERY STATE (unchanged from Sprint 1) ── */}
           {hasQuery && (
             <div className="grid gap-0 sm:grid-cols-[1fr_2fr]">
-              {/* Left: query suggestions */}
               {suggestions.length > 0 && (
                 <div className="border-b border-slate-100 px-4 py-4 sm:border-b-0 sm:border-r sm:px-6">
                   <p className="mb-2 text-[11px] font-semibold uppercase tracking-widest text-slate-400">Suggestions</p>
@@ -341,7 +422,6 @@ export default function InstantSearchOverlay({ open, onClose }: Props) {
                 </div>
               )}
 
-              {/* Right: instant product results */}
               <div className="px-4 py-4 sm:px-6">
                 {loading && (
                   <div className="space-y-3">
@@ -359,9 +439,7 @@ export default function InstantSearchOverlay({ open, onClose }: Props) {
 
                 {!loading && hasResults && (
                   <>
-                    <p className="mb-2 text-[11px] font-semibold uppercase tracking-widest text-slate-400">
-                      Products
-                    </p>
+                    <p className="mb-2 text-[11px] font-semibold uppercase tracking-widest text-slate-400">Products</p>
                     <ul className="space-y-0.5">
                       {instantResults!.products.map((p) => (
                         <li key={p.id}>
@@ -385,7 +463,6 @@ export default function InstantSearchOverlay({ open, onClose }: Props) {
                   </>
                 )}
 
-                {/* No results */}
                 {showNoResult && (
                   <div className="py-8 text-center">
                     <p className="text-sm font-medium text-slate-700">No results for &ldquo;{query}&rdquo;</p>
@@ -409,7 +486,7 @@ export default function InstantSearchOverlay({ open, onClose }: Props) {
           )}
         </div>
 
-        {/* ── Footer: keyboard hint ── */}
+        {/* Footer: keyboard hint */}
         <div className="hidden items-center justify-end gap-4 border-t border-slate-100 px-6 py-2 text-[11px] text-slate-400 sm:flex">
           <span><kbd className="rounded border border-slate-200 bg-slate-50 px-1.5 py-0.5 font-mono text-[10px]">↵</kbd> to search</span>
           <span><kbd className="rounded border border-slate-200 bg-slate-50 px-1.5 py-0.5 font-mono text-[10px]">Esc</kbd> to close</span>
