@@ -161,7 +161,7 @@ export default async function SearchPage({
                 )}
 
                 {/* ── Suspense boundary: skeleton while grid streams in ── */}
-                <Suspense fallback={<ProductGridSkeleton count={24} />}>
+                <Suspense fallback={<ProductGridSkeleton />}>
                   {products.length > 0 ? (
                     <SearchResultsGrid products={products} query={rawQuery} />
                   ) : (
