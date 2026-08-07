@@ -8,7 +8,7 @@ import { ArrowLeft } from "lucide-react";
 import RazorpayButton from "@/components/checkout/RazorpayButton";
 import CheckoutTrustStrip from "@/components/checkout/CheckoutTrustStrip";
 import LuxuryStepIndicator from "@/components/checkout/LuxuryStepIndicator";
-import { useCart } from "@/store/cart";
+import { useCart, useCartHasHydrated } from "@/store/cart";
 
 // ---------------------------------------------------------------------------
 // Validation helpers
@@ -49,11 +49,62 @@ function validate(fields: Fields): Partial<Record<keyof Fields, string>> {
 }
 
 // ---------------------------------------------------------------------------
+// CheckoutSkeleton
+// Renders while Zustand persist is rehydrating from localStorage.
+// Matches the visual weight of the real checkout grid to avoid layout shift.
+// ---------------------------------------------------------------------------
+
+function CheckoutSkeleton() {
+  return (
+    <div
+      className="mt-8 grid gap-12 lg:grid-cols-[2fr_1fr]"
+      aria-label="Loading checkout"
+      aria-busy="true"
+    >
+      {/* Left column skeleton */}
+      <div className="space-y-8">
+        {[1, 2, 3].map((n) => (
+          <div key={n} className="rounded-3xl bg-white p-8 shadow-sm">
+            <div className="mb-6 h-7 w-48 animate-pulse rounded-lg bg-slate-100" />
+            <div className="grid gap-5">
+              {[1, 2, 3].map((r) => (
+                <div key={r} className="flex flex-col gap-1.5">
+                  <div className="h-3 w-24 animate-pulse rounded bg-slate-100" />
+                  <div className="h-12 w-full animate-pulse rounded-xl bg-slate-100" />
+                </div>
+              ))}
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* Right column skeleton */}
+      <div className="sticky top-24 h-fit rounded-3xl bg-white p-8 shadow-sm">
+        <div className="mb-8 h-8 w-40 animate-pulse rounded-lg bg-slate-100" />
+        <div className="space-y-4">
+          {[1, 2, 3].map((r) => (
+            <div key={r} className="flex justify-between">
+              <div className="h-4 w-32 animate-pulse rounded bg-slate-100" />
+              <div className="h-4 w-16 animate-pulse rounded bg-slate-100" />
+            </div>
+          ))}
+        </div>
+        <div className="mt-10 h-14 w-full animate-pulse rounded-full bg-slate-100" />
+      </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
 // Component
 // ---------------------------------------------------------------------------
 
 export default function CheckoutPage() {
   const { items, totalPrice } = useCart();
+  // hasHydrated is false on the server and during the initial client paint.
+  // It becomes true once Zustand's onRehydrateStorage callback fires, meaning
+  // localStorage has been read and items reflects the real persisted state.
+  const hasHydrated = useCartHasHydrated();
 
   const subtotal = totalPrice();
   const shipping = subtotal >= 2999 ? 0 : 99;
@@ -86,8 +137,6 @@ export default function CheckoutPage() {
       setTouched((prev) => ({ ...prev, [key]: true }));
   }
 
-  // Called on every pay-button click — marks all fields touched so inline
-  // errors become visible even if the user never blurred individual inputs.
   const handlePayAttempt = useCallback(() => {
     if (isValid) return;
     const allTouched = Object.fromEntries(
@@ -175,7 +224,17 @@ export default function CheckoutPage() {
 
           <LuxuryStepIndicator currentStep={1} />
 
-          {items.length === 0 ? (
+          {/*
+            Hydration gate:
+            - !hasHydrated  → Zustand persist hasn't read localStorage yet.
+                              Render skeleton. Both SSR and initial client
+                              paint agree on this branch → zero mismatch.
+            - hasHydrated && items.length === 0 → cart is genuinely empty.
+            - hasHydrated && items.length > 0   → render full checkout grid.
+          */}
+          {!hasHydrated ? (
+            <CheckoutSkeleton />
+          ) : items.length === 0 ? (
             <div className="mt-16 flex flex-col items-center gap-4 text-center">
               <p className="text-lg text-slate-500">Your cart is empty.</p>
               <Link
@@ -283,13 +342,6 @@ export default function CheckoutPage() {
                   </div>
                 </div>
 
-                {/*
-                  Wrap RazorpayButton in a click-interceptor div.
-                  handlePayAttempt runs first (marks all fields touched,
-                  focuses first invalid input). RazorpayButton's own
-                  onClick fires next but is gated by disabled={!isValid},
-                  so payment only proceeds when the form is fully valid.
-                */}
                 <div onClick={handlePayAttempt}>
                   <RazorpayButton
                     customer={{
