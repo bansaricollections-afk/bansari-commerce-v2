@@ -40,22 +40,31 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     title: `${ogTitle} | Bansari Collections`,
     description: ogDescription,
     alternates: { canonical: canonicalUrl },
+
     openGraph: {
+      // Only fields that exist on OpenGraphWebsite / OpenGraphMetadata.
+      // og:type='product' is not in Next.js's union; 'website' is the
+      // closest valid value. The actual og:type=product meta tag is
+      // emitted via top-level Metadata.other below.
       title: ogTitle,
       description: ogDescription,
       url: canonicalUrl,
-      // Batch 5: og:type=product (was undefined / defaulting to 'website')
-      type: 'website', // Next.js Metadata only accepts 'website'|'article'|... for type;
-      // og:type product requires openGraph.other
+      siteName: 'Bansari Collections',
+      locale: 'en_IN',
+      type: 'website',
       images: ogImage,
-      other: {
-        'og:type': 'product',
-        'og:availability': inStock ? 'instock' : 'oos',
-        'og:price:amount': String(product.price),
-        'og:price:currency': 'INR',
-      },
     },
-    // Batch 5: Twitter Card
+
+    // Metadata.other is the officially supported escape hatch for arbitrary
+    // <meta property="..."> tags not expressible through the structured API.
+    // These override the og:type Next.js would otherwise emit from openGraph.
+    other: {
+      'og:type': 'product',
+      'product:availability': inStock ? 'in stock' : 'out of stock',
+      'product:price:amount': String(product.price),
+      'product:price:currency': 'INR',
+    },
+
     twitter: {
       card: 'summary_large_image',
       title: ogTitle,
@@ -108,9 +117,7 @@ export default async function ProductPage({ params }: Props) {
     ],
   };
 
-  // ── Batch 5: FAQ JSON-LD ─────────────────────────────────────────────────
-  // Static entries apply to every product; careInstructions entry is
-  // prepended only when the field exists on the product's specifications.
+  // ── FAQ JSON-LD (unchanged) ──────────────────────────────────────────────
   const staticFaqs = [
     {
       '@type': 'Question',
@@ -172,15 +179,12 @@ export default async function ProductPage({ params }: Props) {
       {/* mobile sticky bottom bar offset */}
       <div className="pb-[76px] lg:pb-0">
         <main className="min-h-screen bg-[#FFFDF9]">
-          {/* Batch 5: FAQ JSON-LD (new, before existing scripts) */}
+          {/* JSON-LD blocks — unchanged */}
           <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(faqSchema) }} />
-          {/* Existing JSON-LD blocks — unchanged */}
           <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(productSchema) }} />
           <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbSchema) }} />
 
-          {/* ═══════════════════════════════════════════════════════
-              HERO: GALLERY + PURCHASE PANEL
-          ═══════════════════════════════════════════════════════ */}
+          {/* HERO: GALLERY + PURCHASE PANEL */}
           <section className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 pt-8 pb-16">
             <div className="grid gap-8 lg:gap-16 lg:grid-cols-[55%_45%]">
               <ProductGallery product={product} />
@@ -188,9 +192,7 @@ export default async function ProductPage({ params }: Props) {
             </div>
           </section>
 
-          {/* ═══════════════════════════════════════════════════════
-              PRODUCT DESCRIPTION — always visible, prominent
-          ═══════════════════════════════════════════════════════ */}
+          {/* PRODUCT DESCRIPTION */}
           {product.description && (
             <section className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-14 border-t border-slate-100">
               <div className="max-w-3xl">
@@ -207,16 +209,12 @@ export default async function ProductPage({ params }: Props) {
             </section>
           )}
 
-          {/* ═══════════════════════════════════════════════════════
-              ACCORDION: Details / Care / Shipping / Returns / Reviews
-          ═══════════════════════════════════════════════════════ */}
+          {/* ACCORDION: Details / Care / Shipping / Returns / Reviews */}
           <section className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 pb-14">
             <ProductAccordion product={product} />
           </section>
 
-          {/* ═══════════════════════════════════════════════════════
-              SINGLE TRUST STRIP — appears exactly once
-          ═══════════════════════════════════════════════════════ */}
+          {/* TRUST STRIP */}
           <section
             aria-label="Trust signals"
             className="border-y border-slate-100 bg-white"
@@ -226,16 +224,12 @@ export default async function ProductPage({ params }: Props) {
             </div>
           </section>
 
-          {/* ═══════════════════════════════════════════════════════
-              RELATED PRODUCTS
-          ═══════════════════════════════════════════════════════ */}
+          {/* RELATED PRODUCTS */}
           <section className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
             <CompleteLook product={product} />
           </section>
 
-          {/* ═══════════════════════════════════════════════════════
-              RECENTLY VIEWED
-          ═══════════════════════════════════════════════════════ */}
+          {/* RECENTLY VIEWED */}
           <section className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 pb-24">
             <RecentlyViewed />
           </section>
