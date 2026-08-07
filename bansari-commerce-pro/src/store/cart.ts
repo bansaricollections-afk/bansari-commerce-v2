@@ -1,7 +1,6 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 
-
 export type CartItem = {
   id: number;
   name: string;
@@ -12,6 +11,9 @@ export type CartItem = {
 
 type CartStore = {
   items: CartItem[];
+  // Internal hydration flag — not persisted, not part of public cart API.
+  // Set to true by onRehydrateStorage once localStorage has been read.
+  _hasHydrated: boolean;
 
   addItem: (item: CartItem) => void;
   updateQuantity: (id: number, quantity: number) => void;
@@ -23,12 +25,18 @@ type CartStore = {
   totalItems: () => number;
   totalUniqueItems: () => number;
   totalPrice: () => number;
+
+  // Internal setter — called only by onRehydrateStorage below.
+  _setHasHydrated: (v: boolean) => void;
 };
 
 export const useCart = create<CartStore>()(
   persist(
     (set, get) => ({
       items: [],
+      _hasHydrated: false,
+
+      _setHasHydrated: (v) => set({ _hasHydrated: v }),
 
       addItem: (item) =>
         set((state) => {
@@ -113,9 +121,29 @@ export const useCart = create<CartStore>()(
     }),
     {
       name: "bansari-cart",
+      // _hasHydrated is client-only runtime state — never write it to storage.
       partialize: (state) => ({
         items: state.items,
       }),
+      // onRehydrateStorage fires once the persist middleware has finished
+      // reading from localStorage (or immediately if nothing was stored).
+      // Setting _hasHydrated here is the canonical Zustand pattern for
+      // SSR-safe conditional rendering based on persisted state.
+      onRehydrateStorage: () => (state) => {
+        state?._setHasHydrated(true);
+      },
     }
   )
 );
+
+/**
+ * Stable selector — returns true once the persist middleware has finished
+ * reading from localStorage. Use this in components that must not render
+ * empty-state UI before the cart is known to be genuinely empty.
+ *
+ * Usage:
+ *   const hydrated = useCartHasHydrated();
+ *   if (!hydrated) return <Skeleton />;
+ */
+export const useCartHasHydrated = () =>
+  useCart((s) => s._hasHydrated);
