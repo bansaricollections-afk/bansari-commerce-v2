@@ -1,10 +1,11 @@
 'use client';
 
 import Link from 'next/link';
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 import type { Product } from '@/types/product';
 import type { ProductVariant } from '@/types/product';
+import { trackRecentlyViewed } from '@/lib/recentlyViewed';
 
 import DeliveryEstimate from './DeliveryEstimate';
 import ProductActions from './ProductActions';
@@ -106,6 +107,24 @@ export default function ProductInfo({ product, canonicalUrl }: Props) {
   const [quantity, setQuantity] = useState(1);
   const [selectedVariant, setSelectedVariant] = useState<ProductVariant | null>(null);
   const [sizeGuideOpen, setSizeGuideOpen] = useState(false);
+
+  // ── Recently Viewed tracking ──────────────────────────────────────────────
+  // Ref prevents duplicate writes if this component re-renders for the same
+  // product.id (e.g. variant selection, quantity change).
+  const trackedProductId = useRef<number | null>(null);
+
+  useEffect(() => {
+    if (trackedProductId.current === product.id) return;
+    trackedProductId.current = product.id;
+    trackRecentlyViewed({
+      id: product.id,
+      name: product.name,
+      price: product.price,
+      image: product.images?.[0]?.url ?? '',
+      category: product.category,
+    });
+  }, [product.id]); // dep: id only — not full object
+  // ─────────────────────────────────────────────────────────────────────────
 
   const hasDiscount = product.oldPrice && product.oldPrice > product.price;
   const discountPct = hasDiscount
