@@ -63,7 +63,6 @@ export default function ProductGallery({ product, selectedVariant }: Props) {
   const imagesKey = allImages.map((i) => i.url).join(',');
   if (imagesKey !== prevImagesKey.current) {
     prevImagesKey.current = imagesKey;
-    // Reset will happen via useEffect below
   }
 
   useEffect(() => {
@@ -94,8 +93,11 @@ export default function ProductGallery({ product, selectedVariant }: Props) {
   const [lightboxOpen, setLightboxOpen] = useState(false);
   const [lightboxIndex, setLightboxIndex] = useState(0);
 
-  // ─── Touch swipe ─────────────────────────────────────────────────────────
+  // ─── Touch swipe — main image ─────────────────────────────────────────
   const [touchStart, setTouchStart] = useState<number | null>(null);
+
+  // ─── Touch swipe — lightbox ───────────────────────────────────────────
+  const [lbTouchStart, setLbTouchStart] = useState<number | null>(null);
 
   const mainRef = useRef<HTMLDivElement>(null);
   const thumbsRef = useRef<HTMLDivElement>(null);
@@ -108,6 +110,7 @@ export default function ProductGallery({ product, selectedVariant }: Props) {
     setZoomPos({ x, y });
   }, []);
 
+  // Main image swipe
   const handleTouchStart = (e: React.TouchEvent) => {
     setTouchStart(e.touches[0].clientX);
   };
@@ -119,6 +122,20 @@ export default function ProductGallery({ product, selectedVariant }: Props) {
       else setActiveIndex((i) => Math.max(i - 1, 0));
     }
     setTouchStart(null);
+  };
+
+  // Lightbox swipe
+  const handleLbTouchStart = (e: React.TouchEvent) => {
+    setLbTouchStart(e.touches[0].clientX);
+  };
+  const handleLbTouchEnd = (e: React.TouchEvent) => {
+    if (lbTouchStart === null) return;
+    const diff = lbTouchStart - e.changedTouches[0].clientX;
+    if (Math.abs(diff) > 40) {
+      if (diff > 0) setLightboxIndex((i) => Math.min(i + 1, images.length - 1));
+      else setLightboxIndex((i) => Math.max(i - 1, 0));
+    }
+    setLbTouchStart(null);
   };
 
   // Scroll active thumbnail into view
@@ -159,6 +176,8 @@ export default function ProductGallery({ product, selectedVariant }: Props) {
     fabric: 'Fabric',
     details: 'Details',
   };
+
+  const zoomSrc = images[activeIndex]?.url ?? '';
 
   return (
     // Outer wrapper: positions the side zoom panel relative to the whole gallery
@@ -316,9 +335,18 @@ export default function ProductGallery({ product, selectedVariant }: Props) {
         </div>
       </div>
 
-      {/* ── Desktop side-panel zoom (lg+) ── */}
-      {/* Positioned absolutely to the right of the outer wrapper; */}
-      {/* does not affect flex layout of thumbnails + main column. */}
+      {/*
+       * ── Desktop side-panel zoom (lg+) ──
+       *
+       * FIX: Previously used CSS background-image which fails on signed/
+       * authenticated CDN URLs because the browser makes a fresh unauthenticated
+       * request for the background. Now uses a real <img> element inside an
+       * overflow:hidden container with transform-origin and CSS transform scale
+       * so the same authenticated request path is used.
+       *
+       * Positioned absolutely to the right of the outer wrapper;
+       * does not affect flex layout of thumbnails + main column.
+       */}
       <div
         aria-hidden="true"
         className={[
@@ -331,13 +359,26 @@ export default function ProductGallery({ product, selectedVariant }: Props) {
           'transition-opacity duration-200',
           isZoomed ? 'opacity-100' : 'opacity-0',
         ].join(' ')}
-        style={{
-          backgroundImage: `url(${images[activeIndex]?.url ?? ''})`,
-          backgroundPosition: `${zoomPos.x}% ${zoomPos.y}%`,
-          backgroundSize: '220%',
-          backgroundRepeat: 'no-repeat',
-        }}
-      />
+      >
+        {zoomSrc && (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={zoomSrc}
+            alt=""
+            aria-hidden="true"
+            style={{
+              position: 'absolute',
+              width: '220%',
+              height: '220%',
+              maxWidth: 'none',
+              top: `${-zoomPos.y * 1.2}%`,
+              left: `${-zoomPos.x * 1.2}%`,
+              objectFit: 'cover',
+              pointerEvents: 'none',
+            }}
+          />
+        )}
+      </div>
 
       {/* ── Lightbox ── */}
       {lightboxOpen && (
@@ -346,6 +387,8 @@ export default function ProductGallery({ product, selectedVariant }: Props) {
           role="dialog"
           aria-label="Image viewer"
           aria-modal="true"
+          onTouchStart={handleLbTouchStart}
+          onTouchEnd={handleLbTouchEnd}
         >
           <button
             onClick={() => setLightboxOpen(false)}
