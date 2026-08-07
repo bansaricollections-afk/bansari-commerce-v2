@@ -1,11 +1,18 @@
 "use client";
-
+// ─── Sprint 4 Batch 3 — ShopToolbar (routing bug fix + Relevance sort) ─────
+// Bug fixed: handleSort() hardcoded router.push('/shop?...') which caused
+// the sort control on /search to discard ?q= and navigate to /shop.
+// Fix: use usePathname() so sort navigation stays on the current route.
+// Also adds 'Most Relevant' to SORT_OPTIONS (was in VALID_SORTS but
+// never exposed to the user on the search page).
 import { useState, useRef, useEffect } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams, usePathname } from "next/navigation";
 import { ChevronDown, Grid2X2, LayoutGrid, Rows3 } from "lucide-react";
 import type { FilterParams, SortOption } from "@/types/filter-params";
 
 const SORT_OPTIONS: { value: SortOption; label: string }[] = [
+  // 'relevance' was in VALID_SORTS but absent from the UI — now exposed
+  { value: "relevance" as SortOption, label: "Most Relevant" },
   { value: "newest",     label: "Newest First" },
   { value: "bestseller", label: "Best Selling" },
   { value: "price_asc",  label: "Price: Low → High" },
@@ -21,16 +28,15 @@ interface ShopToolbarProps {
 
 export default function ShopToolbar({ total }: ShopToolbarProps) {
   const router       = useRouter();
+  const pathname     = usePathname();
   const searchParams = useSearchParams();
 
-  // Read current sort from URL; default to 'newest'
   const currentSort = (searchParams.get('sort') ?? 'newest') as SortOption;
 
   const [grid, setGrid] = useState<"2" | "3" | "4">("3");
   const [open, setOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
-  // Close on outside click
   useEffect(() => {
     function handleClick(e: MouseEvent) {
       if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
@@ -49,13 +55,14 @@ export default function ShopToolbar({ total }: ShopToolbarProps) {
     params.set('sort', value);
     // Reset to page 1 whenever sort changes
     params.delete('page');
-    router.push(`/shop?${params.toString()}`);
+    // ✔ Fix: use current pathname so /search stays on /search (preserves ?q=)
+    router.push(`${pathname}?${params.toString()}`);
     setOpen(false);
   }
 
   return (
     <div className="mb-5 flex items-center justify-between border-b border-slate-200 pb-5">
-      {/* Left — product count (real from DB) */}
+      {/* Left — product count */}
       <p className="text-[11px] uppercase tracking-[0.12em] text-slate-400">
         {total !== undefined ? (
           <>
@@ -133,7 +140,7 @@ export default function ShopToolbar({ total }: ShopToolbarProps) {
           {([
             { g: "2" as const, Icon: Rows3,      label: "2-column" },
             { g: "3" as const, Icon: LayoutGrid, label: "3-column" },
-            { g: "4" as const, Icon: Grid2X2,   label: "4-column" },
+            { g: "4" as const, Icon: Grid2X2,    label: "4-column" },
           ]).map(({ g, Icon, label }) => (
             <button
               key={g}
