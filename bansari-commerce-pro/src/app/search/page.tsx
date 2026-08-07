@@ -1,7 +1,8 @@
-// ─── Sprint 9C — /search page ───────────────────────────────────────────────────
-// RSC page for full search with FTS, filters, sort, and pagination.
-// Reuses Sprint 9A/9B layout components wholesale.
-// Search data flows: URL searchParams → searchProducts() RPC → RSC render
+// ─── Sprint 4 Batch 5 — /search page (Suspense boundary + skeleton) ──────────
+// Adds <Suspense> around SearchResultsGrid so RSC streaming shows
+// ProductGridSkeleton during initial product grid render.
+// No route, layout, filter, or sort logic changes.
+import { Suspense } from 'react';
 import type { Metadata } from 'next';
 import Header from '@/components/layout/Header';
 import Footer from '@/components/layout/Footer';
@@ -15,6 +16,7 @@ import SearchResultsGrid from '@/components/search/SearchResultsGrid';
 import ZeroResults from '@/components/search/ZeroResults';
 import TrendingSection from '@/components/search/TrendingSection';
 import SearchInput from '@/components/search/SearchInput';
+import ProductGridSkeleton from '@/components/shop/ProductGridSkeleton';
 import { searchProducts } from '@/services/search.service';
 import { getTrendingSearches } from '@/services/search.service';
 import type { FilterParams, PaginationMeta, SortOption } from '@/types/filter-params';
@@ -29,15 +31,15 @@ export async function generateMetadata({
   const sp = await searchParams;
   const q  = Array.isArray(sp.q) ? sp.q[0] : (sp.q ?? '');
   return {
-    title: q ? `“${q}” — Search — Bansari Collections` : 'Search — Bansari Collections',
+    title: q ? `"${q}" — Search — Bansari Collections` : 'Search — Bansari Collections',
     description: q
-      ? `Shop results for “${q}” at Bansari Collections — luxury ethnic wear.`
+      ? `Shop results for "${q}" at Bansari Collections — luxury ethnic wear.`
       : 'Search our full catalogue of luxury ethnic wear.',
     robots: { index: false, follow: true },
   };
 }
 
-// ── Parse helpers (mirrors shop/page.tsx) ───────────────────────────────────────
+// ── Parse helpers (mirrors shop/page.tsx) ────────────────────────────────────
 const VALID_SORTS = new Set<SortOption>(
   ['relevance' as SortOption, 'newest', 'price_asc', 'price_desc', 'bestseller', 'discount']
 );
@@ -90,7 +92,6 @@ export default async function SearchPage({
                 : undefined,
   };
 
-  // Fetch trending always (used for ZeroResults + TrendingSection)
   const [searchResult, trending] = await Promise.all([
     rawQuery
       ? searchProducts({ ...filterParams, query: rawQuery })
@@ -121,7 +122,7 @@ export default async function SearchPage({
               Search
             </p>
             <h1 className="mb-6 text-center font-[family:var(--font-playfair)] text-3xl font-normal text-slate-900">
-              {rawQuery ? <>“{rawQuery}”</> : 'What are you looking for?'}
+              {rawQuery ? <>"{rawQuery}"</> : 'What are you looking for?'}
             </h1>
             <SearchInput defaultValue={rawQuery} />
           </div>
@@ -137,42 +138,37 @@ export default async function SearchPage({
         {/* ─ Results layout ─ */}
         {rawQuery && (
           <div className="mx-auto max-w-[1380px] px-4 py-8 sm:px-6 lg:px-8">
-            {/* Mobile filter bar */}
             <MobileFilterBar filterParams={filterParams} />
 
             <div className="flex gap-8">
-              {/* Sidebar — desktop */}
               <aside className="hidden w-56 shrink-0 lg:block" aria-label="Filters">
                 <FilterSidebar />
               </aside>
 
-              {/* Main content column */}
               <div className="min-w-0 flex-1">
-                {/* Toolbar: sort + count */}
                 <ShopToolbar
                   total={meta?.total ?? 0}
                   filterParams={filterParams}
                 />
 
-                {/* Active filter chips */}
                 <ActiveFilters />
 
-                {/* Result count summary */}
                 {meta && meta.total > 0 && (
                   <p className="mb-6 text-xs text-slate-500">
                     {meta.total.toLocaleString()} result{meta.total !== 1 ? 's' : ''}
-                    {' '}for “{rawQuery}”
+                    {' '}for "{rawQuery}"
                   </p>
                 )}
 
-                {/* Results or zero state */}
-                {products.length > 0 ? (
-                  <SearchResultsGrid products={products} query={rawQuery} />
-                ) : (
-                  <ZeroResults query={rawQuery} trending={trending} />
-                )}
+                {/* ── Suspense boundary: skeleton while grid streams in ── */}
+                <Suspense fallback={<ProductGridSkeleton count={24} />}>
+                  {products.length > 0 ? (
+                    <SearchResultsGrid products={products} query={rawQuery} />
+                  ) : (
+                    <ZeroResults query={rawQuery} trending={trending} />
+                  )}
+                </Suspense>
 
-                {/* Pagination */}
                 {totalPages > 1 && meta && (
                   <div className="mt-12">
                     <Pagination meta={meta} />

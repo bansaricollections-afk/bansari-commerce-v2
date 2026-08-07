@@ -1,8 +1,9 @@
 'use client';
-// ─── Sprint 1 — useSearch hook ───────────────────────────────────────────────
-// Central search hook consumed by InstantSearchOverlay and the search page.
-// Reuses /api/search and /api/search/trending — does NOT create new endpoints.
-import { useState, useEffect, useRef, useCallback } from 'react';
+// ─── Sprint 4 Batch 5 — useSearch hook (memoized idle suggestions) ───────────
+// Adds useMemo for idleSuggestions so the array reference is stable between
+// renders, preventing unnecessary re-renders of suggestion list rows.
+// No API or public interface changes.
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import type { SearchProduct } from '@/types/search';
 
 export interface Suggestion {
@@ -91,7 +92,20 @@ export function useSearch(options: UseSearchOptions = {}) {
     setRecent(readRecent());
   }, []);
 
-  // Build idle suggestions (no query typed)
+  // ── Memoized idle suggestions ─────────────────────────────────────────────
+  // Keyed on [recent, trending] — stable reference between unrelated renders.
+  const idleSuggestions = useMemo((): Suggestion[] => {
+    const recentSugg: Suggestion[] = recent
+      .slice(0, 4)
+      .map((q) => ({ query: q, type: 'recent' as const }));
+    const trendingSugg: Suggestion[] = trending
+      .filter((t) => !recent.some((r) => r.toLowerCase() === t.toLowerCase()))
+      .slice(0, 6)
+      .map((q) => ({ query: q, type: 'trending' as const }));
+    return [...recentSugg, ...trendingSugg];
+  }, [recent, trending]);
+
+  // Keep buildIdleSuggestions for one-off calls that need a fresh localStorage read
   const buildIdleSuggestions = useCallback(
     (recentList: string[], trendingList: string[]): Suggestion[] => {
       const recentSugg: Suggestion[] = recentList
@@ -115,7 +129,7 @@ export function useSearch(options: UseSearchOptions = {}) {
       if (q.trim().length < 2) {
         setInstantResults(null);
         setLoading(false);
-        setSuggestions(buildIdleSuggestions(recent, trending));
+        setSuggestions(idleSuggestions);
         return;
       }
 
@@ -134,7 +148,6 @@ export function useSearch(options: UseSearchOptions = {}) {
             products: data.products ?? [],
             total: data.meta?.total ?? 0,
           });
-          // Build query-matched suggestions from trending
           const matched: Suggestion[] = trending
             .filter((t) => t.toLowerCase().includes(q.toLowerCase()))
             .slice(0, 5)
@@ -149,7 +162,7 @@ export function useSearch(options: UseSearchOptions = {}) {
         }
       }, debounceMs);
     },
-    [trending, recent, debounceMs, instantResultsCount, buildIdleSuggestions],
+    [trending, idleSuggestions, debounceMs, instantResultsCount],
   );
 
   const setQuery = useCallback(
@@ -158,17 +171,18 @@ export function useSearch(options: UseSearchOptions = {}) {
       if (q.trim() === '') {
         setInstantResults(null);
         setLoading(false);
-        setSuggestions(buildIdleSuggestions(recent, trending));
+        setSuggestions(idleSuggestions);
       } else {
         fetchInstant(q);
       }
     },
-    [fetchInstant, buildIdleSuggestions, recent, trending],
+    [fetchInstant, idleSuggestions],
   );
 
   const openIdle = useCallback(() => {
-    setSuggestions(buildIdleSuggestions(readRecent(), trending));
-    setRecent(readRecent());
+    const freshRecent = readRecent();
+    setSuggestions(buildIdleSuggestions(freshRecent, trending));
+    setRecent(freshRecent);
   }, [trending, buildIdleSuggestions]);
 
   /** Call after a successful search navigation */
@@ -177,7 +191,6 @@ export function useSearch(options: UseSearchOptions = {}) {
     if (!trimmed) return;
     pushRecent(trimmed);
     setRecent(readRecent());
-    // Fire-and-forget analytics
     fetch('/api/search/log', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
