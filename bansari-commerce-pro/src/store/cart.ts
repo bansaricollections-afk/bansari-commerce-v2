@@ -7,7 +7,31 @@ export type CartItem = {
   image: string;
   price: number;
   quantity: number;
+  // Optional line-item disambiguators (Batch 3 — data layer only).
+  // `variant` stores the human-readable variant value (e.g. color name),
+  // never an id — ids are implementation details, color/size are the
+  // business value surfaced in cart UI, order summaries, admin, and emails.
+  size?: string;
+  variant?: string;
 };
+
+/**
+ * A cart line's identity. Two lines are the same row if and only if
+ * id, size, AND variant all match — never id alone. This is the single
+ * definition of "same line" used by every mutating cart operation
+ * (addItem, removeItem, increaseQuantity, decreaseQuantity, updateQuantity)
+ * so they can never drift out of sync with each other.
+ */
+export type CartLineIdentity = {
+  id: number;
+  size?: string;
+  variant?: string;
+};
+
+const isSameLine = (item: CartLineIdentity, target: CartLineIdentity) =>
+  item.id === target.id &&
+  item.size === target.size &&
+  item.variant === target.variant;
 
 type CartStore = {
   items: CartItem[];
@@ -16,10 +40,10 @@ type CartStore = {
   _hasHydrated: boolean;
 
   addItem: (item: CartItem) => void;
-  updateQuantity: (id: number, quantity: number) => void;
-  increaseQuantity: (id: number) => void;
-  decreaseQuantity: (id: number) => void;
-  removeItem: (id: number) => void;
+  updateQuantity: (line: CartLineIdentity, quantity: number) => void;
+  increaseQuantity: (line: CartLineIdentity) => void;
+  decreaseQuantity: (line: CartLineIdentity) => void;
+  removeItem: (line: CartLineIdentity) => void;
   clearCart: () => void;
 
   totalItems: () => number;
@@ -40,12 +64,12 @@ export const useCart = create<CartStore>()(
 
       addItem: (item) =>
         set((state) => {
-          const existing = state.items.find((i) => i.id === item.id);
+          const existing = state.items.find((i) => isSameLine(i, item));
 
           if (existing) {
             return {
               items: state.items.map((i) =>
-                i.id === item.id
+                isSameLine(i, item)
                   ? {
                       ...i,
                       quantity: i.quantity + item.quantity,
@@ -60,10 +84,10 @@ export const useCart = create<CartStore>()(
           };
         }),
 
-      updateQuantity: (id, quantity) =>
+      updateQuantity: (line, quantity) =>
         set((state) => ({
           items: state.items.map((item) =>
-            item.id === id
+            isSameLine(item, line)
               ? {
                   ...item,
                   quantity: Math.max(1, quantity),
@@ -72,10 +96,10 @@ export const useCart = create<CartStore>()(
           ),
         })),
 
-      increaseQuantity: (id) =>
+      increaseQuantity: (line) =>
         set((state) => ({
           items: state.items.map((item) =>
-            item.id === id
+            isSameLine(item, line)
               ? {
                   ...item,
                   quantity: item.quantity + 1,
@@ -84,11 +108,11 @@ export const useCart = create<CartStore>()(
           ),
         })),
 
-      decreaseQuantity: (id) =>
+      decreaseQuantity: (line) =>
         set((state) => ({
           items: state.items
             .map((item) =>
-              item.id === id
+              isSameLine(item, line)
                 ? {
                     ...item,
                     quantity: Math.max(0, item.quantity - 1),
@@ -98,9 +122,9 @@ export const useCart = create<CartStore>()(
             .filter((item) => item.quantity > 0),
         })),
 
-      removeItem: (id) =>
+      removeItem: (line) =>
         set((state) => ({
-          items: state.items.filter((item) => item.id !== id),
+          items: state.items.filter((item) => !isSameLine(item, line)),
         })),
 
       clearCart: () =>
