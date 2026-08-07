@@ -1,16 +1,6 @@
 'use client';
 // ─── Sprint 4 Batch 1 — SearchInput (unified onto useSearch) ─────────────────
-// Replaces the standalone debounce/fetch implementation with the shared
-// useSearch hook so this component is first-class identical to the overlay:
-//   • 250 ms debounce (was 300 ms)
-//   • loading spinner
-//   • highlighted matches via highlightMatch()
-//   • recent searches persist via recordSearch()
-//   • no duplicate logic — all state lives in useSearch
-//
-// Props contract (placeholder, defaultValue, className) is UNCHANGED.
-// ARIA combobox roles are UNCHANGED.
-import { useRef } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { useSearch, highlightMatch } from '@/hooks/useSearch';
 
@@ -46,7 +36,7 @@ export default function SearchInput({
   const router   = useRouter();
   const inputRef = useRef<HTMLInputElement>(null);
 
-  // ── Shared hook — all state lives here, no duplication ───────────────────
+  // ── Shared hook — all search state lives here ───────────────────────────
   const {
     query,
     setQuery,
@@ -55,14 +45,31 @@ export default function SearchInput({
     recordSearch,
   } = useSearch({ debounceMs: 250, instantResultsCount: 5 });
 
+  // ── Keyboard highlight index — React state so mutations trigger re-renders ─
+  // Previously this was a useRef + broken forceUpdate() call. useRef mutations
+  // do not schedule re-renders; the highlighted row and aria-activedescendant
+  // therefore never updated. useState(-1) is the correct pattern.
+  const [activeIdx, setActiveIdx] = useState(-1);
+
+  // Reset highlight whenever the suggestion list changes (new query, cleared, etc.)
+  useEffect(() => {
+    setActiveIdx(-1);
+  }, [suggestions]);
+
+  // Scroll the highlighted item into view AFTER the state update has
+  // committed to the DOM (useEffect runs post-paint).
+  useEffect(() => {
+    if (activeIdx >= 0) {
+      document
+        .getElementById(`si-suggestion-${activeIdx}`)
+        ?.scrollIntoView({ block: 'nearest' });
+    }
+  }, [activeIdx]);
+
   // Initialise value from defaultValue on first render only
   const initialisedRef = useRef(false);
-  if (!initialisedRef.current && defaultValue) {
-    initialisedRef.current = true;
-    // setQuery is stable; calling it during render is safe for initial hydration
-  }
 
-  // ── Navigation helper ────────────────────────────────────────────────────
+  // ── Navigation helper ─────────────────────────────────────────────────
   function submit(q: string) {
     const trimmed = q.trim();
     if (!trimmed) return;
@@ -71,57 +78,46 @@ export default function SearchInput({
     router.push(`/search?q=${encodeURIComponent(trimmed)}`);
   }
 
-  // ── Keyboard handler ─────────────────────────────────────────────────────
-  const activeIdxRef = useRef(-1);
-
+  // ── Keyboard handler ─────────────────────────────────────────────────
   function handleKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
     switch (e.key) {
       case 'ArrowDown':
         e.preventDefault();
-        activeIdxRef.current = Math.min(activeIdxRef.current + 1, suggestions.length - 1);
-        document
-          .getElementById(`si-suggestion-${activeIdxRef.current}`)
-          ?.scrollIntoView({ block: 'nearest' });
-        forceUpdate();
+        // setActiveIdx triggers re-render; scrollIntoView handled by useEffect
+        setActiveIdx((prev) => Math.min(prev + 1, suggestions.length - 1));
         break;
       case 'ArrowUp':
         e.preventDefault();
-        activeIdxRef.current = Math.max(activeIdxRef.current - 1, -1);
-        forceUpdate();
+        setActiveIdx((prev) => Math.max(prev - 1, -1));
         break;
       case 'Enter':
         e.preventDefault();
-        if (activeIdxRef.current >= 0 && suggestions[activeIdxRef.current]) {
-          const picked = suggestions[activeIdxRef.current].query;
+        if (activeIdx >= 0 && suggestions[activeIdx]) {
+          const picked = suggestions[activeIdx].query;
           setQuery(picked);
+          setActiveIdx(-1);
           submit(picked);
         } else {
           submit(query);
         }
-        activeIdxRef.current = -1;
         break;
       case 'Escape':
         setQuery('');
-        activeIdxRef.current = -1;
+        setActiveIdx(-1);
         inputRef.current?.blur();
         break;
     }
   }
 
-  // Minimal force-update for activeIdx (avoids adding useState for a ref-tracked index)
-  const [, setTick] = [0, () => {}];
-  void setTick; // unused — activeIdx highlight driven by aria-activedescendant + CSS
-
-  const open    = suggestions.length > 0;
-  const listId  = 'si-suggestions';
-  const activeIdx = activeIdxRef.current;
+  const open   = suggestions.length > 0;
+  const listId = 'si-suggestions';
 
   return (
     <div
       className={`relative ${className}`}
       onBlur={(e) => {
         if (!e.currentTarget.contains(e.relatedTarget as Node)) {
-          activeIdxRef.current = -1;
+          setActiveIdx(-1);
         }
       }}
     >
@@ -148,7 +144,7 @@ export default function SearchInput({
           onChange={(e) => {
             initialisedRef.current = true;
             setQuery(e.target.value);
-            activeIdxRef.current = -1;
+            setActiveIdx(-1);
           }}
           onFocus={() => {
             if (!initialisedRef.current && defaultValue) {
@@ -166,7 +162,7 @@ export default function SearchInput({
                      transition-colors duration-150"
         />
 
-        {/* Loading spinner — shown while useSearch is fetching */}
+        {/* Loading spinner */}
         {loading && (
           <span
             className="absolute right-12 h-4 w-4 animate-spin rounded-full border-2 border-[#8A5A6A]/30 border-t-[#8A5A6A]"
@@ -181,7 +177,7 @@ export default function SearchInput({
             aria-label="Clear search"
             onClick={() => {
               setQuery('');
-              activeIdxRef.current = -1;
+              setActiveIdx(-1);
               inputRef.current?.focus();
             }}
             className="absolute right-10 flex h-6 w-6 items-center justify-center text-slate-400 hover:text-slate-600"
@@ -234,16 +230,18 @@ export default function SearchInput({
               role="option"
               aria-selected={i === activeIdx}
               onMouseDown={(e) => {
+                // preventDefault keeps focus on the input while the click registers
                 e.preventDefault();
                 setQuery(s.query);
-                activeIdxRef.current = -1;
+                setActiveIdx(-1);
                 submit(s.query);
               }}
               className={`flex cursor-pointer items-center gap-2 px-3 py-2.5 text-sm
                           transition-colors duration-75
-                          ${i === activeIdx
-                            ? 'bg-[#8A5A6A]/10 text-[#8A5A6A]'
-                            : 'text-slate-700 hover:bg-slate-50'
+                          ${
+                            i === activeIdx
+                              ? 'bg-[#8A5A6A]/10 text-[#8A5A6A]'
+                              : 'text-slate-700 hover:bg-slate-50'
                           }`}
             >
               {s.type === 'recent' ? (
