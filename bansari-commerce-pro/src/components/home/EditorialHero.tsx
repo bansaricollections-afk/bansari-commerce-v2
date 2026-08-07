@@ -205,7 +205,7 @@ export default function EditorialHero() {
             >
               {slide.campaign}
             </span>
-            <span style={{ display: "block", width: "2.5rem", height: "1px", background: "var(--bc-gold)", display: slide.position === "center" ? "block" : "none" }} />
+            <span style={{ width: "2.5rem", height: "1px", background: "var(--bc-gold)", display: slide.position === "center" ? "block" : "none" }} />
           </div>
 
           {/* Headline */}
