@@ -1,10 +1,9 @@
 -- ============================================================
 -- Order Management V2 Foundation — reconciled with live schema
 --
--- The production orders table currently uses bigint ids and already has
--- shipping_address jsonb, subtotal/shipping/tax/discount/total, and the
--- Razorpay fields. This migration is additive and restores the application
--- contract without dropping or renaming existing columns.
+-- Production orders uses bigint ids and already has shipping_address jsonb,
+-- subtotal/shipping/tax/discount/total, and Razorpay fields. This migration
+-- restores the application contract additively and preserves existing data.
 -- ============================================================
 
 ALTER TABLE public.orders
@@ -227,3 +226,139 @@ BEGIN
       ));
   END IF;
 END $$;
+
+-- ============================================================
+-- 7. ORDER CREATION FUNCTION — aligned to the reconciled schema
+-- ============================================================
+
+CREATE OR REPLACE FUNCTION public.create_order_with_items(
+  p_order JSONB,
+  p_items JSONB
+)
+RETURNS public.orders
+LANGUAGE plpgsql
+AS $$
+DECLARE
+  v_order public.orders;
+BEGIN
+  INSERT INTO public.orders (
+    order_number,
+    user_id,
+    customer_name,
+    customer_email,
+    customer_phone,
+    shipping_name,
+    shipping_phone,
+    shipping_email,
+    shipping_address,
+    subtotal,
+    shipping,
+    tax,
+    discount,
+    total,
+    payment_status,
+    order_status,
+    created_at,
+    updated_at,
+    payment_method,
+    razorpay_order_id,
+    razorpay_payment_id,
+    razorpay_signature,
+    notes,
+    items,
+    currency,
+    payment_provider,
+    payment_reference,
+    payment_verified_at,
+    paid_at,
+    shipping_fee,
+    grand_total
+  )
+  SELECT
+    p_order->>'order_number',
+    NULLIF(p_order->>'user_id', '')::UUID,
+    p_order->>'customer_name',
+    p_order->>'customer_email',
+    p_order->>'customer_phone',
+    p_order->>'shipping_name',
+    p_order->>'shipping_phone',
+    p_order->>'shipping_email',
+    jsonb_build_object(
+      'name', p_order->>'shipping_name',
+      'phone', p_order->>'shipping_phone',
+      'email', NULLIF(p_order->>'shipping_email', ''),
+      'addressLine1', p_order->>'shipping_address_line1',
+      'addressLine2', NULLIF(p_order->>'shipping_address_line2', ''),
+      'city', p_order->>'shipping_city',
+      'state', p_order->>'shipping_state',
+      'postalCode', p_order->>'shipping_postal_code',
+      'country', COALESCE(NULLIF(p_order->>'shipping_country', ''), 'IN')
+    ),
+    COALESCE((p_order->>'subtotal')::NUMERIC, 0),
+    COALESCE((p_order->>'shipping_fee')::NUMERIC, 0),
+    COALESCE((p_order->>'tax')::NUMERIC, 0),
+    COALESCE((p_order->>'discount')::NUMERIC, 0),
+    COALESCE((p_order->>'grand_total')::NUMERIC, 0),
+    COALESCE(p_order->>'payment_status', 'pending'),
+    COALESCE(p_order->>'order_status', 'placed'),
+    NOW(),
+    NOW(),
+    p_order->>'payment_method',
+    p_order->>'razorpay_order_id',
+    p_order->>'razorpay_payment_id',
+    p_order->>'razorpay_signature',
+    p_order->>'notes',
+    COALESCE(p_items, '[]'::JSONB),
+    COALESCE(NULLIF(p_order->>'currency', ''), 'INR'),
+    COALESCE(NULLIF(p_order->>'payment_provider', ''), 'razorpay'),
+    p_order->>'payment_reference',
+    (p_order->>'payment_verified_at')::TIMESTAMPTZ,
+    (p_order->>'paid_at')::TIMESTAMPTZ,
+    COALESCE((p_order->>'shipping_fee')::NUMERIC, 0),
+    COALESCE((p_order->>'grand_total')::NUMERIC, 0)
+  RETURNING * INTO v_order;
+
+  INSERT INTO public.order_items (
+    order_id,
+    product_id,
+    product_name,
+    product_slug,
+    product_sku,
+    product_image,
+    variant_color,
+    variant_size,
+    unit_price,
+    quantity,
+    line_total,
+    variant_id,
+    variant_sku,
+    mrp,
+    returned_quantity,
+    exchanged_quantity,
+    is_gift,
+    gift_message
+  )
+  SELECT
+    v_order.id,
+    NULLIF(item->>'product_id', '')::BIGINT,
+    item->>'product_name',
+    NULLIF(item->>'product_slug', ''),
+    NULLIF(item->>'product_sku', ''),
+    NULLIF(item->>'product_image', ''),
+    NULLIF(item->>'variant_color', ''),
+    NULLIF(item->>'variant_size', ''),
+    (item->>'unit_price')::NUMERIC,
+    (item->>'quantity')::INTEGER,
+    (item->>'line_total')::NUMERIC,
+    NULLIF(item->>'variant_id', '')::BIGINT,
+    NULLIF(item->>'variant_sku', ''),
+    NULLIF(item->>'mrp', '')::NUMERIC,
+    COALESCE(NULLIF(item->>'returned_quantity', '')::INTEGER, 0),
+    COALESCE(NULLIF(item->>'exchanged_quantity', '')::INTEGER, 0),
+    COALESCE(NULLIF(item->>'is_gift', '')::BOOLEAN, FALSE),
+    NULLIF(item->>'gift_message', '')
+  FROM jsonb_array_elements(COALESCE(p_items, '[]'::JSONB)) AS item;
+
+  RETURN v_order;
+END;
+$$;
