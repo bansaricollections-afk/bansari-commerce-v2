@@ -19,16 +19,15 @@ function diagLog(label: string, data: Record<string, unknown>) {
 
 /**
  * Returns true when the Supabase user holds the admin role.
- * Checks app_metadata (server-set, canonical) then user_metadata as fallback.
+ * Checks app_metadata ONLY — it is server-set (via the service-role/Admin
+ * API) and cannot be edited by the user. user_metadata is client-editable
+ * via supabase.auth.updateUser() and MUST NOT be treated as a trusted
+ * privilege source.
  */
 function isAdminUser(user: {
   app_metadata?: Record<string, unknown>;
-  user_metadata?: Record<string, unknown>;
 }): boolean {
-  return (
-    user.app_metadata?.role === 'admin' ||
-    user.user_metadata?.role === 'admin'
-  );
+  return user.app_metadata?.role === 'admin';
 }
 
 async function makeServerClient() {

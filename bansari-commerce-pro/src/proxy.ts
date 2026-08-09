@@ -43,17 +43,15 @@ function applyHeaders(res: NextResponse): NextResponse {
 
 /**
  * Returns true when the Supabase user holds the admin role.
- * Checks app_metadata first (server-set, canonical for Supabase Auth).
- * Falls back to user_metadata so projects that store role there also work.
+ * Checks app_metadata ONLY — it is server-set (via the service-role/Admin
+ * API) and cannot be edited by the user. user_metadata is client-editable
+ * via supabase.auth.updateUser() and MUST NOT be treated as a trusted
+ * privilege source.
  */
 function isAdmin(user: {
   app_metadata?: Record<string, unknown>;
-  user_metadata?: Record<string, unknown>;
 }): boolean {
-  return (
-    user.app_metadata?.role === 'admin' ||
-    user.user_metadata?.role === 'admin'
-  );
+  return user.app_metadata?.role === 'admin';
 }
 
 export default async function proxy(request: NextRequest) {
