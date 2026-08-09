@@ -261,6 +261,7 @@ export async function POST(request: NextRequest) {
     };
 
     const itemsPayload = lineItems.map((li) => ({
+      product_id:   li.productId,
       product_name: li.productName,
       unit_price:   li.unitPrice,
       quantity:     li.quantity,
