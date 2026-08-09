@@ -101,15 +101,25 @@ async function resolveOrderLines(
 ): Promise<OrderLineWithVariant[]> {
   const sb = createServiceRoleClient();
 
-  // Step 1: fetch order items
-  const { data: items, error: itemsErr } = await sb
-    .from('order_items')
-    .select('product_id, quantity')
-    .eq('order_id', orderId)
-    .not('product_id', 'is', null);
+  // Step 1: fetch order items from orders.items (jsonb array)
+  const { data: order, error: orderErr } = await sb
+    .from('orders')
+    .select('items')
+    .eq('id', orderId)
+    .single();
 
-  if (itemsErr) throw new Error(`resolveOrderLines: ${itemsErr.message}`);
-  if (!items || items.length === 0) return [];
+  if (orderErr) throw new Error(`resolveOrderLines: ${orderErr.message}`);
+
+  const rawItems = (order?.items ?? []) as Array<{
+    product_id?: number;
+    quantity?:   number;
+  }>;
+  const items = rawItems.filter(
+    (i): i is { product_id: number; quantity: number } =>
+      i.product_id != null
+  );
+
+  if (items.length === 0) return [];
 
   const productIds = [...new Set(items.map((i) => i.product_id as number))];
 
