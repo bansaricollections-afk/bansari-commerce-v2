@@ -146,6 +146,9 @@ export async function POST(request: NextRequest) {
     let lineItems: Array<{
       productId: number;
       productName: string;
+      productSlug?: string;
+      productSku?: string;
+      productImage?: string;
       unitPrice: number;
       quantity: number;
       lineTotal: number;
@@ -229,43 +232,39 @@ export async function POST(request: NextRequest) {
     // P0 FIX: user_id is NULL for guests, auth UUID for authenticated users.
     // The create_order_with_items RPC accepts null via nullif coercion.
     const orderPayload = {
-      order_number:             orderNumber,
-      user_id:                  userId ?? null,
-      customer_name:            customerName,
-      customer_email:           customerEmail,
-      customer_phone:           customerPhone ?? '',
-      shipping_name:            shippingData.name,
-      shipping_phone:           shippingData.phone,
-      shipping_email:           shippingData.email ?? '',
-      shipping_address_line1:   shippingData.addressLine1,
-      shipping_address_line2:   shippingData.addressLine2 ?? '',
-      shipping_city:            shippingData.city,
-      shipping_state:           shippingData.state,
-      shipping_postal_code:     shippingData.postalCode,
-      billing_same_as_shipping: 'true',
-      currency:                 'INR',
-      subtotal:                 String(subtotal),
-      discount:                 String(discount),
-      shipping_fee:             String(shippingFee),
-      tax:                      '0',
-      grand_total:              String(grandTotal),
-      payment_provider:         'razorpay',
-      payment_method:           'razorpay',
-      payment_reference:        razorpay_payment_id,
-      razorpay_order_id:        razorpay_order_id,
-      razorpay_payment_id:      razorpay_payment_id,
-      payment_status:           'paid',
-      order_status:             'placed',
-      payment_verified_at:      now,
-      paid_at:                  now,
+      order_number:        orderNumber,
+      user_id:              userId ?? null,
+      customer_name:        customerName,
+      customer_email:       customerEmail,
+      customer_phone:       customerPhone ?? '',
+      shipping_address:     shippingData,
+      currency:             'INR',
+      subtotal:             String(subtotal),
+      discount:             String(discount),
+      shipping_fee:         String(shippingFee),
+      tax:                  '0',
+      grand_total:          String(grandTotal),
+      payment_provider:     'razorpay',
+      payment_method:       'razorpay',
+      payment_reference:    razorpay_payment_id,
+      razorpay_order_id:    razorpay_order_id,
+      razorpay_payment_id:  razorpay_payment_id,
+      razorpay_signature:   razorpay_signature,
+      payment_status:       'paid',
+      order_status:         'placed',
+      payment_verified_at:  now,
+      paid_at:              now,
     };
 
     const itemsPayload = lineItems.map((li) => ({
-      product_id:   li.productId,
-      product_name: li.productName,
-      unit_price:   li.unitPrice,
-      quantity:     li.quantity,
-      line_total:   li.lineTotal,
+      product_id:    li.productId,
+      product_name:  li.productName,
+      product_slug:  li.productSlug ?? '',
+      product_sku:   li.productSku ?? '',
+      product_image: li.productImage ?? '',
+      unit_price:    li.unitPrice,
+      quantity:      li.quantity,
+      line_total:    li.lineTotal,
     }));
 
     // EXPLANATION: create_order_with_items is a RETURNS TABLE (SETOF) function.

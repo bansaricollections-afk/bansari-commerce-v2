@@ -59,6 +59,9 @@ export type CartItem = {
 export type LineItem = {
   productId: number;
   productName: string;
+  productSlug: string;
+  productSku: string;
+  productImage: string;
   unitPrice: number;
   quantity: number;
   lineTotal: number;
@@ -467,6 +470,9 @@ export async function validateCartItems(
     lineItems.push({
       productId: product.id,
       productName: product.name,
+      productSlug: product.slug,
+      productSku: product.sku ?? '',
+      productImage: product.images?.[0]?.url ?? '',
       unitPrice: product.price,
       quantity: item.quantity,
       lineTotal: Math.round(product.price * item.quantity * 100) / 100,
