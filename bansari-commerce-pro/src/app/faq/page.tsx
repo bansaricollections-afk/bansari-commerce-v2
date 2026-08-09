@@ -26,12 +26,27 @@ const faqs = [
   {
     question: 'Can I return a product?',
     answer:
-      'Yes. Eligible products can be returned according to our Return & Refund Policy. Products must be unused and returned with original tags.',
+      'Yes. Eligible products can be returned within 7 days of delivery according to our Return & Refund Policy. Products must be unused, unwashed, and returned with original tags and packaging intact. Products explicitly marked "Final Sale / Non-Returnable" are not eligible.',
+  },
+  {
+    question: 'Can I exchange a product for a different size?',
+    answer:
+      'Yes. Size exchanges are available within 4 days of delivery, subject to availability of the requested size — see our Exchange Policy for details.',
+  },
+  {
+    question: 'What if I receive a defective, damaged or wrong product?',
+    answer:
+      'Contact our support team within 7 days of delivery with your order number and photos of the issue. If the error is on our part, we bear the applicable return shipping cost and will offer a replacement, exchange, or refund depending on stock availability.',
   },
   {
     question: 'Can I cancel my order?',
     answer:
-      'Orders may be cancelled before dispatch. Once shipped, cancellation is no longer possible.',
+      'Orders may be cancelled free of charge before dispatch. Once shipped, cancellation is no longer possible and our Return & Refund Policy applies instead.',
+  },
+  {
+    question: 'Do you offer cash on delivery (COD)?',
+    answer:
+      'No. All orders on Bansari Collections are prepaid — we accept online payment only via Razorpay.',
   },
   {
     question: 'How do I contact customer support?',

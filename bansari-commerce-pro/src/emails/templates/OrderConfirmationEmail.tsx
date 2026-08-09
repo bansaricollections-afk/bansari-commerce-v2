@@ -145,5 +145,5 @@ export const previewProps: OrderConfirmationEmailProps = {
   shippingFee: 0,
   tax: 375,
   grandTotal: 7373,
-  trackOrderUrl: "https://bansaricollections.in/orders/BC-100482",
+  trackOrderUrl: "https://bansaricollection.in/orders/BC-100482",
 };

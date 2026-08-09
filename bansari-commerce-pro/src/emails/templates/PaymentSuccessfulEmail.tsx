@@ -139,5 +139,5 @@ export const previewProps: PaymentSuccessfulEmailProps = {
   shippingFee: 0,
   tax: 375,
   grandTotal: 7373,
-  viewOrderUrl: "https://bansaricollections.in/orders/BC-100482",
+  viewOrderUrl: "https://bansaricollection.in/orders/BC-100482",
 };

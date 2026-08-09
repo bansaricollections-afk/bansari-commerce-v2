@@ -94,5 +94,5 @@ export const previewProps: DeliveredEmailProps = {
     country: "India",
     phone: "+91 98765 43210",
   },
-  viewOrderUrl: "https://bansaricollections.in/orders/BC-100482",
+  viewOrderUrl: "https://bansaricollection.in/orders/BC-100482",
 };

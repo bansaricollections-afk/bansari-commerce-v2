@@ -362,6 +362,22 @@ export default function CheckoutPage() {
                   />
                 </div>
 
+                <p className="text-center text-[11px] leading-relaxed text-slate-400">
+                  By placing this order, you agree to our{" "}
+                  <a href="/terms-and-conditions" target="_blank" rel="noopener noreferrer" className="underline hover:text-slate-600">
+                    Terms &amp; Conditions
+                  </a>
+                  ,{" "}
+                  <a href="/return-refund-policy" target="_blank" rel="noopener noreferrer" className="underline hover:text-slate-600">
+                    Return &amp; Refund Policy
+                  </a>{" "}
+                  and{" "}
+                  <a href="/privacy-policy" target="_blank" rel="noopener noreferrer" className="underline hover:text-slate-600">
+                    Privacy Policy
+                  </a>
+                  .
+                </p>
+
                 <CheckoutTrustStrip />
               </aside>
             </div>

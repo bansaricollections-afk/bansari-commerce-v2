@@ -124,7 +124,7 @@ export default async function ProductPage({ params }: Props) {
       name: 'How long does delivery take?',
       acceptedAnswer: {
         '@type': 'Answer',
-        text: 'Standard delivery takes 5–7 business days across India. Express delivery (2–3 business days) is available at checkout for select pin codes.',
+        text: 'Orders are generally processed and dispatched within 1–2 business days after payment confirmation. Actual delivery time may vary by destination, courier service and circumstances beyond our control.',
       },
     },
     {
@@ -132,7 +132,7 @@ export default async function ProductPage({ params }: Props) {
       name: 'What is the return policy?',
       acceptedAnswer: {
         '@type': 'Answer',
-        text: 'We offer a 7-day hassle-free return policy. Items must be unworn, unwashed, and in their original packaging with tags intact. Free pickup is available for returns.',
+        text: 'Products can be returned within 7 days of delivery. Items must be unworn, unwashed, and in their original packaging with tags intact. See our Return & Refund Policy for full details.',
       },
     },
     {

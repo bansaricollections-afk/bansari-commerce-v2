@@ -114,5 +114,5 @@ export const previewProps: OrderShippedEmailProps = {
     country: "India",
     phone: "+91 98765 43210",
   },
-  trackShipmentUrl: "https://bansaricollections.in/orders/BC-100482/track",
+  trackShipmentUrl: "https://bansaricollection.in/orders/BC-100482/track",
 };

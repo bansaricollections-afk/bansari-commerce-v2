@@ -19,6 +19,7 @@ const POLICY_LINKS = [
   { label: "FAQ",                    href: "/faq" },
   { label: "Shipping Policy",        href: "/shipping-policy" },
   { label: "Return & Refund",        href: "/return-refund-policy" },
+  { label: "Exchange Policy",        href: "/exchange-policy" },
   { label: "Cancellation Policy",    href: "/cancellation-policy" },
   { label: "Privacy Policy",         href: "/privacy-policy" },
   { label: "Terms & Conditions",     href: "/terms-and-conditions" },
