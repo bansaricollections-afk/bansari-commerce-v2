@@ -4,16 +4,19 @@
  * Returns inventory transaction audit log for a specific variant.
  * Query param: ?limit=50 (default 50, max 200)
  */
-import { NextRequest } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { FulfillmentService } from '@/services/fulfillment.service';
 import { apiSuccess, apiError } from '@/lib/api-response';
 import { generateRequestId } from '@/lib/request-id';
+import { requireAdminSession } from '@/lib/auth/requireAdmin';
 
 export async function GET(
   req: NextRequest,
   { params }: { params: Promise<{ variantId: string }> }
 ) {
   const requestId = generateRequestId();
+  const auth = await requireAdminSession(req);
+  if (auth instanceof NextResponse) return auth;
   try {
     const { variantId: variantIdStr } = await params;
     const variantId = Number(variantIdStr);

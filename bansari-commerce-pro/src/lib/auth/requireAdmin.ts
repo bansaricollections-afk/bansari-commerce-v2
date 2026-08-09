@@ -56,6 +56,21 @@ export async function requireAdminPage(): Promise<void> {
   }
 }
 
+/**
+ * For Server Actions ('use server' functions) — no NextRequest/NextResponse
+ * available in that context, so this returns null on failure instead of a
+ * Response. Callers must translate null into their own ActionResult shape.
+ * Uses the same getUser() + isAdminUser() check as requireAdminSession.
+ */
+export async function requireAdminAction(): Promise<{ userId: string; email: string } | null> {
+  const supabase = await makeServerClient();
+  const { data: { user } } = await supabase.auth.getUser();
+
+  if (!user || !isAdminUser(user)) return null;
+
+  return { userId: user.id, email: user.email ?? '' };
+}
+
 /** For API route handlers — returns 401/403 or the verified user identity. */
 export async function requireAdminSession(
   _request: NextRequest
