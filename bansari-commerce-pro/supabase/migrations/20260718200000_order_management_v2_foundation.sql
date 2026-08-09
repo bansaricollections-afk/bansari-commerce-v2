@@ -85,7 +85,7 @@ CREATE TABLE IF NOT EXISTS order_timeline (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   order_id UUID NOT NULL REFERENCES orders(id) ON DELETE CASCADE,
   event TEXT NOT NULL,
-  actor_id UUID,
+  actor_id UUID,           -- admin user id (nullable for system events)
   actor_name TEXT,
   previous_status TEXT,
   new_status TEXT,
@@ -97,6 +97,7 @@ CREATE TABLE IF NOT EXISTS order_timeline (
 CREATE INDEX IF NOT EXISTS idx_order_timeline_order_id ON order_timeline (order_id);
 CREATE INDEX IF NOT EXISTS idx_order_timeline_created_at ON order_timeline (created_at DESC);
 
+-- Immutable: prevent UPDATE and DELETE on timeline rows
 CREATE OR REPLACE FUNCTION order_timeline_immutable()
 RETURNS TRIGGER LANGUAGE plpgsql AS $$
 BEGIN
@@ -145,22 +146,24 @@ CREATE INDEX IF NOT EXISTS idx_order_shipments_awb ON order_shipments (awb_numbe
 CREATE SEQUENCE IF NOT EXISTS seq_invoice_number START 1000 INCREMENT 1;
 CREATE SEQUENCE IF NOT EXISTS seq_packing_slip_number START 1000 INCREMENT 1;
 
+-- Helper: generate invoice number like INV-2026-001000
 CREATE OR REPLACE FUNCTION generate_invoice_number()
 RETURNS TEXT LANGUAGE plpgsql AS $$
 DECLARE
   v_year TEXT := TO_CHAR(NOW(), 'YYYY');
-  v_seq BIGINT;
+  v_seq  BIGINT;
 BEGIN
   v_seq := nextval('seq_invoice_number');
   RETURN 'INV-' || v_year || '-' || LPAD(v_seq::TEXT, 6, '0');
 END;
 $$;
 
+-- Helper: generate packing slip number like PS-2026-001000
 CREATE OR REPLACE FUNCTION generate_packing_slip_number()
 RETURNS TEXT LANGUAGE plpgsql AS $$
 DECLARE
   v_year TEXT := TO_CHAR(NOW(), 'YYYY');
-  v_seq BIGINT;
+  v_seq  BIGINT;
 BEGIN
   v_seq := nextval('seq_packing_slip_number');
   RETURN 'PS-' || v_year || '-' || LPAD(v_seq::TEXT, 6, '0');
