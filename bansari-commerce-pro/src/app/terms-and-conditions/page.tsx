@@ -141,7 +141,11 @@ export default function TermsAndConditionsPage() {
           <li>Proprietor: Mosmiben Devangkumar Bhatt</li>
           <li>GSTIN: 24CTLPS4594R1ZH</li>
           <li>Udyam Registration: UDYAM-GJ-24-0234126</li>
-          <li>Business location: Vadodara, Gujarat – 391410, India</li>
+          <li>
+            Registered address: Ground Floor, Flat No. 4, Auroma Park, Bill
+            Road, Bill, Vadodara, Gujarat 391410, India (the same location
+            shown on our Contact page and website footer)
+          </li>
           <li>
             Customer support:{" "}
             <a href="mailto:support@bansaricollections.com" className="underline">

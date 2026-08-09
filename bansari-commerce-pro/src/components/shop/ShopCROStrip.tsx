@@ -50,7 +50,7 @@ export default function ShopCROStrip() {
               </p>
               <div className="mt-4 flex flex-wrap gap-3">
                 {[
-                  { label: "COD Available", color: "bg-slate-100 text-slate-700" },
+                  { label: "Prepaid Orders Only", color: "bg-slate-100 text-slate-700" },
                   { label: "7-Day Returns", color: "bg-slate-100 text-slate-700" },
                   { label: "Secure Payment", color: "bg-slate-100 text-slate-700" },
                 ].map((b) => (

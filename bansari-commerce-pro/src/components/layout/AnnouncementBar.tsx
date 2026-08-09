@@ -12,7 +12,7 @@ export interface AnnouncementBarProps {
 
 const MESSAGES = [
   "Free shipping on all orders above ₹999 — delivered across India",
-  "Cash on Delivery available · No prepayment required",
+  "Secure online payments via Razorpay · UPI, cards & net banking accepted",
   "Secure payments · Easy 7-day returns · Trusted by 10,000+ customers",
   "New arrivals every week — The Festive Edit is now live",
 ];
