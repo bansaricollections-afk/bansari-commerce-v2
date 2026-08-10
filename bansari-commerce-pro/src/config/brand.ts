@@ -3,7 +3,7 @@ export const BRAND = {
 
   tagline: "Celebrating Every Occasion",
 
-  email: "support@bansaricollections.com",
+  email: "support@bansaricollection.in",
 
   phone: "+91 84601 92745",
 
@@ -17,5 +17,5 @@ export const BRAND = {
 
   linkedin: "https://linkedin.com",
 
-  website: "https://bansaricollection.in",
+  website: "https://www.bansaricollection.in",
 };

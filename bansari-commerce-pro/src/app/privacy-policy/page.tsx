@@ -114,8 +114,8 @@ export default function PrivacyPolicyPage() {
         </h2>
         <p>
           For any privacy-related questions or requests, contact us at{" "}
-          <a href="mailto:support@bansaricollections.com" className="underline">
-            support@bansaricollections.com
+          <a href="mailto:support@bansaricollection.in" className="underline">
+            support@bansaricollection.in
           </a>{" "}
           or call{" "}
           <a href="tel:+918460192745" className="underline">

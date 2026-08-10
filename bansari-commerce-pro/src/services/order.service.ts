@@ -391,7 +391,7 @@ export async function recoverOrderFromWebhook(
     });
 
     const grandTotal     = Math.round((payment.amount / 100) * 100) / 100;
-    const customerEmail  = payment.email ?? 'unknown@bansaricollections.com';
+    const customerEmail  = payment.email ?? 'unknown@bansaricollection.in';
     const customerPhone  = payment.contact ?? '';
     const customerName   = payment.notes?.customer_name ?? 'Customer';
     const orderNumber    = generateOrderNumber();
@@ -459,7 +459,7 @@ export async function recoverOrderFromWebhook(
     });
 
     try {
-      if (customerEmail !== 'unknown@bansaricollections.com') {
+      if (customerEmail !== 'unknown@bansaricollection.in') {
         await sendOrderConfirmationEmail({
           orderNumber:  partialOrder?.order_number ?? orderNumber,
           customerName,

@@ -255,9 +255,9 @@ export default function Footer() {
               </a>
             </li>
             <li style={{ fontSize: "var(--bc-text-sm)", opacity: 0.65 }}>
-              <a href="mailto:support@bansaricollections.com" className="flex items-center gap-2 hover:opacity-100 transition-opacity">
+              <a href="mailto:support@bansaricollection.in" className="flex items-center gap-2 hover:opacity-100 transition-opacity">
                 <Mail size={14} className="flex-shrink-0" />
-                support@bansaricollections.com
+                support@bansaricollection.in
               </a>
             </li>
             <li style={{ fontSize: "var(--bc-text-sm)", opacity: 0.65 }}>

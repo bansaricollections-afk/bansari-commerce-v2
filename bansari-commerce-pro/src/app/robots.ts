@@ -5,7 +5,7 @@ import { MetadataRoute } from 'next';
  * No manual file needed in /public.
  */
 export default function robots(): MetadataRoute.Robots {
-  const base = process.env.NEXT_PUBLIC_SITE_URL ?? 'https://bansaricollections.com';
+  const base = process.env.NEXT_PUBLIC_SITE_URL ?? 'https://www.bansaricollection.in';
 
   return {
     rules: [

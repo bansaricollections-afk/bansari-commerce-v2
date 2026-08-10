@@ -12,6 +12,6 @@ export const STORE = {
 
   defaultProductLimit: 24,
 
-  supportEmail: "support@bansaricollections.com",
+  supportEmail: "support@bansaricollection.in",
 
 };

@@ -8,7 +8,7 @@ export const metadata = {
   openGraph: {
     title: "New Arrivals | Bansari Collections",
     description: "Fresh ethnic styles, just arrived. Shop premium sarees, kurta sets and lehengas.",
-    url: "https://bansaricollections.com/new-arrivals",
+    url: "https://www.bansaricollection.in/new-arrivals",
     siteName: "Bansari Collections",
   },
 };

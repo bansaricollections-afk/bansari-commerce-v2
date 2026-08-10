@@ -179,10 +179,10 @@ export function SupportSection() {
             <p style={{ ...textStyles.muted, marginTop: spacing.xs }}>
               Write to us at{" "}
               <a
-                href="mailto:support@bansaricollections.com"
+                href="mailto:support@bansaricollection.in"
                 style={{ color: colors.maroon }}
               >
-                support@bansaricollections.com
+                support@bansaricollection.in
               </a>{" "}
               or call +91 98765 43210
             </p>

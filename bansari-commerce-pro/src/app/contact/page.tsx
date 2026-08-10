@@ -69,8 +69,8 @@ export default function ContactPage() {
               </span>
               <div>
                 <p className="mb-0.5 text-xs font-semibold uppercase tracking-widest text-slate-500">Email</p>
-                <a href="mailto:support@bansaricollections.com" className="text-slate-700 hover:text-[#8A5A6A] transition-colors">
-                  support@bansaricollections.com
+                <a href="mailto:support@bansaricollection.in" className="text-slate-700 hover:text-[#8A5A6A] transition-colors">
+                  support@bansaricollection.in
                 </a>
               </div>
             </li>

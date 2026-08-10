@@ -8,7 +8,7 @@ Use an incognito / private browser window for all steps.
 ## 1. Homepage
 
 ```
-[ ] Open https://bansaricollections.com
+[ ] Open https://www.bansaricollection.in
 [ ] Page loads without errors
 [ ] Hero image renders
 [ ] Category grid renders with images

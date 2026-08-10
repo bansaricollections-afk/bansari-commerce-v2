@@ -51,7 +51,7 @@ const faqs = [
   {
     question: 'How do I contact customer support?',
     answer:
-      'You can contact us by phone at +91 84601 92745 or email us at support@bansaricollections.com.',
+      'You can contact us by phone at +91 84601 92745 or email us at support@bansaricollection.in.',
   },
 ];
 

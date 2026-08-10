@@ -5,11 +5,11 @@ export const metadata: Metadata = {
   title: "Collections — Bansari Collections",
   description:
     "Explore Bansari Collections — Kurta Sets, Sarees, Lehengas, Co-ord Sets, Gowns, Festive Wear, and New Arrivals. Luxury ethnic wear for every occasion.",
-  alternates: { canonical: "https://bansaricollections.com/collections" },
+  alternates: { canonical: "https://www.bansaricollection.in/collections" },
   openGraph: {
     title: "Collections — Bansari Collections",
     description: "Luxury ethnic wear collections — Sarees, Lehengas, Kurta Sets, Gowns, and more.",
-    url: "https://bansaricollections.com/collections",
+    url: "https://www.bansaricollection.in/collections",
     type: "website",
   },
   twitter: {
@@ -106,8 +106,8 @@ export default function CollectionsPage() {
             "@context": "https://schema.org",
             "@type": "BreadcrumbList",
             itemListElement: [
-              { "@type": "ListItem", position: 1, name: "Home", item: "https://bansaricollections.com" },
-              { "@type": "ListItem", position: 2, name: "Collections", item: "https://bansaricollections.com/collections" },
+              { "@type": "ListItem", position: 1, name: "Home", item: "https://www.bansaricollection.in" },
+              { "@type": "ListItem", position: 2, name: "Collections", item: "https://www.bansaricollection.in/collections" },
             ],
           }),
         }}
@@ -123,7 +123,7 @@ export default function CollectionsPage() {
             "@type": "CollectionPage",
             name: "Collections — Bansari Collections",
             description: "Luxury ethnic wear collections — Sarees, Lehengas, Kurta Sets, Gowns, and more.",
-            url: "https://bansaricollections.com/collections",
+            url: "https://www.bansaricollection.in/collections",
           }),
         }}
       />

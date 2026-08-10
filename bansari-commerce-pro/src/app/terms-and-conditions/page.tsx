@@ -148,8 +148,8 @@ export default function TermsAndConditionsPage() {
           </li>
           <li>
             Customer support:{" "}
-            <a href="mailto:support@bansaricollections.com" className="underline">
-              support@bansaricollections.com
+            <a href="mailto:support@bansaricollection.in" className="underline">
+              support@bansaricollection.in
             </a>{" "}
             /{" "}
             <a href="tel:+918460192745" className="underline">

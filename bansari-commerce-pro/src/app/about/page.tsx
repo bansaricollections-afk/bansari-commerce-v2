@@ -101,8 +101,8 @@ export default function AboutPage() {
                 </a>
               </p>
               <p>
-                <a href="mailto:support@bansaricollections.com" className="hover:text-[#8A5A6A] transition-colors break-all">
-                  support@bansaricollections.com
+                <a href="mailto:support@bansaricollection.in" className="hover:text-[#8A5A6A] transition-colors break-all">
+                  support@bansaricollection.in
                 </a>
               </p>
             </address>

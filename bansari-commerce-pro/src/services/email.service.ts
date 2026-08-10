@@ -6,7 +6,7 @@
  *
  * Required environment variables:
  *   RESEND_API_KEY     — your Resend API key (re_...)
- *   RESEND_FROM_EMAIL  — verified sender address, e.g. orders@bansaricollections.com
+ *   RESEND_FROM_EMAIL  — verified sender address, e.g. support@bansaricollection.in
  *
  * SERVER-SIDE ONLY.  Never import into a Client Component.
  *
@@ -209,7 +209,7 @@ async function sendEmail({
 }): Promise<EmailResult> {
   const apiKey = process.env.RESEND_API_KEY;
   const from =
-    process.env.RESEND_FROM_EMAIL ?? "orders@bansaricollections.com";
+    process.env.RESEND_FROM_EMAIL ?? "support@bansaricollection.in";
 
   if (!apiKey) {
     console.warn(
