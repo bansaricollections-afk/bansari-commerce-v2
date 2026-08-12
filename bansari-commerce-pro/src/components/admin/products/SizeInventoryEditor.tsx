@@ -201,12 +201,19 @@ export default function SizeInventoryEditor({ data }: { data: AdminProductInvent
         reserved for open orders.
       </p>
 
-      <div className="flex flex-wrap items-center gap-3">
+      {/* Action bar — sticks to the bottom of the viewport so Save is always
+          reachable while working down a long size table.
+          The background colour is set inline on purpose: globals.css declares
+          an unlayered `button { background: none }` rule that overrides
+          Tailwind bg-* utilities on raw buttons, which rendered this control
+          invisible (white label on a cream page). */}
+      <div className="sticky bottom-0 -mx-1 flex flex-wrap items-center gap-3 border-t border-slate-200 bg-white/95 px-1 py-4 backdrop-blur">
         <button
           type="button"
           onClick={handleSave}
           disabled={pending}
-          className="bg-slate-900 px-5 py-2.5 text-sm font-medium text-white transition-colors hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60"
+          style={{ backgroundColor: pending ? '#64748b' : '#0f172a', color: '#ffffff' }}
+          className="px-5 py-2.5 text-sm font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-70"
         >
           {pending ? 'Saving…' : 'Save size inventory'}
         </button>
@@ -217,7 +224,11 @@ export default function SizeInventoryEditor({ data }: { data: AdminProductInvent
           Back to products
         </Link>
         {message && (
-          <span className={`text-sm ${message.ok ? 'text-emerald-700' : 'text-rose-700'}`}>
+          <span
+            className="text-sm font-medium"
+            style={{ color: message.ok ? '#047857' : '#be123c' }}
+            role="status"
+          >
             {message.text}
           </span>
         )}
