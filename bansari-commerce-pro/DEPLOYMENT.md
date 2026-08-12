@@ -34,7 +34,31 @@ git config core.hooksPath .githooks
 
 ---
 
-## 1a. Deploy gate (read this before pushing)
+## 1a. Deployment invariant (read before every deploy)
+
+> **Production may only be deployed from a committed, clean, verified Git state.**
+> Production is deployed from the committed repository state — never from
+> uncommitted local changes. If the working tree is dirty: stop, do not deploy,
+> and do not assume the changes were meant to ship.
+
+Both production paths are guarded, and both fail closed:
+
+| Path | Trigger | Guard |
+|---|---|---|
+| Vercel GitHub integration | `git push origin main` | `.githooks/pre-push` |
+| Vercel CLI | `npm run deploy` | `scripts/deploy-preflight.sh` (npm `predeploy`) |
+
+Required before any production deploy:
+
+```
+git status --short   = clean
+HEAD                == origin/main
+npx tsc --noEmit      PASS
+npm run build         PASS
+git diff --check      PASS
+```
+
+
 
 Pushing `main` triggers a Vercel production build **from the committed tree**.
 Anything left uncommitted is simply absent from that build.
@@ -112,8 +136,20 @@ Both must complete with no errors before deploying.
 ### Via CLI
 
 ```bash
-vercel --prod
+npm run deploy
 ```
+
+Not `vercel --prod` directly. `npm run deploy` runs `scripts/deploy-preflight.sh`
+first (npm `predeploy`) and aborts the deploy unless every gate passes:
+
+```
+working tree clean  →  HEAD == origin/main  →  tsc  →  build  →  diff check  →  vercel --prod
+```
+
+`vercel --prod` on its own uploads the **local working tree**, bypassing Git
+entirely — that is how a deploy can diverge from the repository. The preflight
+is what closes that path; it fails closed and never commits, stashes or
+discards anything, it only reports what is blocking.
 
 ---
 
