@@ -1,12 +1,20 @@
 'use client';
 
 import { useState } from 'react';
-import type { ProductVariant } from '@/types/product';
+import type { ProductVariant, SizeAvailability } from '@/types/product';
 
 interface Props {
   variants: ProductVariant[];
   selected: ProductVariant | null;
   onSelect: (variant: ProductVariant) => void;
+  /**
+   * Size-level inventory. When present it is authoritative: each size carries
+   * its own availability and a sold-out size cannot be selected. Absent for
+   * products that are not yet size-managed (legacy product-level path).
+   */
+  sizeAvailability?: SizeAvailability[];
+  selectedSize?: SizeAvailability | null;
+  onSelectSize?: (size: SizeAvailability) => void;
 }
 
 const SIZE_ORDER = ['XXS','XS','S','M','L','XL','XXL','3XL','4XL','Free Size'];
@@ -75,8 +83,80 @@ function SizeGuideModal({ onClose }: { onClose: () => void }) {
   );
 }
 
-export default function ProductVariantSelector({ variants, selected, onSelect }: Props) {
+export default function ProductVariantSelector({
+  variants,
+  selected,
+  onSelect,
+  sizeAvailability,
+  selectedSize,
+  onSelectSize,
+}: Props) {
   const [guideOpen, setGuideOpen] = useState(false);
+
+  // ── Size-managed products: one independent inventory unit per size ───────
+  if (sizeAvailability && sizeAvailability.length > 0) {
+    return (
+      <div className="flex flex-col gap-2">
+        <div className="flex flex-wrap gap-2">
+          {sizeAvailability.map((s) => {
+            const soldOut = s.status === 'SOLD_OUT';
+            const isSelected = selectedSize?.variantId === s.variantId;
+
+            return (
+              <button
+                key={s.variantId}
+                type="button"
+                onClick={() => !soldOut && onSelectSize?.(s)}
+                disabled={soldOut}
+                aria-pressed={isSelected}
+                aria-label={`Size ${s.label}${soldOut ? ' — sold out' : s.status === 'ONLY_ONE_LEFT' ? ' — only 1 left' : ' — available'}`}
+                className={[
+                  'relative min-w-[52px] h-12 px-4 text-sm font-medium border transition-all duration-150 rounded-sm select-none',
+                  isSelected
+                    ? 'border-[#8A5A6A] bg-[#8A5A6A] text-white shadow-sm'
+                    : soldOut
+                    ? 'border-slate-150 text-slate-300 cursor-not-allowed bg-slate-50'
+                    : 'border-slate-200 text-slate-700 hover:border-[#8A5A6A] hover:text-[#8A5A6A] bg-white',
+                ].join(' ')}
+              >
+                {s.label}
+                {soldOut && (
+                  <span className="absolute inset-0 flex items-center justify-center pointer-events-none overflow-hidden rounded-sm">
+                    <span className="absolute w-[130%] h-px bg-slate-300 rotate-[-20deg]" />
+                  </span>
+                )}
+              </button>
+            );
+          })}
+        </div>
+
+        {/* Per-size truth line — never derived from a product-level total. */}
+        <div className="min-h-[16px]">
+          {selectedSize ? (
+            selectedSize.status === 'ONLY_ONE_LEFT' ? (
+              <span className="flex items-center gap-1.5 text-[11px] font-medium text-amber-700">
+                <span className="relative flex h-2 w-2 flex-shrink-0">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75" />
+                  <span className="relative inline-flex h-2 w-2 rounded-full bg-amber-500" />
+                </span>
+                Size {selectedSize.label} — only 1 left
+              </span>
+            ) : selectedSize.status === 'LOW_STOCK' ? (
+              <span className="text-[11px] text-amber-700">
+                Size {selectedSize.label} — only {selectedSize.available} left
+              </span>
+            ) : (
+              <span className="text-[11px] text-green-600">
+                Size {selectedSize.label} — in stock
+              </span>
+            )
+          ) : (
+            <span className="text-[11px] text-slate-400 italic">Select your size</span>
+          )}
+        </div>
+      </div>
+    );
+  }
 
   const sizes = [
     ...new Set(

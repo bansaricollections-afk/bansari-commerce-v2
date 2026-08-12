@@ -38,6 +38,26 @@ export type ProductSize = {
   sku: string;
 };
 
+// ── Size-level inventory ────────────────────────────────────────────────────
+// Derived server-side by size-inventory.service; never computed in the UI.
+
+export type SizeStatus = "AVAILABLE" | "LOW_STOCK" | "ONLY_ONE_LEFT" | "SOLD_OUT";
+
+export type SizeSemantic = "REGULAR" | "PLUS" | "FREE_SIZE" | "UNCLASSIFIED";
+
+/** One purchasable size of a product, with its own independent inventory. */
+export type SizeAvailability = {
+  variantId: number;
+  sizeId: number;
+  label: string;
+  sortOrder: number;
+  semantic: SizeSemantic;
+  sku: string;
+  /** stock - reserved_stock, clamped at 0. Used to cap the quantity selector. */
+  available: number;
+  status: SizeStatus;
+};
+
 export type ProductReview = {
   id: string;
   customerName: string;
@@ -93,6 +113,12 @@ export interface Product {
   newArrival?: boolean;
   bestSeller?: boolean;
   variants?: ProductVariant[];
+  /**
+   * Size-level availability. Present (non-empty) only for size-managed
+   * products — i.e. products that have at least one live product_variants row.
+   * When absent, the legacy product-level `stock` path applies unchanged.
+   */
+  sizeAvailability?: SizeAvailability[];
   specifications?: ProductSpecification;
   description?: string;
   seo?: ProductSEO;

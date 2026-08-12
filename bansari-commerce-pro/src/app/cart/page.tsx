@@ -10,7 +10,7 @@ import {
   ShoppingBag,
 } from "lucide-react";
 
-import { useCart, useCartHasHydrated } from "@/store/cart";
+import { useCart, useCartHasHydrated, cartLineId } from "@/store/cart";
 import CartTrustStrip from "@/components/cart/CartTrustStrip";
 import ShippingProgress from "@/components/cart/ShippingProgress";
 import {
@@ -161,6 +161,10 @@ export default function CartPage() {
                         {item.name}
                       </h2>
 
+                      {item.size && (
+                        <p className="mt-1 text-sm text-slate-500">Size: {item.size}</p>
+                      )}
+
                       <p className="mt-2 text-xl font-bold text-[#8A5A6A]">
                         ₹{item.price.toLocaleString("en-IN")}
                       </p>
@@ -170,7 +174,7 @@ export default function CartPage() {
                       <div className="flex items-center rounded-xl border">
                         <button
                           type="button"
-                          onClick={() => decreaseQuantity(item.id)}
+                          onClick={() => decreaseQuantity(cartLineId(item))}
                           className="p-3"
                           aria-label="Decrease quantity"
                         >
@@ -183,7 +187,7 @@ export default function CartPage() {
 
                         <button
                           type="button"
-                          onClick={() => increaseQuantity(item.id)}
+                          onClick={() => increaseQuantity(cartLineId(item))}
                           className="p-3"
                           aria-label="Increase quantity"
                         >
@@ -193,7 +197,7 @@ export default function CartPage() {
 
                       <button
                         type="button"
-                        onClick={() => removeItem(item.id)}
+                        onClick={() => removeItem(cartLineId(item))}
                         aria-label="Remove item"
                         className="text-red-500 transition hover:text-red-700"
                       >

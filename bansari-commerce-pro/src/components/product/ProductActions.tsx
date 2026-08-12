@@ -5,7 +5,7 @@ import { useState } from 'react';
 
 import { useCart } from '@/hooks/useCart';
 import { useWishlist } from '@/hooks/useWishlist';
-import type { Product, ProductVariant } from '@/types/product';
+import type { Product, ProductVariant, SizeAvailability } from '@/types/product';
 
 import CartDrawer from './CartDrawer';
 import NotifyMe from './NotifyMe';
@@ -14,9 +14,23 @@ interface Props {
   product: Product;
   quantity: number;
   selectedVariant: ProductVariant | null;
+  /** Selected size for size-managed products — carries the purchased variant. */
+  selectedSize?: SizeAvailability | null;
+  isSizeManaged?: boolean;
 }
 
-export default function ProductActions({ product, quantity, selectedVariant }: Props) {
+/** Maps the selected size onto the cart's variant identity. */
+function toCartSize(size: SizeAvailability | null) {
+  return size ? { variantId: size.variantId, label: size.label, sku: size.sku } : null;
+}
+
+export default function ProductActions({
+  product,
+  quantity,
+  selectedVariant,
+  selectedSize = null,
+  isSizeManaged = false,
+}: Props) {
   const { addToCart } = useCart();
   const { toggleWishlist, isInWishlist } = useWishlist();
   const router = useRouter();
@@ -26,12 +40,20 @@ export default function ProductActions({ product, quantity, selectedVariant }: P
   const [sizeWarningShake, setSizeWarningShake] = useState(false);
 
   const inWishlist = isInWishlist(product.id);
-  const isOutOfStock = !product.stock || product.stock === 0;
 
-  const requiresSizeSelection =
-    Array.isArray((product as any).variants) &&
-    (product as any).variants.length > 0 &&
-    selectedVariant === null;
+  const sizeAvailability = product.sizeAvailability ?? [];
+  const hasSellableSize = sizeAvailability.some((s) => s.status !== 'SOLD_OUT');
+
+  // Size-managed products are only out of stock when EVERY size is sold out.
+  const isOutOfStock = isSizeManaged
+    ? !hasSellableSize
+    : !product.stock || product.stock === 0;
+
+  const requiresSizeSelection = isSizeManaged
+    ? selectedSize === null || selectedSize.status === 'SOLD_OUT'
+    : Array.isArray((product as any).variants) &&
+      (product as any).variants.length > 0 &&
+      selectedVariant === null;
 
   const handleAddToCart = () => {
     if (isOutOfStock) return;
@@ -42,7 +64,7 @@ export default function ProductActions({ product, quantity, selectedVariant }: P
       setTimeout(() => setSizeWarningShake(false), 400);
       return;
     }
-    addToCart({ product, quantity, variant: selectedVariant });
+    addToCart({ product, quantity, variant: selectedVariant, size: toCartSize(selectedSize) });
     setAddedToCart(true);
     setCartDrawerOpen(true);
     setTimeout(() => setAddedToCart(false), 2500);
@@ -56,7 +78,7 @@ export default function ProductActions({ product, quantity, selectedVariant }: P
       setTimeout(() => setSizeWarningShake(false), 400);
       return;
     }
-    addToCart({ product, quantity, variant: selectedVariant });
+    addToCart({ product, quantity, variant: selectedVariant, size: toCartSize(selectedSize) });
     router.push('/checkout');
   };
 
@@ -106,73 +128,44 @@ export default function ProductActions({ product, quantity, selectedVariant }: P
           <NotifyMe productId={product.id} productName={product.name} />
         ) : (
           <>
-            {/*
-             * Primary CTAs
-             * Hierarchy: Buy Now (filled rose) > Add to Cart (outlined) > Wishlist > Share
-             * Rationale: luxury fashion sites drive direct purchase; Add to Cart is
-             * a fallback for comparison shoppers, Buy Now is the conversion action.
-             */}
-            <div className="flex gap-3">
-              {/* Buy Now — PRIMARY (filled, high visual weight) */}
-              <button
-                onClick={handleBuyNow}
-                aria-label={requiresSizeSelection ? 'Select a size first' : 'Buy now'}
-                className={`flex-1 h-12 text-sm tracking-[0.12em] uppercase font-medium transition-all duration-200 rounded-sm ${
-                  requiresSizeSelection
-                    ? 'bg-slate-100 text-slate-400 cursor-not-allowed'
-                    : 'bg-[#8A5A6A] text-white hover:bg-[#6e3f50]'
-                }`}
-              >
-                Buy Now
-              </button>
-
+            {/* Slim secondary-action row — wishlist / share as understated text links */}
+            <div className="flex items-center gap-5 text-[11px] tracking-[0.1em] uppercase text-slate-500">
               <button
                 onClick={() => toggleWishlist(product.id)}
-                aria-label={inWishlist ? 'Remove from wishlist' : 'Add to wishlist'}
                 aria-pressed={inWishlist}
-                className={`h-12 w-12 flex items-center justify-center border rounded-sm transition-all duration-200 flex-shrink-0 ${
-                  inWishlist
-                    ? 'border-[#8A5A6A] bg-[#8A5A6A]/5 text-[#8A5A6A]'
-                    : 'border-slate-200 text-slate-500 hover:border-[#8A5A6A] hover:text-[#8A5A6A]'
+                className={`flex items-center gap-1.5 transition-colors duration-200 ${
+                  inWishlist ? 'text-[#8A5A6A]' : 'hover:text-slate-900'
                 }`}
               >
-                <svg
-                  className="w-5 h-5"
-                  fill={inWishlist ? 'currentColor' : 'none'}
-                  stroke="currentColor"
-                  strokeWidth="1.5"
-                  viewBox="0 0 24 24"
-                >
+                <svg className="w-3.5 h-3.5" fill={inWishlist ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" d="M21 8.25c0-2.485-2.099-4.5-4.688-4.5-1.935 0-3.597 1.126-4.312 2.733-.715-1.607-2.377-2.733-4.313-2.733C5.1 3.75 3 5.765 3 8.25c0 7.22 9 12 9 12s9-4.78 9-12z" />
                 </svg>
+                {inWishlist ? 'Wishlisted' : 'Wishlist'}
               </button>
-
-              <button
-                onClick={handleShare}
-                aria-label={shareCopied ? 'Link copied' : 'Share product'}
-                className="h-12 w-12 flex items-center justify-center border border-slate-200 rounded-sm text-slate-500 hover:border-slate-400 hover:text-slate-700 transition-all duration-200 flex-shrink-0 relative"
-              >
-                {shareCopied ? (
-                  <span className="text-[10px] font-medium text-green-700 tracking-wide">Copied!</span>
-                ) : (
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M7.217 10.907a2.25 2.25 0 100 2.186m0-2.186c.18.324.283.696.283 1.093s-.103.77-.283 1.093m0-2.186l9.566-5.314m-9.566 7.5l9.566 5.314m0 0a2.25 2.25 0 103.935 2.186 2.25 2.25 0 00-3.935-2.186zm0-12.814a2.25 2.25 0 103.933-2.185 2.25 2.25 0 00-3.933 2.185z" />
-                  </svg>
-                )}
+              <button onClick={handleShare} className="flex items-center gap-1.5 hover:text-slate-900 transition-colors duration-200">
+                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M7.217 10.907a2.25 2.25 0 100 2.186m0-2.186c.18.324.283.696.283 1.093s-.103.77-.283 1.093m0-2.186l9.566-5.314m-9.566 7.5l9.566 5.314m0 0a2.25 2.25 0 103.935 2.186 2.25 2.25 0 00-3.935-2.186zm0-12.814a2.25 2.25 0 103.933-2.185 2.25 2.25 0 00-3.933 2.185z" />
+                </svg>
+                {shareCopied ? 'Copied!' : 'Share'}
               </button>
             </div>
 
-            {/* Add to Cart — SECONDARY (outlined) */}
+            {/*
+             * Primary purchase actions — two full-width, equally-dominant, stacked
+             * buttons. Add to Cart first (comparison shoppers), Buy Now second
+             * (direct conversion) — both solid so neither reads as secondary.
+             */}
             <button
               onClick={handleAddToCart}
               aria-label={requiresSizeSelection ? 'Select a size first' : 'Add to cart'}
-              className={`w-full h-12 text-sm tracking-[0.12em] uppercase font-medium border rounded-sm transition-all duration-200 ${
+              className={`w-full h-13 text-sm tracking-[0.14em] uppercase font-medium transition-all duration-200 ${
                 requiresSizeSelection
-                  ? 'border-slate-200 text-slate-400 cursor-not-allowed'
+                  ? 'bg-slate-100 text-slate-400 cursor-not-allowed'
                   : addedToCart
-                  ? 'border-green-700 text-green-700 bg-green-50'
-                  : 'border-slate-900 text-slate-900 hover:bg-slate-900 hover:text-white'
+                  ? 'bg-green-700 text-white'
+                  : 'bg-white border border-slate-900 text-slate-900 hover:bg-slate-900 hover:text-white'
               }`}
+              style={{ height: 52 }}
             >
               {addedToCart ? (
                 <span className="flex items-center justify-center gap-2">
@@ -184,6 +177,19 @@ export default function ProductActions({ product, quantity, selectedVariant }: P
               ) : (
                 'Add to Cart'
               )}
+            </button>
+
+            <button
+              onClick={handleBuyNow}
+              aria-label={requiresSizeSelection ? 'Select a size first' : 'Buy now'}
+              className={`w-full text-sm tracking-[0.14em] uppercase font-medium transition-all duration-200 ${
+                requiresSizeSelection
+                  ? 'bg-slate-100 text-slate-400 cursor-not-allowed'
+                  : 'bg-[#8A5A6A] text-white hover:bg-[#6e3f50]'
+              }`}
+              style={{ height: 52 }}
+            >
+              Buy Now
             </button>
           </>
         )}

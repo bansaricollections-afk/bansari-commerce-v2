@@ -32,10 +32,13 @@ export function useCart() {
   function addToCart({
     product,
     quantity,
+    size,
   }: {
     product: { id: number; name: string; price: number; images?: { url?: string }[] };
     quantity: number;
     variant?: unknown;
+    /** Selected size for size-managed products — carried through to the order. */
+    size?: { variantId: number; label: string; sku?: string } | null;
   }) {
     store.addItem({
       id: product.id,
@@ -43,6 +46,9 @@ export function useCart() {
       image: product.images?.[0]?.url ?? '',
       price: product.price,
       quantity,
+      variantId: size?.variantId ?? null,
+      size: size?.label ?? null,
+      variantSku: size?.sku ?? null,
     });
   }
 

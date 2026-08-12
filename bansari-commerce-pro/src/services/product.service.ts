@@ -1,10 +1,15 @@
 import { createServiceRoleClient } from '@/lib/supabase/service';
 import {
+  getSizeAvailabilityMap,
+  getVariantAvailability,
+} from '@/services/size-inventory.service';
+import {
   logServiceQueryStart,
   logServiceQueryResult,
   logServiceError,
 } from '@/lib/debug/product-debug';
 import type { FilterParams, PaginationMeta, SortOption } from '@/types/filter-params';
+import type { SizeAvailability } from '@/types/product';
 
 // ---------------------------------------------------------------------------
 // Types — fields must exactly match public.products column names
@@ -42,8 +47,14 @@ export type Product = {
   bestSeller?: boolean;
   /** Flat sizes array from DB e.g. ["S","M","L"]. */
   sizes?: string[];
-  /** Synthesised from sizes[] for ProductVariantSelector. */
+  /** Synthesised from sizes[] for ProductVariantSelector (legacy path only). */
   variants?: any[];
+  /**
+   * Size-level availability, present only for size-managed products (products
+   * with at least one live product_variants row). When present it is the ONLY
+   * source of availability; `stock` above is the legacy product-level figure.
+   */
+  sizeAvailability?: SizeAvailability[];
   specifications?: any;
   seo?: any;
   reviews?: any[];
@@ -54,6 +65,8 @@ export type Product = {
 export type CartItem = {
   productId: number;
   quantity: number;
+  /** Present for size-managed products — identifies the exact purchased size. */
+  variantId?: number | null;
 };
 
 export type LineItem = {
@@ -65,6 +78,10 @@ export type LineItem = {
   unitPrice: number;
   quantity: number;
   lineTotal: number;
+  /** Variant identity — carried through payment into order_items. */
+  variantId?: number | null;
+  variantSku?: string | null;
+  variantSize?: string | null;
 };
 
 export type CartValidationResult =
@@ -81,6 +98,28 @@ const PRODUCT_SELECT =
 // ---------------------------------------------------------------------------
 // mapRow — normalises a raw Supabase row into the Product shape
 // ---------------------------------------------------------------------------
+
+// ---------------------------------------------------------------------------
+// Size-level availability enrichment
+// ---------------------------------------------------------------------------
+
+/**
+ * Attaches `sizeAvailability` to a set of mapped products in ONE query.
+ *
+ * Products without live variants come back untouched, so the legacy
+ * product-level stock path continues to work exactly as before.
+ */
+async function withSizeAvailability(products: Product[]): Promise<Product[]> {
+  if (products.length === 0) return products;
+
+  const map = await getSizeAvailabilityMap(products.map((p) => p.id));
+  if (map.size === 0) return products;
+
+  return products.map((p) => {
+    const sizes = map.get(p.id);
+    return sizes && sizes.length > 0 ? { ...p, sizeAvailability: sizes } : p;
+  });
+}
 
 function mapRow(row: Record<string, any>): Product {
   // Build variants[] from flat sizes[] so ProductVariantSelector receives data
@@ -122,8 +161,20 @@ function mapRow(row: Record<string, any>): Product {
     collection: row['collection'] ?? undefined,
     fabric: row['fabric'] ?? undefined,
     color: row['color'] ?? undefined,
-    rating: row['rating'] ?? undefined,
-    reviewCount: row['review_count'] ?? undefined,
+    // ── Ratings / review counts are deliberately NOT emitted ────────────────
+    // products.rating and products.review_count hold seeded placeholder values
+    // (every row carries 5, one carries 4.8 / 126) with nothing behind them:
+    // order_items is empty and no reviews table exists. Emitting them made the
+    // storefront render star scores and "(126)" as if they were real customer
+    // feedback — on the shop grid, the PDP, and in the product JSON-LD
+    // aggregateRating sent to search engines.
+    //
+    // Withholding them here is the single chokepoint: every consumer already
+    // guards on these being present, so no rating UI renders anywhere. The
+    // database values are untouched. Restore this mapping only once a real
+    // review system exists and the stored values reflect genuine reviews.
+    rating: undefined,
+    reviewCount: undefined,
     specifications: row['specifications'] ?? undefined,
     seo_title: row['seo_title'] ?? undefined,
     seo_description: row['seo_description'] ?? undefined,
@@ -150,7 +201,9 @@ export async function getProductById(id: number): Promise<Product | null> {
     .maybeSingle();
 
   if (error) throw new Error(error.message);
-  return data ? mapRow(data) : null;
+  if (!data) return null;
+  const [product] = await withSizeAvailability([mapRow(data)]);
+  return product ?? null;
 }
 
 // ---------------------------------------------------------------------------
@@ -174,7 +227,7 @@ export async function getProducts(): Promise<Product[]> {
     .order('created_at', { ascending: false });
 
   if (error) throw new Error(error.message);
-  return (data ?? []).map(mapRow);
+  return withSizeAvailability((data ?? []).map(mapRow));
 }
 
 // ---------------------------------------------------------------------------
@@ -308,7 +361,7 @@ export async function getFilteredProducts(
   const totalPages = Math.max(1, Math.ceil(total / safePerPage));
 
   return {
-    products: (data ?? []).map(mapRow),
+    products: await withSizeAvailability((data ?? []).map(mapRow)),
     meta: {
       page:        safePage,
       perPage:     safePerPage,
@@ -349,7 +402,93 @@ export async function getNewArrivals(): Promise<Product[]> {
 
   const rows = data ?? [];
   logServiceQueryResult('getNewArrivals', rows, Date.now() - t0);
-  return rows.map(mapRow);
+  return withSizeAvailability(rows.map(mapRow));
+}
+
+// ---------------------------------------------------------------------------
+// getMostViewed
+// ---------------------------------------------------------------------------
+
+/**
+ * Fetch active products ordered by real page-view count (products.view_count),
+ * highest first. Used by the homepage "Best Sellers" section — genuinely
+ * reflects what customers are actually looking at, not a curated/fabricated list.
+ * Products with zero views are excluded so the section never shows arbitrary
+ * catalog order dressed up as "popular".
+ */
+export async function getMostViewed(limit = 8): Promise<Product[]> {
+  const supabase = createServiceRoleClient();
+
+  logServiceQueryStart('getMostViewed', { active: true, limit });
+  const t0 = Date.now();
+
+  const { data, error } = await supabase
+    .from('products')
+    .select(PRODUCT_SELECT)
+    .eq('active', true)
+    .gt('view_count', 0)
+    .order('view_count', { ascending: false })
+    .limit(limit);
+
+  if (error) {
+    logServiceError('getMostViewed', error);
+    throw new Error(error.message);
+  }
+
+  const rows = data ?? [];
+  logServiceQueryResult('getMostViewed', rows, Date.now() - t0);
+  return withSizeAvailability(rows.map(mapRow));
+}
+
+// ---------------------------------------------------------------------------
+// getBestSellers
+// ---------------------------------------------------------------------------
+
+/**
+ * Fetch active products the admin has explicitly flagged `best_seller = true`
+ * in Product Management. This is a real, admin-curated catalog signal — not a
+ * derived or invented sales score. (No purchase history exists to rank by:
+ * order_items is currently empty.)
+ */
+export async function getBestSellers(limit = 8): Promise<Product[]> {
+  const supabase = createServiceRoleClient();
+
+  logServiceQueryStart('getBestSellers', { active: true, best_seller: true });
+  const t0 = Date.now();
+
+  const { data, error } = await supabase
+    .from('products')
+    .select(PRODUCT_SELECT)
+    .eq('active', true)
+    .eq('best_seller', true)
+    .order('created_at', { ascending: false })
+    .limit(limit);
+
+  if (error) {
+    logServiceError('getBestSellers', error);
+    throw new Error(error.message);
+  }
+
+  const rows = data ?? [];
+  logServiceQueryResult('getBestSellers', rows, Date.now() - t0);
+  return withSizeAvailability(rows.map(mapRow));
+}
+
+// ---------------------------------------------------------------------------
+// incrementProductView
+// ---------------------------------------------------------------------------
+
+/**
+ * Records a real product-detail-page view. Fire-and-forget from the PDP —
+ * never throws, so a tracking hiccup can never break the page for a visitor.
+ */
+export async function incrementProductView(id: number): Promise<void> {
+  try {
+    const supabase = createServiceRoleClient();
+    await supabase.rpc('increment_product_view', { p_id: id });
+  } catch {
+    // Analytics only — never let this affect the page.
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -380,7 +519,7 @@ export async function getFeaturedProducts(): Promise<Product[]> {
 
   const rows = data ?? [];
   logServiceQueryResult('getFeaturedProducts', rows, Date.now() - t0);
-  return rows.map(mapRow);
+  return withSizeAvailability(rows.map(mapRow));
 }
 
 // ---------------------------------------------------------------------------
@@ -411,7 +550,7 @@ export async function getRelatedProducts(
     .limit(limit);
 
   if (error) throw new Error(error.message);
-  return (data ?? []).map(mapRow);
+  return withSizeAvailability((data ?? []).map(mapRow));
 }
 
 // ---------------------------------------------------------------------------
@@ -460,7 +599,43 @@ export async function validateCartItems(
       continue;
     }
 
-    if (product.stock < item.quantity) {
+    // ── Size-managed products: availability is per size, never per product ──
+    const sizeAvailability = product.sizeAvailability ?? [];
+    let variantId: number | null = null;
+    let variantSku: string | null = null;
+    let variantSize: string | null = null;
+
+    if (sizeAvailability.length > 0) {
+      if (item.variantId == null) {
+        errors.push(`Please select a size for "${product.name}".`);
+        continue;
+      }
+
+      const size = sizeAvailability.find((s) => s.variantId === item.variantId);
+      if (!size) {
+        errors.push(`The selected size for "${product.name}" is no longer available.`);
+        continue;
+      }
+
+      // Re-read under no assumption of freshness — the grid snapshot above may
+      // be seconds old; this is the authoritative check before payment.
+      const live = await getVariantAvailability(size.variantId);
+      const available = live?.available ?? 0;
+
+      if (available < item.quantity) {
+        errors.push(
+          available === 0
+            ? `"${product.name}" — size ${size.label} is sold out.`
+            : `"${product.name}" — size ${size.label}: only ${available} left, ${item.quantity} requested.`
+        );
+        continue;
+      }
+
+      variantId = size.variantId;
+      variantSku = size.sku || null;
+      variantSize = size.label;
+    } else if (product.stock < item.quantity) {
+      // Legacy product-level path — unchanged for products without variants.
       errors.push(
         `Insufficient stock for "${product.name}": ${product.stock} available, ${item.quantity} requested.`
       );
@@ -476,6 +651,9 @@ export async function validateCartItems(
       unitPrice: product.price,
       quantity: item.quantity,
       lineTotal: Math.round(product.price * item.quantity * 100) / 100,
+      variantId,
+      variantSku,
+      variantSize,
     });
   }
 

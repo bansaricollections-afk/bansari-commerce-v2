@@ -17,7 +17,7 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { useEffect } from 'react';
 
-import { useCart } from '@/store/cart';
+import { useCart, cartLineId } from '@/store/cart';
 
 interface Props {
   open: boolean;
@@ -131,7 +131,7 @@ export default function CartDrawer({ open, onClose }: Props) {
                     {item.name}
                   </p>
                   <p className="text-xs text-slate-500 mt-0.5">
-                    Qty: {item.quantity}
+                    {item.size ? `Size ${item.size} · ` : ''}Qty: {item.quantity}
                   </p>
                   <p className="text-sm text-slate-900 font-light mt-1">
                     ₹{(item.price * item.quantity).toLocaleString('en-IN')}
@@ -140,7 +140,7 @@ export default function CartDrawer({ open, onClose }: Props) {
 
                 {/* Remove */}
                 <button
-                  onClick={() => removeItem(item.id)}
+                  onClick={() => removeItem(cartLineId(item))}
                   aria-label={`Remove ${item.name}`}
                   className="flex-shrink-0 text-slate-300 hover:text-red-400 transition-colors self-start mt-1"
                 >

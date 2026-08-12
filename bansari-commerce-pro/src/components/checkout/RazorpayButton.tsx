@@ -70,7 +70,7 @@ export default function RazorpayButton({ customer, shipping, disabled = false }:
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          items: items.map((i) => ({ productId: i.id, quantity: i.quantity })),
+          items: items.map((i) => ({ productId: i.id, quantity: i.quantity, variantId: i.variantId ?? null })),
           customer,
           shipping,
         }),
@@ -133,7 +133,7 @@ export default function RazorpayButton({ customer, shipping, disabled = false }:
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({
-                items: items.map((i) => ({ productId: i.id, quantity: i.quantity })),
+                items: items.map((i) => ({ productId: i.id, quantity: i.quantity, variantId: i.variantId ?? null })),
                 customer,
                 shipping,
                 razorpay_order_id: response.razorpay_order_id,

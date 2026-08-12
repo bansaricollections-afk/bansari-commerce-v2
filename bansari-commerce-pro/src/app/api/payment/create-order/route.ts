@@ -9,9 +9,8 @@ import { createLogger } from '@/lib/logger';
 import { generateRequestId } from '@/lib/request-id';
 import { checkRateLimit, RATE_LIMIT_CHECKOUT } from '@/lib/rate-limit';
 import { apiError } from '@/lib/api-response';
+import { getShippingCost } from '@/lib/shipping';
 
-const FREE_SHIPPING_THRESHOLD = 2999;
-const STANDARD_SHIPPING_FEE = 99;
 const MAX_ITEMS = 50;
 
 function round2(n: number) {
@@ -33,12 +32,18 @@ function parseItems(raw: unknown): CartItem[] | string {
   for (const [i, el] of raw.entries()) {
     if (!el || typeof el !== 'object')
       return `Item at index ${i} is invalid.`;
-    const { productId, quantity } = el as Record<string, unknown>;
+    const { productId, quantity, variantId } = el as Record<string, unknown>;
     if (!Number.isInteger(productId) || (productId as number) <= 0)
       return `Item at index ${i} has an invalid productId.`;
     if (!Number.isInteger(quantity) || (quantity as number) <= 0)
       return `Item at index ${i} has an invalid quantity.`;
-    items.push({ productId: productId as number, quantity: quantity as number });
+    if (variantId != null && (!Number.isInteger(variantId) || (variantId as number) <= 0))
+      return `Item at index ${i} has an invalid variantId.`;
+    items.push({
+      productId: productId as number,
+      quantity: quantity as number,
+      variantId: variantId == null ? null : (variantId as number),
+    });
   }
   return items;
 }
@@ -158,7 +163,9 @@ export async function POST(request: NextRequest) {
     const { lineItems } = cartValidation;
 
     const subtotal    = round2(lineItems.reduce((s, r) => s + r.lineTotal, 0));
-    const shippingFee = subtotal >= FREE_SHIPPING_THRESHOLD ? 0 : STANDARD_SHIPPING_FEE;
+    // Server-authoritative: computed from the validated cart subtotal, never
+    // trusted from the client. Single source: src/lib/shipping.ts.
+    const shippingFee = getShippingCost(subtotal);
     const discount    = 0;
     const grandTotal  = round2(subtotal + shippingFee - discount);
     const amountPaise = Math.round(grandTotal * 100);

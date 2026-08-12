@@ -10,6 +10,7 @@ import { createLogger } from '@/lib/logger';
 import { generateRequestId } from '@/lib/request-id';
 import { checkRateLimit, RATE_LIMIT_CHECKOUT } from '@/lib/rate-limit';
 import { apiError } from '@/lib/api-response';
+import { getShippingCost } from '@/lib/shipping';
 
 const log = createLogger({ service: 'orders.create' });
 
@@ -152,6 +153,9 @@ export async function POST(request: NextRequest) {
       unitPrice: number;
       quantity: number;
       lineTotal: number;
+      variantId?: number | null;
+      variantSku?: string | null;
+      variantSize?: string | null;
     }>;
     let subtotal: number;
     let shippingFee: number;
@@ -197,6 +201,7 @@ export async function POST(request: NextRequest) {
         rawItems.map((i: Record<string, unknown>) => ({
           productId: Number(i.productId),
           quantity: Number(i.quantity),
+          variantId: i.variantId == null ? null : Number(i.variantId),
         }))
       );
 
@@ -206,7 +211,9 @@ export async function POST(request: NextRequest) {
 
       lineItems = validation.lineItems;
       subtotal = Math.round(lineItems.reduce((s, r) => s + r.lineTotal, 0) * 100) / 100;
-      shippingFee = subtotal >= 2999 ? 0 : 99;
+      // Recovery path only (pending_orders row missing) — re-derives from the
+      // server-validated cart, never from client input. Single source: lib/shipping.ts.
+      shippingFee = getShippingCost(subtotal);
       discount = 0;
       grandTotal = Math.round((subtotal + shippingFee - discount) * 100) / 100;
 
@@ -265,6 +272,11 @@ export async function POST(request: NextRequest) {
       unit_price:    li.unitPrice,
       quantity:      li.quantity,
       line_total:    li.lineTotal,
+      // Size identity — persisted on order_items and used by the RPC to
+      // decrement that exact variant inside the order transaction.
+      variant_id:    li.variantId ?? null,
+      variant_sku:   li.variantSku ?? null,
+      variant_size:  li.variantSize ?? null,
     }));
 
     // EXPLANATION: create_order_with_items is a RETURNS TABLE (SETOF) function.
@@ -297,6 +309,13 @@ export async function POST(request: NextRequest) {
           idempotent: true,
         });
       }
+      if (rpcErr.code === 'P0002') {
+        // Variant stock ran out between validation and commit: the order is
+        // rejected rather than oversold. Payment is captured — this needs a
+        // refund, so it is logged at error level.
+        rLog.error('orders.create.variant_out_of_stock', rpcErr);
+        return apiError(requestId, 'OUT_OF_STOCK', rpcErr.message, 409);
+      }
       rLog.error('orders.create.rpc_failed', rpcErr);
       return apiError(requestId, 'DB_ERROR', rpcErr.message, 500);
     }
@@ -321,8 +340,11 @@ export async function POST(request: NextRequest) {
       authenticated: userId !== null,
     });
 
-    // Decrement stock (best-effort, outside order transaction)
+    // Decrement stock (best-effort, outside order transaction).
+    // Size-managed lines are already decremented atomically inside
+    // create_order_with_items — only legacy product-level lines land here.
     for (const li of lineItems) {
+      if (li.variantId != null) continue;
       const { error: stockErr } = await supabase.rpc('decrement_product_stock', {
         p_product_id: li.productId,
         p_quantity: li.quantity,

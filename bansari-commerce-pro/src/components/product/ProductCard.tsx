@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import Image from "next/image";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { Heart, Star, ShoppingBag, Eye } from "lucide-react";
 import { useCart } from "@/hooks/useCart";
 
@@ -20,6 +21,7 @@ export default function ProductCard({ product, priority = false }: Props) {
   const [hovered, setHovered] = useState(false);
   const [quickAdded, setQuickAdded] = useState(false);
   const { addItem } = useCart();
+  const router = useRouter();
 
   const primaryImage = product.images?.[0]?.url || "/placeholder.png";
   const hoverImage = product.images?.[1]?.url || primaryImage;
@@ -44,7 +46,28 @@ export default function ProductCard({ product, priority = false }: Props) {
   /* ── Badge logic ── */
   const isNew = (product as any).isNew ?? false;
   const isBestSeller = (product as any).isBestSeller ?? false;
-  const isLowStock = ((product as any).stock ?? 999) <= 5;
+  /* ── Availability ──
+     Size-managed products get their badge from per-size inventory. A
+     product-level total is never allowed to imply a size is available, and
+     "Only 1 left" is shown only when a single size is sellable with exactly
+     one unit left. Products without variants keep the legacy <= 5 rule. */
+  const sizeAvailability = (product as any).sizeAvailability as
+    | { label: string; status: string; available: number }[]
+    | undefined;
+  const isSizeManaged = Array.isArray(sizeAvailability) && sizeAvailability.length > 0;
+  const sellableSizes = isSizeManaged
+    ? sizeAvailability!.filter((s) => s.status !== "SOLD_OUT")
+    : [];
+  const isSoldOut = isSizeManaged && sellableSizes.length === 0;
+  const onlyOneLeftSize =
+    isSizeManaged && sellableSizes.length === 1 && sellableSizes[0]!.status === "ONLY_ONE_LEFT"
+      ? sellableSizes[0]!
+      : null;
+  const isLowStock = isSizeManaged
+    ? !isSoldOut &&
+      !onlyOneLeftSize &&
+      sellableSizes.some((s) => s.status === "LOW_STOCK" || s.status === "ONLY_ONE_LEFT")
+    : ((product as any).stock ?? 999) <= 5;
   const originalPrice = (product as any).originalPrice as number | undefined;
   const discountPct =
     originalPrice && originalPrice > product.price
@@ -60,6 +83,11 @@ export default function ProductCard({ product, priority = false }: Props) {
   function handleQuickAdd(e: React.MouseEvent) {
     e.preventDefault();
     e.stopPropagation();
+    // A size-managed product cannot be added without choosing a size.
+    if (isSizeManaged) {
+      router.push(`/product/${product.id}`);
+      return;
+    }
     addItem({ productId: product.id, quantity: 1 });
     setQuickAdded(true);
     setTimeout(() => setQuickAdded(false), 1800);
@@ -141,6 +169,16 @@ export default function ProductCard({ product, priority = false }: Props) {
               Best Seller
             </span>
           )}
+          {isSoldOut && (
+            <span className={`${badgeBase} bg-slate-500 text-white`}>
+              Sold Out
+            </span>
+          )}
+          {onlyOneLeftSize && (
+            <span className={`${badgeBase} bg-rose-600 text-white`}>
+              {onlyOneLeftSize.label} &middot; Only 1 left
+            </span>
+          )}
           {isLowStock && (
             <span className={`${badgeBase} bg-rose-600 text-white`}>
               Low Stock
@@ -215,7 +253,7 @@ export default function ProductCard({ product, priority = false }: Props) {
             tabIndex={hovered ? 0 : -1}
           >
             <ShoppingBag size={11} aria-hidden="true" />
-            {quickAdded ? "Added ✓" : "Quick Add"}
+            {quickAdded ? "Added ✓" : isSizeManaged ? "Select Size" : "Quick Add"}
           </button>
         </div>
       </div>
@@ -241,6 +279,15 @@ export default function ProductCard({ product, priority = false }: Props) {
         {/* Craft detail */}
         {craftDetail && (
           <p className="text-[11px] leading-relaxed text-slate-400">{craftDetail}</p>
+        )}
+
+        {/* Size availability — real per-size inventory, never a product total */}
+        {isSizeManaged && (
+          <p className="text-[10px] tracking-[0.08em] text-slate-500">
+            {isSoldOut
+              ? "Sold out in all sizes"
+              : `${sellableSizes.map((s) => s.label).join(" · ")} available`}
+          </p>
         )}
 
         {/* Rating */}

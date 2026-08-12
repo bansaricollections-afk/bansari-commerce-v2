@@ -4,8 +4,9 @@ import Link from 'next/link';
 import { useEffect, useRef, useState } from 'react';
 
 import type { Product } from '@/types/product';
-import type { ProductVariant } from '@/types/product';
+import type { ProductVariant, SizeAvailability } from '@/types/product';
 import { trackRecentlyViewed } from '@/lib/recentlyViewed';
+import { SHIPPING_THRESHOLD } from '@/lib/shipping';
 
 import DeliveryEstimate from './DeliveryEstimate';
 import ProductActions from './ProductActions';
@@ -106,6 +107,7 @@ function SizeGuideModal({ onClose }: { onClose: () => void }) {
 export default function ProductInfo({ product, canonicalUrl }: Props) {
   const [quantity, setQuantity] = useState(1);
   const [selectedVariant, setSelectedVariant] = useState<ProductVariant | null>(null);
+  const [selectedSize, setSelectedSize] = useState<SizeAvailability | null>(null);
   const [sizeGuideOpen, setSizeGuideOpen] = useState(false);
 
   // ── Recently Viewed tracking ──────────────────────────────────────────────
@@ -131,8 +133,20 @@ export default function ProductInfo({ product, canonicalUrl }: Props) {
     ? Math.round(((product.oldPrice! - product.price) / product.oldPrice!) * 100)
     : 0;
   const savedAmount = hasDiscount ? product.oldPrice! - product.price : 0;
-  const isOutOfStock = !product.stock || product.stock === 0;
-  const isLowStock = !isOutOfStock && (product.stock ?? 0) <= 5;
+  // ── Availability ─────────────────────────────────────────────────────────
+  // Size-managed products derive everything from per-size inventory; the
+  // product-level total is never used to imply that a size is available.
+  const sizeAvailability = product.sizeAvailability ?? [];
+  const isSizeManaged = sizeAvailability.length > 0;
+  const sellableSizes = sizeAvailability.filter((s) => s.status !== 'SOLD_OUT');
+
+  const isOutOfStock = isSizeManaged
+    ? sellableSizes.length === 0
+    : !product.stock || product.stock === 0;
+  const isLowStock = !isSizeManaged && !isOutOfStock && (product.stock ?? 0) <= 5;
+  const maxQuantity = isSizeManaged
+    ? selectedSize?.available ?? 1
+    : product.stock;
   const specs = product.specifications;
 
   const modelInfo = specs?.modelInfo;
@@ -180,7 +194,7 @@ export default function ProductInfo({ product, canonicalUrl }: Props) {
 
         {/* ── Product name ── */}
         <div>
-          <h1 className="text-[1.65rem] lg:text-3xl font-light text-slate-900 leading-snug tracking-tight">
+          <h1 className="font-[family:var(--font-playfair)] text-[1.85rem] lg:text-[2.5rem] font-normal text-slate-900 leading-[1.15] tracking-tight">
             {product.name}
           </h1>
           {product.reviewCount && product.reviewCount > 0 && product.rating ? (
@@ -193,7 +207,7 @@ export default function ProductInfo({ product, canonicalUrl }: Props) {
         {/* ── Price row ── */}
         <div className="border-t border-b border-slate-100 py-4 flex flex-col gap-2">
           <div className="flex items-baseline gap-3 flex-wrap">
-            <span className="text-2xl font-light text-slate-900">
+            <span className="text-[1.75rem] font-medium text-slate-900 tabular-nums">
               ₹{product.price.toLocaleString('en-IN')}
             </span>
             {hasDiscount && (
@@ -227,8 +241,13 @@ export default function ProductInfo({ product, canonicalUrl }: Props) {
             , subject to policy
           </p>
 
+          {/* Shipping copy is derived from the same constant the checkout and
+              the order-creation API bill against. This previously read "Free
+              shipping on all orders", which is false for any order under the
+              threshold — those are charged the flat STANDARD_SHIPPING rate. */}
           <p className="text-[11px] text-slate-400 tracking-wide">
-            Inclusive of all taxes · Free shipping on all orders
+            Inclusive of all taxes · Free shipping on orders above &#8377;
+            {SHIPPING_THRESHOLD.toLocaleString('en-IN')}
           </p>
 
           {/* Availability + Style Code */}
@@ -236,7 +255,12 @@ export default function ProductInfo({ product, canonicalUrl }: Props) {
             {isOutOfStock ? (
               <span className="flex items-center gap-1 text-[11px] text-red-500">
                 <span className="w-1.5 h-1.5 rounded-full bg-red-500 inline-block" />
-                Out of Stock
+                {isSizeManaged ? 'Sold Out — all sizes' : 'Out of Stock'}
+              </span>
+            ) : isSizeManaged ? (
+              <span className="flex items-center gap-1 text-[11px] text-green-600">
+                <span className="w-1.5 h-1.5 rounded-full bg-green-500 inline-block" />
+                {sellableSizes.map((s) => s.label).join(' · ')} available
               </span>
             ) : isLowStock ? (
               /* Urgency: pulsing dot + exact count */
@@ -261,9 +285,6 @@ export default function ProductInfo({ product, canonicalUrl }: Props) {
           </div>
         </div>
 
-        {/* ── Delivery Estimate ── */}
-        {!isOutOfStock && <DeliveryEstimate />}
-
         {/* ── Model Info Strip ── */}
         {(modelInfo || sizeWorn) && (
           <div className="flex items-start gap-2 text-[11px] text-slate-500 bg-slate-50 border border-slate-100 rounded-sm px-3 py-2.5">
@@ -286,7 +307,7 @@ export default function ProductInfo({ product, canonicalUrl }: Props) {
         )}
 
         {/* ── Size selector + Size Guide affordance ── */}
-        {product.variants && product.variants.length > 0 && (
+        {(isSizeManaged || (product.variants && product.variants.length > 0)) && (
           <div className="flex flex-col gap-2">
             <div className="flex items-center justify-between">
               <p className="text-[10px] tracking-[0.18em] uppercase text-slate-500 font-medium">
@@ -301,9 +322,12 @@ export default function ProductInfo({ product, canonicalUrl }: Props) {
               </button>
             </div>
             <ProductVariantSelector
-              variants={product.variants}
+              variants={product.variants ?? []}
               selected={selectedVariant}
               onSelect={setSelectedVariant}
+              sizeAvailability={isSizeManaged ? sizeAvailability : undefined}
+              selectedSize={selectedSize}
+              onSelectSize={setSelectedSize}
             />
           </div>
         )}
@@ -314,19 +338,22 @@ export default function ProductInfo({ product, canonicalUrl }: Props) {
             <p className="text-[10px] tracking-[0.18em] uppercase text-slate-500 font-medium">
               Quantity
             </p>
-            <QuantitySelector value={quantity} onChange={setQuantity} max={product.stock} />
+            <QuantitySelector value={quantity} onChange={setQuantity} max={maxQuantity} />
           </div>
         )}
-
-        {/* ── Pincode delivery checker ── */}
-        <PincodeChecker />
 
         {/* ── Action buttons ── */}
         <ProductActions
           product={product}
           quantity={quantity}
           selectedVariant={selectedVariant}
+          selectedSize={selectedSize}
+          isSizeManaged={isSizeManaged}
         />
+
+        {/* ── Delivery Estimate + Pincode checker — below purchase controls ── */}
+        {!isOutOfStock && <DeliveryEstimate />}
+        <PincodeChecker />
 
         {/* ── Quick spec pills ── */}
         {specs && (

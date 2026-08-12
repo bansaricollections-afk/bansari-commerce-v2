@@ -7,7 +7,23 @@ export type CartItem = {
   image: string;
   price: number;
   quantity: number;
+  /**
+   * Size identity. Present for size-managed products; the variant is what is
+   * actually purchased, reserved and decremented, so two sizes of the same
+   * product are two independent cart lines.
+   */
+  variantId?: number | null;
+  size?: string | null;
+  variantSku?: string | null;
 };
+
+/**
+ * Stable per-line key. A cart line is identified by (product, variant) — not
+ * by product alone — so M and L never collapse into one line.
+ */
+export function cartLineId(item: Pick<CartItem, 'id' | 'variantId'>): string {
+  return `${item.id}:${item.variantId ?? ''}`;
+}
 
 type CartStore = {
   items: CartItem[];
@@ -16,10 +32,10 @@ type CartStore = {
   _hasHydrated: boolean;
 
   addItem: (item: CartItem) => void;
-  updateQuantity: (id: number, quantity: number) => void;
-  increaseQuantity: (id: number) => void;
-  decreaseQuantity: (id: number) => void;
-  removeItem: (id: number) => void;
+  updateQuantity: (lineId: string, quantity: number) => void;
+  increaseQuantity: (lineId: string) => void;
+  decreaseQuantity: (lineId: string) => void;
+  removeItem: (lineId: string) => void;
   clearCart: () => void;
 
   totalItems: () => number;
@@ -40,12 +56,13 @@ export const useCart = create<CartStore>()(
 
       addItem: (item) =>
         set((state) => {
-          const existing = state.items.find((i) => i.id === item.id);
+          const key = cartLineId(item);
+          const existing = state.items.find((i) => cartLineId(i) === key);
 
           if (existing) {
             return {
               items: state.items.map((i) =>
-                i.id === item.id
+                cartLineId(i) === key
                   ? {
                       ...i,
                       quantity: i.quantity + item.quantity,
@@ -60,10 +77,10 @@ export const useCart = create<CartStore>()(
           };
         }),
 
-      updateQuantity: (id, quantity) =>
+      updateQuantity: (lineId, quantity) =>
         set((state) => ({
           items: state.items.map((item) =>
-            item.id === id
+            cartLineId(item) === lineId
               ? {
                   ...item,
                   quantity: Math.max(1, quantity),
@@ -72,10 +89,10 @@ export const useCart = create<CartStore>()(
           ),
         })),
 
-      increaseQuantity: (id) =>
+      increaseQuantity: (lineId) =>
         set((state) => ({
           items: state.items.map((item) =>
-            item.id === id
+            cartLineId(item) === lineId
               ? {
                   ...item,
                   quantity: item.quantity + 1,
@@ -84,11 +101,11 @@ export const useCart = create<CartStore>()(
           ),
         })),
 
-      decreaseQuantity: (id) =>
+      decreaseQuantity: (lineId) =>
         set((state) => ({
           items: state.items
             .map((item) =>
-              item.id === id
+              cartLineId(item) === lineId
                 ? {
                     ...item,
                     quantity: Math.max(0, item.quantity - 1),
@@ -98,9 +115,9 @@ export const useCart = create<CartStore>()(
             .filter((item) => item.quantity > 0),
         })),
 
-      removeItem: (id) =>
+      removeItem: (lineId) =>
         set((state) => ({
-          items: state.items.filter((item) => item.id !== id),
+          items: state.items.filter((item) => cartLineId(item) !== lineId),
         })),
 
       clearCart: () =>

@@ -1,12 +1,14 @@
 "use client";
 
 import Image from "next/image";
+import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   CheckCircle2,
   Edit,
   Eye,
   ImagePlus,
+  Layers,
   Loader2,
   Package,
   Plus,
@@ -25,6 +27,7 @@ import {
   Settings2,
   ChevronRight,
   ChevronLeft,
+  ChevronDown,
   Sparkles,
   LayoutGrid,
 } from "lucide-react";
@@ -109,7 +112,13 @@ const productFormSchema = z.object({
     .min(2, "Slug is required.")
     .regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/, "Use a URL-safe slug."),
   category: z.string().trim().min(1, "Category is required."),
+  category_id: z.number().nullable().refine((v) => v !== null, {
+    message: "Select a category from the catalog — a text-only match is not enough.",
+  }),
   collection: z.string().trim().min(1, "Collection is required."),
+  collection_id: z.number().nullable().refine((v) => v !== null, {
+    message: "Select a collection from the catalog — a text-only match is not enough.",
+  }),
   brand: z.string().trim().min(1, "Brand is required."),
   fabric: z.string().trim().min(1, "Fabric is required."),
   color: z.string().trim().min(1, "Color is required."),
@@ -550,30 +559,34 @@ type LookupSelectProps = {
 function LookupSelect({ label, value, options, onChange, required, error, placeholder }: LookupSelectProps) {
   return (
     <div className="space-y-1.5">
-      <label className="block text-sm font-medium text-gray-700">
-        {label}{required && <span className="text-red-500 ml-0.5">*</span>}
+      <label className="block text-sm font-semibold text-neutral-900 tracking-tight">
+        {label}{required && <span className="text-rose-600 ml-0.5">*</span>}
       </label>
-      <select
-        value={value ?? ""}
-        onChange={(e) => {
-          const id = e.target.value === "" ? null : Number(e.target.value);
-          const name = id ? (options.find((o) => o.id === id)?.name ?? "") : "";
-          onChange(id, name);
-        }}
-        className={cn(
-          "w-full h-10 rounded-md border px-3 py-2 text-sm bg-white shadow-sm",
-          "focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500",
-          error ? "border-red-400" : "border-gray-300"
-        )}
-      >
-        <option value="">{placeholder ?? `Select ${label}`}</option>
-        {options.map((o) => (
-          <option key={o.id} value={o.id}>
-            {o.name}
-          </option>
-        ))}
-      </select>
-      {error && <p className="text-xs text-red-500">{error}</p>}
+      <div className="relative">
+        <select
+          value={value ?? ""}
+          onChange={(e) => {
+            const id = e.target.value === "" ? null : Number(e.target.value);
+            const name = id ? (options.find((o) => o.id === id)?.name ?? "") : "";
+            onChange(id, name);
+          }}
+          className={cn(
+            "w-full h-11 appearance-none rounded-lg border px-3.5 pr-9 text-sm font-medium text-neutral-900 bg-white shadow-sm",
+            "focus:outline-none focus:ring-2 focus:ring-amber-600 focus:border-amber-600",
+            "hover:border-neutral-400 transition-colors",
+            error ? "border-rose-400" : "border-neutral-300"
+          )}
+        >
+          <option value="" className="text-neutral-400">{placeholder ?? `Select ${label}`}</option>
+          {options.map((o) => (
+            <option key={o.id} value={o.id}>
+              {o.name}
+            </option>
+          ))}
+        </select>
+        <ChevronDown className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-neutral-400" />
+      </div>
+      {error && <p className="text-xs text-rose-600">{error}</p>}
     </div>
   );
 }
@@ -592,10 +605,10 @@ function ToggleSwitch({
   description?: string;
 }) {
   return (
-    <label className="flex items-center justify-between cursor-pointer rounded-lg border border-gray-200 bg-gray-50 px-4 py-3 hover:bg-gray-100 transition-colors">
+    <label className="flex items-center justify-between cursor-pointer rounded-xl border border-neutral-200 bg-white px-4 py-3.5 hover:border-neutral-300 hover:shadow-sm transition-all">
       <div>
-        <span className="font-medium text-sm text-gray-800">{label}</span>
-        {description && <p className="text-xs text-gray-500 mt-0.5">{description}</p>}
+        <span className="font-medium text-sm text-neutral-900">{label}</span>
+        {description && <p className="text-xs text-neutral-500 mt-0.5">{description}</p>}
       </div>
       <button
         type="button"
@@ -604,8 +617,8 @@ function ToggleSwitch({
         onClick={() => onChange(!checked)}
         className={cn(
           "relative inline-flex h-6 w-11 flex-shrink-0 rounded-full border-2 border-transparent",
-          "transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-1",
-          checked ? "bg-indigo-600" : "bg-gray-300"
+          "transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-amber-600 focus:ring-offset-1",
+          checked ? "bg-neutral-900" : "bg-neutral-200"
         )}
       >
         <span
@@ -689,6 +702,28 @@ export default function ProductManagement() {
     () => catalog.subcategories.filter((s) => !form.category_id || s.categoryId === form.category_id),
     [catalog.subcategories, form.category_id]
   );
+
+  // ── Legacy classification resolution ──────────────────────────────────────
+  // Existing products may carry a text `category`/`collection` with no FK
+  // (pre-dating the catalog tables). Once the catalog is loaded, attempt a
+  // SAFE exact-name match to auto-resolve the FK. Never invent a mapping —
+  // if no exact match exists, category_id/collection_id stay null and the
+  // classification card below surfaces an explicit warning instead.
+  useEffect(() => {
+    if (catalogLoading) return;
+    if (!form.category_id && form.category) {
+      const match = catalog.categories.find((c) => c.name === form.category);
+      if (match) setField("category_id", match.id);
+    }
+    if (!form.collection_id && form.collection) {
+      const match = catalog.collections.find((c) => c.name === form.collection);
+      if (match) setField("collection_id", match.id);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [catalogLoading, catalog.categories, catalog.collections, form.category, form.collection]);
+
+  const categoryUnresolved = !form.category_id && !!form.category;
+  const collectionUnresolved = !form.collection_id && !!form.collection;
 
   // SizeCharts coerced to LookupItem (slug defaults to "")
   const sizeChartOptions = useMemo<LookupItem[]>(
@@ -984,15 +1019,15 @@ export default function ProductManagement() {
   // ── Render ─────────────────────────────────────────────────────────────────
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-neutral-50">
       {/* Header */}
-      <div className="bg-white border-b border-gray-200 px-6 py-4">
+      <div className="bg-white border-b border-neutral-200 px-6 py-5">
         <div className="flex items-center justify-between max-w-7xl mx-auto">
           <div>
-            <h1 className="text-2xl font-bold text-gray-900">Products</h1>
-            <p className="text-sm text-gray-500 mt-0.5">{total} product{total !== 1 ? "s" : ""} total</p>
+            <h1 className="font-serif text-3xl text-neutral-900 tracking-tight">Products</h1>
+            <p className="text-sm text-neutral-500 mt-1">{total} product{total !== 1 ? "s" : ""} total</p>
           </div>
-          <Button onClick={openNew} className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700">
+          <Button onClick={openNew} className="flex items-center gap-2 bg-neutral-900 hover:bg-amber-700 transition-colors">
             <Plus className="h-4 w-4" />
             Add Product
           </Button>
@@ -1000,19 +1035,19 @@ export default function ProductManagement() {
       </div>
 
       {/* Stats bar */}
-      <div className="max-w-7xl mx-auto px-6 py-4 grid grid-cols-2 sm:grid-cols-5 gap-3">
+      <div className="max-w-7xl mx-auto px-6 py-5 grid grid-cols-2 sm:grid-cols-5 gap-3">
         {[
-          { label: "Total",       value: stats.total,      icon: Package,   color: "text-gray-600" },
+          { label: "Total",       value: stats.total,      icon: Package,   color: "text-neutral-600" },
           { label: "Active",      value: stats.active,     icon: CheckCircle2, color: "text-green-600" },
-          { label: "Featured",    value: stats.featured,   icon: Sparkles,  color: "text-indigo-600" },
+          { label: "Featured",    value: stats.featured,   icon: Sparkles,  color: "text-amber-700" },
           { label: "Low Stock",   value: stats.lowStock,   icon: AlertTriangle, color: "text-yellow-600" },
           { label: "Out of Stock",value: stats.outOfStock, icon: ShoppingBag, color: "text-red-600" },
         ].map(({ label, value, icon: Icon, color }) => (
-          <div key={label} className="bg-white rounded-lg border border-gray-200 p-3 flex items-center gap-3">
+          <div key={label} className="bg-white rounded-xl border border-neutral-200 p-3.5 flex items-center gap-3 hover:shadow-sm hover:border-neutral-300 transition-all">
             <Icon className={cn("h-5 w-5", color)} />
             <div>
-              <p className="text-xs text-gray-500">{label}</p>
-              <p className="text-lg font-semibold text-gray-900">{value}</p>
+              <p className="text-xs text-neutral-500">{label}</p>
+              <p className="text-lg font-semibold text-neutral-900">{value}</p>
             </div>
           </div>
         ))}
@@ -1021,16 +1056,16 @@ export default function ProductManagement() {
       {/* Search */}
       <div className="max-w-7xl mx-auto px-6 pb-4">
         <div className="relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-neutral-400" />
           <input
             type="text"
             placeholder="Search products by name, SKU, or slug..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white"
+            className="w-full pl-10 pr-4 py-2.5 border border-neutral-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-amber-600 bg-white"
           />
           {searchQuery && (
-            <button onClick={() => setSearchQuery("")} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
+            <button onClick={() => setSearchQuery("")} className="absolute right-3 top-1/2 -translate-y-1/2 text-neutral-400 hover:text-neutral-600">
               <X className="h-4 w-4" />
             </button>
           )}
@@ -1041,10 +1076,10 @@ export default function ProductManagement() {
       <div className="max-w-7xl mx-auto px-6 pb-8">
         {isLoading ? (
           <div className="flex items-center justify-center py-24">
-            <Loader2 className="h-8 w-8 animate-spin text-indigo-500" />
+            <Loader2 className="h-8 w-8 animate-spin text-amber-600" />
           </div>
         ) : products.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-24 text-gray-400">
+          <div className="flex flex-col items-center justify-center py-24 text-neutral-400">
             <Package className="h-12 w-12 mb-3 opacity-40" />
             <p className="text-lg font-medium">No products found</p>
             <p className="text-sm">Create your first product to get started.</p>
@@ -1054,10 +1089,10 @@ export default function ProductManagement() {
             {products.map((p) => (
               <div
                 key={p.id}
-                className="bg-white rounded-xl border border-gray-200 overflow-hidden hover:shadow-md transition-shadow"
+                className="bg-white rounded-xl border border-neutral-200 overflow-hidden hover:shadow-md transition-shadow"
               >
                 {/* Product image */}
-                <div className="aspect-square relative bg-gray-100">
+                <div className="aspect-square relative bg-neutral-100">
                   {p.images[0] ? (
                     <Image
                       src={p.images[0].url}
@@ -1068,12 +1103,12 @@ export default function ProductManagement() {
                     />
                   ) : (
                     <div className="absolute inset-0 flex items-center justify-center">
-                      <Package className="h-12 w-12 text-gray-300" />
+                      <Package className="h-12 w-12 text-neutral-300" />
                     </div>
                   )}
                   {/* Status badges */}
                   <div className="absolute top-2 left-2 flex flex-col gap-1">
-                    {p.featured   && <Badge className="bg-indigo-600 text-white text-xs">Featured</Badge>}
+                    {p.featured   && <Badge className="bg-amber-600 text-white text-xs">Featured</Badge>}
                     {p.bestSeller && <Badge className="bg-orange-500 text-white text-xs">Best Seller</Badge>}
                     {p.newArrival && <Badge className="bg-green-600 text-white text-xs">New</Badge>}
                   </div>
@@ -1086,10 +1121,10 @@ export default function ProductManagement() {
 
                 {/* Info */}
                 <div className="p-3">
-                  <p className="font-medium text-gray-900 text-sm line-clamp-1">{p.name}</p>
-                  <p className="text-xs text-gray-500 mt-0.5">{p.sku} · {p.category}</p>
+                  <p className="font-medium text-neutral-900 text-sm line-clamp-1">{p.name}</p>
+                  <p className="text-xs text-neutral-500 mt-0.5">{p.sku} · {p.category}</p>
                   <div className="flex items-center justify-between mt-2">
-                    <span className="font-semibold text-gray-900">₹{p.price.toLocaleString("en-IN")}</span>
+                    <span className="font-semibold text-neutral-900">₹{p.price.toLocaleString("en-IN")}</span>
                     {p.stock <= LOW_STOCK_THRESHOLD && (
                       <span className={cn("text-xs font-medium", p.stock === 0 ? "text-red-600" : "text-yellow-600")}>
                         {p.stock === 0 ? "Out of stock" : `${p.stock} left`}
@@ -1099,6 +1134,16 @@ export default function ProductManagement() {
 
                   {/* Actions */}
                   <div className="flex gap-2 mt-3">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="flex-1 text-xs"
+                      asChild
+                    >
+                      <Link href={`/admin/products/${p.id}/inventory`}>
+                        <Layers className="h-3 w-3 mr-1" /> Sizes
+                      </Link>
+                    </Button>
                     <Button
                       size="sm"
                       variant="outline"
@@ -1141,7 +1186,7 @@ export default function ProductManagement() {
             >
               <ChevronLeft className="h-4 w-4" />
             </Button>
-            <span className="text-sm text-gray-600">
+            <span className="text-sm text-neutral-600">
               Page {currentPage + 1} of {totalPages}
             </span>
             <Button
@@ -1159,11 +1204,11 @@ export default function ProductManagement() {
       {/* ── Add/Edit Sheet ──────────────────────────────────────────────────── */}
       <Sheet open={isSheetOpen} onOpenChange={setIsSheetOpen}>
         <SheetContent side="right" className="w-full sm:max-w-2xl overflow-y-auto p-0">
-          <SheetHeader className="sticky top-0 z-10 bg-white border-b border-gray-200 px-6 py-4">
-            <SheetTitle className="text-lg font-semibold">
+          <SheetHeader className="sticky top-0 z-10 bg-white border-b border-neutral-200 px-6 py-5">
+            <SheetTitle className="font-serif text-xl text-neutral-900">
               {editProduct ? `Edit: ${editProduct.name}` : "Add New Product"}
             </SheetTitle>
-            <SheetDescription className="text-sm text-gray-500">
+            <SheetDescription className="text-sm text-neutral-500">
               Step {currentStep + 1} of {STEPS.length} — {STEPS[currentStep]?.label}
             </SheetDescription>
 
@@ -1179,10 +1224,10 @@ export default function ProductManagement() {
                     type="button"
                     onClick={() => setCurrentStep(step.id)}
                     className={cn(
-                      "flex-1 flex flex-col items-center gap-1 py-2 rounded-md text-xs transition-colors",
-                      isActive ? "bg-indigo-50 text-indigo-700 font-semibold" :
-                      isDone   ? "text-green-600 hover:bg-green-50" :
-                                 "text-gray-500 hover:bg-gray-50"
+                      "flex-1 flex flex-col items-center gap-1 py-2 rounded-lg text-xs transition-colors",
+                      isActive ? "bg-neutral-900 text-white font-semibold" :
+                      isDone   ? "text-amber-700 hover:bg-amber-50" :
+                                 "text-neutral-400 hover:bg-neutral-50"
                     )}
                   >
                     <Icon className="h-4 w-4" />
@@ -1197,18 +1242,27 @@ export default function ProductManagement() {
 
             {/* ── STEP 0: Media ─────────────────────────────────────────── */}
             {currentStep === 0 && (
-              <div className="space-y-4">
+              <div className="space-y-5">
+                <div className="flex items-baseline justify-between">
+                  <div className="flex items-center gap-2"><span className="h-3.5 w-0.5 rounded-full bg-amber-600" /><p className="text-xs font-bold uppercase tracking-[0.12em] text-neutral-900">Product Photography</p></div>
+                  {imagePreviews.length > 0 && (
+                    <p className="text-xs text-neutral-400">{imagePreviews.length} image{imagePreviews.length === 1 ? "" : "s"}</p>
+                  )}
+                </div>
+
                 <div
-                  className="border-2 border-dashed border-gray-300 rounded-xl p-8 text-center cursor-pointer hover:border-indigo-400 transition-colors"
+                  className="border-2 border-dashed border-neutral-300 rounded-xl p-10 text-center cursor-pointer hover:border-amber-500 hover:bg-amber-50/40 transition-colors"
                   onClick={() => fileInputRef.current?.click()}
+                  onDragOver={(e) => e.preventDefault()}
+                  onDrop={(e) => { e.preventDefault(); handleImageUpload(e.dataTransfer.files); }}
                 >
                   {uploadingImages ? (
-                    <Loader2 className="h-8 w-8 animate-spin text-indigo-500 mx-auto" />
+                    <Loader2 className="h-9 w-9 animate-spin text-neutral-400 mx-auto" />
                   ) : (
                     <>
-                      <ImagePlus className="h-10 w-10 text-gray-400 mx-auto mb-2" />
-                      <p className="text-sm text-gray-600 font-medium">Click to upload images</p>
-                      <p className="text-xs text-gray-400 mt-1">JPEG, PNG, WebP, GIF · max 5 MB each</p>
+                      <ImagePlus className="h-10 w-10 text-neutral-300 mx-auto mb-3" />
+                      <p className="text-sm text-neutral-700 font-medium">Drag and drop, or click to upload</p>
+                      <p className="text-xs text-neutral-500 mt-1">JPEG, PNG, WebP, GIF · max 5 MB each</p>
                     </>
                   )}
                 </div>
@@ -1222,14 +1276,26 @@ export default function ProductManagement() {
                 />
 
                 {imagePreviews.length > 0 && (
-                  <div className="grid grid-cols-3 gap-3">
+                  <div className="grid grid-cols-3 sm:grid-cols-4 gap-3">
                     {imagePreviews.map((url, i) => (
-                      <div key={i} className="relative aspect-square rounded-lg overflow-hidden bg-gray-100">
+                      <div
+                        key={i}
+                        className={cn(
+                          "group relative aspect-[3/4] overflow-hidden rounded-md bg-neutral-100 border",
+                          i === 0 ? "border-neutral-900 ring-1 ring-neutral-900" : "border-neutral-200"
+                        )}
+                      >
                         <Image src={url} alt={`Preview ${i + 1}`} fill className="object-cover" sizes="200px" />
+                        {i === 0 && (
+                          <span className="absolute left-1.5 top-1.5 bg-neutral-900 text-white text-[9px] font-semibold uppercase tracking-wide px-1.5 py-0.5 rounded-sm">
+                            Primary
+                          </span>
+                        )}
                         <button
                           type="button"
                           onClick={() => removeImage(i)}
-                          className="absolute top-1 right-1 bg-red-500 text-white rounded-full w-5 h-5 flex items-center justify-center hover:bg-red-600"
+                          aria-label={`Remove image ${i + 1}`}
+                          className="absolute top-1.5 right-1.5 bg-black/60 text-white rounded-full w-5 h-5 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-600"
                         >
                           <X className="h-3 w-3" />
                         </button>
@@ -1243,10 +1309,10 @@ export default function ProductManagement() {
             {/* ── STEP 1: Basic Info ────────────────────────────────────── */}
             {currentStep === 1 && (
               <div className="space-y-4">
-                {/* Name */}
+                {/* Name — visually dominant */}
                 <div className="space-y-1.5">
-                  <label className="block text-sm font-medium text-gray-700">
-                    Product Name <span className="text-red-500">*</span>
+                  <label className="block text-xs font-semibold uppercase tracking-wider text-neutral-500">
+                    Product Name <span className="text-rose-600">*</span>
                   </label>
                   <input
                     type="text"
@@ -1254,17 +1320,17 @@ export default function ProductManagement() {
                     onChange={(e) => handleNameChange(e.target.value)}
                     placeholder="e.g. Silk Embroidered Saree"
                     className={cn(
-                      "w-full h-10 rounded-md border px-3 py-2 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500",
-                      fieldErrors.name ? "border-red-400" : "border-gray-300"
+                      "w-full h-12 rounded-lg border px-3.5 py-2 font-serif text-lg text-neutral-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-amber-600 focus:border-amber-600",
+                      fieldErrors.name ? "border-rose-400" : "border-neutral-300"
                     )}
                   />
-                  {fieldErrors.name && <p className="text-xs text-red-500">{fieldErrors.name}</p>}
+                  {fieldErrors.name && <p className="text-xs text-rose-600">{fieldErrors.name}</p>}
                 </div>
 
-                {/* Slug */}
+                {/* Slug — secondary */}
                 <div className="space-y-1.5">
-                  <label className="block text-sm font-medium text-gray-700">
-                    Slug <span className="text-red-500">*</span>
+                  <label className="block text-xs font-semibold text-neutral-700">
+                    Slug <span className="text-rose-600">*</span>
                   </label>
                   <div className="flex gap-2">
                     <input
@@ -1272,8 +1338,8 @@ export default function ProductManagement() {
                       value={form.slug}
                       onChange={(e) => setField("slug", slugify(e.target.value))}
                       className={cn(
-                        "flex-1 h-10 rounded-md border px-3 py-2 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500",
-                        fieldErrors.slug ? "border-red-400" : "border-gray-300"
+                        "flex-1 h-9 rounded-md border px-3 py-2 text-xs text-neutral-600 shadow-sm focus:outline-none focus:ring-2 focus:ring-amber-600",
+                        fieldErrors.slug ? "border-rose-400" : "border-neutral-300"
                       )}
                     />
                     <Button
@@ -1286,13 +1352,13 @@ export default function ProductManagement() {
                       <RefreshCw className="h-3 w-3" />
                     </Button>
                   </div>
-                  {fieldErrors.slug && <p className="text-xs text-red-500">{fieldErrors.slug}</p>}
+                  {fieldErrors.slug && <p className="text-xs text-rose-600">{fieldErrors.slug}</p>}
                 </div>
 
                 {/* SKU */}
                 <div className="space-y-1.5">
-                  <label className="block text-sm font-medium text-gray-700">
-                    SKU <span className="text-red-500">*</span>
+                  <label className="block text-sm font-semibold text-neutral-900">
+                    SKU <span className="text-rose-600">*</span>
                   </label>
                   <div className="flex gap-2">
                     <input
@@ -1300,8 +1366,8 @@ export default function ProductManagement() {
                       value={form.sku}
                       onChange={(e) => setField("sku", e.target.value)}
                       className={cn(
-                        "flex-1 h-10 rounded-md border px-3 py-2 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500",
-                        fieldErrors.sku ? "border-red-400" : "border-gray-300"
+                        "flex-1 h-10 rounded-md border px-3 py-2 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-amber-600",
+                        fieldErrors.sku ? "border-rose-400" : "border-neutral-300"
                       )}
                     />
                     <Button
@@ -1314,206 +1380,251 @@ export default function ProductManagement() {
                       <Wand2 className="h-3 w-3" />
                     </Button>
                   </div>
-                  {fieldErrors.sku && <p className="text-xs text-red-500">{fieldErrors.sku}</p>}
+                  {fieldErrors.sku && <p className="text-xs text-rose-600">{fieldErrors.sku}</p>}
                 </div>
 
-                {/* Category */}
-                <LookupSelect
-                  label="Category"
-                  required
-                  value={form.category_id}
-                  options={catalog.categories}
-                  error={fieldErrors.category}
-                  onChange={(id, name) => {
-                    setField("category_id", id);
-                    setField("category", name);
-                    setField("subcategory_id", null);
-                  }}
-                />
+                {/* ── Product Classification — distinct card, own section ── */}
+                <div className="sm:col-span-2 rounded-xl border border-neutral-200 bg-neutral-50/70 p-5 space-y-4">
+                  <div className="flex items-center gap-2">
+                    <span className="h-3.5 w-0.5 rounded-full bg-amber-600" />
+                    <p className="text-xs font-bold uppercase tracking-[0.12em] text-neutral-900">
+                      Product Classification
+                    </p>
+                  </div>
 
-                {/* Subcategory */}
-                <LookupSelect
-                  label="Subcategory"
-                  value={form.subcategory_id}
-                  options={filteredSubcats}
-                  onChange={(id, name) => setField("subcategory_id", id)}
-                  placeholder="Select subcategory (optional)"
-                />
+                  {(categoryUnresolved || collectionUnresolved) && (
+                    <div className="rounded-lg border border-amber-300 bg-amber-50 px-3.5 py-2.5 text-xs text-amber-900 space-y-1">
+                      {categoryUnresolved && (
+                        <p>
+                          Legacy category &ldquo;{form.category}&rdquo; has no matching catalog record.
+                          Select the correct category below before publishing.
+                        </p>
+                      )}
+                      {collectionUnresolved && (
+                        <p>
+                          Legacy collection &ldquo;{form.collection}&rdquo; has no matching catalog record.
+                          Select the correct collection below before publishing.
+                        </p>
+                      )}
+                    </div>
+                  )}
 
-                {/* Collection */}
-                <LookupSelect
-                  label="Collection"
-                  required
-                  value={form.collection_id}
-                  options={catalog.collections}
-                  error={fieldErrors.collection}
-                  onChange={(id, name) => {
-                    setField("collection_id", id);
-                    setField("collection", name);
-                  }}
-                />
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    {/* Category */}
+                    <LookupSelect
+                      label="Category"
+                      required
+                      value={form.category_id}
+                      options={catalog.categories}
+                      error={fieldErrors.category_id ?? fieldErrors.category}
+                      onChange={(id, name) => {
+                        setField("category_id", id);
+                        setField("category", name);
+                        setField("subcategory_id", null);
+                      }}
+                    />
+
+                    {/* Subcategory — depends on Category */}
+                    <LookupSelect
+                      label="Subcategory"
+                      value={form.subcategory_id}
+                      options={filteredSubcats}
+                      onChange={(id, name) => setField("subcategory_id", id)}
+                      placeholder={form.category_id ? "Select subcategory (optional)" : "Select category first"}
+                    />
+
+                    {/* Collection — independent of Category */}
+                    <LookupSelect
+                      label="Collection"
+                      required
+                      value={form.collection_id}
+                      options={catalog.collections}
+                      error={fieldErrors.collection_id ?? fieldErrors.collection}
+                      onChange={(id, name) => {
+                        setField("collection_id", id);
+                        setField("collection", name);
+                      }}
+                    />
+                  </div>
+
+                  {(form.category_id || form.collection_id) && (
+                    <div className="flex flex-wrap gap-x-8 gap-y-1 border-t border-neutral-200 pt-3 text-xs">
+                      {form.category_id && (
+                        <span className="text-neutral-500">
+                          Category <span className="ml-1 font-medium text-neutral-900">{form.category}</span>
+                        </span>
+                      )}
+                      {form.subcategory_id && (
+                        <span className="text-neutral-500">
+                          Subcategory{" "}
+                          <span className="ml-1 font-medium text-neutral-900">
+                            {filteredSubcats.find((s) => s.id === form.subcategory_id)?.name ?? catalog.subcategories.find((s) => s.id === form.subcategory_id)?.name}
+                          </span>
+                        </span>
+                      )}
+                      {form.collection_id && (
+                        <span className="text-neutral-500">
+                          Collection <span className="ml-1 font-medium text-neutral-900">{form.collection}</span>
+                        </span>
+                      )}
+                    </div>
+                  )}
+                </div>
 
                 {/* Brand */}
                 <div className="space-y-1.5">
-                  <label className="block text-sm font-medium text-gray-700">
-                    Brand <span className="text-red-500">*</span>
+                  <label className="block text-sm font-semibold text-neutral-900">
+                    Brand <span className="text-rose-600">*</span>
                   </label>
                   <input
                     type="text"
                     value={form.brand}
                     onChange={(e) => setField("brand", e.target.value)}
                     className={cn(
-                      "w-full h-10 rounded-md border px-3 py-2 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500",
-                      fieldErrors.brand ? "border-red-400" : "border-gray-300"
+                      "w-full h-10 rounded-md border px-3 py-2 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-amber-600",
+                      fieldErrors.brand ? "border-rose-400" : "border-neutral-300"
                     )}
                   />
                 </div>
 
-                {/* Fabric */}
-                <LookupSelect
-                  label="Fabric"
-                  required
-                  value={form.attr_fabric_id}
-                  options={catalog.attrs.fabric}
-                  error={fieldErrors.fabric}
-                  onChange={(id, name) => {
-                    setField("attr_fabric_id", id);
-                    setField("fabric", name);
-                  }}
-                />
-
-                {/* Color */}
-                <LookupSelect
-                  label="Color"
-                  required
-                  value={form.attr_color_id}
-                  options={catalog.attrs.color}
-                  error={fieldErrors.color}
-                  onChange={(id, name) => {
-                    setField("attr_color_id", id);
-                    setField("color", name);
-                  }}
-                />
-
-                {/* Occasion */}
-                <LookupSelect
-                  label="Occasion"
-                  value={form.attr_occasion_id}
-                  options={catalog.attrs.occasion}
-                  onChange={(id, _name) => setField("attr_occasion_id", id)}
-                  placeholder="Select occasion (optional)"
-                />
-
-                {/* Pattern */}
-                <LookupSelect
-                  label="Pattern"
-                  value={form.attr_pattern_id}
-                  options={catalog.attrs.pattern}
-                  onChange={(id, _name) => setField("attr_pattern_id", id)}
-                  placeholder="Select pattern (optional)"
-                />
-
-                {/* Fit */}
-                <LookupSelect
-                  label="Fit"
-                  value={form.attr_fit_id}
-                  options={catalog.attrs.fit}
-                  onChange={(id, _name) => setField("attr_fit_id", id)}
-                  placeholder="Select fit (optional)"
-                />
-
-                {/* Sleeve */}
-                <LookupSelect
-                  label="Sleeve"
-                  value={form.attr_sleeve_id}
-                  options={catalog.attrs.sleeve}
-                  onChange={(id, _name) => setField("attr_sleeve_id", id)}
-                  placeholder="Select sleeve (optional)"
-                />
-
-                {/* Neck */}
-                <LookupSelect
-                  label="Neck"
-                  value={form.attr_neck_id}
-                  options={catalog.attrs.neck}
-                  onChange={(id, _name) => setField("attr_neck_id", id)}
-                  placeholder="Select neck (optional)"
-                />
-
-                {/* Work */}
-                <LookupSelect
-                  label="Work"
-                  value={form.attr_work_id}
-                  options={catalog.attrs.work}
-                  onChange={(id, _name) => setField("attr_work_id", id)}
-                  placeholder="Select work (optional)"
-                />
-
-                {/* Length */}
-                <LookupSelect
-                  label="Length"
-                  value={form.attr_length_id}
-                  options={catalog.attrs.length}
-                  onChange={(id, _name) => setField("attr_length_id", id)}
-                  placeholder="Select length (optional)"
-                />
-
-                {/* Sizes */}
-                <div className="space-y-1.5">
-                  <label className="block text-sm font-medium text-gray-700">
-                    Sizes <span className="text-red-500">*</span>
-                  </label>
-                  <input
-                    type="text"
-                    value={form.sizes}
-                    onChange={(e) => setField("sizes", e.target.value)}
-                    placeholder="XS, S, M, L, XL"
-                    className={cn(
-                      "w-full h-10 rounded-md border px-3 py-2 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500",
-                      fieldErrors.sizes ? "border-red-400" : "border-gray-300"
-                    )}
-                  />
-                  <p className="text-xs text-gray-400">Comma-separated list of sizes</p>
-                  {fieldErrors.sizes && <p className="text-xs text-red-500">{fieldErrors.sizes}</p>}
+                {/* ── CORE attributes ── */}
+                <div className="rounded-xl border border-neutral-200 bg-neutral-50/70 p-5 space-y-4">
+                  <div className="flex items-center gap-2"><span className="h-3.5 w-0.5 rounded-full bg-amber-600" /><p className="text-xs font-bold uppercase tracking-[0.12em] text-neutral-900">Core Attributes</p></div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <LookupSelect
+                      label="Fabric"
+                      required
+                      value={form.attr_fabric_id}
+                      options={catalog.attrs.fabric}
+                      error={fieldErrors.fabric}
+                      onChange={(id, name) => { setField("attr_fabric_id", id); setField("fabric", name); }}
+                    />
+                    <LookupSelect
+                      label="Color"
+                      required
+                      value={form.attr_color_id}
+                      options={catalog.attrs.color}
+                      error={fieldErrors.color}
+                      onChange={(id, name) => { setField("attr_color_id", id); setField("color", name); }}
+                    />
+                    <LookupSelect
+                      label="Pattern"
+                      value={form.attr_pattern_id}
+                      options={catalog.attrs.pattern}
+                      onChange={(id) => setField("attr_pattern_id", id)}
+                      placeholder="Optional"
+                    />
+                    <LookupSelect
+                      label="Work"
+                      value={form.attr_work_id}
+                      options={catalog.attrs.work}
+                      onChange={(id) => setField("attr_work_id", id)}
+                      placeholder="Optional"
+                    />
+                  </div>
                 </div>
 
-                {/* Size Chart */}
-                <LookupSelect
-                  label="Size Chart"
-                  value={form.size_chart_id}
-                  options={sizeChartOptions}
-                  onChange={(id, _name) => setField("size_chart_id", id)}
-                  placeholder="Select size chart (optional)"
-                />
+                {/* ── STYLE attributes ── */}
+                <div className="rounded-xl border border-neutral-200 bg-neutral-50/70 p-5 space-y-4">
+                  <div className="flex items-center gap-2"><span className="h-3.5 w-0.5 rounded-full bg-amber-600" /><p className="text-xs font-bold uppercase tracking-[0.12em] text-neutral-900">Style</p></div>
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
+                    <LookupSelect
+                      label="Occasion"
+                      value={form.attr_occasion_id}
+                      options={catalog.attrs.occasion}
+                      onChange={(id) => setField("attr_occasion_id", id)}
+                      placeholder="Optional"
+                    />
+                    <LookupSelect
+                      label="Fit"
+                      value={form.attr_fit_id}
+                      options={catalog.attrs.fit}
+                      onChange={(id) => setField("attr_fit_id", id)}
+                      placeholder="Optional"
+                    />
+                    <LookupSelect
+                      label="Sleeve"
+                      value={form.attr_sleeve_id}
+                      options={catalog.attrs.sleeve}
+                      onChange={(id) => setField("attr_sleeve_id", id)}
+                      placeholder="Optional"
+                    />
+                    <LookupSelect
+                      label="Neck"
+                      value={form.attr_neck_id}
+                      options={catalog.attrs.neck}
+                      onChange={(id) => setField("attr_neck_id", id)}
+                      placeholder="Optional"
+                    />
+                    <LookupSelect
+                      label="Length"
+                      value={form.attr_length_id}
+                      options={catalog.attrs.length}
+                      onChange={(id) => setField("attr_length_id", id)}
+                      placeholder="Optional"
+                    />
+                  </div>
+                </div>
+
+                {/* ── SIZE ── */}
+                <div className="rounded-xl border border-neutral-200 bg-neutral-50/70 p-5 space-y-4">
+                  <div className="flex items-center gap-2"><span className="h-3.5 w-0.5 rounded-full bg-amber-600" /><p className="text-xs font-bold uppercase tracking-[0.12em] text-neutral-900">Size</p></div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-1.5">
+                      <label className="block text-sm font-semibold text-neutral-900">
+                        Available Sizes <span className="text-rose-600">*</span>
+                      </label>
+                      <input
+                        type="text"
+                        value={form.sizes}
+                        onChange={(e) => setField("sizes", e.target.value)}
+                        placeholder="XS, S, M, L, XL"
+                        className={cn(
+                          "w-full h-10 rounded-md border px-3 py-2 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-amber-600",
+                          fieldErrors.sizes ? "border-rose-400" : "border-neutral-300"
+                        )}
+                      />
+                      {fieldErrors.sizes && <p className="text-xs text-rose-600">{fieldErrors.sizes}</p>}
+                    </div>
+                    <LookupSelect
+                      label="Size Chart"
+                      value={form.size_chart_id}
+                      options={sizeChartOptions}
+                      onChange={(id) => setField("size_chart_id", id)}
+                      placeholder="Select (optional)"
+                    />
+                  </div>
+                  <p className="text-xs text-neutral-500">Comma-separated list of sizes</p>
+                </div>
               </div>
             )}
 
             {/* ── STEP 2: Pricing ───────────────────────────────────────── */}
             {currentStep === 2 && (
               <div className="space-y-4">
-                <div className="grid grid-cols-2 gap-4">
-                  {/* Price */}
-                  <div className="space-y-1.5">
-                    <label className="block text-sm font-medium text-gray-700">
-                      Price (₹) <span className="text-red-500">*</span>
-                    </label>
-                    <input
-                      type="number"
-                      min="0"
-                      step="0.01"
-                      value={form.price}
-                      onChange={(e) => setField("price", e.target.value)}
-                      className={cn(
-                        "w-full h-10 rounded-md border px-3 py-2 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500",
-                        fieldErrors.price ? "border-red-400" : "border-gray-300"
-                      )}
-                    />
-                    {fieldErrors.price && <p className="text-xs text-red-500">{fieldErrors.price}</p>}
-                  </div>
+                {/* Selling Price — visually dominant, own row */}
+                <div className="rounded-xl border border-neutral-200 bg-neutral-50/70 p-5 space-y-1.5">
+                  <label className="block text-xs font-bold uppercase tracking-[0.12em] text-neutral-900">
+                    Selling Price (₹) <span className="text-rose-600">*</span>
+                  </label>
+                  <input
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    value={form.price}
+                    onChange={(e) => setField("price", e.target.value)}
+                    className={cn(
+                      "w-full sm:w-64 h-12 rounded-lg border px-3.5 py-2 font-serif text-2xl text-neutral-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-amber-600 focus:border-amber-600",
+                      fieldErrors.price ? "border-rose-400" : "border-neutral-300"
+                    )}
+                  />
+                  {fieldErrors.price && <p className="text-xs text-rose-600">{fieldErrors.price}</p>}
+                </div>
 
+                <div className="grid grid-cols-2 gap-4">
                   {/* Compare Price */}
                   <div className="space-y-1.5">
-                    <label className="block text-sm font-medium text-gray-700">Compare At (₹)</label>
+                    <label className="block text-sm font-semibold text-neutral-900">Compare At (₹)</label>
                     <input
                       type="number"
                       min="0"
@@ -1521,13 +1632,13 @@ export default function ProductManagement() {
                       value={form.comparePrice}
                       onChange={(e) => setField("comparePrice", e.target.value)}
                       placeholder="Original price"
-                      className="w-full h-10 rounded-md border border-gray-300 px-3 py-2 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                      className="w-full h-10 rounded-md border border-neutral-300 px-3 py-2 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-amber-600"
                     />
                   </div>
 
                   {/* Cost */}
                   <div className="space-y-1.5">
-                    <label className="block text-sm font-medium text-gray-700">Cost (₹)</label>
+                    <label className="block text-sm font-semibold text-neutral-900">Cost (₹)</label>
                     <input
                       type="number"
                       min="0"
@@ -1535,14 +1646,14 @@ export default function ProductManagement() {
                       value={form.cost}
                       onChange={(e) => setField("cost", e.target.value)}
                       placeholder="Cost of goods"
-                      className="w-full h-10 rounded-md border border-gray-300 px-3 py-2 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                      className="w-full h-10 rounded-md border border-neutral-300 px-3 py-2 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-amber-600"
                     />
                   </div>
 
                   {/* Stock */}
                   <div className="space-y-1.5">
-                    <label className="block text-sm font-medium text-gray-700">
-                      Stock <span className="text-red-500">*</span>
+                    <label className="block text-sm font-semibold text-neutral-900">
+                      Stock <span className="text-rose-600">*</span>
                     </label>
                     <input
                       type="number"
@@ -1551,17 +1662,17 @@ export default function ProductManagement() {
                       value={form.stock}
                       onChange={(e) => setField("stock", e.target.value)}
                       className={cn(
-                        "w-full h-10 rounded-md border px-3 py-2 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500",
-                        fieldErrors.stock ? "border-red-400" : "border-gray-300"
+                        "w-full h-10 rounded-md border px-3 py-2 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-amber-600",
+                        fieldErrors.stock ? "border-rose-400" : "border-neutral-300"
                       )}
                     />
-                    {fieldErrors.stock && <p className="text-xs text-red-500">{fieldErrors.stock}</p>}
+                    {fieldErrors.stock && <p className="text-xs text-rose-600">{fieldErrors.stock}</p>}
                   </div>
 
                   {/* HSN */}
                   <div className="space-y-1.5">
-                    <label className="block text-sm font-medium text-gray-700">
-                      HSN Code <span className="text-red-500">*</span>
+                    <label className="block text-sm font-semibold text-neutral-900">
+                      HSN Code <span className="text-rose-600">*</span>
                     </label>
                     <input
                       type="text"
@@ -1569,20 +1680,20 @@ export default function ProductManagement() {
                       onChange={(e) => setField("hsn", e.target.value)}
                       placeholder="e.g. 5208"
                       className={cn(
-                        "w-full h-10 rounded-md border px-3 py-2 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500",
-                        fieldErrors.hsn ? "border-red-400" : "border-gray-300"
+                        "w-full h-10 rounded-md border px-3 py-2 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-amber-600",
+                        fieldErrors.hsn ? "border-rose-400" : "border-neutral-300"
                       )}
                     />
-                    {fieldErrors.hsn && <p className="text-xs text-red-500">{fieldErrors.hsn}</p>}
+                    {fieldErrors.hsn && <p className="text-xs text-rose-600">{fieldErrors.hsn}</p>}
                   </div>
 
                   {/* GST */}
                   <div className="space-y-1.5">
-                    <label className="block text-sm font-medium text-gray-700">GST (%)</label>
+                    <label className="block text-sm font-semibold text-neutral-900">GST (%)</label>
                     <select
                       value={form.gst}
                       onChange={(e) => setField("gst", e.target.value)}
-                      className="w-full h-10 rounded-md border border-gray-300 px-3 py-2 text-sm bg-white shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                      className="w-full h-10 rounded-md border border-neutral-300 px-3 py-2 text-sm bg-white shadow-sm focus:outline-none focus:ring-2 focus:ring-amber-600"
                     >
                       {[0, 5, 12, 18, 28].map((r) => (
                         <option key={r} value={r}>{r}%</option>
@@ -1595,29 +1706,31 @@ export default function ProductManagement() {
 
             {/* ── STEP 3: Content ───────────────────────────────────────── */}
             {currentStep === 3 && (
-              <div className="space-y-4">
+              <div className="space-y-5">
+                <div className="flex items-center gap-2"><span className="h-3.5 w-0.5 rounded-full bg-amber-600" /><p className="text-xs font-bold uppercase tracking-[0.12em] text-neutral-900">Product Description</p></div>
                 {/* Description */}
                 <div className="space-y-1.5">
-                  <label className="block text-sm font-medium text-gray-700">
-                    Description <span className="text-red-500">*</span>
+                  <label className="block text-sm font-semibold text-neutral-900">
+                    Description <span className="text-rose-600">*</span>
                   </label>
                   <textarea
-                    rows={5}
+                    rows={6}
                     value={form.description}
                     onChange={(e) => setField("description", e.target.value)}
                     placeholder="Detailed product description..."
                     className={cn(
-                      "w-full rounded-md border px-3 py-2 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 resize-none",
-                      fieldErrors.description ? "border-red-400" : "border-gray-300"
+                      "w-full rounded-md border px-3 py-2 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-amber-600 resize-none",
+                      fieldErrors.description ? "border-rose-400" : "border-neutral-300"
                     )}
                   />
-                  {fieldErrors.description && <p className="text-xs text-red-500">{fieldErrors.description}</p>}
+                  {fieldErrors.description && <p className="text-xs text-rose-600">{fieldErrors.description}</p>}
                 </div>
 
-                {/* SEO Title */}
+                {/* SEO */}
+                <div className="flex items-center gap-2 pt-2"><span className="h-3.5 w-0.5 rounded-full bg-amber-600" /><p className="text-xs font-bold uppercase tracking-[0.12em] text-neutral-900">SEO</p></div>
                 <div className="space-y-1.5">
-                  <label className="block text-sm font-medium text-gray-700">
-                    SEO Title <span className="text-red-500">*</span>
+                  <label className="block text-sm font-semibold text-neutral-900">
+                    SEO Title <span className="text-rose-600">*</span>
                   </label>
                   <input
                     type="text"
@@ -1625,17 +1738,17 @@ export default function ProductManagement() {
                     onChange={(e) => setField("seoTitle", e.target.value)}
                     placeholder="Page title for search engines"
                     className={cn(
-                      "w-full h-10 rounded-md border px-3 py-2 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500",
-                      fieldErrors.seoTitle ? "border-red-400" : "border-gray-300"
+                      "w-full h-10 rounded-md border px-3 py-2 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-amber-600",
+                      fieldErrors.seoTitle ? "border-rose-400" : "border-neutral-300"
                     )}
                   />
-                  {fieldErrors.seoTitle && <p className="text-xs text-red-500">{fieldErrors.seoTitle}</p>}
+                  {fieldErrors.seoTitle && <p className="text-xs text-rose-600">{fieldErrors.seoTitle}</p>}
                 </div>
 
                 {/* SEO Description */}
                 <div className="space-y-1.5">
-                  <label className="block text-sm font-medium text-gray-700">
-                    SEO Description <span className="text-red-500">*</span>
+                  <label className="block text-sm font-semibold text-neutral-900">
+                    SEO Description <span className="text-rose-600">*</span>
                   </label>
                   <textarea
                     rows={3}
@@ -1643,54 +1756,54 @@ export default function ProductManagement() {
                     onChange={(e) => setField("seoDescription", e.target.value)}
                     placeholder="Meta description for search engines (150-160 chars)"
                     className={cn(
-                      "w-full rounded-md border px-3 py-2 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 resize-none",
-                      fieldErrors.seoDescription ? "border-red-400" : "border-gray-300"
+                      "w-full rounded-md border px-3 py-2 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-amber-600 resize-none",
+                      fieldErrors.seoDescription ? "border-rose-400" : "border-neutral-300"
                     )}
                   />
-                  {fieldErrors.seoDescription && <p className="text-xs text-red-500">{fieldErrors.seoDescription}</p>}
+                  {fieldErrors.seoDescription && <p className="text-xs text-rose-600">{fieldErrors.seoDescription}</p>}
                 </div>
 
                 {/* Phase 1B — Model & Fit Information */}
-                <div className="rounded-lg border border-gray-200 bg-gray-50 p-4 space-y-4">
+                <div className="rounded-xl border border-neutral-200 bg-neutral-50/70 p-5 space-y-4">
                   <div className="flex items-center gap-2">
-                    <TrendingUp className="h-4 w-4 text-indigo-500" />
-                    <h3 className="text-sm font-semibold text-gray-700">Model &amp; Fit Information</h3>
+                    <TrendingUp className="h-4 w-4 text-amber-600" />
+                    <h3 className="text-sm font-semibold text-neutral-900">Model &amp; Fit Information</h3>
                   </div>
 
                   {/* Model Info — FIX: removed smart quote from placeholder */}
                   <div className="space-y-1.5">
-                    <label className="block text-sm font-medium text-gray-700">Model Info</label>
+                    <label className="block text-sm font-semibold text-neutral-900">Model Info</label>
                     <input
                       type="text"
                       value={form.spec_modelInfo}
                       onChange={(e) => setField("spec_modelInfo", e.target.value)}
                       placeholder="e.g. Model is 5ft 7in, Measurements: 34-26-36"
-                      className="w-full h-10 rounded-md border border-gray-300 px-3 py-2 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                      className="w-full h-10 rounded-md border border-neutral-300 px-3 py-2 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-amber-600"
                     />
-                    <p className="text-xs text-gray-400">Displayed on PDP to help customers size correctly</p>
+                    <p className="text-xs text-neutral-500">Displayed on PDP to help customers size correctly</p>
                   </div>
 
                   {/* Size Worn */}
                   <div className="space-y-1.5">
-                    <label className="block text-sm font-medium text-gray-700">Size Worn</label>
+                    <label className="block text-sm font-semibold text-neutral-900">Size Worn</label>
                     <input
                       type="text"
                       value={form.spec_sizeWorn}
                       onChange={(e) => setField("spec_sizeWorn", e.target.value)}
                       placeholder="e.g. Model is wearing size S"
-                      className="w-full h-10 rounded-md border border-gray-300 px-3 py-2 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                      className="w-full h-10 rounded-md border border-neutral-300 px-3 py-2 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-amber-600"
                     />
                   </div>
 
                   {/* Fit Guidance */}
                   <div className="space-y-1.5">
-                    <label className="block text-sm font-medium text-gray-700">Fit Guidance</label>
+                    <label className="block text-sm font-semibold text-neutral-900">Fit Guidance</label>
                     <input
                       type="text"
                       value={form.spec_fitGuidance}
                       onChange={(e) => setField("spec_fitGuidance", e.target.value)}
                       placeholder="e.g. Slim fit, size up if between sizes"
-                      className="w-full h-10 rounded-md border border-gray-300 px-3 py-2 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                      className="w-full h-10 rounded-md border border-neutral-300 px-3 py-2 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-amber-600"
                     />
                   </div>
                 </div>
@@ -1700,6 +1813,8 @@ export default function ProductManagement() {
             {/* ── STEP 4: Visibility ────────────────────────────────────── */}
             {currentStep === 4 && (
               <div className="space-y-4">
+                <div className="flex items-center gap-2"><span className="h-3.5 w-0.5 rounded-full bg-amber-600" /><p className="text-xs font-bold uppercase tracking-[0.12em] text-neutral-900">Product Status</p></div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <ToggleSwitch
                   checked={form.active}
                   onChange={(v) => setField("active", v)}
@@ -1724,12 +1839,13 @@ export default function ProductManagement() {
                   label="Best Seller"
                   description="Tag product as a best seller"
                 />
+                </div>
               </div>
             )}
           </div>
 
           {/* ── Sheet footer ─────────────────────────────────────────────── */}
-          <SheetFooter className="sticky bottom-0 bg-white border-t border-gray-200 px-6 py-4 flex flex-row items-center justify-between gap-3">
+          <SheetFooter className="sticky bottom-0 bg-white border-t border-neutral-200 px-6 py-4 flex flex-row items-center justify-between gap-3">
             <Button
               type="button"
               variant="outline"
@@ -1742,7 +1858,7 @@ export default function ProductManagement() {
 
             <div className="flex gap-2">
               {currentStep < STEPS.length - 1 ? (
-                <Button type="button" onClick={handleNext} className="flex items-center gap-1 bg-indigo-600 hover:bg-indigo-700">
+                <Button type="button" onClick={handleNext} className="flex items-center gap-1 bg-neutral-900 hover:bg-neutral-800">
                   Next <ChevronRight className="h-4 w-4" />
                 </Button>
               ) : (
@@ -1760,10 +1876,10 @@ export default function ProductManagement() {
                     type="button"
                     onClick={() => handleSave(true)}
                     disabled={isSaving || isPublishing}
-                    className="bg-green-600 hover:bg-green-700 flex items-center gap-1"
+                    className="bg-neutral-900 hover:bg-amber-700 transition-colors flex items-center gap-1"
                   >
                     {isPublishing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
-                    Publish
+                    Publish Product
                   </Button>
                 </>
               )}
@@ -1782,7 +1898,7 @@ export default function ProductManagement() {
             </DialogTitle>
             <DialogDescription>
               Are you sure you want to delete{" "}
-              <span className="font-semibold text-gray-900">{productToDelete?.name}</span>?
+              <span className="font-semibold text-neutral-900">{productToDelete?.name}</span>?
               This action cannot be undone.
             </DialogDescription>
           </DialogHeader>
@@ -1809,7 +1925,7 @@ export default function ProductManagement() {
           <DialogContent className="sm:max-w-lg overflow-y-auto max-h-[90vh]">
             <DialogHeader>
               <DialogTitle>{viewProduct.name}</DialogTitle>
-              <DialogDescription className="text-xs text-gray-500">
+              <DialogDescription className="text-xs text-neutral-500">
                 {viewProduct.sku} · {viewProduct.category} · {viewProduct.collection}
               </DialogDescription>
             </DialogHeader>
@@ -1817,7 +1933,7 @@ export default function ProductManagement() {
             <div className="space-y-4">
               {/* Image */}
               {viewProduct.images[0] && (
-                <div className="aspect-video relative rounded-lg overflow-hidden bg-gray-100">
+                <div className="aspect-video relative rounded-lg overflow-hidden bg-neutral-100">
                   <Image
                     src={viewProduct.images[0].url}
                     alt={viewProduct.images[0].alt}
@@ -1831,39 +1947,39 @@ export default function ProductManagement() {
               {/* Details grid */}
               <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
                 <div>
-                  <span className="text-gray-500">Price</span>
+                  <span className="text-neutral-500">Price</span>
                   <p className="font-semibold">₹{viewProduct.price.toLocaleString("en-IN")}</p>
                 </div>
                 {viewProduct.comparePrice && (
                   <div>
-                    <span className="text-gray-500">Compare at</span>
-                    <p className="font-semibold line-through text-gray-400">₹{viewProduct.comparePrice.toLocaleString("en-IN")}</p>
+                    <span className="text-neutral-500">Compare at</span>
+                    <p className="font-semibold line-through text-neutral-400">₹{viewProduct.comparePrice.toLocaleString("en-IN")}</p>
                   </div>
                 )}
                 <div>
-                  <span className="text-gray-500">Stock</span>
-                  <p className={cn("font-semibold", viewProduct.stock === 0 ? "text-red-600" : viewProduct.stock <= LOW_STOCK_THRESHOLD ? "text-yellow-600" : "text-gray-900")}>
+                  <span className="text-neutral-500">Stock</span>
+                  <p className={cn("font-semibold", viewProduct.stock === 0 ? "text-red-600" : viewProduct.stock <= LOW_STOCK_THRESHOLD ? "text-yellow-600" : "text-neutral-900")}>
                     {viewProduct.stock}
                   </p>
                 </div>
                 <div>
-                  <span className="text-gray-500">Brand</span>
+                  <span className="text-neutral-500">Brand</span>
                   <p className="font-medium">{viewProduct.brand}</p>
                 </div>
                 <div>
-                  <span className="text-gray-500">Fabric</span>
+                  <span className="text-neutral-500">Fabric</span>
                   <p className="font-medium">{viewProduct.fabric}</p>
                 </div>
                 <div>
-                  <span className="text-gray-500">Color</span>
+                  <span className="text-neutral-500">Color</span>
                   <p className="font-medium">{viewProduct.color}</p>
                 </div>
                 <div>
-                  <span className="text-gray-500">Sizes</span>
+                  <span className="text-neutral-500">Sizes</span>
                   <p className="font-medium">{viewProduct.sizes.join(", ")}</p>
                 </div>
                 <div>
-                  <span className="text-gray-500">HSN / GST</span>
+                  <span className="text-neutral-500">HSN / GST</span>
                   <p className="font-medium">{viewProduct.hsn} / {viewProduct.gst}%</p>
                 </div>
               </div>
@@ -1871,8 +1987,8 @@ export default function ProductManagement() {
               {/* Badges */}
               <div className="flex flex-wrap gap-2">
                 {viewProduct.active    && <Badge className="bg-green-100 text-green-700">Active</Badge>}
-                {!viewProduct.active   && <Badge className="bg-gray-100 text-gray-500">Inactive</Badge>}
-                {viewProduct.featured  && <Badge className="bg-indigo-100 text-indigo-700">Featured</Badge>}
+                {!viewProduct.active   && <Badge className="bg-neutral-100 text-neutral-500">Inactive</Badge>}
+                {viewProduct.featured  && <Badge className="bg-amber-100 text-amber-800">Featured</Badge>}
                 {viewProduct.bestSeller && <Badge className="bg-orange-100 text-orange-700">Best Seller</Badge>}
                 {viewProduct.newArrival && <Badge className="bg-green-100 text-green-700">New Arrival</Badge>}
               </div>
@@ -1880,8 +1996,8 @@ export default function ProductManagement() {
               {/* Description */}
               {viewProduct.description && (
                 <div>
-                  <p className="text-sm font-medium text-gray-700 mb-1">Description</p>
-                  <p className="text-sm text-gray-600 leading-relaxed">{viewProduct.description}</p>
+                  <p className="text-sm font-medium text-neutral-700 mb-1">Description</p>
+                  <p className="text-sm text-neutral-600 leading-relaxed">{viewProduct.description}</p>
                 </div>
               )}
 
@@ -1889,11 +2005,11 @@ export default function ProductManagement() {
               {viewProduct.specifications && (
                 Object.values(viewProduct.specifications).some(Boolean)
               ) && (
-                <div className="rounded-lg border border-gray-200 bg-gray-50 p-3 space-y-1">
-                  <p className="text-sm font-medium text-gray-700">Model &amp; Fit</p>
-                  {viewProduct.specifications.modelInfo  && <p className="text-xs text-gray-600">{viewProduct.specifications.modelInfo}</p>}
-                  {viewProduct.specifications.sizeWorn   && <p className="text-xs text-gray-500">Wearing: {viewProduct.specifications.sizeWorn}</p>}
-                  {viewProduct.specifications.fitGuidance && <p className="text-xs text-gray-500">Fit: {viewProduct.specifications.fitGuidance}</p>}
+                <div className="rounded-xl border border-neutral-200 bg-neutral-50/70 p-4 space-y-1.5">
+                  <p className="text-sm font-medium text-neutral-700">Model &amp; Fit</p>
+                  {viewProduct.specifications.modelInfo  && <p className="text-xs text-neutral-600">{viewProduct.specifications.modelInfo}</p>}
+                  {viewProduct.specifications.sizeWorn   && <p className="text-xs text-neutral-500">Wearing: {viewProduct.specifications.sizeWorn}</p>}
+                  {viewProduct.specifications.fitGuidance && <p className="text-xs text-neutral-500">Fit: {viewProduct.specifications.fitGuidance}</p>}
                 </div>
               )}
             </div>
@@ -1905,7 +2021,7 @@ export default function ProductManagement() {
                   setViewDialogOpen(false);
                   openEdit(viewProduct);
                 }}
-                className="bg-indigo-600 hover:bg-indigo-700"
+                className="bg-neutral-900 hover:bg-neutral-800"
               >
                 <Edit className="h-4 w-4 mr-1" /> Edit
               </Button>
