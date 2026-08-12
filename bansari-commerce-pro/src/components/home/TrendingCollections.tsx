@@ -1,74 +1,57 @@
 import Link from "next/link";
 import Image from "next/image";
 
+import { createServiceRoleClient } from "@/lib/supabase/service";
+
 interface Collection {
-  id: string;
+  slug: string;
   name: string;
-  desc: string;
-  tag: string;
-  href: string;
+  count: number;
   image: string;
-  color: string;
 }
 
-const COLLECTIONS: Collection[] = [
-  {
-    id: "wedding",
-    name: "Wedding",
-    desc: "Bridal lehengas, shaadiwali sarees & occasion wear",
-    tag: "Most Loved",
-    href: "/collections/wedding",
-    image: "https://images.unsplash.com/photo-1610030469983-98e550d6193c?w=700&q=80&auto=format&fit=crop",
-    color: "#3D2535",
-  },
-  {
-    id: "festive",
-    name: "Festive",
-    desc: "Diwali, Navratri & celebration-ready ethnic wear",
-    tag: "New Season",
-    href: "/collections/festive",
-    image: "https://images.unsplash.com/photo-1583391733956-3750e0ff4e8b?w=700&q=80&auto=format&fit=crop",
-    color: "#5C3A4F",
-  },
-  {
-    id: "office",
-    name: "Office Wear",
-    desc: "Refined kurtas & co-ord sets for the modern professional",
-    tag: "Bestseller",
-    href: "/collections/office-wear",
-    image: "https://images.unsplash.com/photo-1594938298603-c8148c4b4571?w=700&q=80&auto=format&fit=crop",
-    color: "#2C1A24",
-  },
-  {
-    id: "daily",
-    name: "Daily Wear",
-    desc: "Easy cotton, linen & khadi for everyday Indian living",
-    tag: "Everyday",
-    href: "/collections/daily-wear",
-    image: "https://images.unsplash.com/photo-1617627143750-d86bc21e42bb?w=700&q=80&auto=format&fit=crop",
-    color: "#4B3A43",
-  },
-  {
-    id: "party",
-    name: "Party",
-    desc: "Glamorous ensembles that command every room",
-    tag: "Editor's Pick",
-    href: "/collections/party",
-    image: "https://images.unsplash.com/photo-1541099649105-f69ad21f3246?w=700&q=80&auto=format&fit=crop",
-    color: "#714857",
-  },
-  {
-    id: "vacation",
-    name: "Vacation",
-    desc: "Breezy silks, printed cotton & resort-ready ethnic",
-    tag: "Summer Edit",
-    href: "/collections/vacation",
-    image: "https://images.unsplash.com/photo-1610030469983-98e550d6193c?w=700&q=80&auto=format&fit=crop&facepad=2",
-    color: "#8A5A6A",
-  },
-];
+// ── Real, product-backed collections only ──────────────────────────────────
+// Same source of truth as /collections: the products table's `collection`
+// text field, populated by Admin Product Management. Nothing here is
+// hard-coded — a collection only appears if it has at least one active
+// product with a real image.
+async function getRealCollections(): Promise<Collection[]> {
+  const supabase = createServiceRoleClient();
+  const { data } = await supabase
+    .from("products")
+    .select("collection, images, created_at")
+    .eq("active", true)
+    .order("created_at", { ascending: false });
 
-export default function TrendingCollections() {
+  const byCollection = new Map<string, { count: number; image: string }>();
+  for (const row of data ?? []) {
+    const collection = row.collection as string | null;
+    if (!collection) continue;
+    const image = Array.isArray(row.images) ? row.images[0]?.url : undefined;
+    const existing = byCollection.get(collection);
+    if (existing) {
+      existing.count += 1;
+    } else {
+      byCollection.set(collection, { count: 1, image: image ?? "" });
+    }
+  }
+
+  return Array.from(byCollection.entries())
+    .filter(([, info]) => info.image)
+    .map(([name, info]) => ({
+      slug: name.toLowerCase().replace(/\s+/g, "-"),
+      name,
+      count: info.count,
+      image: info.image,
+    }))
+    .sort((a, b) => b.count - a.count)
+    .slice(0, 6);
+}
+
+export default async function TrendingCollections() {
+  const collections = await getRealCollections();
+  if (collections.length === 0) return null;
+
   return (
     <section
       aria-labelledby="trending-heading"
@@ -141,14 +124,15 @@ export default function TrendingCollections() {
 
         {/* Collection tiles */}
         <div
+          className="bc-trend-grid"
           style={{
             display: "grid",
-            gridTemplateColumns: "repeat(6, 1fr)",
+            gridTemplateColumns: `repeat(${Math.min(collections.length, 6)}, 1fr)`,
             gap: "12px",
           }}
         >
-          {COLLECTIONS.map((col, i) => (
-            <CollectionTile key={col.id} col={col} large={i === 0 || i === 5} />
+          {collections.map((col, i) => (
+            <CollectionTile key={col.slug} col={col} large={i === 0} />
           ))}
         </div>
 
@@ -168,17 +152,17 @@ export default function TrendingCollections() {
 function CollectionTile({ col, large }: { col: Collection; large?: boolean }) {
   return (
     <Link
-      href={col.href}
+      href={`/shop?collection=${encodeURIComponent(col.name)}`}
       style={{
         display: "flex",
         flexDirection: "column",
         position: "relative",
         overflow: "hidden",
         aspectRatio: large ? "2/3" : "3/4",
-        background: col.color,
+        background: "var(--bc-stone)",
         cursor: "pointer",
       }}
-      aria-label={`${col.name} collection`}
+      aria-label={`Shop ${col.name} collection`}
     >
       <Image
         src={col.image}
@@ -188,8 +172,6 @@ function CollectionTile({ col, large }: { col: Collection; large?: boolean }) {
         style={{
           objectFit: "cover",
           transition: "transform 700ms cubic-bezier(0.16,1,0.3,1)",
-          mixBlendMode: "multiply",
-          opacity: 0.85,
         }}
         className="bc-trend-img"
       />
@@ -198,7 +180,7 @@ function CollectionTile({ col, large }: { col: Collection; large?: boolean }) {
         style={{
           position: "absolute",
           inset: 0,
-          background: `linear-gradient(to top, ${col.color}f0 0%, ${col.color}80 40%, transparent 100%)`,
+          background: "linear-gradient(to top, rgba(26,15,22,0.85) 0%, rgba(26,15,22,0.35) 45%, transparent 100%)",
         }}
       />
 
@@ -219,7 +201,7 @@ function CollectionTile({ col, large }: { col: Collection; large?: boolean }) {
           backdropFilter: "blur(4px)",
         }}
       >
-        {col.tag}
+        {col.count} {col.count === 1 ? "piece" : "pieces"}
       </span>
 
       {/* Content */}
@@ -238,27 +220,12 @@ function CollectionTile({ col, large }: { col: Collection; large?: boolean }) {
             fontSize: large ? "clamp(1.25rem, 2vw, 1.75rem)" : "clamp(1rem, 1.5vw, 1.375rem)",
             fontWeight: 500,
             color: "var(--bc-cream)",
-            margin: "0 0 0.375rem",
+            margin: 0,
             lineHeight: 1.1,
           }}
         >
           {col.name}
         </h3>
-        <p
-          style={{
-            fontFamily: "var(--font-inter), sans-serif",
-            fontSize: "0.75rem",
-            color: "rgba(255,253,249,0.62)",
-            margin: 0,
-            lineHeight: 1.4,
-            display: large ? "block" : "-webkit-box",
-            WebkitLineClamp: 2,
-            WebkitBoxOrient: "vertical",
-            overflow: "hidden",
-          }}
-        >
-          {col.desc}
-        </p>
       </div>
 
       <style>{`

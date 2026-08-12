@@ -4,7 +4,7 @@ const BENEFITS = [
   { label: "New Arrivals", detail: "First to know" },
   { label: "Private Launches", detail: "Members only" },
   { label: "Early Access", detail: "Before the world" },
-  { label: "Festive Edits", detail: "Curated seasons" },
+  { label: "Restocks", detail: "When pieces return" },
 ];
 
 export default function LuxuryNewsletter() {
@@ -207,7 +207,7 @@ export default function LuxuryNewsletter() {
                 color: "rgba(255,253,249,0.25)",
               }}
             >
-              2,400+ members · Zero spam · Unsubscribe anytime
+              Zero spam · Unsubscribe anytime
             </span>
           </div>
         </div>

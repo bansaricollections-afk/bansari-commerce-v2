@@ -2,11 +2,15 @@
 
 import { useEffect, useRef, useState } from "react";
 
+// Every line must be supported by a published policy or an observable fact.
+// Removed: the ₹999 free-shipping threshold (not established by the shipping
+// policy), "Est. 2018" (contradicted elsewhere, no authoritative source), and
+// the weekly-arrivals cadence (no such schedule is committed anywhere).
 const MESSAGES = [
-  { text: "Free shipping on orders above ₹999", highlight: "Free shipping" },
-  { text: "Handcrafted with love in India — Est. 2018", highlight: "Handcrafted with love" },
-  { text: "New arrivals every Friday — Shop the latest edit", highlight: "New arrivals every Friday" },
-  { text: "Easy 7-day returns · WhatsApp support 24/7", highlight: "Easy 7-day returns" },
+  { text: "Shipping across India — dispatched in 1–2 business days", highlight: "Shipping across India" },
+  { text: "Handcrafted in India", highlight: "Handcrafted in India" },
+  { text: "Secure payments via Razorpay — UPI, cards & net banking", highlight: "Secure payments" },
+  { text: "Easy 7-day returns · WhatsApp support", highlight: "Easy 7-day returns" },
 ];
 
 export default function AnnouncementBar() {

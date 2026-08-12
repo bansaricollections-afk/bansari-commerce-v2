@@ -1,14 +1,19 @@
 import Image from "next/image";
 import Link from "next/link";
 
-const STATS = [
-  { value: "2011", label: "Est. in Surat" },
-  { value: "500+", label: "Artisan families" },
-  { value: "12", label: "Heritage crafts" },
-  { value: "40k+", label: "Happy customers" },
-];
+import { getFeaturedProducts } from "@/services/product.service";
 
-export default function CraftsmanshipStory() {
+export default async function CraftsmanshipStory() {
+  // Real catalog imagery only — no stock photography. If no suitable real
+  // product image exists, the image panel is omitted rather than padded.
+  let storyImage: string | null = null;
+  try {
+    const featured = await getFeaturedProducts();
+    storyImage = featured.find((p) => p.images?.[0]?.url)?.images?.[0]?.url ?? null;
+  } catch {
+    storyImage = null;
+  }
+
   return (
     <section
       aria-label="Our craftsmanship story"
@@ -30,12 +35,13 @@ export default function CraftsmanshipStory() {
       <div
         style={{
           display: "grid",
-          gridTemplateColumns: "1fr 1fr",
+          gridTemplateColumns: storyImage ? "1fr 1fr" : "1fr",
           minHeight: "clamp(500px, 65vw, 800px)",
         }}
         className="bc-craft-grid"
       >
-        {/* ── Left: Image panel ── */}
+        {/* ── Left: Image panel — real catalog imagery only ── */}
+        {storyImage && (
         <div
           style={{
             position: "relative",
@@ -44,13 +50,13 @@ export default function CraftsmanshipStory() {
           }}
         >
           <Image
-            src="https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=1200&q=85&auto=format&fit=crop"
-            alt="Artisan hands at work — Bansari Collection craftsmanship"
+            src={storyImage}
+            alt="Bansari Collections craftsmanship"
             fill
             sizes="(max-width: 768px) 100vw, 50vw"
             style={{
               objectFit: "cover",
-              objectPosition: "center",
+              objectPosition: "center top",
               transition: "transform 1.2s cubic-bezier(0.16,1,0.3,1)",
             }}
           />
@@ -98,10 +104,14 @@ export default function CraftsmanshipStory() {
                 fontWeight: 500,
               }}
             >
-              Est. 2011 · Surat, India
+              {/* Founding year removed: "Est. 2011" here contradicted
+                  "Est. 2018" in the announcement bar and no authoritative
+                  source exists in the project to settle it. */}
+              Surat, India
             </span>
           </div>
         </div>
+        )}
 
         {/* ── Right: Content ── */}
         <div
@@ -189,44 +199,6 @@ export default function CraftsmanshipStory() {
             >
               Every thread is chosen with intention. Every embroidery is the work of artisan hands that have practiced their craft across generations. We do not manufacture garments — we preserve living traditions.
             </p>
-          </div>
-
-          {/* Stats row */}
-          <div
-            style={{
-              display: "grid",
-              gridTemplateColumns: "repeat(4, 1fr)",
-              borderTop: "1px solid rgba(200,165,110,0.15)",
-              paddingTop: "1.75rem",
-              gap: "1rem",
-            }}
-          >
-            {STATS.map((s) => (
-              <div key={s.value} style={{ display: "flex", flexDirection: "column", gap: "0.25rem" }}>
-                <span
-                  style={{
-                    fontFamily: "var(--font-playfair), serif",
-                    fontSize: "clamp(1.375rem, 2.2vw, 2rem)",
-                    fontWeight: 500,
-                    color: "var(--bc-gold-light)",
-                    lineHeight: 1,
-                  }}
-                >
-                  {s.value}
-                </span>
-                <span
-                  style={{
-                    fontFamily: "var(--font-inter), sans-serif",
-                    fontSize: "0.6875rem",
-                    letterSpacing: "0.1em",
-                    color: "rgba(255,253,249,0.4)",
-                    textTransform: "uppercase",
-                  }}
-                >
-                  {s.label}
-                </span>
-              </div>
-            ))}
           </div>
 
           {/* CTA */}

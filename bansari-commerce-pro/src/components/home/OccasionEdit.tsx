@@ -1,59 +1,66 @@
 import Image from "next/image";
 import Link from "next/link";
 
+import { createServiceRoleClient } from "@/lib/supabase/service";
+
 interface Occasion {
-  id: string;
+  slug: string;
   name: string;
-  subtitle: string;
-  href: string;
+  count: number;
   image: string;
-  size: "hero" | "tall" | "short" | "wide";
 }
 
-const OCCASIONS: Occasion[] = [
-  {
-    id: "wedding",
-    name: "Wedding",
-    subtitle: "Bridal & trousseau",
-    href: "/collections/wedding",
-    image: "https://images.unsplash.com/photo-1610030469983-98e550d6193c?w=900&q=85&auto=format&fit=crop",
-    size: "hero",
-  },
-  {
-    id: "festive",
-    name: "Festive",
-    subtitle: "Diwali to Eid",
-    href: "/collections/festive",
-    image: "https://images.unsplash.com/photo-1583391733956-3750e0ff4e8b?w=700&q=80&auto=format&fit=crop",
-    size: "tall",
-  },
-  {
-    id: "puja",
-    name: "Puja & Temple",
-    subtitle: "Graceful devotion",
-    href: "/collections/puja",
-    image: "https://images.unsplash.com/photo-1617627143750-d86bc21e42bb?w=700&q=80&auto=format&fit=crop",
-    size: "short",
-  },
-  {
-    id: "party",
-    name: "Cocktail & Party",
-    subtitle: "Glamour after dark",
-    href: "/collections/party",
-    image: "https://images.unsplash.com/photo-1541099649105-f69ad21f3246?w=700&q=80&auto=format&fit=crop",
-    size: "short",
-  },
-  {
-    id: "office",
-    name: "Office",
-    subtitle: "Power dressing",
-    href: "/collections/office-wear",
-    image: "https://images.unsplash.com/photo-1594938298603-c8148c4b4571?w=700&q=80&auto=format&fit=crop",
-    size: "wide",
-  },
+// ── Real, product-backed collections only ──────────────────────────────────
+// There is no "occasion" taxonomy wired into the storefront's shop filters
+// today (only category/collection), so this section is driven by the same
+// real `collection` data as TrendingCollections/FeaturedCollections rather
+// than inventing an occasion mapping the catalog doesn't actually support.
+async function getRealCollections(): Promise<Occasion[]> {
+  const supabase = createServiceRoleClient();
+  const { data } = await supabase
+    .from("products")
+    .select("collection, images, created_at")
+    .eq("active", true)
+    .order("created_at", { ascending: false });
+
+  const byCollection = new Map<string, { count: number; image: string }>();
+  for (const row of data ?? []) {
+    const collection = row.collection as string | null;
+    if (!collection) continue;
+    const image = Array.isArray(row.images) ? row.images[0]?.url : undefined;
+    const existing = byCollection.get(collection);
+    if (existing) {
+      existing.count += 1;
+    } else {
+      byCollection.set(collection, { count: 1, image: image ?? "" });
+    }
+  }
+
+  return Array.from(byCollection.entries())
+    .filter(([, info]) => info.image)
+    .map(([name, info]) => ({
+      slug: name.toLowerCase().replace(/\s+/g, "-"),
+      name,
+      count: info.count,
+      image: info.image,
+    }))
+    .sort((a, b) => b.count - a.count)
+    .slice(0, 5);
+}
+
+// Fixed collage layout for up to 5 tiles: first is the hero, rest fill the collage.
+const LAYOUT: React.CSSProperties[] = [
+  { gridColumn: "1 / 6", gridRow: "1 / 3" },
+  { gridColumn: "6 / 9", gridRow: "1 / 2" },
+  { gridColumn: "9 / 13", gridRow: "1 / 2" },
+  { gridColumn: "6 / 9", gridRow: "2 / 3" },
+  { gridColumn: "9 / 13", gridRow: "2 / 3" },
 ];
 
-export default function OccasionEdit() {
+export default async function OccasionEdit() {
+  const collections = await getRealCollections();
+  if (collections.length === 0) return null;
+
   return (
     <section
       aria-labelledby="occasion-heading"
@@ -90,7 +97,7 @@ export default function OccasionEdit() {
               }}
             >
               <span style={{ display: "block", width: "2rem", height: "1px", background: "var(--bc-gold)" }} />
-              The Occasion Edit
+              The Edit
             </span>
             <h2
               id="occasion-heading"
@@ -123,12 +130,13 @@ export default function OccasionEdit() {
               whiteSpace: "nowrap",
             }}
           >
-            All occasions
+            Shop all
           </Link>
         </div>
 
         {/* Magazine collage */}
         <div
+          className="bc-occ-grid"
           style={{
             display: "grid",
             gridTemplateColumns: "repeat(12, 1fr)",
@@ -136,31 +144,9 @@ export default function OccasionEdit() {
             gap: "8px",
           }}
         >
-          {/* Hero — wedding */}
-          <OccasionTile
-            occ={OCCASIONS[0]}
-            style={{ gridColumn: "1 / 6", gridRow: "1 / 3" }}
-          />
-          {/* Festive */}
-          <OccasionTile
-            occ={OCCASIONS[1]}
-            style={{ gridColumn: "6 / 9", gridRow: "1 / 2" }}
-          />
-          {/* Puja */}
-          <OccasionTile
-            occ={OCCASIONS[2]}
-            style={{ gridColumn: "9 / 13", gridRow: "1 / 2" }}
-          />
-          {/* Party */}
-          <OccasionTile
-            occ={OCCASIONS[3]}
-            style={{ gridColumn: "6 / 9", gridRow: "2 / 3" }}
-          />
-          {/* Office */}
-          <OccasionTile
-            occ={OCCASIONS[4]}
-            style={{ gridColumn: "9 / 13", gridRow: "2 / 3" }}
-          />
+          {collections.map((col, i) => (
+            <OccasionTile key={col.slug} occ={col} style={LAYOUT[i]} />
+          ))}
         </div>
 
         <style>{`
@@ -178,7 +164,7 @@ export default function OccasionEdit() {
 function OccasionTile({ occ, style }: { occ: Occasion; style?: React.CSSProperties }) {
   return (
     <Link
-      href={occ.href}
+      href={`/shop?collection=${encodeURIComponent(occ.name)}`}
       style={{
         display: "block",
         position: "relative",
@@ -197,7 +183,6 @@ function OccasionTile({ occ, style }: { occ: Occasion; style?: React.CSSProperti
           objectFit: "cover",
           objectPosition: "center top",
           transition: "transform 700ms cubic-bezier(0.16,1,0.3,1)",
-          opacity: 0.75,
         }}
         className="bc-occ-img"
       />
@@ -230,7 +215,7 @@ function OccasionTile({ occ, style }: { occ: Occasion; style?: React.CSSProperti
             fontWeight: 500,
           }}
         >
-          {occ.subtitle}
+          {occ.count} {occ.count === 1 ? "piece" : "pieces"}
         </p>
         <h3
           style={{
@@ -247,7 +232,7 @@ function OccasionTile({ occ, style }: { occ: Occasion; style?: React.CSSProperti
       </div>
 
       <style>{`
-        a:hover .bc-occ-img { transform: scale(1.06); opacity: 0.9; }
+        a:hover .bc-occ-img { transform: scale(1.06); }
       `}</style>
     </Link>
   );

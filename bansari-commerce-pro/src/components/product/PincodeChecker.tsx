@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { SHIPPING_THRESHOLD, STANDARD_SHIPPING } from '@/lib/shipping';
 
 type DeliveryResult = {
   available: boolean;
@@ -17,7 +18,7 @@ async function checkPincode(pin: string): Promise<DeliveryResult> {
   return {
     available: true,
     days: '3–7 business days',
-    charge: 'Free shipping',
+    charge: `Free over ₹${SHIPPING_THRESHOLD.toLocaleString('en-IN')}, else ₹${STANDARD_SHIPPING}`,
   };
 }
 

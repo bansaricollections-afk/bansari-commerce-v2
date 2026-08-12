@@ -1,3 +1,5 @@
+import { SHIPPING_THRESHOLD, STANDARD_SHIPPING } from "@/lib/shipping";
+
 export default function ShopCROStrip() {
   return (
     <section
@@ -43,10 +45,10 @@ export default function ShopCROStrip() {
             </div>
             <div>
               <h3 className="text-[11px] font-bold uppercase tracking-[0.16em] text-slate-900">
-                Free Shipping on Orders Above ₹1,999
+                Free Shipping on Orders Above &#8377;{SHIPPING_THRESHOLD.toLocaleString("en-IN")}
               </h3>
               <p className="mt-1.5 text-[12px] leading-relaxed text-slate-500">
-                Add ₹499 more to your bag to unlock free delivery. Plus — easy 7-day returns on all orders, no questions asked.
+                Orders below that ship for a flat &#8377;{STANDARD_SHIPPING}. Plus — easy 7-day returns on all orders, no questions asked.
               </p>
               <div className="mt-4 flex flex-wrap gap-3">
                 {[

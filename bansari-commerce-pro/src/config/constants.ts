@@ -1,8 +1,14 @@
+import { SHIPPING_THRESHOLD, STANDARD_SHIPPING } from "@/lib/shipping";
+
+// This object is currently unreferenced elsewhere in the codebase. Its
+// shipping figures are kept wired to the single source of truth (rather than
+// left as independent literals) so it cannot silently drift if it is ever
+// wired up.
 export const STORE = {
 
-  freeShipping: 2999,
+  freeShipping: SHIPPING_THRESHOLD,
 
-  shippingCharge: 99,
+  shippingCharge: STANDARD_SHIPPING,
 
   currencySymbol: "₹",
 

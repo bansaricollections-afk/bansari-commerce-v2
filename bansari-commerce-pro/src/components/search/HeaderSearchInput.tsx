@@ -6,6 +6,7 @@
 import { useState, useEffect } from 'react';
 import { usePathname } from 'next/navigation';
 import dynamic from 'next/dynamic';
+import type { NavEntry } from '@/components/layout/HeaderClient';
 
 // Lazy-load the overlay so it does not bloat the header bundle
 const InstantSearchOverlay = dynamic(
@@ -13,7 +14,13 @@ const InstantSearchOverlay = dynamic(
   { ssr: false },
 );
 
-export default function HeaderSearchInput() {
+export default function HeaderSearchInput({
+  categories,
+  collections,
+}: {
+  categories: NavEntry[];
+  collections: NavEntry[];
+}) {
   const [open, setOpen] = useState(false);
   const pathname = usePathname();
 
@@ -42,7 +49,12 @@ export default function HeaderSearchInput() {
       </button>
 
       {/* Instant search overlay (lazy-loaded) */}
-      <InstantSearchOverlay open={open} onClose={() => setOpen(false)} />
+      <InstantSearchOverlay
+        open={open}
+        onClose={() => setOpen(false)}
+        categories={categories}
+        collections={collections}
+      />
     </>
   );
 }

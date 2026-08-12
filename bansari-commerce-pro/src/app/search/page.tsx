@@ -18,6 +18,7 @@ import TrendingSection from '@/components/search/TrendingSection';
 import SearchInput from '@/components/search/SearchInput';
 import ProductGridSkeleton from '@/components/shop/ProductGridSkeleton';
 import { searchProducts } from '@/services/search.service';
+import { getShopFacets } from '@/services/shop-facets';
 import { getTrendingSearches } from '@/services/search.service';
 import type { FilterParams, PaginationMeta, SortOption } from '@/types/filter-params';
 
@@ -92,11 +93,14 @@ export default async function SearchPage({
                 : undefined,
   };
 
-  const [searchResult, trending] = await Promise.all([
+  // Filter options come from the same live-catalog source as /shop, so the
+  // two surfaces can never offer different taxonomy.
+  const [searchResult, trending, facets] = await Promise.all([
     rawQuery
       ? searchProducts({ ...filterParams, query: rawQuery })
       : Promise.resolve(null),
     getTrendingSearches(),
+    getShopFacets(),
   ]);
 
   const products    = searchResult?.products ?? [];
@@ -138,11 +142,11 @@ export default async function SearchPage({
         {/* ─ Results layout ─ */}
         {rawQuery && (
           <div className="mx-auto max-w-[1380px] px-4 py-8 sm:px-6 lg:px-8">
-            <MobileFilterBar filterParams={filterParams} />
+            <MobileFilterBar filterParams={filterParams} facets={facets} />
 
             <div className="flex gap-8">
               <aside className="hidden w-56 shrink-0 lg:block" aria-label="Filters">
-                <FilterSidebar />
+                <FilterSidebar facets={facets} />
               </aside>
 
               <div className="min-w-0 flex-1">

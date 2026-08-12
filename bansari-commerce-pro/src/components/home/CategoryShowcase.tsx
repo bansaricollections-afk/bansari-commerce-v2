@@ -1,59 +1,50 @@
 import Image from "next/image";
 import Link from "next/link";
 
+import { createServiceRoleClient } from "@/lib/supabase/service";
+
 interface Category {
   name: string;
-  label: string;
-  description: string;
-  href: string;
+  count: number;
   image: string;
-  span: "tall" | "wide" | "normal";
 }
 
-const CATEGORIES: Category[] = [
-  {
-    name: "Sarees",
-    label: "The Saree Edit",
-    description: "Timeless drapes from Bengal to Kanjivaram",
-    href: "/shop?category=sarees",
-    image: "https://images.unsplash.com/photo-1617627143750-d86bc21e42bb?w=900&q=85&auto=format&fit=crop",
-    span: "tall",
-  },
-  {
-    name: "Lehengas",
-    label: "Bridal Lehengas",
-    description: "For the grandest occasions of your life",
-    href: "/shop?category=lehengas",
-    image: "https://images.unsplash.com/photo-1610030469983-98e550d6193c?w=800&q=85&auto=format&fit=crop",
-    span: "normal",
-  },
-  {
-    name: "Kurta Sets",
-    label: "Kurta & Sets",
-    description: "Artisan embroidery, everyday ease",
-    href: "/shop?category=kurta-sets",
-    image: "https://images.unsplash.com/photo-1583391733956-3750e0ff4e8b?w=800&q=85&auto=format&fit=crop",
-    span: "normal",
-  },
-  {
-    name: "Anarkalis",
-    label: "Anarkali Suits",
-    description: "Flowing silhouettes with Mughal grace",
-    href: "/shop?category=anarkalis",
-    image: "https://images.unsplash.com/photo-1594938298603-c8148c4b4571?w=800&q=85&auto=format&fit=crop",
-    span: "wide",
-  },
-  {
-    name: "Dupattas",
-    label: "Dupattas & Stoles",
-    description: "The finishing touch of every look",
-    href: "/shop?category=dupattas",
-    image: "https://images.unsplash.com/photo-1541099649105-f69ad21f3246?w=800&q=85&auto=format&fit=crop",
-    span: "normal",
-  },
-];
+// ── Real, product-backed categories only ───────────────────────────────────
+// Source of truth: the products table's `category` text field, the exact
+// same value Admin Product Management writes on save. A category only
+// appears here if it has at least one active product with a real image.
+async function getRealCategories(): Promise<Category[]> {
+  const supabase = createServiceRoleClient();
+  const { data } = await supabase
+    .from("products")
+    .select("category, images, created_at")
+    .eq("active", true)
+    .order("created_at", { ascending: false });
 
-export default function CategoryShowcase() {
+  const byCategory = new Map<string, { count: number; image: string }>();
+  for (const row of data ?? []) {
+    const category = row.category as string | null;
+    if (!category) continue;
+    const image = Array.isArray(row.images) ? row.images[0]?.url : undefined;
+    const existing = byCategory.get(category);
+    if (existing) {
+      existing.count += 1;
+    } else {
+      byCategory.set(category, { count: 1, image: image ?? "" });
+    }
+  }
+
+  return Array.from(byCategory.entries())
+    .filter(([, info]) => info.image)
+    .map(([name, info]) => ({ name, count: info.count, image: info.image }))
+    .sort((a, b) => b.count - a.count)
+    .slice(0, 5);
+}
+
+export default async function CategoryShowcase() {
+  const categories = await getRealCategories();
+  if (categories.length === 0) return null;
+
   return (
     <section
       aria-labelledby="categories-heading"
@@ -125,59 +116,18 @@ export default function CategoryShowcase() {
           </Link>
         </div>
 
-        {/* Editorial grid */}
+        {/* Editorial grid — first category large, rest uniform. Robust to any real count. */}
         <div
+          className="bc-cat-grid"
           style={{
             display: "grid",
-            gridTemplateColumns: "repeat(12, 1fr)",
-            gridTemplateRows: "480px 320px",
+            gridTemplateColumns: `repeat(${Math.min(categories.length, 5)}, 1fr)`,
             gap: "12px",
           }}
         >
-          {/* Tall card — sarees */}
-          <CategoryCard
-            cat={CATEGORIES[0]}
-            style={{
-              gridColumn: "1 / 5",
-              gridRow: "1 / 3",
-            }}
-          />
-
-          {/* Normal — lehengas */}
-          <CategoryCard
-            cat={CATEGORIES[1]}
-            style={{
-              gridColumn: "5 / 9",
-              gridRow: "1 / 2",
-            }}
-          />
-
-          {/* Normal — kurtas */}
-          <CategoryCard
-            cat={CATEGORIES[2]}
-            style={{
-              gridColumn: "9 / 13",
-              gridRow: "1 / 2",
-            }}
-          />
-
-          {/* Wide — anarkalis */}
-          <CategoryCard
-            cat={CATEGORIES[3]}
-            style={{
-              gridColumn: "5 / 9",
-              gridRow: "2 / 3",
-            }}
-          />
-
-          {/* Normal — dupattas */}
-          <CategoryCard
-            cat={CATEGORIES[4]}
-            style={{
-              gridColumn: "9 / 13",
-              gridRow: "2 / 3",
-            }}
-          />
+          {categories.map((cat, i) => (
+            <CategoryCard key={cat.name} cat={cat} large={i === 0} />
+          ))}
         </div>
 
         {/* Mobile: horizontal scroll */}
@@ -192,8 +142,6 @@ export default function CategoryShowcase() {
             }
             .bc-cat-grid::-webkit-scrollbar { display: none; }
             .bc-cat-grid > * {
-              grid-column: unset !important;
-              grid-row: unset !important;
               min-width: 240px;
               height: 360px;
               flex-shrink: 0;
@@ -205,22 +153,16 @@ export default function CategoryShowcase() {
   );
 }
 
-function CategoryCard({
-  cat,
-  style,
-}: {
-  cat: Category;
-  style?: React.CSSProperties;
-}) {
+function CategoryCard({ cat, large }: { cat: Category; large?: boolean }) {
   return (
     <Link
-      href={cat.href}
+      href={`/shop?category=${encodeURIComponent(cat.name)}`}
       style={{
         display: "block",
         position: "relative",
         overflow: "hidden",
+        aspectRatio: large ? "2/3" : "3/4",
         background: "var(--bc-stone)",
-        ...style,
       }}
       aria-label={`Shop ${cat.name}`}
     >
@@ -228,7 +170,7 @@ function CategoryCard({
         src={cat.image}
         alt={cat.name}
         fill
-        sizes="(max-width: 900px) 240px, 33vw"
+        sizes="(max-width: 900px) 240px, 20vw"
         style={{
           objectFit: "cover",
           transition: "transform 700ms cubic-bezier(0.16,1,0.3,1)",
@@ -268,7 +210,7 @@ function CategoryCard({
             fontWeight: 500,
           }}
         >
-          {cat.label}
+          {cat.count} {cat.count === 1 ? "piece" : "pieces"}
         </p>
         <h3
           style={{
@@ -276,23 +218,12 @@ function CategoryCard({
             fontSize: "clamp(1.25rem, 2vw, 1.875rem)",
             fontWeight: 500,
             color: "var(--bc-cream)",
-            margin: "0 0 0.3rem",
+            margin: 0,
             lineHeight: 1.1,
           }}
         >
           {cat.name}
         </h3>
-        <p
-          style={{
-            fontFamily: "var(--font-inter), sans-serif",
-            fontSize: "0.8125rem",
-            color: "rgba(255,253,249,0.6)",
-            margin: 0,
-            lineHeight: 1.4,
-          }}
-        >
-          {cat.description}
-        </p>
 
         {/* Hover CTA */}
         <div

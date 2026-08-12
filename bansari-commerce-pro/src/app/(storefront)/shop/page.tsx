@@ -13,17 +13,21 @@ import ProductGridSkeleton from "@/components/shop/ProductGridSkeleton";
 import Pagination from "@/components/shop/Pagination";
 
 import { getFilteredProducts } from "@/services/product.service";
+import { getShopFacets } from "@/services/shop-facets";
 import type { FilterParams, SortOption } from "@/types/filter-params";
+
+// Filters read live catalog values — must not be frozen at build time.
+export const revalidate = 60;
 
 // ─── Metadata ────────────────────────────────────────────────────────────────
 
 export const metadata: Metadata = {
   title: "Shop — Bansari Collection | Luxury Indian Ethnic Fashion",
   description:
-    "Discover Bansari Collection's full range of luxury Indian ethnic wear — Kurta Sets, Sarees, Lehengas, Co-ord Sets and more. Filter by occasion, fabric, colour, size and price.",
+    "Browse the full Bansari Collection catalogue of Indian ethnic wear. Filter by category, collection, fabric, colour, size and price.",
   openGraph: {
     title: "Shop — Bansari Collection",
-    description: "Luxury Indian ethnic fashion. Kurta Sets, Sarees, Lehengas and more.",
+    description: "Browse the full Bansari Collection catalogue of Indian ethnic wear.",
     type: "website",
   },
 };
@@ -92,7 +96,10 @@ export default async function ShopPage({ searchParams }: ShopPageProps) {
   // Single RSC fetch for meta (total count, pagination).
   // ProductGrid makes its own internal call for the product rows.
   // This is the existing architecture — no double-fetching of row data.
-  const { meta } = await getFilteredProducts(filterParams);
+  const [{ meta }, facets] = await Promise.all([
+    getFilteredProducts(filterParams),
+    getShopFacets(),
+  ]);
 
   return (
     <>
@@ -141,7 +148,7 @@ export default async function ShopPage({ searchParams }: ShopPageProps) {
             className="hidden w-[240px] shrink-0 lg:block xl:w-[260px]"
             aria-label="Product filters"
           >
-            <FilterSidebar />
+            <FilterSidebar facets={facets} />
           </div>
 
           {/* ── Product grid ───────────────────────────────────────────────── */}
@@ -172,7 +179,7 @@ export default async function ShopPage({ searchParams }: ShopPageProps) {
 
       {/* ── Mobile filter / sort bar (fixed bottom, visible < 1024px) ────────── */}
       {/* pb-[72px] on the page body is handled by the bar's own fixed height  */}
-      <MobileFilterBar filterParams={filterParams} />
+      <MobileFilterBar filterParams={filterParams} facets={facets} />
     </>
   );
 }

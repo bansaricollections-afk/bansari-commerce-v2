@@ -4,26 +4,26 @@ import { useState, useCallback, Suspense } from "react";
 import { useRouter, useSearchParams, usePathname } from "next/navigation";
 import { ChevronDown, SlidersHorizontal, X } from "lucide-react";
 
-// ─── Static option lists ─────────────────────────────────────────────────────
+// ─── Filter facets ───────────────────────────────────────────────────────────
+// Options are derived from the live catalog by the Shop page and passed in.
+// Nothing is hardcoded here: a hardcoded list drifts from the catalog and
+// starts offering filters that return zero products.
 
-const CATEGORIES = ["Kurta Sets", "Ethnic Dresses", "Sarees", "Lehengas", "Co-ord Sets", "Gowns"];
-const OCCASIONS  = ["Wedding", "Festive", "Office", "Party", "Travel", "Casual"];
-const FABRICS    = ["Cotton", "Silk", "Rayon", "Georgette", "Organza", "Chiffon", "Crepe", "Linen"];
-const SIZES      = ["XS", "S", "M", "L", "XL", "XXL", "3XL"];
-const COLORS: { hex: string; label: string }[] = [
-  { hex: "#FFFFFF", label: "White" },
-  { hex: "#1C1917", label: "Black" },
-  { hex: "#C2344E", label: "Red" },
-  { hex: "#E8A0B4", label: "Pink" },
-  { hex: "#4A7C59", label: "Green" },
-  { hex: "#3D5A80", label: "Navy" },
-  { hex: "#C9A84C", label: "Gold" },
-  { hex: "#7B52A6", label: "Purple" },
-  { hex: "#D97941", label: "Orange" },
-  { hex: "#8A5A6A", label: "Mauve" },
-  { hex: "#B5A09A", label: "Beige" },
-  { hex: "#6B7280", label: "Grey" },
-];
+export interface ShopFacets {
+  categories:  string[];
+  collections: string[];
+  fabrics:     string[];
+  colors:      string[];
+  sizes:       string[];
+  occasions:   string[];
+}
+
+/** Empty facets — used where a route has not wired live catalog facets yet.
+ *  Renders no taxonomy options at all, which is correct: showing a hardcoded
+ *  list there is what produced dead zero-result filters in the first place. */
+export const EMPTY_SHOP_FACETS: ShopFacets = {
+  categories: [], collections: [], fabrics: [], colors: [], sizes: [], occasions: [],
+};
 const AVAILABILITY_OPTIONS = [
   { label: "In Stock",     value: "in_stock" },
   { label: "Out of Stock", value: "out_of_stock" },
@@ -135,10 +135,11 @@ function AccordionSection({
 
 // ─── Core sidebar implementation ──────────────────────────────────────────────
 
-function FilterSidebarInner() {
+function FilterSidebarInner({ facets }: { facets: ShopFacets }) {
   const { params, navigate } = useFilterUrl();
 
   const category     = params.get("category")     ?? "";
+  const collection   = params.get("collection")   ?? "";
   const occasion     = params.get("occasion")     ?? "";
   const fabric       = params.get("fabric")       ?? "";
   const size         = params.get("size")         ?? "";
@@ -148,7 +149,7 @@ function FilterSidebarInner() {
   const priceMax     = params.get("priceMax")     ?? "";
 
   const totalActive = [
-    category, occasion, fabric, size, color, availability, priceMin, priceMax,
+    category, collection, occasion, fabric, size, color, availability, priceMin, priceMax,
   ].filter(Boolean).length;
 
   const clearAll = useCallback(() => {
@@ -186,10 +187,11 @@ function FilterSidebarInner() {
         )}
       </div>
 
-      {/* Category */}
+      {/* Category — exact stored products.category values */}
+      {facets.categories.length > 0 && (
       <AccordionSection title="Category" count={category ? 1 : 0} defaultOpen>
         <div className="space-y-1.5">
-          {CATEGORIES.map((c) => (
+          {facets.categories.map((c) => (
             <Checkbox
               key={c} label={c}
               checked={category === c}
@@ -198,11 +200,28 @@ function FilterSidebarInner() {
           ))}
         </div>
       </AccordionSection>
+      )}
+
+      {/* Collection — exact stored products.collection values */}
+      {facets.collections.length > 0 && (
+      <AccordionSection title="Collection" count={collection ? 1 : 0} defaultOpen>
+        <div className="space-y-1.5">
+          {facets.collections.map((c) => (
+            <Checkbox
+              key={c} label={c}
+              checked={collection === c}
+              onChange={() => navigate("collection", collection === c ? null : c)}
+            />
+          ))}
+        </div>
+      </AccordionSection>
+      )}
 
       {/* Occasion */}
+      {facets.occasions.length > 0 && (
       <AccordionSection title="Occasion" count={occasion ? 1 : 0} defaultOpen>
         <div className="space-y-1.5">
-          {OCCASIONS.map((o) => (
+          {facets.occasions.map((o) => (
             <Checkbox
               key={o} label={o}
               checked={occasion === o}
@@ -211,11 +230,13 @@ function FilterSidebarInner() {
           ))}
         </div>
       </AccordionSection>
+      )}
 
       {/* Fabric */}
+      {facets.fabrics.length > 0 && (
       <AccordionSection title="Fabric" count={fabric ? 1 : 0}>
         <div className="space-y-1.5">
-          {FABRICS.map((f) => (
+          {facets.fabrics.map((f) => (
             <Checkbox
               key={f} label={f}
               checked={fabric === f}
@@ -224,11 +245,13 @@ function FilterSidebarInner() {
           ))}
         </div>
       </AccordionSection>
+      )}
 
       {/* Size chips */}
+      {facets.sizes.length > 0 && (
       <AccordionSection title="Size" count={size ? 1 : 0}>
         <div className="flex flex-wrap gap-1.5">
-          {SIZES.map((s) => {
+          {facets.sizes.map((s) => {
             const active = size === s;
             return (
               <button
@@ -246,41 +269,34 @@ function FilterSidebarInner() {
           })}
         </div>
       </AccordionSection>
+      )}
 
-      {/* Colour swatches */}
+      {/* Colour — exact stored products.color values.
+           Previously navigated with a hex code (e.g. "#C2344E") while the
+           column stores names like "BABY PINK", so every swatch returned
+           zero products. Now driven by real values. */}
+      {facets.colors.length > 0 && (
       <AccordionSection title="Colour" count={color ? 1 : 0}>
-        <div className="flex flex-wrap gap-2">
-          {COLORS.map(({ hex, label }) => {
-            const active = color === hex;
-            const lightBg = ["#FFFFFF", "#C9A84C", "#E8A0B4", "#B5A09A"].includes(hex);
+        <div className="flex flex-wrap gap-1.5">
+          {facets.colors.map((c) => {
+            const active = color === c;
             return (
               <button
-                key={hex} type="button"
-                aria-label={label} aria-pressed={active} title={label}
-                onClick={() => navigate("color", active ? null : hex)}
+                key={c} type="button"
+                aria-pressed={active}
+                onClick={() => navigate("color", active ? null : c)}
                 className={[
-                  "relative h-7 w-7 rounded-full border-2 transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#8A5A6A] focus-visible:ring-offset-1",
-                  active ? "scale-110 border-[#8A5A6A] shadow-sm" : "border-slate-200 hover:scale-110 hover:border-slate-400",
+                  "flex h-9 items-center justify-center border px-3 text-[11px] font-semibold capitalize tracking-wide transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#8A5A6A]",
+                  active ? "border-[#8A5A6A] bg-[#8A5A6A] text-white" : "border-slate-200 bg-white text-slate-600 hover:border-slate-900",
                 ].join(" ")}
-                style={{ backgroundColor: hex }}
               >
-                {hex === "#FFFFFF" && <span className="absolute inset-0 rounded-full border border-slate-200" />}
-                {active && (
-                  <span className="absolute inset-0 flex items-center justify-center rounded-full">
-                    <svg width="8" height="6" viewBox="0 0 8 6" fill="none">
-                      <path
-                        d="M1 3l2 2 4-4"
-                        stroke={lightBg ? "#1C1917" : "white"}
-                        strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"
-                      />
-                    </svg>
-                  </span>
-                )}
+                {c.toLowerCase()}
               </button>
             );
           })}
         </div>
       </AccordionSection>
+      )}
 
       {/* Price Range */}
       <AccordionSection title="Price Range" count={priceMin || priceMax ? 1 : 0}>
@@ -325,10 +341,10 @@ function FilterSidebarInner() {
 }
 
 // ─── Public export — wrapped in Suspense for useSearchParams ──────────────────
-export default function FilterSidebar() {
+export default function FilterSidebar({ facets = EMPTY_SHOP_FACETS }: { facets?: ShopFacets }) {
   return (
     <Suspense fallback={<div className="w-[260px]" />}>
-      <FilterSidebarInner />
+      <FilterSidebarInner facets={facets} />
     </Suspense>
   );
 }

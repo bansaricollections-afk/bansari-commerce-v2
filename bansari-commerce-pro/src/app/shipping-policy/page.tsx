@@ -25,6 +25,21 @@ export default function ShippingPolicyPage() {
           control.
         </p>
 
+        {/* Shipping Charges — documents the rule enforced by
+            SHIPPING_THRESHOLD / STANDARD_SHIPPING in src/lib/shipping.ts and
+            applied server-side in /api/orders/create. Keep these figures in
+            sync with those constants. */}
+        <h2 className="pt-2 text-2xl font-semibold text-slate-900">
+          Shipping Charges
+        </h2>
+
+        <p>
+          Orders with a subtotal of ₹2,999 or more are shipped free of charge.
+          Orders below ₹2,999 are charged a flat standard shipping fee of ₹99.
+          The applicable shipping charge is shown at checkout before payment is
+          completed.
+        </p>
+
         <p>
           Customers will receive shipment tracking details by SMS and/or
           email once the order has been dispatched.

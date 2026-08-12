@@ -53,7 +53,7 @@ export default async function AdminLayout({ children }: Readonly<AdminLayoutProp
         }
       `}</style>
       <div
-        className="admin-shell min-h-screen bg-slate-50 [&_h1]:font-sans [&_h2]:font-sans [&_h3]:font-sans [&_h4]:font-sans [&_h5]:font-sans [&_h6]:font-sans"
+        className="admin-shell min-h-screen bg-[#FBF9F6] [&_h1]:font-sans [&_h2]:font-sans [&_h3]:font-sans [&_h4]:font-sans [&_h5]:font-sans [&_h6]:font-sans"
       >
         <div className="flex">
           {/* Skip to main content — accessibility */}
@@ -66,12 +66,12 @@ export default async function AdminLayout({ children }: Readonly<AdminLayoutProp
 
           {/* Desktop Sidebar */}
           <aside className="hidden lg:block" aria-label="Admin navigation">
-            <AdminSidebar />
+            <AdminSidebar pathname={pathname ?? ""} />
           </aside>
 
           {/* Main Content */}
           <div className="flex min-h-screen flex-1 flex-col">
-            <AdminHeader />
+            <AdminHeader pathname={pathname ?? ""} />
 
             <main id="admin-main" className="flex-1 p-4 md:p-6 lg:p-8">
               <div className="mx-auto w-full max-w-7xl">{children}</div>

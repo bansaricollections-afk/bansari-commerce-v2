@@ -1,358 +1,47 @@
-"use client";
+/**
+ * Header — server component.
+ *
+ * Deliberately NOT a client component. All interactivity lives in
+ * HeaderClient; this wrapper exists purely so the navigation taxonomy can be
+ * read from the live catalog on the server and handed down as props.
+ *
+ * Why it matters: the header previously hardcoded NAV_CATEGORIES and
+ * NAV_COLLECTIONS. When the catalog changed, the nav did not — "Women's
+ * Co-Ord Sets" kept rendering on every page after its last product was
+ * re-categorised, linking to a filter that returned zero products, while a
+ * newly created "Bestsellers" collection never appeared at all. /shop had no
+ * such problem because its filters are derived. This makes the header derive
+ * too, so an admin catalog change is reflected without a code deployment.
+ *
+ * Every call site (the storefront layout, the PDP, /search) renders <Header />
+ * from a server component, so no call site needed to change.
+ */
 
-import Link from "next/link";
-import { Heart, Menu, ShoppingBag, User } from "lucide-react";
-import { useState, useEffect, useRef, useCallback } from "react";
-import { useCart } from "@/store/cart";
-import { useWishlist } from "@/store/wishlist";
-import AnnouncementBar, { type AnnouncementBarProps } from "./AnnouncementBar";
-import MobileMenu from "./MobileMenu";
-import HeaderSearchInput from "@/components/search/HeaderSearchInput";
+import { getShopFacets } from "@/services/shop-facets";
 
-export const NAV_CATEGORIES = [
-  "Kurta Sets",
-  "Ethnic Dresses",
-  "Sarees",
-  "Lehengas",
-  "Co-ord Sets",
-  "Gowns",
-] as const;
+import HeaderClient, { type NavEntry } from "./HeaderClient";
 
-export const NAV_COLLECTIONS = [
-  "New Arrivals",
-  "Best Sellers",
-  "Wedding Edit",
-  "Festive Edit",
-  "Office Edit",
-] as const;
+export default async function Header() {
+  // Only values with at least one active product come back, so a nav entry
+  // can never point at an empty result. getShopFacets is React-cached, so the
+  // Header, the Footer and the page share one query per request.
+  const { categories, collections } = await getShopFacets();
 
-export const NAV_TOP_LINKS = [
-  { label: "New Arrivals", href: "/new-arrivals" },
-  { label: "Collections",  href: "/collections" },
-  { label: "About",        href: "/about" },
-  { label: "Contact",      href: "/contact" },
-] as const;
-
-const ANNOUNCEMENT: AnnouncementBarProps = {
-  storageKey: "announcement:v3",
-};
-
-export default function Header() {
-  const { items }           = useCart();
-  const { items: wishlist } = useWishlist();
-  const [shopOpen, setShopOpen]     = useState(false);
-  const [mobileOpen, setMobileOpen] = useState(false);
-  const [scrolled, setScrolled]     = useState(false);
-  const closeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  useEffect(() => {
-    const onScroll = () => setScrolled(window.scrollY > 48);
-    window.addEventListener("scroll", onScroll, { passive: true });
-    return () => window.removeEventListener("scroll", onScroll);
-  }, []);
-
-  const openDropdown = useCallback(() => {
-    if (closeTimerRef.current !== null) {
-      clearTimeout(closeTimerRef.current);
-      closeTimerRef.current = null;
-    }
-    setShopOpen(true);
-  }, []);
-
-  const scheduleClose = useCallback(() => {
-    closeTimerRef.current = setTimeout(() => {
-      setShopOpen(false);
-      closeTimerRef.current = null;
-    }, 120);
-  }, []);
-
-  useEffect(() => () => {
-    if (closeTimerRef.current !== null) clearTimeout(closeTimerRef.current);
-  }, []);
+  // Exact stored strings, URL-encoded. Never slugified: /shop matches the
+  // stored value verbatim.
+  const toCategory = (name: string): NavEntry => ({
+    label: name,
+    href: `/shop?category=${encodeURIComponent(name)}`,
+  });
+  const toCollection = (name: string): NavEntry => ({
+    label: name,
+    href: `/shop?collection=${encodeURIComponent(name)}`,
+  });
 
   return (
-    <>
-      <AnnouncementBar {...ANNOUNCEMENT} />
-
-      <header
-        className="sticky top-0 z-[var(--bc-z-sticky)] backdrop-blur-lg"
-        style={{
-          backgroundColor: scrolled ? "rgba(255,253,249,0.97)" : "rgba(255,253,249,0.92)",
-          borderBottom: scrolled
-            ? "1px solid var(--bc-border-default)"
-            : "1px solid transparent",
-          boxShadow: scrolled ? "var(--bc-shadow-sm)" : "none",
-          transition:
-            "background-color var(--bc-transition-base), border-color var(--bc-transition-base), box-shadow var(--bc-transition-base)",
-        }}
-      >
-        <div
-          className="mx-auto flex items-center justify-between px-6"
-          style={{ maxWidth: "var(--bc-content-wide)", height: "5rem" }}
-        >
-          {/* ── Logo ── */}
-          <Link
-            href="/"
-            className="font-[family:var(--font-playfair)] tracking-wide"
-            style={{
-              fontSize: "1.75rem",
-              fontWeight: 700,
-              color: "var(--bc-brand-mauve)",
-              letterSpacing: "0.06em",
-            }}
-          >
-            Bansari
-          </Link>
-
-          {/* ── Desktop Nav ── */}
-          <nav className="hidden items-center lg:flex" style={{ gap: "2.25rem" }}>
-
-            {/* Shop mega-menu — hover-tolerant wrapper */}
-            <div
-              className="relative"
-              onMouseEnter={openDropdown}
-              onMouseLeave={scheduleClose}
-            >
-              <button
-                aria-expanded={shopOpen}
-                aria-haspopup="true"
-                className="bc-nav-link uppercase tracking-[0.12em] font-medium"
-                style={{
-                  fontSize: "var(--bc-text-xs)",
-                  background: "none",
-                  border: "none",
-                  borderBottom: shopOpen
-                    ? "1px solid var(--bc-brand-mauve)"
-                    : "1px solid transparent",
-                  paddingBottom: "2px",
-                  color: "var(--bc-text-primary)",
-                  transition: "color var(--bc-transition-fast), border-color var(--bc-transition-fast)",
-                }}
-              >
-                Shop
-              </button>
-
-              {shopOpen && (
-                <div
-                  aria-hidden="true"
-                  style={{
-                    position: "absolute",
-                    top: "100%",
-                    left: "-1.5rem",
-                    width: "560px",
-                    height: "0.75rem",
-                    background: "transparent",
-                  }}
-                />
-              )}
-
-              {shopOpen && (
-                <div
-                  role="menu"
-                  className="absolute"
-                  onMouseEnter={openDropdown}
-                  onMouseLeave={scheduleClose}
-                  style={{
-                    left: "-1.5rem",
-                    top: "calc(100% + 0.75rem)",
-                    width: "560px",
-                    backgroundColor: "#fff",
-                    border: "1px solid var(--bc-border-soft)",
-                    boxShadow: "var(--bc-shadow-xl)",
-                    padding: "1.75rem",
-                    zIndex: "var(--bc-z-dropdown)",
-                  }}
-                >
-                  <div className="grid grid-cols-2" style={{ gap: "2rem" }}>
-                    <div>
-                      <p
-                        className="uppercase tracking-[0.16em] mb-4"
-                        style={{
-                          fontSize: "var(--bc-text-xs)",
-                          fontWeight: 500,
-                          color: "var(--bc-text-gold)",
-                        }}
-                      >
-                        Categories
-                      </p>
-                      <div className="flex flex-col" style={{ gap: "0.625rem" }}>
-                        {NAV_CATEGORIES.map((item) => (
-                          <Link
-                            key={item}
-                            href="/shop"
-                            role="menuitem"
-                            className="bc-dropdown-link"
-                            style={{ fontSize: "var(--bc-text-sm)", color: "var(--bc-text-primary)" }}
-                          >
-                            {item}
-                          </Link>
-                        ))}
-                      </div>
-                    </div>
-
-                    <div>
-                      <p
-                        className="uppercase tracking-[0.16em] mb-4"
-                        style={{
-                          fontSize: "var(--bc-text-xs)",
-                          fontWeight: 500,
-                          color: "var(--bc-text-gold)",
-                        }}
-                      >
-                        Collections
-                      </p>
-                      <div className="flex flex-col" style={{ gap: "0.625rem" }}>
-                        {NAV_COLLECTIONS.map((item) => (
-                          <Link
-                            key={item}
-                            href="/shop"
-                            role="menuitem"
-                            className="bc-dropdown-link"
-                            style={{ fontSize: "var(--bc-text-sm)", color: "var(--bc-text-primary)" }}
-                          >
-                            {item}
-                          </Link>
-                        ))}
-                      </div>
-                    </div>
-                  </div>
-
-                  <div
-                    style={{
-                      borderTop: "1px solid var(--bc-border-soft)",
-                      backgroundColor: "var(--bc-surface-warm)",
-                      padding: "1rem 1.25rem",
-                      marginTop: "1.25rem",
-                    }}
-                  >
-                    <p
-                      className="uppercase tracking-[0.16em]"
-                      style={{ fontSize: "var(--bc-text-xs)", fontWeight: 500, color: "var(--bc-brand-mauve)" }}
-                    >
-                      Featured
-                    </p>
-                    <p
-                      className="font-[family:var(--font-playfair)] mt-1"
-                      style={{ fontSize: "var(--bc-text-lg)", fontWeight: 400, color: "var(--bc-text-primary)" }}
-                    >
-                      Wedding Edit 2026
-                    </p>
-                  </div>
-                </div>
-              )}
-            </div>
-
-            {NAV_TOP_LINKS.map(({ label, href }) => (
-              <Link
-                key={label}
-                href={href}
-                className="bc-nav-link uppercase tracking-[0.12em] font-medium"
-                style={{
-                  fontSize: "var(--bc-text-xs)",
-                  color: "var(--bc-text-primary)",
-                  borderBottom: "1px solid transparent",
-                  paddingBottom: "2px",
-                  transition: "color var(--bc-transition-fast), border-color var(--bc-transition-fast)",
-                }}
-              >
-                {label}
-              </Link>
-            ))}
-          </nav>
-
-          {/* ── Icons ── */}
-          <div className="flex items-center" style={{ gap: "0.125rem" }}>
-            {/* ─── Sprint 9C: live search overlay ─── */}
-            <HeaderSearchInput />
-
-            <Link
-              href="/wishlist"
-              aria-label={`Wishlist${wishlist.length > 0 ? `, ${wishlist.length} items` : ""}`}
-              className="bc-icon-btn relative rounded-full p-2.5 transition-colors"
-            >
-              <Heart size={19} />
-              {wishlist.length > 0 && <NavBadge n={wishlist.length} />}
-            </Link>
-
-            <Link
-              href="/cart"
-              aria-label={`Cart${items.length > 0 ? `, ${items.length} items` : ""}`}
-              className="bc-icon-btn relative rounded-full p-2.5 transition-colors"
-            >
-              <ShoppingBag size={19} />
-              {items.length > 0 && <NavBadge n={items.length} />}
-            </Link>
-
-            <Link
-              href="/auth/login"
-              aria-label="Account"
-              className="bc-icon-btn rounded-full p-2.5 transition-colors"
-            >
-              <User size={19} />
-            </Link>
-
-            <button
-              aria-label="Open navigation menu"
-              aria-expanded={mobileOpen}
-              onClick={() => setMobileOpen(true)}
-              className="bc-icon-btn rounded-full p-2.5 transition-colors lg:hidden"
-            >
-              <Menu size={21} />
-            </button>
-          </div>
-        </div>
-      </header>
-
-      <MobileMenu
-        open={mobileOpen}
-        onClose={() => setMobileOpen(false)}
-        cartCount={items.length}
-        wishlistCount={wishlist.length}
-      />
-
-      <style>{`
-        .bc-nav-link:hover {
-          color: var(--bc-brand-mauve) !important;
-          border-bottom-color: var(--bc-brand-mauve) !important;
-        }
-        .bc-dropdown-link {
-          display: block;
-          transition: color var(--bc-transition-fast);
-        }
-        .bc-dropdown-link:hover {
-          color: var(--bc-brand-mauve) !important;
-        }
-        .bc-icon-btn {
-          color: var(--bc-text-primary);
-          display: inline-flex;
-          align-items: center;
-          justify-content: center;
-        }
-        .bc-icon-btn:hover {
-          background-color: var(--bc-surface-warm);
-        }
-      `}</style>
-    </>
-  );
-}
-
-function NavBadge({ n }: { n: number }) {
-  return (
-    <span
-      aria-hidden="true"
-      className="absolute flex items-center justify-center rounded-full text-white"
-      style={{
-        top: "0.15rem",
-        right: "0.15rem",
-        width: "1.1rem",
-        height: "1.1rem",
-        fontSize: "0.6rem",
-        fontWeight: 700,
-        backgroundColor: "var(--bc-brand-mauve)",
-        lineHeight: 1,
-      }}
-    >
-      {n}
-    </span>
+    <HeaderClient
+      categories={categories.map(toCategory)}
+      collections={collections.map(toCollection)}
+    />
   );
 }

@@ -4,9 +4,13 @@ import { useState, useCallback, useEffect, Suspense } from "react";
 import { useRouter, useSearchParams, usePathname } from "next/navigation";
 import { SlidersHorizontal, X, ChevronDown } from "lucide-react";
 import type { FilterParams, SortOption } from "@/types/filter-params";
+import { EMPTY_SHOP_FACETS, type ShopFacets } from "./FilterSidebar";
 
 interface Props {
   filterParams?: FilterParams;
+  /** Live catalog facets — identical source to the desktop sidebar, so the
+   *  two can never diverge (mobile must never show a filter desktop hides). */
+  facets?: ShopFacets;
 }
 
 const SORT_OPTIONS: { value: SortOption; label: string }[] = [
@@ -17,18 +21,6 @@ const SORT_OPTIONS: { value: SortOption; label: string }[] = [
   { value: "discount",   label: "Discount" },
 ];
 
-const CATEGORIES = ["Kurta Sets", "Ethnic Dresses", "Sarees", "Lehengas", "Co-ord Sets", "Gowns"];
-const OCCASIONS  = ["Wedding", "Festive", "Office", "Party", "Travel", "Casual"];
-const FABRICS    = ["Cotton", "Silk", "Rayon", "Georgette", "Organza", "Chiffon", "Crepe", "Linen"];
-const SIZES      = ["XS", "S", "M", "L", "XL", "XXL", "3XL"];
-const COLORS: { hex: string; label: string }[] = [
-  { hex: "#FFFFFF", label: "White" }, { hex: "#1C1917", label: "Black" },
-  { hex: "#C2344E", label: "Red" },   { hex: "#E8A0B4", label: "Pink" },
-  { hex: "#4A7C59", label: "Green" }, { hex: "#3D5A80", label: "Navy" },
-  { hex: "#C9A84C", label: "Gold" },  { hex: "#7B52A6", label: "Purple" },
-  { hex: "#D97941", label: "Orange" },{ hex: "#8A5A6A", label: "Mauve" },
-  { hex: "#B5A09A", label: "Beige" }, { hex: "#6B7280", label: "Grey" },
-];
 const AVAILABILITY_OPTIONS = [
   { label: "In Stock",     value: "in_stock" },
   { label: "Out of Stock", value: "out_of_stock" },
@@ -37,6 +29,7 @@ const AVAILABILITY_OPTIONS = [
 
 type DraftFilters = {
   category:     string;
+  collection:   string;
   occasion:     string;
   fabric:       string;
   size:         string;
@@ -47,7 +40,7 @@ type DraftFilters = {
   sort:         SortOption;
 };
 
-function MobileFilterBarInner() {
+function MobileFilterBarInner({ facets }: { facets: ShopFacets }) {
   const router    = useRouter();
   const pathname  = usePathname();
   const params    = useSearchParams();
@@ -56,6 +49,7 @@ function MobileFilterBarInner() {
   // Draft mirrors URL on open
   const [draft, setDraft] = useState<DraftFilters>({
     category:     "",
+    collection:   "",
     occasion:     "",
     fabric:       "",
     size:         "",
@@ -71,6 +65,7 @@ function MobileFilterBarInner() {
     if (!open) return;
     setDraft({
       category:     params.get("category")     ?? "",
+      collection:   params.get("collection")   ?? "",
       occasion:     params.get("occasion")     ?? "",
       fabric:       params.get("fabric")       ?? "",
       size:         params.get("size")         ?? "",
@@ -95,6 +90,7 @@ function MobileFilterBarInner() {
   const applyFilters = useCallback(() => {
     const next = new URLSearchParams();
     if (draft.category)     next.set("category",     draft.category);
+    if (draft.collection)   next.set("collection",   draft.collection);
     if (draft.occasion)     next.set("occasion",     draft.occasion);
     if (draft.fabric)       next.set("fabric",       draft.fabric);
     if (draft.size)         next.set("size",         draft.size);
@@ -109,10 +105,10 @@ function MobileFilterBarInner() {
   }, [draft, pathname, router]);
 
   const clearDraft = useCallback(() => {
-    setDraft({ category: "", occasion: "", fabric: "", size: "", color: "", availability: "", priceMin: "", priceMax: "", sort: "newest" });
+    setDraft({ category: "", collection: "", occasion: "", fabric: "", size: "", color: "", availability: "", priceMin: "", priceMax: "", sort: "newest" });
   }, []);
 
-  const activeCount = [draft.category, draft.occasion, draft.fabric, draft.size, draft.color, draft.availability, draft.priceMin, draft.priceMax].filter(Boolean).length;
+  const activeCount = [draft.category, draft.collection, draft.occasion, draft.fabric, draft.size, draft.color, draft.availability, draft.priceMin, draft.priceMax].filter(Boolean).length;
 
   return (
     <>
@@ -237,10 +233,11 @@ function MobileFilterBarInner() {
             </div>
           </div>
 
-          {/* Category */}
+          {/* Category — exact stored products.category values */}
+          {facets.categories.length > 0 && (
           <FilterSection title="Category">
             <div className="flex flex-wrap gap-2">
-              {CATEGORIES.map((c) => (
+              {facets.categories.map((c) => (
                 <Pill
                   key={c} label={c}
                   active={draft.category === c}
@@ -249,11 +246,29 @@ function MobileFilterBarInner() {
               ))}
             </div>
           </FilterSection>
+          )}
 
-          {/* Occasion */}
+          {/* Collection — exact stored products.collection values.
+              Previously absent on mobile entirely, so mobile and desktop
+              offered different taxonomy. */}
+          {facets.collections.length > 0 && (
+          <FilterSection title="Collection">
+            <div className="flex flex-wrap gap-2">
+              {facets.collections.map((c) => (
+                <Pill
+                  key={c} label={c}
+                  active={draft.collection === c}
+                  onClick={() => setDraft((d) => ({ ...d, collection: d.collection === c ? "" : c }))}
+                />
+              ))}
+            </div>
+          </FilterSection>
+          )}
+
+          {facets.occasions.length > 0 && (
           <FilterSection title="Occasion">
             <div className="flex flex-wrap gap-2">
-              {OCCASIONS.map((o) => (
+              {facets.occasions.map((o) => (
                 <Pill
                   key={o} label={o}
                   active={draft.occasion === o}
@@ -262,11 +277,12 @@ function MobileFilterBarInner() {
               ))}
             </div>
           </FilterSection>
+          )}
 
-          {/* Fabric */}
+          {facets.fabrics.length > 0 && (
           <FilterSection title="Fabric">
             <div className="flex flex-wrap gap-2">
-              {FABRICS.map((f) => (
+              {facets.fabrics.map((f) => (
                 <Pill
                   key={f} label={f}
                   active={draft.fabric === f}
@@ -275,11 +291,12 @@ function MobileFilterBarInner() {
               ))}
             </div>
           </FilterSection>
+          )}
 
-          {/* Size */}
+          {facets.sizes.length > 0 && (
           <FilterSection title="Size">
             <div className="flex flex-wrap gap-1.5">
-              {SIZES.map((s) => (
+              {facets.sizes.map((s) => (
                 <button
                   key={s} type="button"
                   aria-pressed={draft.size === s}
@@ -296,37 +313,24 @@ function MobileFilterBarInner() {
               ))}
             </div>
           </FilterSection>
+          )}
 
-          {/* Colour */}
+          {/* Colour — exact stored products.color values. The previous
+              swatches navigated with hex codes that never matched the stored
+              colour names, so every swatch returned zero products. */}
+          {facets.colors.length > 0 && (
           <FilterSection title="Colour">
-            <div className="flex flex-wrap gap-3">
-              {COLORS.map(({ hex, label }) => {
-                const active = draft.color === hex;
-                const lightBg = ["#FFFFFF", "#C9A84C", "#E8A0B4", "#B5A09A"].includes(hex);
-                return (
-                  <button
-                    key={hex} type="button"
-                    aria-label={label} aria-pressed={active} title={label}
-                    onClick={() => setDraft((d) => ({ ...d, color: d.color === hex ? "" : hex }))}
-                    className={[
-                      "relative h-8 w-8 rounded-full border-2 transition-all",
-                      active ? "scale-110 border-[#8A5A6A] shadow" : "border-slate-200",
-                    ].join(" ")}
-                    style={{ backgroundColor: hex }}
-                  >
-                    {hex === "#FFFFFF" && <span className="absolute inset-0 rounded-full border border-slate-200" />}
-                    {active && (
-                      <span className="absolute inset-0 flex items-center justify-center rounded-full">
-                        <svg width="9" height="7" viewBox="0 0 8 6" fill="none">
-                          <path d="M1 3l2 2 4-4" stroke={lightBg ? "#1C1917" : "white"} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-                        </svg>
-                      </span>
-                    )}
-                  </button>
-                );
-              })}
+            <div className="flex flex-wrap gap-2">
+              {facets.colors.map((c) => (
+                <Pill
+                  key={c} label={c.toLowerCase()}
+                  active={draft.color === c}
+                  onClick={() => setDraft((d) => ({ ...d, color: d.color === c ? "" : c }))}
+                />
+              ))}
             </div>
           </FilterSection>
+          )}
 
           {/* Price */}
           <FilterSection title="Price Range (₹)">
@@ -415,10 +419,10 @@ function Pill({ label, active, onClick }: { label: string; active: boolean; onCl
   );
 }
 
-export default function MobileFilterBar({ filterParams }: Props) {
+export default function MobileFilterBar({ filterParams, facets = EMPTY_SHOP_FACETS }: Props) {
   return (
     <Suspense fallback={null}>
-      <MobileFilterBarInner />
+      <MobileFilterBarInner facets={facets} />
     </Suspense>
   );
 }

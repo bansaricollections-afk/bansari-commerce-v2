@@ -34,8 +34,12 @@ export default function SearchResultsGrid({ products, query }: Props) {
               category:      product.category ?? undefined,
               collection:    product.collection ?? undefined,
               oldPrice:      product.compare_price ?? undefined,
-              rating:        product.rating ?? undefined,
-              reviewCount:   product.review_count ?? undefined,
+              // Ratings / review counts are deliberately not passed through.
+              // The search RPC returns the same seeded placeholder values as
+              // products.rating / products.review_count, which have no real
+              // reviews behind them. See mapRow in product.service.ts.
+              rating:        undefined,
+              reviewCount:   undefined,
               featured:      product.featured ?? undefined,
               newArrival:    product.new_arrival ?? undefined,
               bestSeller:    product.best_seller ?? undefined,

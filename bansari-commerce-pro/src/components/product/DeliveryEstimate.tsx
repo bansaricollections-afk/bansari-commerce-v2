@@ -12,6 +12,7 @@
  */
 
 import { useMemo } from 'react';
+import { SHIPPING_THRESHOLD } from '@/lib/shipping';
 
 function addBusinessDays(date: Date, days: number): Date {
   const result = new Date(date);
@@ -58,7 +59,7 @@ export default function DeliveryEstimate() {
         />
       </svg>
       <span>
-        <span className="font-medium text-slate-800">Free delivery</span>
+        <span className="font-medium text-slate-800">Free delivery over &#8377;{SHIPPING_THRESHOLD.toLocaleString('en-IN')}</span>
         {' · '}
         Metro by <span className="font-medium">{metro}</span>
         {' · '}

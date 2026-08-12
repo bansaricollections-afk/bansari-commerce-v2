@@ -1,74 +1,84 @@
 import Image from "next/image";
 import Link from "next/link";
 
+import { createServiceRoleClient } from "@/lib/supabase/service";
+
 interface FeaturedCollection {
-  id: string;
-  tag: string;
-  title: string;
-  italic: string;
-  body: string;
-  cta: string;
-  href: string;
+  slug: string;
+  name: string;
+  count: number;
   image: string;
-  reverse?: boolean;
-  bg: string;
 }
 
-const FEATURED: FeaturedCollection[] = [
-  {
-    id: "bridal",
-    tag: "Bridal Edit 2024",
-    title: "The Wedding",
-    italic: "Collection",
-    body: "From intimate mehendi ceremonies to the grand wedding night — our bridal lehengas, sarees and trousseau pieces are crafted to be heirlooms. Every thread carries the memory of a lifetime.",
-    cta: "Explore Bridal",
-    href: "/collections/bridal",
-    image: "https://images.unsplash.com/photo-1610030469983-98e550d6193c?w=900&q=85&auto=format&fit=crop",
-    reverse: false,
-    bg: "var(--bc-cream)",
-  },
-  {
-    id: "festive",
-    tag: "Season Favourites",
-    title: "Festive",
-    italic: "Splendour",
-    body: "India celebrates in colour. Our festive edit brings together the richest embroideries, the most vivid silks, and the most beloved silhouettes — curated to make you the celebration.",
-    cta: "Shop Festive",
-    href: "/collections/festive",
-    image: "https://images.unsplash.com/photo-1583391733956-3750e0ff4e8b?w=900&q=85&auto=format&fit=crop",
-    reverse: true,
-    bg: "var(--bc-sand)",
-  },
-  {
-    id: "everyday",
-    tag: "Daily Essentials",
-    title: "Everyday",
-    italic: "Elegance",
-    body: "Handloom cotton, lightweight linen, breathable khadi — our everyday edit is designed for the woman who carries her culture with ease. Beautiful for boardrooms, markets, and everything between.",
-    cta: "Shop Daily Wear",
-    href: "/collections/daily-wear",
-    image: "https://images.unsplash.com/photo-1594938298603-c8148c4b4571?w=900&q=85&auto=format&fit=crop",
-    reverse: false,
-    bg: "var(--bc-blush)",
-  },
-];
+const BG_TONES = ["var(--bc-cream)", "var(--bc-sand)", "var(--bc-blush)"];
 
-export default function FeaturedCollections() {
+// ── Real, product-backed collections only — same source as /collections
+// and TrendingCollections. No editorial copy is invented; the description
+// is generated from real product counts, never fabricated marketing claims.
+async function getRealFeatured(): Promise<FeaturedCollection[]> {
+  const supabase = createServiceRoleClient();
+  const { data } = await supabase
+    .from("products")
+    .select("collection, images, created_at")
+    .eq("active", true)
+    .order("created_at", { ascending: false });
+
+  const byCollection = new Map<string, { count: number; image: string }>();
+  for (const row of data ?? []) {
+    const collection = row.collection as string | null;
+    if (!collection) continue;
+    const image = Array.isArray(row.images) ? row.images[0]?.url : undefined;
+    const existing = byCollection.get(collection);
+    if (existing) {
+      existing.count += 1;
+    } else {
+      byCollection.set(collection, { count: 1, image: image ?? "" });
+    }
+  }
+
+  return Array.from(byCollection.entries())
+    .filter(([, info]) => info.image)
+    .map(([name, info]) => ({
+      slug: name.toLowerCase().replace(/\s+/g, "-"),
+      name,
+      count: info.count,
+      image: info.image,
+    }))
+    .sort((a, b) => b.count - a.count)
+    .slice(0, 3);
+}
+
+export default async function FeaturedCollections() {
+  const featured = await getRealFeatured();
+  if (featured.length === 0) return null;
+
   return (
     <div aria-labelledby="featured-heading">
-      {FEATURED.map((col, i) => (
-        <FeaturedPanel key={col.id} col={col} index={i} />
+      {featured.map((col, i) => (
+        <FeaturedPanel key={col.slug} col={col} index={i} total={featured.length} reverse={i % 2 === 1} bg={BG_TONES[i % BG_TONES.length]} />
       ))}
     </div>
   );
 }
 
-function FeaturedPanel({ col, index }: { col: FeaturedCollection; index: number }) {
+function FeaturedPanel({
+  col,
+  index,
+  total,
+  reverse,
+  bg,
+}: {
+  col: FeaturedCollection;
+  index: number;
+  total: number;
+  reverse: boolean;
+  bg: string;
+}) {
   return (
     <section
       className="bc-feat-panel"
       style={{
-        background: col.bg,
+        background: bg,
         overflow: "hidden",
       }}
     >
@@ -84,12 +94,12 @@ function FeaturedPanel({ col, index }: { col: FeaturedCollection; index: number 
           style={{
             position: "relative",
             overflow: "hidden",
-            order: col.reverse ? 2 : 1,
+            order: reverse ? 2 : 1,
           }}
         >
           <Image
             src={col.image}
-            alt={`${col.title} ${col.italic} — Bansari Collection`}
+            alt={`${col.name} — Bansari Collections`}
             fill
             sizes="(max-width: 768px) 100vw, 50vw"
             style={{
@@ -105,8 +115,8 @@ function FeaturedPanel({ col, index }: { col: FeaturedCollection; index: number 
             style={{
               position: "absolute",
               bottom: "2rem",
-              left: col.reverse ? "auto" : "2rem",
-              right: col.reverse ? "2rem" : "auto",
+              left: reverse ? "auto" : "2rem",
+              right: reverse ? "2rem" : "auto",
               fontFamily: "var(--font-inter), sans-serif",
               fontSize: "0.5625rem",
               letterSpacing: "0.2em",
@@ -118,14 +128,14 @@ function FeaturedPanel({ col, index }: { col: FeaturedCollection; index: number 
             }}
             aria-hidden="true"
           >
-            No. {String(index + 1).padStart(2, "0")} / 03
+            No. {String(index + 1).padStart(2, "0")} / {String(total).padStart(2, "0")}
           </span>
         </div>
 
         {/* Content */}
         <div
           style={{
-            order: col.reverse ? 1 : 2,
+            order: reverse ? 1 : 2,
             display: "flex",
             flexDirection: "column",
             justifyContent: "center",
@@ -154,7 +164,7 @@ function FeaturedPanel({ col, index }: { col: FeaturedCollection; index: number 
                 fontWeight: 500,
               }}
             >
-              {col.tag}
+              {col.count} {col.count === 1 ? "piece" : "pieces"} in this edit
             </span>
           </div>
 
@@ -170,38 +180,13 @@ function FeaturedPanel({ col, index }: { col: FeaturedCollection; index: number 
               margin: 0,
             }}
           >
-            {col.title}
-            <br />
-            <em
-              style={{
-                fontStyle: "italic",
-                fontWeight: 400,
-                color: "var(--bc-gold-light)",
-              }}
-            >
-              {col.italic}
-            </em>
+            {col.name}
           </h2>
-
-          {/* Body */}
-          <p
-            style={{
-              fontFamily: "var(--font-inter), sans-serif",
-              fontSize: "clamp(0.9375rem, 1vw, 1.0625rem)",
-              lineHeight: 1.75,
-              color: "var(--bc-text-mid)",
-              fontWeight: 300,
-              maxWidth: "42ch",
-              margin: 0,
-            }}
-          >
-            {col.body}
-          </p>
 
           {/* CTA — canonical bc-cta-primary */}
           <div>
-            <Link href={col.href} className="bc-cta-primary">
-              {col.cta}
+            <Link href={`/shop?collection=${encodeURIComponent(col.name)}`} className="bc-cta-primary">
+              Shop {col.name}
               <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true">
                 <path
                   d="M2.5 7h9M7.5 3l4 4-4 4"

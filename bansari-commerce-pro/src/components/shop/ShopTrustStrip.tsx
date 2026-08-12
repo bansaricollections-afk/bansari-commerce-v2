@@ -1,7 +1,13 @@
+import { SHIPPING_THRESHOLD } from "@/lib/shipping";
+
+// Shipping copy is derived from the same constant the checkout and the
+// order-creation API bill against, so the two can never contradict each other.
+// This previously read "Orders above ₹1,999" while the server charged ₹99 on
+// anything under ₹2,999.
 const TRUST_ITEMS = [
   {
     label: "Free Shipping",
-    sub: "Orders above ₹1,999",
+    sub: `Orders above ₹${SHIPPING_THRESHOLD.toLocaleString("en-IN")}`,
     icon: (
       <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
         <path d="M1 3h15v13H1z" /><path d="M16 8h4l3 3v5h-7V8z" />

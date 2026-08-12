@@ -22,7 +22,16 @@ function toProductImages(
   raw: (ProductImage | { url?: string; alt?: string; type?: string })[] | undefined,
 ): ProductImage[] {
   if (!raw) return [];
-  return raw.filter((img): img is ProductImage => !!img.url && !!img.type) as ProductImage[];
+  // A valid image URL must never be discarded merely because `type` is
+  // missing/legacy — normalize to a safe default so it still renders.
+  return raw
+    .filter((img) => !!img.url)
+    .map((img) => ({
+      id: (img as ProductImage).id ?? img.url!,
+      url: img.url!,
+      alt: img.alt ?? '',
+      type: (img.type as ProductImage['type']) ?? 'front',
+    }));
 }
 
 interface Props {

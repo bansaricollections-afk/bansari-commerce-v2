@@ -1,3 +1,17 @@
+// Real catalog destinations only. Removed in this pass:
+//   • "✦ Festive 2025 Edit ✦" kicker — no such edit, and a stale year.
+//   • /shop?category=festive-wear and /shop?category=new-arrivals — slugified
+//     values that match nothing in products.category (both returned 0 products).
+//   • The five ?edit= chips (Wedding Edit, Office Collection, Celebrity
+//     Inspired, Summer Collection, Editor's Picks) — the shop page has no
+//     `edit` filter at all, so every chip silently returned the full catalogue.
+// Collections below use the exact stored products.collection values.
+const HERO_COLLECTIONS = [
+  "SUMMER 2026",
+  "Celebration Edit",
+  "New Arrivals",
+] as const;
+
 export default function ShopEditorialHero() {
   return (
     <section
@@ -23,7 +37,7 @@ export default function ShopEditorialHero() {
 
         {/* Kicker */}
         <p className="mb-4 text-[9px] font-bold uppercase tracking-[0.32em] text-[#8A5A6A]">
-          ✦ Festive 2025 Edit ✦
+          ✦ The Bansari Catalogue ✦
         </p>
 
         {/* Editorial headline */}
@@ -33,38 +47,32 @@ export default function ShopEditorialHero() {
 
         {/* Subline */}
         <p className="mx-auto mt-4 max-w-lg text-[12px] leading-relaxed text-slate-500 md:text-[13px]">
-          From heirloom silks to festival-ready kurtas — a curated wardrobe
-          for the woman who celebrates every moment.
+          Every piece we currently stock, in one place. Filter by category,
+          collection, fabric, colour, size and price.
         </p>
 
         {/* CTA row */}
         <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
           <a
-            href="/shop?category=festive-wear"
+            href="/shop"
             className="inline-flex items-center gap-2 bg-slate-900 px-7 py-3 text-[10.5px] font-semibold uppercase tracking-[0.16em] text-white transition-all duration-200 hover:bg-[#8A5A6A] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#8A5A6A] focus-visible:ring-offset-2"
           >
-            Shop Festive Edit
+            View All
           </a>
           <a
-            href="/shop?category=new-arrivals"
+            href="/new-arrivals"
             className="inline-flex items-center gap-2 border border-slate-300 bg-transparent px-7 py-3 text-[10.5px] font-semibold uppercase tracking-[0.16em] text-slate-700 transition-all duration-200 hover:border-slate-900 hover:text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#8A5A6A] focus-visible:ring-offset-2"
           >
             New Arrivals
           </a>
         </div>
 
-        {/* Collection chips */}
+        {/* Collection chips — real collections, exact stored values */}
         <div className="mt-8 flex flex-wrap items-center justify-center gap-2">
-          {[
-            "Wedding Edit",
-            "Office Collection",
-            "Celebrity Inspired",
-            "Summer Collection",
-            "Editor's Picks",
-          ].map((tag) => (
+          {HERO_COLLECTIONS.map((tag) => (
             <a
               key={tag}
-              href={`/shop?edit=${tag.toLowerCase().replace(/\s+/g, "-")}`}
+              href={`/shop?collection=${encodeURIComponent(tag)}`}
               className="border border-slate-200 bg-white px-4 py-1.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-500 transition-all duration-200 hover:border-[#8A5A6A] hover:text-[#8A5A6A] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#8A5A6A]"
             >
               {tag}

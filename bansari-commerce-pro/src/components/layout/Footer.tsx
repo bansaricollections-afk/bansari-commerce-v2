@@ -1,16 +1,21 @@
-"use client";
-
 import Link from "next/link";
 import { MapPin, Phone, Mail, MessageCircle } from "lucide-react";
 import { FaInstagram, FaFacebookF, FaPinterestP } from "react-icons/fa6";
 
-const SHOP_LINKS = [
-  { label: "All Products",  href: "/shop" },
-  { label: "Collections",   href: "/collections" },
-  { label: "New Arrivals",  href: "/new-arrivals" },
-  { label: "Best Sellers",  href: "/shop" },
-  { label: "Wedding Edit",  href: "/shop" },
-  { label: "Wishlist",      href: "/wishlist" },
+import { getShopFacets } from "@/services/shop-facets";
+
+// Fixed destinations that are not catalog-derived. The collection links used
+// to be hardcoded here too ("SUMMER 2026", "Celebration Edit") and would have
+// gone stale the moment an admin renamed or emptied one — they are now built
+// from the live catalog in the component below.
+const STATIC_SHOP_LINKS = [
+  { label: "All Products", href: "/shop" },
+  { label: "Collections",  href: "/collections" },
+  { label: "New Arrivals", href: "/new-arrivals" },
+] as const;
+
+const TRAILING_SHOP_LINKS = [
+  { label: "Wishlist", href: "/wishlist" },
 ] as const;
 
 const POLICY_LINKS = [
@@ -43,7 +48,20 @@ const PAYMENT_METHODS = [
 const WHATSAPP_NUMBER = "918460192745";
 const WHATSAPP_URL = `https://wa.me/${WHATSAPP_NUMBER}?text=Hi%2C%20I%20have%20a%20query%20about%20Bansari%20Collections`;
 
-export default function Footer() {
+export default async function Footer() {
+  // Same React-cached catalog source the Header uses, so footer collection
+  // links can never disagree with the nav or with /shop.
+  const { collections } = await getShopFacets();
+
+  const SHOP_LINKS = [
+    ...STATIC_SHOP_LINKS,
+    ...collections.map((name) => ({
+      label: name,
+      href: `/shop?collection=${encodeURIComponent(name)}`,
+    })),
+    ...TRAILING_SHOP_LINKS,
+  ];
+
   return (
     <footer
       style={{

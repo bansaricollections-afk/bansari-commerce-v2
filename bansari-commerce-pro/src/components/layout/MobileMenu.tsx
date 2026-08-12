@@ -4,18 +4,16 @@ import Link from "next/link";
 import { Heart, ShoppingBag, User, X } from "lucide-react";
 import { useEffect } from "react";
 import { FaInstagram, FaFacebookF, FaPinterestP } from "react-icons/fa6";
-import {
-  NAV_CATEGORIES,
-  NAV_COLLECTIONS,
-  NAV_TOP_LINKS,
-} from "./Header";
+import { NAV_TOP_LINKS, type NavEntry } from "./HeaderClient";
 
 /**
  * MobileMenu
  *
  * Slide-in navigation drawer for viewports below the lg breakpoint.
- * Reuses NAV_CATEGORIES, NAV_COLLECTIONS, and NAV_TOP_LINKS from Header.tsx
- * as the single source of truth — no duplicated navigation definitions.
+ * Category and collection entries are passed down from HeaderClient, which
+ * receives them from the server-derived catalog. Mobile and desktop therefore
+ * render byte-identical taxonomy by construction — no duplicated arrays, and
+ * no way for the two to drift apart.
  */
 
 interface MobileMenuProps {
@@ -23,6 +21,10 @@ interface MobileMenuProps {
   onClose: () => void;
   cartCount: number;
   wishlistCount: number;
+  /** Live catalog categories — same array the desktop mega-menu renders. */
+  categories: NavEntry[];
+  /** Live catalog collections — same array the desktop mega-menu renders. */
+  collections: NavEntry[];
 }
 
 export default function MobileMenu({
@@ -30,6 +32,8 @@ export default function MobileMenu({
   onClose,
   cartCount,
   wishlistCount,
+  categories,
+  collections,
 }: MobileMenuProps) {
   // Lock body scroll while drawer is open.
   useEffect(() => {
@@ -100,14 +104,14 @@ export default function MobileMenu({
               Categories
             </p>
             <ul className="space-y-3">
-              {NAV_CATEGORIES.map((item) => (
-                <li key={item}>
+              {categories.map(({ label, href }) => (
+                <li key={label}>
                   <Link
-                    href="/shop"
+                    href={href}
                     onClick={onClose}
                     className="block text-base text-[var(--bc-text-primary)] hover:text-[#8A5A6A] transition-colors"
                   >
-                    {item}
+                    {label}
                   </Link>
                 </li>
               ))}
@@ -120,14 +124,14 @@ export default function MobileMenu({
               Collections
             </p>
             <ul className="space-y-3">
-              {NAV_COLLECTIONS.map((item) => (
-                <li key={item}>
+              {collections.map(({ label, href }) => (
+                <li key={label}>
                   <Link
-                    href="/shop"
+                    href={href}
                     onClick={onClose}
                     className="block text-base text-[var(--bc-text-primary)] hover:text-[#8A5A6A] transition-colors"
                   >
-                    {item}
+                    {label}
                   </Link>
                 </li>
               ))}

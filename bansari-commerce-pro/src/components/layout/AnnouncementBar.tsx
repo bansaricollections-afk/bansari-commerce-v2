@@ -10,11 +10,15 @@ export interface AnnouncementBarProps {
   className?: string;
 }
 
+// Every line must be supported by a published policy or an observable fact.
+// Removed: the ₹999 free-shipping threshold (no such commitment exists in the
+// shipping policy), "Trusted by 10,000+ customers" (no sales data supports it),
+// and "The Festive Edit is now live" (no such collection exists).
 const MESSAGES = [
-  "Free shipping on all orders above ₹999 — delivered across India",
+  "Shipping across India · Dispatched in 1–2 business days",
   "Secure online payments via Razorpay · UPI, cards & net banking accepted",
-  "Secure payments · Easy 7-day returns · Trusted by 10,000+ customers",
-  "New arrivals every week — The Festive Edit is now live",
+  "Tracking details sent by SMS and email once your order ships",
+  "Easy 7-day returns as per our Return & Refund Policy",
 ];
 
 export default function AnnouncementBar({

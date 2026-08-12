@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import type { Product } from '@/types/product';
+import { SHIPPING_THRESHOLD, STANDARD_SHIPPING } from '@/lib/shipping';
 
 interface Props { product: Product; }
 
@@ -147,7 +148,8 @@ export default function ProductAccordion({ product }: Props) {
       content: (
         <ul className="space-y-2">
           {[
-            'Free shipping across India on all orders',
+            `Free shipping on orders above ₹${SHIPPING_THRESHOLD.toLocaleString('en-IN')} — a flat ₹${STANDARD_SHIPPING} below that`,
+            'Ships across India through our courier partners',
             'Metro cities: 3–5 business days',
             'Rest of India: 5–7 business days',
             'Tracking link sent via SMS and email',

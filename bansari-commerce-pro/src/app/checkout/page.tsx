@@ -9,6 +9,7 @@ import RazorpayButton from "@/components/checkout/RazorpayButton";
 import CheckoutTrustStrip from "@/components/checkout/CheckoutTrustStrip";
 import LuxuryStepIndicator from "@/components/checkout/LuxuryStepIndicator";
 import { useCart, useCartHasHydrated } from "@/store/cart";
+import { getShippingCost } from "@/lib/shipping";
 
 // ---------------------------------------------------------------------------
 // Validation helpers
@@ -107,7 +108,10 @@ export default function CheckoutPage() {
   const hasHydrated = useCartHasHydrated();
 
   const subtotal = totalPrice();
-  const shipping = subtotal >= 2999 ? 0 : 99;
+  // Display estimate only — the server (api/payment/create-order) computes
+  // the authoritative amount from its own validated cart and that is what is
+  // actually charged via Razorpay. Single source: lib/shipping.ts.
+  const shipping = getShippingCost(subtotal);
   const total    = subtotal + shipping;
 
   const [fields, setFields] = useState<Fields>({

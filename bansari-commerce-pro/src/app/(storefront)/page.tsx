@@ -1,17 +1,18 @@
-import { Suspense } from "react";
-
 import AnnouncementBar from "@/components/home/AnnouncementBar";
 import EditorialHero from "@/components/home/EditorialHero";
 import CategoryShowcase from "@/components/home/CategoryShowcase";
 import TrendingCollections from "@/components/home/TrendingCollections";
 import NewArrivals from "@/components/home/NewArrivals";
 import BestSellers from "@/components/home/BestSellers";
-import FeaturedCollections from "@/components/home/FeaturedCollections";
-import OccasionEdit from "@/components/home/OccasionEdit";
 import CraftsmanshipStory from "@/components/home/CraftsmanshipStory";
 import WhyBansari from "@/components/home/WhyBansari";
-import CustomerStories from "@/components/home/CustomerStories";
 import LuxuryNewsletter from "@/components/home/LuxuryNewsletter";
+
+// The homepage renders live catalog data (categories, collections, new
+// arrivals, best sellers). Without this it is prerendered once at build time
+// and every admin catalog edit stays invisible until the next deploy.
+// 60s ISR keeps the page CDN-fast while picking up catalog changes on its own.
+export const revalidate = 60;
 
 export const metadata = {
   title: "Bansari Collection — Luxury Indian Ethnic Fashion",
@@ -38,37 +39,27 @@ export default function HomePage() {
         <EditorialHero />
 
         {/* ── 4. Shop by Category ── */}
-        <Suspense>
-          <CategoryShowcase />
-        </Suspense>
+        <CategoryShowcase />
 
         {/* ── 5. Trending Collections ── */}
         <TrendingCollections />
 
         {/* ── 6. New Arrivals ── */}
-        <Suspense>
-          <NewArrivals />
-        </Suspense>
+        <NewArrivals />
 
         {/* ── 7. Best Sellers ── */}
-        <Suspense>
-          <BestSellers />
-        </Suspense>
+        <BestSellers />
 
-        {/* ── 8. Featured Collections ── */}
-        <FeaturedCollections />
-
-        {/* ── 9. Shop by Occasion ── */}
-        <OccasionEdit />
-
-        {/* ── 10. Craftsmanship Story ── */}
+        {/* ── 8. Craftsmanship Story ── */}
         <CraftsmanshipStory />
 
         {/* ── 11. Why Bansari ── */}
         <WhyBansari />
 
-        {/* ── 12. Customer Stories ── */}
-        <CustomerStories />
+        {/* ── 12. Customer stories removed: no review/testimonial data exists.
+               order_items is empty and there is no reviews table, so the
+               section could only have shown invented testimonials. It stays
+               out until real, attributable customer feedback exists. ── */}
 
         {/* ── 13. Newsletter ── */}
         <LuxuryNewsletter />

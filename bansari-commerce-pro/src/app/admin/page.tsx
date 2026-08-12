@@ -42,7 +42,6 @@ export default async function AdminDashboardPage() {
           description: 'Paid orders since midnight',
           href: '/admin/analytics',
           icon: Wallet,
-          tone: 'bg-emerald-50 text-emerald-700',
         },
         {
           title: 'Revenue This Month',
@@ -50,7 +49,6 @@ export default async function AdminDashboardPage() {
           description: 'Month-to-date paid revenue',
           href: '/admin/analytics',
           icon: BarChart3,
-          tone: 'bg-orange-50 text-orange-700',
         },
         {
           title: 'Orders Today',
@@ -58,7 +56,6 @@ export default async function AdminDashboardPage() {
           description: 'Paid orders placed today',
           href: '/admin/orders',
           icon: ShoppingBag,
-          tone: 'bg-blue-50 text-blue-700',
         },
         {
           title: 'Orders This Month',
@@ -66,7 +63,6 @@ export default async function AdminDashboardPage() {
           description: 'Month-to-date paid orders',
           href: '/admin/orders',
           icon: ShoppingCart,
-          tone: 'bg-indigo-50 text-indigo-700',
         },
         {
           title: 'Avg Order Value',
@@ -74,7 +70,6 @@ export default async function AdminDashboardPage() {
           description: 'Month-to-date AOV',
           href: '/admin/analytics',
           icon: TrendingUp,
-          tone: 'bg-violet-50 text-violet-700',
         },
         {
           title: 'Conversion Rate',
@@ -82,7 +77,6 @@ export default async function AdminDashboardPage() {
           description: 'Paid / total checkout attempts',
           href: '/admin/analytics',
           icon: CheckCircle,
-          tone: 'bg-teal-50 text-teal-700',
         },
         {
           title: 'Payment Success',
@@ -90,7 +84,6 @@ export default async function AdminDashboardPage() {
           description: 'Of all payment attempts',
           href: '/admin/analytics',
           icon: CheckCircle,
-          tone: 'bg-green-50 text-green-700',
         },
         {
           title: 'Cart Abandonment',
@@ -98,7 +91,6 @@ export default async function AdminDashboardPage() {
           description: 'Pending vs total checkouts',
           href: '/admin/analytics',
           icon: AlertTriangle,
-          tone: 'bg-yellow-50 text-yellow-700',
         },
         {
           title: 'Low Stock Items',
@@ -106,7 +98,6 @@ export default async function AdminDashboardPage() {
           description: '5 or fewer units remaining',
           href: '/admin/inventory',
           icon: AlertTriangle,
-          tone: 'bg-red-50 text-red-700',
         },
       ]
     : [
@@ -116,7 +107,6 @@ export default async function AdminDashboardPage() {
           description: 'Total products',
           href: '/admin/products',
           icon: Package,
-          tone: 'bg-blue-50 text-blue-700',
         },
         {
           title: 'Orders',
@@ -124,7 +114,6 @@ export default async function AdminDashboardPage() {
           description: 'Total orders',
           href: '/admin/orders',
           icon: ShoppingBag,
-          tone: 'bg-green-50 text-green-700',
         },
         {
           title: 'Customers',
@@ -132,7 +121,6 @@ export default async function AdminDashboardPage() {
           description: 'Registered customers',
           href: '/admin/customers',
           icon: Users,
-          tone: 'bg-purple-50 text-purple-700',
         },
         {
           title: 'Revenue',
@@ -140,7 +128,6 @@ export default async function AdminDashboardPage() {
           description: 'Total revenue',
           href: '/admin/analytics',
           icon: BarChart3,
-          tone: 'bg-orange-50 text-orange-700',
         },
       ];
 
@@ -204,10 +191,12 @@ export default async function AdminDashboardPage() {
   return (
     <div>
       <div className="mb-10">
-        <h1 className="text-2xl font-bold text-slate-950">Welcome Admin</h1>
-        <p className="mt-2 text-sm text-slate-600">
-          Manage your products, inventory, customers, orders and store settings
-          from one place.
+        <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-neutral-400">
+          Bansari Collections
+        </p>
+        <h1 className="mt-1 font-serif text-3xl text-neutral-900">Commerce Operations</h1>
+        <p className="mt-2 text-sm text-neutral-500">
+          Products, inventory, customers, orders and store settings — at a glance.
         </p>
       </div>
 
@@ -218,27 +207,30 @@ export default async function AdminDashboardPage() {
       </section>
 
       {metrics && metrics.topProducts.length > 0 && (
-        <section className="mt-8">
-          <h2 className="mb-4 text-lg font-semibold text-slate-950">
-            Top Selling Products
-          </h2>
-          <div className="overflow-hidden rounded-xl border bg-white shadow-sm">
+        <section className="mt-10">
+          <div className="mb-4 flex items-center gap-2">
+            <span className="h-3.5 w-0.5 rounded-full bg-[#C9A96E]" />
+            <h2 className="text-xs font-bold uppercase tracking-[0.12em] text-neutral-700">
+              Top Selling Products
+            </h2>
+          </div>
+          <div className="overflow-hidden rounded-lg border border-neutral-200 bg-white">
             <table className="w-full text-sm">
-              <thead className="bg-slate-50 text-left">
-                <tr>
-                  <th className="px-4 py-3 font-medium text-slate-600">#</th>
-                  <th className="px-4 py-3 font-medium text-slate-600">Product</th>
-                  <th className="px-4 py-3 font-medium text-slate-600 text-right">Units Sold</th>
-                  <th className="px-4 py-3 font-medium text-slate-600 text-right">Revenue</th>
+              <thead className="text-left">
+                <tr className="border-b border-neutral-200">
+                  <th className="px-4 py-3 font-medium text-neutral-500">#</th>
+                  <th className="px-4 py-3 font-medium text-neutral-500">Product</th>
+                  <th className="px-4 py-3 text-right font-medium text-neutral-500">Units Sold</th>
+                  <th className="px-4 py-3 text-right font-medium text-neutral-500">Revenue</th>
                 </tr>
               </thead>
-              <tbody className="divide-y">
+              <tbody className="divide-y divide-neutral-100">
                 {metrics.topProducts.map((p, i) => (
-                  <tr key={p.productName} className="hover:bg-slate-50/50">
-                    <td className="px-4 py-3 text-slate-400">{i + 1}</td>
-                    <td className="px-4 py-3 font-medium text-slate-900">{p.productName}</td>
-                    <td className="px-4 py-3 text-right text-slate-700">{fmt(p.totalQty)}</td>
-                    <td className="px-4 py-3 text-right text-slate-700">{fmtCurrency(p.totalRevenue)}</td>
+                  <tr key={p.productName} className="hover:bg-neutral-50/70 transition-colors">
+                    <td className="px-4 py-3 text-neutral-400">{i + 1}</td>
+                    <td className="px-4 py-3 font-medium text-neutral-900">{p.productName}</td>
+                    <td className="px-4 py-3 text-right text-neutral-600">{fmt(p.totalQty)}</td>
+                    <td className="px-4 py-3 text-right font-medium text-neutral-900">{fmtCurrency(p.totalRevenue)}</td>
                   </tr>
                 ))}
               </tbody>
@@ -247,11 +239,16 @@ export default async function AdminDashboardPage() {
         </section>
       )}
 
-      <section className="mt-8 grid gap-6 xl:grid-cols-[1fr_360px]">
+      <section className="mt-10 grid gap-6 xl:grid-cols-[1fr_360px]">
         <RecentOrders />
 
         <div>
-          <h2 className="mb-4 text-lg font-semibold text-slate-950">Quick Actions</h2>
+          <div className="mb-4 flex items-center gap-2">
+            <span className="h-3.5 w-0.5 rounded-full bg-[#C9A96E]" />
+            <h2 className="text-xs font-bold uppercase tracking-[0.12em] text-neutral-700">
+              Quick Actions
+            </h2>
+          </div>
           <div className="space-y-3">
             {quickLinks.map((item) => (
               <QuickActionCard key={item.title} {...item} />
@@ -260,7 +257,7 @@ export default async function AdminDashboardPage() {
         </div>
       </section>
 
-      <section className="mt-8">
+      <section className="mt-10">
         <LowStockProducts />
       </section>
     </div>

@@ -13,43 +13,23 @@ import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 import { useSearch, highlightMatch } from '@/hooks/useSearch';
 import type { SearchProduct } from '@/types/search';
+import type { NavEntry } from '@/components/layout/HeaderClient';
 
 interface Props {
   open: boolean;
   onClose: () => void;
+  /** Live catalog categories — identical array to the header mega-menu. */
+  categories: NavEntry[];
+  /** Live catalog collections — identical array to the header mega-menu. */
+  collections: NavEntry[];
 }
 
-// ── Static idle discovery config ──────────────────────────────────────────────
-const POPULAR_CATEGORIES = [
-  { label: 'Kurta Sets',      param: 'category', value: 'kurta-sets' },
-  { label: 'Sarees',          param: 'category', value: 'sarees' },
-  { label: 'Lehengas',        param: 'category', value: 'lehengas' },
-  { label: 'Dress Materials', param: 'category', value: 'dress-materials' },
-  { label: 'Co-ord Sets',     param: 'category', value: 'coord-sets' },
-];
-
-const POPULAR_COLLECTIONS = [
-  { label: 'Navratri Edit',  param: 'collection', value: 'navratri-edit' },
-  { label: 'Wedding Season', param: 'collection', value: 'wedding-season' },
-  { label: 'Everyday Luxe',  param: 'collection', value: 'everyday-luxe' },
-  { label: 'Festive Hues',   param: 'collection', value: 'festive-hues' },
-];
-
-const POPULAR_FABRICS = [
-  { label: 'Pure Silk',  param: 'fabric', value: 'pure-silk' },
-  { label: 'Chanderi',   param: 'fabric', value: 'chanderi' },
-  { label: 'Georgette',  param: 'fabric', value: 'georgette' },
-  { label: 'Cotton',     param: 'fabric', value: 'cotton' },
-  { label: 'Kota Doria', param: 'fabric', value: 'kota-doria' },
-];
-
-const POPULAR_OCCASIONS = [
-  { label: 'Festive', param: 'occasion', value: 'festive' },
-  { label: 'Wedding', param: 'occasion', value: 'wedding' },
-  { label: 'Casual',  param: 'occasion', value: 'casual' },
-  { label: 'Office',  param: 'occasion', value: 'office' },
-  { label: 'Party',   param: 'occasion', value: 'party' },
-];
+// Taxonomy shown in the overlay is passed in from the server-derived catalog
+// (see Header.tsx → HeaderClient → HeaderSearchInput). It is never hardcoded
+// here: this file previously shipped "Women's Co-Ord Sets" long after that
+// category stopped having any active products, sending customers to an empty
+// filter. Fabric and Occasion rows stay out — those vary per product and the
+// Shop sidebar derives them from the same catalog source.
 
 // ── Helpers ────────────────────────────────────────────────────────────────
 function formatPrice(p: number) {
@@ -131,7 +111,7 @@ function PillRow({
   onNavigate,
 }: {
   label: string;
-  items: { label: string; param: string; value: string }[];
+  items: NavEntry[];
   onNavigate: (url: string) => void;
 }) {
   return (
@@ -140,9 +120,12 @@ function PillRow({
       <div className="flex flex-wrap gap-1.5">
         {items.map((item) => (
           <button
-            key={item.value}
+            key={item.href}
             type="button"
-            onClick={() => onNavigate(`/search?q=${encodeURIComponent(item.label)}&${item.param}=${encodeURIComponent(item.value)}`)}
+            /* item.href is the same /shop?category= | ?collection= link the
+               header renders, so an overlay chip and a nav link can never
+               point at different destinations. */
+            onClick={() => onNavigate(item.href)}
             className="rounded-full border border-slate-200 px-3 py-1 text-xs text-slate-600
                        transition-colors hover:border-[#8A5A6A] hover:text-[#8A5A6A]
                        focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#8A5A6A]/40"
@@ -155,7 +138,7 @@ function PillRow({
   );
 }
 
-export default function InstantSearchOverlay({ open, onClose }: Props) {
+export default function InstantSearchOverlay({ open, onClose, categories, collections }: Props) {
   const router = useRouter();
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -247,7 +230,7 @@ export default function InstantSearchOverlay({ open, onClose }: Props) {
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           onKeyDown={handleKeyDown}
-          placeholder="Search kurta, saree, lehenga…"
+          placeholder="Search kurta sets, co-ord sets…"
           autoComplete="off"
           spellCheck={false}
           className="flex-1 bg-transparent py-1 text-base text-slate-900 placeholder:text-slate-400 focus:outline-none"
@@ -353,15 +336,17 @@ export default function InstantSearchOverlay({ open, onClose }: Props) {
               {!hasRecent && trendingSugg.length === 0 && (
                 <div className="col-span-2 px-6 py-8 text-center">
                   <p className="text-sm text-slate-400">Start typing to search our collection</p>
-                  <p className="mt-1 text-xs text-slate-300">Kurtas · Sarees · Lehengas · Dress Materials</p>
+                  <p className="mt-1 text-xs text-slate-300">{categories.map((c) => c.label).join(' · ')}</p>
                 </div>
               )}
             </div>
             <div className="border-t border-slate-100 pt-4">
-              <PillRow label="Shop by Category"     items={POPULAR_CATEGORIES}  onNavigate={navigateUrl} />
-              <PillRow label="Featured Collections"  items={POPULAR_COLLECTIONS} onNavigate={navigateUrl} />
-              <PillRow label="By Fabric"             items={POPULAR_FABRICS}     onNavigate={navigateUrl} />
-              <PillRow label="By Occasion"           items={POPULAR_OCCASIONS}   onNavigate={navigateUrl} />
+              {categories.length > 0 && (
+                <PillRow label="Shop by Category"   items={categories}  onNavigate={navigateUrl} />
+              )}
+              {collections.length > 0 && (
+                <PillRow label="Shop by Collection" items={collections} onNavigate={navigateUrl} />
+              )}
             </div>
           </>
         )}
@@ -445,7 +430,7 @@ export default function InstantSearchOverlay({ open, onClose }: Props) {
                   <p className="text-sm font-medium text-slate-700">No results for &ldquo;{query}&rdquo;</p>
                   <p className="mt-1 text-xs text-slate-400">Try a different spelling or browse our collections</p>
                   <div className="mt-4 flex flex-wrap justify-center gap-2">
-                    {['Kurta Sets', 'Sarees', 'Lehengas', 'Dress Materials'].map((cat) => (
+                    {categories.map(({ label: cat }) => (
                       <button
                         key={cat}
                         type="button"

@@ -1,7 +1,7 @@
 import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 
-import { getProductById } from '@/services/product.service';
+import { getProductById, incrementProductView } from '@/services/product.service';
 import Header from '@/components/layout/Header';
 import Footer from '@/components/layout/Footer';
 
@@ -78,6 +78,10 @@ export default async function ProductPage({ params }: Props) {
   const { id } = await params;
   const product = await getProductById(Number(id));
   if (!product) notFound();
+
+  // Real view tracking for the homepage "Best Sellers" section — fire-and-forget,
+  // never blocks or fails the page render.
+  void incrementProductView(Number(id));
 
   const canonicalUrl = `${SITE_URL}/product/${id}`;
 

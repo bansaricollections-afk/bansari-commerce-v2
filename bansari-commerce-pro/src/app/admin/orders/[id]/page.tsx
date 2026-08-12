@@ -12,24 +12,26 @@ type ApiListResponse   = { success: boolean; data: OrderTimelineEntry[] };
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
+const GOLD = '#C9A96E';
+
 const STATUS_COLORS: Record<string, string> = {
-  pending:            'bg-yellow-100 text-yellow-800',
-  confirmed:          'bg-blue-100 text-blue-800',
-  processing:         'bg-blue-100 text-blue-800',
-  packed:             'bg-indigo-100 text-indigo-800',
-  shipped:            'bg-purple-100 text-purple-800',
-  out_for_delivery:   'bg-purple-100 text-purple-800',
-  delivered:          'bg-green-100 text-green-800',
-  cancelled:          'bg-red-100 text-red-800',
-  return_requested:   'bg-orange-100 text-orange-800',
-  returned:           'bg-orange-100 text-orange-800',
-  exchange_requested: 'bg-amber-100 text-amber-800',
-  refunded:           'bg-pink-100 text-pink-800',
-  partially_refunded: 'bg-pink-100 text-pink-800',
+  pending:            'bg-amber-50 text-amber-800',
+  confirmed:          'bg-blue-50 text-blue-700',
+  processing:         'bg-blue-50 text-blue-700',
+  packed:             'bg-neutral-100 text-neutral-700',
+  shipped:            'bg-violet-50 text-violet-700',
+  out_for_delivery:   'bg-violet-50 text-violet-700',
+  delivered:          'bg-emerald-50 text-emerald-700',
+  cancelled:          'bg-red-50 text-red-700',
+  return_requested:   'bg-orange-50 text-orange-700',
+  returned:           'bg-orange-50 text-orange-700',
+  exchange_requested: 'bg-amber-50 text-amber-800',
+  refunded:           'bg-pink-50 text-pink-700',
+  partially_refunded: 'bg-pink-50 text-pink-700',
 };
 
 function badge(status: string) {
-  return `inline-flex items-center rounded-full px-3 py-1 text-xs font-medium ${STATUS_COLORS[status] ?? 'bg-gray-100 text-gray-700'}`;
+  return `inline-flex items-center rounded-full px-2.5 py-1 text-xs font-medium ${STATUS_COLORS[status] ?? 'bg-neutral-100 text-neutral-700'}`;
 }
 
 function fmt(n: number | string | null | undefined) {
@@ -59,10 +61,10 @@ async function apiPatch<T>(url: string, body: unknown): Promise<T> {
 function Modal({ title, onClose, children }: { title: string; onClose: () => void; children: React.ReactNode }) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-      <div className="w-full max-w-md rounded-3xl bg-white p-8 shadow-2xl">
-        <div className="mb-6 flex items-center justify-between">
-          <h3 className="text-xl font-semibold">{title}</h3>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-2xl leading-none">&times;</button>
+      <div className="w-full max-w-md rounded-xl border border-neutral-200 bg-white p-7 shadow-lg">
+        <div className="mb-5 flex items-center justify-between">
+          <h3 className="text-base font-semibold text-neutral-900">{title}</h3>
+          <button onClick={onClose} className="text-xl leading-none text-neutral-400 hover:text-neutral-700">&times;</button>
         </div>
         {children}
       </div>
@@ -74,8 +76,11 @@ function Modal({ title, onClose, children }: { title: string; onClose: () => voi
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <section className="rounded-3xl bg-white p-8 shadow-sm">
-      <h2 className="mb-5 text-xl font-semibold">{title}</h2>
+    <section className="rounded-lg border border-neutral-200 bg-white p-6">
+      <div className="mb-4 flex items-center gap-2">
+        <span className="h-3.5 w-0.5 rounded-full" style={{ background: GOLD }} />
+        <h2 className="text-xs font-bold uppercase tracking-[0.12em] text-neutral-700">{title}</h2>
+      </div>
       {children}
     </section>
   );
@@ -83,9 +88,9 @@ function Section({ title, children }: { title: string; children: React.ReactNode
 
 function Row({ label, value }: { label: string; value: React.ReactNode }) {
   return (
-    <div className="flex justify-between py-1 text-sm">
-      <span className="text-gray-500">{label}</span>
-      <span className="font-medium text-right max-w-xs">{value ?? '—'}</span>
+    <div className="flex justify-between gap-4 py-1.5 text-sm">
+      <span className="text-neutral-500">{label}</span>
+      <span className="max-w-xs text-right font-medium text-neutral-900">{value ?? '—'}</span>
     </div>
   );
 }
@@ -242,13 +247,13 @@ export default function OrderDetailPage() {
   // ── Render ────────────────────────────────────────────────────────────────
 
   if (loading) {
-    return <main className="flex min-h-screen items-center justify-center"><p className="text-gray-400">Loading order…</p></main>;
+    return <main className="flex min-h-screen items-center justify-center bg-[#FBF9F6]"><p className="text-neutral-400">Loading order…</p></main>;
   }
   if (error || !order) {
     return (
-      <main className="flex min-h-screen flex-col items-center justify-center gap-4">
-        <p className="text-red-500">{error ?? 'Order not found'}</p>
-        <Link href="/admin/orders" className="text-[#8A5A6A] underline">Back to orders</Link>
+      <main className="flex min-h-screen flex-col items-center justify-center gap-4 bg-[#FBF9F6]">
+        <p className="text-red-600">{error ?? 'Order not found'}</p>
+        <Link href="/admin/orders" className="text-neutral-700 underline hover:text-amber-700">Back to orders</Link>
       </main>
     );
   }
@@ -261,15 +266,24 @@ export default function OrderDetailPage() {
   const canReturn   = ['delivered','shipped','out_for_delivery'].includes(status);
   const canExchange = status === 'delivered';
 
+  // First applicable forward-moving action gets primary (solid) emphasis; the rest stay
+  // as quiet outline buttons so the action bar reads as one dominant next-step, not a
+  // row of equally-weighted colored pills.
+  const primaryAction: 'ship' | 'deliver' | 'return' | 'exchange' | 'refund' | null =
+    canShip ? 'ship' : canDeliver ? 'deliver' : canReturn ? 'return' : canExchange ? 'exchange' : canRefund ? 'refund' : null;
+
   return (
-    <main className="min-h-screen bg-[#F8F8F8]">
-      <div className="mx-auto max-w-5xl px-6 py-12 space-y-8">
+    <div>
+      <div className="mx-auto max-w-5xl space-y-6">
 
         {/* ── Header ── */}
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div>
-            <h1 className="font-[family:var(--font-playfair)] text-4xl font-bold">{order.orderNumber}</h1>
-            <p className="mt-2 text-gray-500 text-sm">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-neutral-400">
+              Order
+            </p>
+            <h1 className="mt-1 font-serif text-3xl text-neutral-900">{order.orderNumber}</h1>
+            <p className="mt-2 text-sm text-neutral-500">
               Placed {new Date(order.createdAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' })}
             </p>
             <div className="mt-3 flex flex-wrap gap-2">
@@ -278,21 +292,21 @@ export default function OrderDetailPage() {
               <span className={badge(order.fulfillmentStatus ?? '')}>{(order.fulfillmentStatus ?? '').replace(/_/g, ' ')}</span>
             </div>
           </div>
-          <Link href="/admin/orders" className="rounded-full border border-[#8A5A6A] px-5 py-2.5 text-sm font-medium text-[#8A5A6A] transition hover:bg-[#8A5A6A] hover:text-white">
+          <Link href="/admin/orders" className="rounded-lg border border-neutral-300 px-4 py-2 text-sm font-medium text-neutral-700 transition-colors hover:bg-neutral-50">
             ← Back
           </Link>
         </div>
 
         {/* ── Action Bar ── */}
-        <div className="flex flex-wrap gap-3">
-          {canShip     && <ActionBtn color="purple" onClick={() => { setCourier(''); setAwb(''); setTracking(''); setExpected(''); setModal('ship'); }}>Ship Order</ActionBtn>}
-          {canDeliver  && <ActionBtn color="green"  onClick={() => { void doDeliver(); }} disabled={busy}>Mark Delivered</ActionBtn>}
-          {canReturn   && <ActionBtn color="orange" onClick={() => { setReason(''); setModal('return'); }}>Request Return</ActionBtn>}
-          {canExchange && <ActionBtn color="amber"  onClick={() => { setReason(''); setModal('exchange'); }}>Request Exchange</ActionBtn>}
-          {canRefund   && <ActionBtn color="pink"   onClick={() => { setReason(''); setRefundAmt(''); setRefundRef(''); setModal('refund'); }}>Issue Refund</ActionBtn>}
-          {canCancel   && <ActionBtn color="red"    onClick={() => { setReason(''); setModal('cancel'); }}>Cancel Order</ActionBtn>}
-          <ActionBtn color="indigo" onClick={() => { setReason(''); setModal('note'); }}>Add Note</ActionBtn>
-          <ActionBtn color="gray"  onClick={openNotes}>Edit Notes</ActionBtn>
+        <div className="flex flex-wrap gap-2.5">
+          {canShip     && <ActionBtn primary={primaryAction === 'ship'}     onClick={() => { setCourier(''); setAwb(''); setTracking(''); setExpected(''); setModal('ship'); }}>Ship Order</ActionBtn>}
+          {canDeliver  && <ActionBtn primary={primaryAction === 'deliver'}  onClick={() => { void doDeliver(); }} disabled={busy}>Mark Delivered</ActionBtn>}
+          {canReturn   && <ActionBtn primary={primaryAction === 'return'}   onClick={() => { setReason(''); setModal('return'); }}>Request Return</ActionBtn>}
+          {canExchange && <ActionBtn primary={primaryAction === 'exchange'} onClick={() => { setReason(''); setModal('exchange'); }}>Request Exchange</ActionBtn>}
+          {canRefund   && <ActionBtn primary={primaryAction === 'refund'}   onClick={() => { setReason(''); setRefundAmt(''); setRefundRef(''); setModal('refund'); }}>Issue Refund</ActionBtn>}
+          {canCancel   && <ActionBtn destructive onClick={() => { setReason(''); setModal('cancel'); }}>Cancel Order</ActionBtn>}
+          <ActionBtn onClick={() => { setReason(''); setModal('note'); }}>Add Note</ActionBtn>
+          <ActionBtn onClick={openNotes}>Edit Notes</ActionBtn>
         </div>
 
         {/* ── Customer + Shipping ── */}
@@ -332,7 +346,7 @@ export default function OrderDetailPage() {
             <Row label="AWB"     value={order.courierAwb} />
             {order.courierUrl && (
               <Row label="Tracking" value={
-                <a href={order.courierUrl} target="_blank" rel="noopener noreferrer" className="text-[#8A5A6A] underline">Track</a>
+                <a href={order.courierUrl} target="_blank" rel="noopener noreferrer" className="text-neutral-700 underline hover:text-amber-700">Track</a>
               } />
             )}
             <Row label="Shipped At"          value={order.shippedAt ? new Date(order.shippedAt).toLocaleString('en-IN') : null} />
@@ -341,41 +355,44 @@ export default function OrderDetailPage() {
         )}
 
         {/* ── Order Items ── */}
-        <section className="overflow-hidden rounded-3xl bg-white shadow-sm">
-          <h2 className="px-8 pt-8 pb-4 text-xl font-semibold">Order Items</h2>
-          <table className="w-full">
-            <thead className="bg-[#FAF8F5]">
-              <tr>
-                <th className="px-6 py-3 text-left text-sm font-semibold">Product</th>
-                <th className="px-6 py-3 text-left text-sm font-semibold">Variant</th>
-                <th className="px-6 py-3 text-right text-sm font-semibold">Unit Price</th>
-                <th className="px-6 py-3 text-right text-sm font-semibold">Qty</th>
-                <th className="px-6 py-3 text-right text-sm font-semibold">Total</th>
+        <section className="overflow-hidden rounded-lg border border-neutral-200 bg-white">
+          <div className="flex items-center gap-2 px-6 pt-6 pb-4">
+            <span className="h-3.5 w-0.5 rounded-full" style={{ background: GOLD }} />
+            <h2 className="text-xs font-bold uppercase tracking-[0.12em] text-neutral-700">Order Items</h2>
+          </div>
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-y border-neutral-200 text-left">
+                <th className="px-6 py-3 font-medium text-neutral-500">Product</th>
+                <th className="px-6 py-3 font-medium text-neutral-500">Variant</th>
+                <th className="px-6 py-3 text-right font-medium text-neutral-500">Unit Price</th>
+                <th className="px-6 py-3 text-right font-medium text-neutral-500">Qty</th>
+                <th className="px-6 py-3 text-right font-medium text-neutral-500">Total</th>
               </tr>
             </thead>
-            <tbody>
+            <tbody className="divide-y divide-neutral-100">
               {(order.items ?? []).map((item) => (
-                <tr key={item.id} className="border-t">
-                  <td className="px-6 py-4 font-medium">
+                <tr key={item.id}>
+                  <td className="px-6 py-3.5 font-medium text-neutral-900">
                     {item.productName}
-                    {item.productSku && <span className="block text-xs text-gray-400">{item.productSku}</span>}
+                    {item.productSku && <span className="block text-xs font-normal text-neutral-400">{item.productSku}</span>}
                   </td>
-                  <td className="px-6 py-4 text-sm">{[item.variantColor, item.variantSize].filter(Boolean).join(' / ') || '—'}</td>
-                  <td className="px-6 py-4 text-right text-sm">{fmt(item.unitPrice)}</td>
-                  <td className="px-6 py-4 text-right text-sm">{item.quantity}</td>
-                  <td className="px-6 py-4 text-right text-sm font-medium">{fmt(item.lineTotal)}</td>
+                  <td className="px-6 py-3.5 text-neutral-600">{[item.variantColor, item.variantSize].filter(Boolean).join(' / ') || '—'}</td>
+                  <td className="px-6 py-3.5 text-right text-neutral-600">{fmt(item.unitPrice)}</td>
+                  <td className="px-6 py-3.5 text-right text-neutral-600">{item.quantity}</td>
+                  <td className="px-6 py-3.5 text-right font-medium text-neutral-900">{fmt(item.lineTotal)}</td>
                 </tr>
               ))}
             </tbody>
           </table>
-          <div className="space-y-1 border-t px-8 py-6">
+          <div className="space-y-1 border-t border-neutral-200 px-6 py-5">
             <Row label="Subtotal"  value={fmt(order.subtotal)} />
             <Row label="Discount"  value={fmt(order.discount)} />
             <Row label="Shipping"  value={fmt(order.shippingFee)} />
             <Row label="Tax"       value={fmt(order.tax)} />
-            <div className="flex justify-between pt-2 text-lg font-bold">
-              <span>Grand Total</span>
-              <span>{fmt(order.grandTotal)}</span>
+            <div className="flex items-baseline justify-between pt-3">
+              <span className="text-xs font-bold uppercase tracking-[0.12em] text-neutral-500">Grand Total</span>
+              <span className="font-serif text-2xl text-neutral-900">{fmt(order.grandTotal)}</span>
             </div>
           </div>
         </section>
@@ -404,18 +421,18 @@ export default function OrderDetailPage() {
         {/* ── Timeline ── */}
         <Section title="Timeline">
           {timeline.length === 0 ? (
-            <p className="text-sm text-gray-400">No timeline events yet.</p>
+            <p className="text-sm text-neutral-400">No timeline events yet.</p>
           ) : (
-            <ol className="relative border-l border-gray-200 space-y-4 pl-6">
+            <ol className="relative space-y-4 border-l border-neutral-200 pl-6">
               {timeline.map((entry) => (
                 <li key={entry.id} className="text-sm">
-                  <div className="absolute -left-1.5 mt-1 h-3 w-3 rounded-full border border-white bg-[#8A5A6A]" />
-                  <time className="text-xs text-gray-400">{new Date(entry.createdAt).toLocaleString('en-IN')}</time>
-                  <p className="font-medium capitalize">{entry.event.replace(/_/g, ' ')}</p>
-                  {entry.reason    && <p className="text-gray-500">{entry.reason}</p>}
-                  {entry.actorName && <p className="text-gray-400 text-xs">by {entry.actorName}</p>}
+                  <div className="absolute -left-1.5 mt-1 h-3 w-3 rounded-full border border-white" style={{ background: GOLD }} />
+                  <time className="text-xs text-neutral-400">{new Date(entry.createdAt).toLocaleString('en-IN')}</time>
+                  <p className="font-medium capitalize text-neutral-900">{entry.event.replace(/_/g, ' ')}</p>
+                  {entry.reason    && <p className="text-neutral-500">{entry.reason}</p>}
+                  {entry.actorName && <p className="text-xs text-neutral-400">by {entry.actorName}</p>}
                   {entry.previousStatus && entry.newStatus && (
-                    <p className="text-gray-400 text-xs">{entry.previousStatus} → {entry.newStatus}</p>
+                    <p className="text-xs text-neutral-400">{entry.previousStatus} → {entry.newStatus}</p>
                   )}
                 </li>
               ))}
@@ -434,7 +451,7 @@ export default function OrderDetailPage() {
             <Field label="AWB / Tracking # *"><input value={awb} onChange={(e) => setAwb(e.target.value)} className={inputCls} placeholder="1234567890" /></Field>
             <Field label="Tracking URL"><input value={trackingUrl} onChange={(e) => setTracking(e.target.value)} className={inputCls} placeholder="https://…" /></Field>
             <Field label="Expected Delivery Date"><input type="date" value={expected} onChange={(e) => setExpected(e.target.value)} className={inputCls} /></Field>
-            <ModalActions onCancel={() => setModal(null)} onConfirm={() => { void doShip(); }} busy={busy} confirmLabel="Ship" confirmColor="purple" />
+            <ModalActions onCancel={() => setModal(null)} onConfirm={() => { void doShip(); }} busy={busy} confirmLabel="Ship" />
           </div>
         </Modal>
       )}
@@ -443,7 +460,7 @@ export default function OrderDetailPage() {
         <Modal title="Cancel Order" onClose={() => setModal(null)}>
           <div className="space-y-4">
             <Field label="Reason *"><textarea value={reason} onChange={(e) => setReason(e.target.value)} className={`${inputCls} h-28 resize-none`} placeholder="Why is this order being cancelled?" /></Field>
-            <ModalActions onCancel={() => setModal(null)} onConfirm={() => { void doCancel(); }} busy={busy} confirmLabel="Cancel Order" confirmColor="red" />
+            <ModalActions onCancel={() => setModal(null)} onConfirm={() => { void doCancel(); }} busy={busy} confirmLabel="Cancel Order" destructive />
           </div>
         </Modal>
       )}
@@ -454,7 +471,7 @@ export default function OrderDetailPage() {
             <Field label={`Amount (max ${fmt(order.grandTotal)}) *`}><input type="number" min="1" max={order.grandTotal} value={refundAmt} onChange={(e) => setRefundAmt(e.target.value)} className={inputCls} /></Field>
             <Field label="Reference (gateway refund ID)"><input value={refundRef} onChange={(e) => setRefundRef(e.target.value)} className={inputCls} /></Field>
             <Field label="Reason"><input value={reason} onChange={(e) => setReason(e.target.value)} className={inputCls} /></Field>
-            <ModalActions onCancel={() => setModal(null)} onConfirm={() => { void doRefund(); }} busy={busy} confirmLabel="Issue Refund" confirmColor="pink" />
+            <ModalActions onCancel={() => setModal(null)} onConfirm={() => { void doRefund(); }} busy={busy} confirmLabel="Issue Refund" />
           </div>
         </Modal>
       )}
@@ -463,7 +480,7 @@ export default function OrderDetailPage() {
         <Modal title="Request Return" onClose={() => setModal(null)}>
           <div className="space-y-4">
             <Field label="Reason *"><textarea value={reason} onChange={(e) => setReason(e.target.value)} className={`${inputCls} h-28 resize-none`} /></Field>
-            <ModalActions onCancel={() => setModal(null)} onConfirm={() => { void doReturn(); }} busy={busy} confirmLabel="Request Return" confirmColor="orange" />
+            <ModalActions onCancel={() => setModal(null)} onConfirm={() => { void doReturn(); }} busy={busy} confirmLabel="Request Return" />
           </div>
         </Modal>
       )}
@@ -472,7 +489,7 @@ export default function OrderDetailPage() {
         <Modal title="Request Exchange" onClose={() => setModal(null)}>
           <div className="space-y-4">
             <Field label="Reason *"><textarea value={reason} onChange={(e) => setReason(e.target.value)} className={`${inputCls} h-28 resize-none`} /></Field>
-            <ModalActions onCancel={() => setModal(null)} onConfirm={() => { void doExchange(); }} busy={busy} confirmLabel="Request Exchange" confirmColor="amber" />
+            <ModalActions onCancel={() => setModal(null)} onConfirm={() => { void doExchange(); }} busy={busy} confirmLabel="Request Exchange" />
           </div>
         </Modal>
       )}
@@ -481,7 +498,7 @@ export default function OrderDetailPage() {
         <Modal title="Add Timeline Note" onClose={() => setModal(null)}>
           <div className="space-y-4">
             <Field label="Note *"><textarea value={reason} onChange={(e) => setReason(e.target.value)} className={`${inputCls} h-28 resize-none`} placeholder="Internal note visible on timeline…" /></Field>
-            <ModalActions onCancel={() => setModal(null)} onConfirm={() => { void doNote(); }} busy={busy} confirmLabel="Add Note" confirmColor="indigo" />
+            <ModalActions onCancel={() => setModal(null)} onConfirm={() => { void doNote(); }} busy={busy} confirmLabel="Add Note" />
           </div>
         </Modal>
       )}
@@ -492,73 +509,63 @@ export default function OrderDetailPage() {
             <Field label="Internal Notes"><textarea value={internalNote} onChange={(e) => setInternal(e.target.value)} className={`${inputCls} h-20 resize-none`} placeholder="Visible only to admin" /></Field>
             <Field label="Customer Notes"><textarea value={customerNote} onChange={(e) => setCustomer(e.target.value)} className={`${inputCls} h-20 resize-none`} placeholder="Visible to customer" /></Field>
             <Field label="Packing Notes"><textarea value={packingNote}  onChange={(e) => setPacking(e.target.value)}  className={`${inputCls} h-20 resize-none`} placeholder="For warehouse" /></Field>
-            <ModalActions onCancel={() => setModal(null)} onConfirm={() => { void doSaveNotes(); }} busy={busy} confirmLabel="Save Notes" confirmColor="gray" />
+            <ModalActions onCancel={() => setModal(null)} onConfirm={() => { void doSaveNotes(); }} busy={busy} confirmLabel="Save Notes" />
           </div>
         </Modal>
       )}
 
-    </main>
+    </div>
   );
 }
 
 // ─── Tiny shared sub-components ──────────────────────────────────────────────
 
-const inputCls = 'w-full rounded-2xl border border-gray-300 px-4 py-2.5 text-sm focus:border-[#8A5A6A] focus:outline-none';
+const inputCls = 'w-full rounded-lg border border-neutral-300 px-3.5 py-2 text-sm shadow-sm focus:border-amber-600 focus:outline-none focus:ring-2 focus:ring-amber-600';
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
-  return <label className="block space-y-1"><span className="text-sm font-medium text-gray-700">{label}</span>{children}</label>;
+  return <label className="block space-y-1"><span className="text-sm font-medium text-neutral-700">{label}</span>{children}</label>;
 }
 
-const CONFIRM_COLORS: Record<string, string> = {
-  purple: 'bg-purple-600 hover:bg-purple-700',
-  green:  'bg-green-600 hover:bg-green-700',
-  red:    'bg-red-600 hover:bg-red-700',
-  orange: 'bg-orange-500 hover:bg-orange-600',
-  amber:  'bg-amber-500 hover:bg-amber-600',
-  pink:   'bg-pink-600 hover:bg-pink-700',
-  indigo: 'bg-indigo-600 hover:bg-indigo-700',
-  gray:   'bg-[#8A5A6A] hover:bg-[#7a4a5a]',
-};
-
-function ModalActions({ onCancel, onConfirm, busy, confirmLabel, confirmColor }: {
+function ModalActions({ onCancel, onConfirm, busy, confirmLabel, destructive }: {
   onCancel:     () => void;
   onConfirm:    () => void;
   busy:         boolean;
   confirmLabel: string;
-  confirmColor: string;
+  destructive?: boolean;
 }) {
   return (
-    <div className="flex justify-end gap-3 pt-2">
-      <button onClick={onCancel} disabled={busy} className="rounded-full border border-gray-300 px-5 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50">Cancel</button>
-      <button onClick={onConfirm} disabled={busy} className={`rounded-full px-5 py-2 text-sm font-medium text-white transition disabled:opacity-50 ${CONFIRM_COLORS[confirmColor] ?? CONFIRM_COLORS.gray}`}>
+    <div className="flex justify-end gap-2.5 pt-2">
+      <button onClick={onCancel} disabled={busy} className="rounded-lg border border-neutral-300 px-4 py-2 text-sm font-medium text-neutral-700 hover:bg-neutral-50 disabled:opacity-50">Cancel</button>
+      <button
+        onClick={onConfirm}
+        disabled={busy}
+        className={`rounded-lg px-4 py-2 text-sm font-medium text-white transition-colors disabled:opacity-50 ${
+          destructive ? 'bg-red-600 hover:bg-red-700' : 'bg-neutral-900 hover:bg-amber-700'
+        }`}
+      >
         {busy ? 'Please wait…' : confirmLabel}
       </button>
     </div>
   );
 }
 
-const ACTION_COLORS: Record<string, string> = {
-  purple: 'border-purple-500 text-purple-600 hover:bg-purple-500 hover:text-white',
-  green:  'border-green-600 text-green-700 hover:bg-green-600 hover:text-white',
-  red:    'border-red-500 text-red-600 hover:bg-red-500 hover:text-white',
-  orange: 'border-orange-400 text-orange-600 hover:bg-orange-400 hover:text-white',
-  amber:  'border-amber-400 text-amber-600 hover:bg-amber-400 hover:text-white',
-  pink:   'border-pink-500 text-pink-600 hover:bg-pink-500 hover:text-white',
-  indigo: 'border-indigo-500 text-indigo-600 hover:bg-indigo-500 hover:text-white',
-  gray:   'border-gray-400 text-gray-600 hover:bg-gray-400 hover:text-white',
-};
-
-function ActionBtn({ color, onClick, disabled, children }: {
-  color: string;
+function ActionBtn({ primary, destructive, onClick, disabled, children }: {
+  primary?: boolean;
+  destructive?: boolean;
   onClick: () => void;
   disabled?: boolean;
   children: React.ReactNode;
 }) {
+  const style = primary
+    ? 'border-neutral-900 bg-neutral-900 text-white hover:bg-amber-700 hover:border-amber-700'
+    : destructive
+    ? 'border-red-200 text-red-700 hover:bg-red-50'
+    : 'border-neutral-300 text-neutral-700 hover:bg-neutral-50';
   return (
     <button
       onClick={onClick}
       disabled={disabled}
-      className={`rounded-full border px-5 py-2 text-sm font-medium transition disabled:opacity-40 disabled:cursor-not-allowed ${ACTION_COLORS[color] ?? ACTION_COLORS.gray}`}
+      className={`rounded-lg border px-4 py-2 text-sm font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-40 ${style}`}
     >
       {children}
     </button>
