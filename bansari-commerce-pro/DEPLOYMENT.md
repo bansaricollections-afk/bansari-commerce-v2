@@ -26,6 +26,31 @@ cd bansari-commerce-v2/bansari-commerce-pro
 npm install
 ```
 
+Then enable the deploy gate — **once per clone**, from the repository root:
+
+```bash
+git config core.hooksPath .githooks
+```
+
+---
+
+## 1a. Deploy gate (read this before pushing)
+
+Pushing `main` triggers a Vercel production build **from the committed tree**.
+Anything left uncommitted is simply absent from that build.
+
+On 2026-08-12 two days of storefront work existed only as working-tree
+changes. The first git-triggered deploy built the older committed homepage and
+replaced the running version — hardcoded taxonomy and stock imagery came back.
+Nothing was lost; it had never been committed.
+
+`.githooks/pre-push` now blocks a push to `main` when the working tree has
+uncommitted changes to tracked files, or untracked files under `src/`,
+`supabase/migrations/` or `public/`. It prints exactly what would be missing.
+
+Rule: **what is in the commit is what ships.** Deliberately shipping without
+pending work requires `git push --no-verify`.
+
 ---
 
 ## 2. Environment Variables

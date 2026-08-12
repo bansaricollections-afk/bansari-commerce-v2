@@ -1,0 +1,65 @@
+#!/bin/sh
+#
+# Deploy gate — blocks a push to main while work is still uncommitted.
+#
+# Why this exists (incident 2026-08-12):
+#   Pushing main triggers a Vercel production build from the COMMITTED tree.
+#   Two days of storefront work existed only as working-tree changes, so the
+#   first git-triggered deploy built the older committed homepage and silently
+#   replaced the running version. Nothing was lost, but production regressed.
+#
+# The rule this enforces: what is in the commit IS what ships. If the working
+# tree is dirty when you push main, the deploy will not contain those changes.
+#
+# Bypass (only when you have consciously decided the pending work must not
+# ship yet):  git push --no-verify
+
+set -e
+
+# Only guard pushes that can reach production.
+guard=0
+while read -r _local_ref _local_sha remote_ref _remote_sha; do
+  case "$remote_ref" in
+    refs/heads/main) guard=1 ;;
+  esac
+done
+[ "$guard" -eq 1 ] || exit 0
+
+# 1. Tracked files modified or staged but not committed.
+dirty_tracked=$(git status --porcelain --untracked-files=no)
+
+# 2. New source files never added — the exact shape of the incident
+#    (HeaderClient.tsx, shop-facets.ts and the rails were untracked).
+untracked_src=$(git ls-files --others --exclude-standard \
+  -- '*/src/*' '*/supabase/migrations/*' '*/public/*' 2>/dev/null || true)
+
+if [ -z "$dirty_tracked" ] && [ -z "$untracked_src" ]; then
+  exit 0
+fi
+
+echo ""
+echo "  ✖ DEPLOY GATE — push to main blocked"
+echo ""
+echo "  Pushing main deploys the committed tree. These changes are NOT in it,"
+echo "  so production would be built without them:"
+echo ""
+
+if [ -n "$dirty_tracked" ]; then
+  echo "  Uncommitted changes to tracked files:"
+  echo "$dirty_tracked" | sed 's/^/    /'
+  echo ""
+fi
+
+if [ -n "$untracked_src" ]; then
+  echo "  Untracked source files (never added to git):"
+  echo "$untracked_src" | sed 's/^/    ?? /'
+  echo ""
+fi
+
+echo "  Fix one of these ways:"
+echo "    git add -A && git commit    # ship them"
+echo "    git stash -u                # park them, then push"
+echo "    git push --no-verify        # deliberately ship without them"
+echo ""
+
+exit 1
