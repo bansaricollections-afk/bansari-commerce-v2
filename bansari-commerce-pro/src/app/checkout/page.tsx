@@ -8,7 +8,7 @@ import { ArrowLeft } from "lucide-react";
 import RazorpayButton from "@/components/checkout/RazorpayButton";
 import CheckoutTrustStrip from "@/components/checkout/CheckoutTrustStrip";
 import LuxuryStepIndicator from "@/components/checkout/LuxuryStepIndicator";
-import { useCart, useCartHasHydrated } from "@/store/cart";
+import { useCart, useCartHasHydrated, cartLineId } from "@/store/cart";
 import { getShippingCost } from "@/lib/shipping";
 
 // ---------------------------------------------------------------------------
@@ -314,9 +314,19 @@ export default function CheckoutPage() {
 
                 <div className="space-y-4">
                   {items.map((item) => (
-                    <div key={item.id} className="flex justify-between text-sm">
-                      <span className="text-slate-700">{item.name} &times; {item.quantity}</span>
-                      <span className="tabular-nums font-medium">
+                    /* Keyed by product+variant: two sizes of the same product are
+                       two distinct lines and must not collide on product id. */
+                    <div key={cartLineId(item)} className="flex justify-between gap-4 text-sm">
+                      <span className="text-slate-700">
+                        {item.name}
+                        {item.size && (
+                          <span className="block text-xs text-slate-500">
+                            Size: {item.size} &middot; Qty: {item.quantity}
+                          </span>
+                        )}
+                        {!item.size && <> &times; {item.quantity}</>}
+                      </span>
+                      <span className="tabular-nums font-medium whitespace-nowrap">
                         &#x20B9;{(item.price * item.quantity).toLocaleString("en-IN")}
                       </span>
                     </div>

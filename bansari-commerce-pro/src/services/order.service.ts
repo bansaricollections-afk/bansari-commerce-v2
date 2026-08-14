@@ -96,7 +96,13 @@ export type RazorpayPaymentEntity = {
   notes?: Record<string, string>;
 };
 
-/** A single line item as stored in pending_orders.items_json */
+/**
+ * A single line item as stored in pending_orders.items_json.
+ *
+ * Variant identity is written by validateCartItems at checkout time and MUST
+ * survive into the recovered order — recovery creates the same order the
+ * browser would have created, so it decrements the same purchased size.
+ */
 type PendingLineItem = {
   productId: number;
   productName: string;
@@ -106,6 +112,10 @@ type PendingLineItem = {
   unitPrice: number;
   quantity: number;
   lineTotal: number;
+  /** Present for size-managed purchases; absent only for legacy/variant-less lines. */
+  variantId?: number | null;
+  variantSku?: string | null;
+  variantSize?: string | null;
 };
 
 /** pending_orders row shape (only fields we use in recovery) */
@@ -293,6 +303,9 @@ export async function recoverOrderFromWebhook(
         paid_at:              now,
       };
 
+      // Variant identity is passed through unchanged. create_order_with_items
+      // persists it on order_items AND decrements that exact variant inside the
+      // order transaction — identical to the browser checkout path.
       const itemsPayload = lineItems.map((li) => ({
         product_id:    li.productId,
         product_name:  li.productName,
@@ -302,6 +315,9 @@ export async function recoverOrderFromWebhook(
         unit_price:    li.unitPrice,
         quantity:      li.quantity,
         line_total:    li.lineTotal,
+        variant_id:    li.variantId ?? null,
+        variant_sku:   li.variantSku ?? null,
+        variant_size:  li.variantSize ?? null,
       }));
 
       // SENTINEL UNION FIX: await separately, then cast through unknown.
@@ -324,6 +340,16 @@ export async function recoverOrderFromWebhook(
           rLog.info('recovery.race_winner', { orderId: winner?.id });
           return { recovered: true, orderId: winner?.id };
         }
+        if (rpcErr.code === 'P0002') {
+          // A size sold out between checkout and this webhook. The order is
+          // rejected rather than oversold; the payment needs a refund.
+          rLog.error('recovery.variant_out_of_stock', {
+            error: rpcErr,
+            razorpayPaymentId: payment.id,
+            note: 'Payment captured but variant stock insufficient — manual refund required.',
+          });
+          return { recovered: false, error: rpcErr.message };
+        }
         rLog.error('recovery.rpc.failed', { error: rpcErr });
         return { recovered: false, error: rpcErr.message };
       }
@@ -337,8 +363,13 @@ export async function recoverOrderFromWebhook(
         userId: resolvedUserId ?? undefined,
       });
 
-      // --- Decrement stock (best-effort) ---
+      // --- Decrement stock (best-effort, legacy lines only) ---
+      // Size-managed lines were already decremented atomically inside
+      // create_order_with_items. Running the product-level decrement for them
+      // would double-count the sale against products.stock.
       for (const li of lineItems) {
+        if (li.variantId != null) continue;
+
         const { error: stockErr } = await supabase.rpc('decrement_product_stock', {
           p_product_id: li.productId,
           p_quantity:   li.quantity,

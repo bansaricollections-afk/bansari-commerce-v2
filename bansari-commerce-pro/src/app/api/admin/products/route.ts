@@ -132,6 +132,7 @@ export async function POST(request: NextRequest) {
     log.error('admin.products.create.failed', err, { requestId });
     const statusMap: Record<string, number> = {
       VALIDATION:    422,
+      SIZE_INVENTORY_REQUIRED: 422,
       DUPLICATE_SKU: 409,
       DUPLICATE_SLUG: 409,
       SKU_DUPLICATE: 409,

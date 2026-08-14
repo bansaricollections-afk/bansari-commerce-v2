@@ -143,6 +143,108 @@ export async function getVariantAvailability(
 }
 
 // ---------------------------------------------------------------------------
+// Catalogue-level availability (shop filters + facets)
+// ---------------------------------------------------------------------------
+
+/**
+ * Which products are size-managed, and which of those are actually sellable.
+ *
+ * A product is size-managed the moment it has one live variant. Its
+ * sellability is then decided ONLY by variant availability — `products.stock`
+ * and `products.sizes[]` are never consulted for it. Products absent from
+ * `sizeManagedIds` keep the legacy product-level path.
+ *
+ * `sizeManagedIds` is the set to exclude from legacy matching; `sellableIds`
+ * is the subset with at least one size that has `available > 0`.
+ */
+export async function getVariantAvailabilityIndex(): Promise<{
+  sizeManagedIds: Set<number>;
+  sellableIds: Set<number>;
+  /** size label (upper-cased) → product ids with available > 0 for that size */
+  sellableIdsBySize: Map<string, Set<number>>;
+  /** size label (upper-cased) → every size-managed product offering that size */
+  offeredIdsBySize: Map<string, Set<number>>;
+  /** size labels that have at least one product with available > 0 */
+  sellableSizeLabels: Set<string>;
+}> {
+  const sizeManagedIds = new Set<number>();
+  const sellableIds = new Set<number>();
+  const sellableIdsBySize = new Map<string, Set<number>>();
+  const offeredIdsBySize = new Map<string, Set<number>>();
+  const sellableSizeLabels = new Set<string>();
+
+  const supabase = createServiceRoleClient();
+  const { data, error } = await supabase
+    .from('v_product_size_availability')
+    .select('product_id, size_label, available, status, size_active')
+    .eq('status', 'active')
+    .eq('size_active', true);
+
+  if (error) {
+    // Availability must never take the shop down. With no index, callers fall
+    // back to the legacy path for every product — the pre-size-inventory
+    // behaviour, which is safe if imprecise.
+    return {
+      sizeManagedIds, sellableIds, sellableIdsBySize, offeredIdsBySize, sellableSizeLabels,
+    };
+  }
+
+  for (const row of (data ?? []) as AvailabilityRow[]) {
+    const productId = row.product_id;
+    sizeManagedIds.add(productId);
+
+    const label = (row.size_label ?? '').trim().toUpperCase();
+    if (label) {
+      const offered = offeredIdsBySize.get(label) ?? new Set<number>();
+      offered.add(productId);
+      offeredIdsBySize.set(label, offered);
+    }
+
+    if ((row.available ?? 0) > 0) {
+      sellableIds.add(productId);
+
+      if (label) {
+        sellableSizeLabels.add(label);
+        const set = sellableIdsBySize.get(label) ?? new Set<number>();
+        set.add(productId);
+        sellableIdsBySize.set(label, set);
+      }
+    }
+  }
+
+  return {
+    sizeManagedIds, sellableIds, sellableIdsBySize, offeredIdsBySize, sellableSizeLabels,
+  };
+}
+
+/**
+ * Live availability for a set of variants, in one query.
+ * Used to cap cart quantities against current stock.
+ */
+export async function getAvailabilityForVariants(
+  variantIds: number[]
+): Promise<Map<number, number>> {
+  const result = new Map<number, number>();
+  const ids = [...new Set(variantIds.filter((id) => Number.isFinite(id) && id > 0))];
+  if (ids.length === 0) return result;
+
+  const supabase = createServiceRoleClient();
+  const { data, error } = await supabase
+    .from('v_product_size_availability')
+    .select('variant_id, available, status, size_active')
+    .in('variant_id', ids);
+
+  if (error) return result;
+
+  for (const row of (data ?? []) as AvailabilityRow[]) {
+    const sellable = row.status === 'active' && row.size_active !== false;
+    result.set(row.variant_id, sellable ? Math.max(0, row.available ?? 0) : 0);
+  }
+
+  return result;
+}
+
+// ---------------------------------------------------------------------------
 // Admin reads / writes
 // ---------------------------------------------------------------------------
 

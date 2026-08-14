@@ -2,6 +2,7 @@
 
 import Image from "next/image";
 import Link from "next/link";
+import { useEffect, useState } from "react";
 import {
   Minus,
   Plus,
@@ -88,6 +89,61 @@ export default function CartPage() {
   // localStorage. Prevents the empty-cart state from flashing before data loads.
   const hasHydrated = useCartHasHydrated();
 
+  // ── Live availability for the variants in this cart ──────────────────────
+  // Read-only projection of the same canonical source the server validates
+  // against, so the customer sees the cap before checkout rejects them.
+  // Server-side validation remains authoritative — this never grants stock,
+  // it only prevents asking for more than exists.
+  const [availability, setAvailability] = useState<Record<number, number>>({});
+
+  const variantKey = items
+    .map((i) => i.variantId)
+    .filter((v): v is number => typeof v === "number")
+    .sort((a, b) => a - b)
+    .join(",");
+
+  useEffect(() => {
+    if (!variantKey) {
+      setAvailability({});
+      return;
+    }
+    let cancelled = false;
+    fetch(`/api/inventory/availability?variantIds=${variantKey}`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data) => {
+        if (!cancelled && data?.availability) setAvailability(data.availability);
+      })
+      .catch(() => {
+        // Availability lookup must never break the cart; without it the
+        // customer simply sees no cap and the server still rejects overselling.
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [variantKey]);
+
+  /**
+   * Maximum quantity for a line.
+   * Size-managed line → live variant availability.
+   * Legacy line (no variantId) → uncapped here, exactly as before.
+   */
+  function maxQtyFor(item: (typeof items)[number]): number | null {
+    if (typeof item.variantId !== "number") return null;
+    const available = availability[item.variantId];
+    return typeof available === "number" ? available : null;
+  }
+
+  /**
+   * A line that asks for more than exists (or for a sold-out size) blocks
+   * checkout. Without this the customer only discovers the problem after
+   * entering their details and hitting payment.
+   */
+  const blockedLines = items.filter((item) => {
+    const max = maxQtyFor(item);
+    return max !== null && (max <= 0 || item.quantity > max);
+  });
+  const checkoutBlocked = blockedLines.length > 0;
+
   const subtotal = items.reduce(
     (sum, item) => sum + item.price * item.quantity,
     0
@@ -143,7 +199,7 @@ export default function CartPage() {
             <div className="space-y-6">
               {items.map((item) => (
                 <article
-                  key={item.id}
+                  key={cartLineId(item)}
                   className="flex gap-6 rounded-3xl bg-white p-6 shadow-sm"
                 >
                   <Image
@@ -165,6 +221,33 @@ export default function CartPage() {
                         <p className="mt-1 text-sm text-slate-500">Size: {item.size}</p>
                       )}
 
+                      {(() => {
+                        const max = maxQtyFor(item);
+                        if (max === null) return null;
+                        if (max <= 0) {
+                          return (
+                            <p className="mt-1 text-sm font-medium text-red-600">
+                              Sold out — remove this item to continue
+                            </p>
+                          );
+                        }
+                        if (item.quantity > max) {
+                          return (
+                            <p className="mt-1 text-sm font-medium text-red-600">
+                              Only {max} left in size {item.size ?? ""} — reduce the quantity to continue
+                            </p>
+                          );
+                        }
+                        if (item.quantity >= max) {
+                          return (
+                            <p className="mt-1 text-sm text-amber-700">
+                              {max === 1 ? "Only 1 left" : `Only ${max} left`} in this size
+                            </p>
+                          );
+                        }
+                        return null;
+                      })()}
+
                       <p className="mt-2 text-xl font-bold text-[#8A5A6A]">
                         ₹{item.price.toLocaleString("en-IN")}
                       </p>
@@ -185,14 +268,22 @@ export default function CartPage() {
                           {item.quantity}
                         </span>
 
-                        <button
-                          type="button"
-                          onClick={() => increaseQuantity(cartLineId(item))}
-                          className="p-3"
-                          aria-label="Increase quantity"
-                        >
-                          <Plus size={18} />
-                        </button>
+                        {(() => {
+                          const max = maxQtyFor(item);
+                          const atCap = max !== null && item.quantity >= max;
+                          return (
+                            <button
+                              type="button"
+                              onClick={() => !atCap && increaseQuantity(cartLineId(item))}
+                              disabled={atCap}
+                              className="p-3 disabled:cursor-not-allowed disabled:opacity-40"
+                              aria-label="Increase quantity"
+                              title={atCap ? "No more stock available in this size" : undefined}
+                            >
+                              <Plus size={18} />
+                            </button>
+                          );
+                        })()}
                       </div>
 
                       <button
@@ -253,25 +344,45 @@ export default function CartPage() {
                   </div>
                 </div>
 
+                {checkoutBlocked && (
+                  <p className="mt-6 text-sm font-medium text-red-600">
+                    Adjust the highlighted item{blockedLines.length > 1 ? "s" : ""} above to continue —
+                    the quantity requested is no longer available.
+                  </p>
+                )}
+
                 {/* Desktop checkout CTA — hidden on mobile, replaced by sticky bar */}
-                <Link
-                  href="/checkout"
-                  className="mt-10 hidden sm:flex items-center justify-center gap-3 rounded-full bg-[#8A5A6A] py-4 font-semibold text-white transition hover:bg-[#734757]"
-                >
-                  Secure Checkout
-                  <ArrowRight size={18} />
-                </Link>
+                {checkoutBlocked ? (
+                  <button
+                    type="button"
+                    disabled
+                    className="mt-10 hidden sm:flex w-full items-center justify-center gap-3 rounded-full bg-slate-300 py-4 font-semibold text-white cursor-not-allowed"
+                  >
+                    Secure Checkout
+                    <ArrowRight size={18} />
+                  </button>
+                ) : (
+                  <Link
+                    href="/checkout"
+                    className="mt-10 hidden sm:flex items-center justify-center gap-3 rounded-full bg-[#8A5A6A] py-4 font-semibold text-white transition hover:bg-[#734757]"
+                  >
+                    Secure Checkout
+                    <ArrowRight size={18} />
+                  </Link>
+                )}
 
                 {/* Mobile fallback within summary — visible when no sticky bar support */}
-                <Link
-                  href="/checkout"
-                  className="mt-10 flex sm:hidden items-center justify-center gap-3 rounded-full bg-[#8A5A6A] py-4 font-semibold text-white transition hover:bg-[#734757]"
-                  aria-hidden="true"
-                  tabIndex={-1}
-                >
-                  Secure Checkout
-                  <ArrowRight size={18} />
-                </Link>
+                {!checkoutBlocked && (
+                  <Link
+                    href="/checkout"
+                    className="mt-10 flex sm:hidden items-center justify-center gap-3 rounded-full bg-[#8A5A6A] py-4 font-semibold text-white transition hover:bg-[#734757]"
+                    aria-hidden="true"
+                    tabIndex={-1}
+                  >
+                    Secure Checkout
+                    <ArrowRight size={18} />
+                  </Link>
+                )}
               </div>
 
               <CartTrustStrip />
@@ -296,13 +407,23 @@ export default function CartPage() {
               ₹{total.toLocaleString("en-IN")}
             </span>
           </div>
-          <Link
-            href="/checkout"
-            className="flex items-center justify-center gap-2 w-full rounded-full bg-[#8A5A6A] py-3.5 font-semibold text-white text-sm transition hover:bg-[#734757]"
-          >
-            Secure Checkout
-            <ArrowRight size={16} />
-          </Link>
+          {checkoutBlocked ? (
+            <button
+              type="button"
+              disabled
+              className="flex items-center justify-center gap-2 w-full rounded-full bg-slate-300 py-3.5 font-semibold text-white text-sm cursor-not-allowed"
+            >
+              Adjust quantity to continue
+            </button>
+          ) : (
+            <Link
+              href="/checkout"
+              className="flex items-center justify-center gap-2 w-full rounded-full bg-[#8A5A6A] py-3.5 font-semibold text-white text-sm transition hover:bg-[#734757]"
+            >
+              Secure Checkout
+              <ArrowRight size={16} />
+            </Link>
+          )}
         </div>
       )}
     </main>

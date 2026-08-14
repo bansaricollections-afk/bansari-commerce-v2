@@ -168,6 +168,8 @@ type Product = {
   newArrival: boolean;
   bestSeller: boolean;
   active: boolean;
+  /** Explicit intent: sold through size variants. Never inferred. */
+  isSizeManaged: boolean;
   images: ProductImage[];
   createdAt?: string;
   updatedAt?: string;
@@ -218,6 +220,8 @@ type ProductFormState = {
   newArrival: boolean;
   bestSeller: boolean;
   active: boolean;
+  /** Explicit intent: sold through size variants. Never inferred. */
+  isSizeManaged: boolean;
   images: ProductImage[];
   // V2 FK IDs
   category_id: number | null;
@@ -262,6 +266,7 @@ type ApiProductPayload = {
   new_arrival: boolean;
   best_seller: boolean;
   active: boolean;
+  is_size_managed: boolean;
   images: ProductImage[];
   // V2 FK IDs
   category_id: number | null;
@@ -287,7 +292,7 @@ type ApiProductPayload = {
 };
 
 type FieldErrors = Partial<Record<keyof ProductFormState, string>>;
-type ToggleFieldId = keyof Pick<ProductFormState, "featured" | "newArrival" | "bestSeller" | "active">;
+type ToggleFieldId = keyof Pick<ProductFormState, "featured" | "newArrival" | "bestSeller" | "active" | "isSizeManaged">;
 
 // ─── API response shapes ───────────────────────────────────────────────────────
 
@@ -376,6 +381,7 @@ const emptyForm: ProductFormState = {
   price: "", comparePrice: "", cost: "", stock: "", hsn: "", gst: "5",
   description: "", seoTitle: "", seoDescription: "",
   featured: false, newArrival: false, bestSeller: false, active: true,
+  isSizeManaged: false,
   images: [],
   category_id: null, subcategory_id: null, collection_id: null, size_chart_id: null,
   attr_fabric_id: null, attr_color_id: null, attr_occasion_id: null,
@@ -454,6 +460,7 @@ function mapApiProductToForm(p: ApiProductRecord): ProductFormState {
     newArrival:     p.new_arrival ?? false,
     bestSeller:     p.best_seller ?? false,
     active:         p.active ?? true,
+    isSizeManaged:  (p as { is_size_managed?: boolean }).is_size_managed ?? false,
     images:         normalizeImages(p.images),
     category_id:    p.category_id ?? null,
     subcategory_id: p.subcategory_id ?? null,
@@ -506,6 +513,7 @@ function mapApiProductToProduct(p: ApiProductRecord): Product {
     newArrival:     p.new_arrival ?? false,
     bestSeller:     p.best_seller ?? false,
     active:         p.active ?? true,
+    isSizeManaged:  (p as { is_size_managed?: boolean }).is_size_managed ?? false,
     images:         normalizeImages(p.images),
     createdAt:      p.created_at,
     updatedAt:      p.updated_at,
@@ -922,6 +930,7 @@ export default function ProductManagement() {
       new_arrival:    form.newArrival,
       best_seller:    form.bestSeller,
       active:         publishNow ? true : form.active,
+      is_size_managed: form.isSizeManaged,
       images:         form.images,
       // V2 FK IDs
       category_id:    form.category_id,
@@ -1820,6 +1829,12 @@ export default function ProductManagement() {
                   onChange={(v) => setField("active", v)}
                   label="Active"
                   description="Product is visible to customers"
+                />
+                <ToggleSwitch
+                  checked={form.isSizeManaged}
+                  onChange={(v) => setField("isSizeManaged", v)}
+                  label="Size-managed product"
+                  description="Sold by size. Stock is set per size under Sizes, and the product cannot be published until at least one size has stock."
                 />
                 <ToggleSwitch
                   checked={form.featured}

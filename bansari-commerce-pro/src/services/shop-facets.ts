@@ -19,6 +19,7 @@
 import { cache } from 'react';
 
 import { createServiceRoleClient } from '@/lib/supabase/service';
+import { getVariantAvailabilityIndex } from '@/services/size-inventory.service';
 import type { ShopFacets } from '@/components/shop/FilterSidebar';
 
 export type { ShopFacets };
@@ -39,7 +40,7 @@ export const getShopFacets = cache(async function getShopFacets(): Promise<ShopF
     const supabase = createServiceRoleClient();
     const { data, error } = await supabase
       .from("products")
-      .select("category, collection, fabric, color, sizes, specifications")
+      .select("id, category, collection, fabric, color, sizes, specifications")
       .eq("active", true);
 
     if (error || !data) return EMPTY;
@@ -48,11 +49,20 @@ export const getShopFacets = cache(async function getShopFacets(): Promise<ShopF
       [...new Set(values.filter((v): v is string => typeof v === "string" && v.trim().length > 0))]
         .sort((a, b) => a.localeCompare(b));
 
+    // Size facets come from real sellability, not from products.sizes[].
+    // A size-managed product contributes a size only when that size has
+    // available > 0; products with no live variants keep contributing their
+    // legacy sizes[] (the pre-size-inventory behaviour).
+    const index = await getVariantAvailabilityIndex();
+
     const sizes = new Set<string>();
+    for (const label of index.sellableSizeLabels) sizes.add(label);
+
     const occasions = new Set<string>();
     for (const row of data) {
+      const isSizeManaged = index.sizeManagedIds.has(row.id as number);
       const rowSizes: unknown = row.sizes;
-      if (Array.isArray(rowSizes)) {
+      if (!isSizeManaged && Array.isArray(rowSizes)) {
         for (const s of rowSizes) {
           if (typeof s === "string" && s.trim()) sizes.add(s.trim());
         }

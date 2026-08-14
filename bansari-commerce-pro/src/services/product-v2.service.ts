@@ -386,6 +386,59 @@ export const ProductV2Service = {
   // CREATE
   // ────────────────────────────────────────────────────────
 
+  /**
+   * Publication guard for size-managed products.
+   *
+   * A product flagged `is_size_managed` is sold through size variants, so
+   * publishing it active without sellable size inventory would put a product
+   * on the storefront that no customer can buy in any size.
+   *
+   * Only publication is blocked — drafts save freely and inventory editing is
+   * never blocked. Products with `is_size_managed = false` keep the legacy
+   * product-level path untouched.
+   */
+  async assertPublishable(
+    productId: number | null,
+    isSizeManaged: boolean,
+    willBeActive: boolean
+  ): Promise<void> {
+    if (!isSizeManaged || !willBeActive) return;
+
+    if (productId === null) {
+      throw new ProductError(
+        'A size-managed product cannot be published before its sizes exist. Save it as a draft first, add stock under Sizes, then publish.',
+        'SIZE_INVENTORY_REQUIRED',
+        { field: 'active' }
+      );
+    }
+
+    const sb = createServiceRoleClient();
+    const { data } = await sb
+      .from('v_product_size_availability')
+      .select('available, status, size_active')
+      .eq('product_id', productId)
+      .eq('status', 'active')
+      .eq('size_active', true);
+
+    const rows = (data ?? []) as Array<{ available: number | null }>;
+
+    if (rows.length === 0) {
+      throw new ProductError(
+        'This product is marked size-managed but has no active sizes. Add at least one size under Sizes before publishing.',
+        'SIZE_INVENTORY_REQUIRED',
+        { field: 'active' }
+      );
+    }
+
+    if (!rows.some((r) => (r.available ?? 0) > 0)) {
+      throw new ProductError(
+        'Every size of this product is sold out, so it cannot be published. Add stock to at least one size under Sizes, or save it as a draft.',
+        'SIZE_INVENTORY_REQUIRED',
+        { field: 'active' }
+      );
+    }
+  },
+
   async create(payload: CreateProductV2Payload): Promise<ProductV2> {
     const sb = createServiceRoleClient();
 
@@ -396,6 +449,12 @@ export const ProductV2Service = {
         field: validationErrors[0]!.field,
       });
     }
+
+    await this.assertPublishable(
+      null,
+      payload.is_size_managed === true,
+      (payload.active ?? true) === true
+    );
 
     // Uniqueness checks
     const [skuCheck, slugCheck] = await Promise.all([
@@ -460,6 +519,7 @@ export const ProductV2Service = {
       new_arrival:        payload.new_arrival          ?? false,
       best_seller:        payload.best_seller          ?? false,
       active:             payload.active               ?? true,
+      is_size_managed:    payload.is_size_managed      ?? false,
       display_order:      payload.display_order        ?? 0,
       // FIX: was hardcoded to 0 — now correctly reads from payload.
       stock:              payload.stock                ?? 0,
@@ -491,12 +551,23 @@ export const ProductV2Service = {
     // Check product exists
     const { data: existing } = await sb
       .from('products')
-      .select('id,sku,slug')
+      .select('id,sku,slug,is_size_managed')
       .eq('id', id)
       .maybeSingle();
     if (!existing) throw new ProductError(`Product ${id} not found.`, 'INTERNAL');
 
-    const existingRow = existing as { sku: string; slug: string };
+    const existingRow = existing as { sku: string; slug: string; is_size_managed?: boolean };
+
+    // Publication guard: use the incoming flag when the caller is changing it,
+    // otherwise the product's stored flag.
+    const willBeSizeManaged =
+      payload.is_size_managed !== undefined
+        ? payload.is_size_managed === true
+        : existingRow.is_size_managed === true;
+
+    if (payload.active !== undefined || payload.is_size_managed !== undefined) {
+      await this.assertPublishable(id, willBeSizeManaged, payload.active === true);
+    }
 
     // Uniqueness checks (only if changing sku / slug)
     if (payload.sku && payload.sku !== existingRow.sku) {
@@ -541,7 +612,8 @@ export const ProductV2Service = {
       seo_title: 'seo_title', seo_description: 'seo_description',
       seo_keywords: 'seo_keywords', canonical_url: 'canonical_url',
       featured: 'featured', new_arrival: 'new_arrival', best_seller: 'best_seller',
-      active: 'active', display_order: 'display_order', stock: 'stock',
+      active: 'active', is_size_managed: 'is_size_managed',
+      display_order: 'display_order', stock: 'stock',
       updated_by: 'updated_by',
     };
     for (const [key, col] of Object.entries(fieldMap)) {

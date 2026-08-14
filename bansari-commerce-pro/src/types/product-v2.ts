@@ -497,6 +497,12 @@ export type CreateProductV2Payload = {
   new_arrival?: boolean;
   best_seller?: boolean;
   active?: boolean;
+  /**
+   * Explicit admin intent: this product is sold through size variants.
+   * Never inferred from sizes[] or variant presence. When true, publication
+   * requires at least one active variant with available stock.
+   */
+  is_size_managed?: boolean;
   display_order?: number;
   seo_title?: string;
   seo_description?: string;
@@ -653,4 +659,6 @@ export type ProductErrorCode =
   | 'IMAGE_DUPLICATE_URL'
   | 'VARIANT_DUPLICATE_SKU'
   | 'REF_INVALID'
+  /** Size-managed product cannot be published without sellable size stock. */
+  | 'SIZE_INVENTORY_REQUIRED'
   | 'INTERNAL';

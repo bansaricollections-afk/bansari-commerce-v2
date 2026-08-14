@@ -6,14 +6,10 @@
  *
  * Schema facts:
  *   - product_variants.id  → bigint  → number in TS
- *   - orders.id            → uuid    → string in TS
- *   - order_items          → has NO variant_id column
- *     Resolution strategy: join order_items → products → product_variants
- *     using order_items.product_id + variant filters to locate the correct
- *     variant. For Bansari Commerce's current model (one default variant per
- *     product), we select the single active variant for the ordered product.
- *     When multi-variant ordering is added, a variant_id column should be
- *     added to order_items and this join can be replaced with a direct lookup.
+ *   - order_items.variant_id → the variant the customer actually bought,
+ *     written at order time by create_order_with_items. Every inventory
+ *     movement in this service resolves from that column and never from a
+ *     default variant, product_id, or size text.
  *
  * Rules:
  *   - Every mutation goes through a Supabase RPC (DB-level transaction + row lock)
@@ -36,11 +32,14 @@ const log = createLogger({ service: 'fulfillment.service' });
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
-/** Shape of each row returned by the order_items + product_variants join */
+/** One purchased line, carrying the exact variant identity captured at order time. */
 interface OrderLineWithVariant {
-  product_id: number;
-  quantity:   number;
-  variant_id: number;   // resolved from product_variants
+  product_id:   number | null;
+  quantity:     number;
+  /** order_items.variant_id — authoritative, never re-derived. */
+  variant_id:   number;
+  variant_sku:  string | null;
+  variant_size: string | null;
 }
 
 // ─── Mapper ──────────────────────────────────────────────────────────────────
@@ -85,80 +84,90 @@ function refundKey(orderId: string, variantId: number) {
 // ─── Private: resolve variant IDs for an order ───────────────────────────────
 
 /**
- * order_items has no variant_id column (schema-verified).
+ * Resolves the exact variants a customer purchased, from the order's own
+ * line-item snapshot.
  *
- * Resolution:
- *   1. Fetch order_items for this order → get product_id + quantity
- *   2. For each product_id, fetch the single DEFAULT (is_default = true) active
- *      variant from product_variants.
- *   3. If no default variant exists, fall back to the lowest-id active variant.
+ * `order_items.variant_id` IS the authoritative identity. It is written by
+ * create_order_with_items at order time and is never recomputed, so a
+ * fulfillment action always moves stock on the size the customer actually
+ * bought — the same variant that was decremented when the order was placed.
  *
- * This mirrors Bansari Commerce's current product model where each product
- * has exactly one default variant driving inventory.
+ * Deliberately NOT done here:
+ *   - no default-variant substitution
+ *   - no inference from product_id
+ *   - no reconstruction from variant_size text
+ * Guessing a variant would silently move stock on the wrong size, which is
+ * exactly the defect this replaces.
+ *
+ * Legacy orders (variant_id NULL — placed before size-level inventory
+ * existed) are classified as legacy and excluded from variant-level inventory
+ * operations rather than guessed at. They are logged so they can be handled
+ * manually; their product-level stock behaviour is left exactly as it was.
  */
 async function resolveOrderLines(
   orderId: string
 ): Promise<OrderLineWithVariant[]> {
   const sb = createServiceRoleClient();
 
-  // Step 1: fetch order items from orders.items (jsonb array)
-  const { data: order, error: orderErr } = await sb
-    .from('orders')
-    .select('items')
-    .eq('id', orderId)
-    .single();
+  const { data: items, error: itemsErr } = await sb
+    .from('order_items')
+    .select('id, product_id, variant_id, variant_sku, variant_size, quantity')
+    .eq('order_id', orderId);
 
-  if (orderErr) throw new Error(`resolveOrderLines: ${orderErr.message}`);
+  if (itemsErr) throw new Error(`resolveOrderLines: ${itemsErr.message}`);
 
-  const rawItems = (order?.items ?? []) as Array<{
-    product_id?: number;
-    quantity?:   number;
+  const rows = (items ?? []) as Array<{
+    id:            string;
+    product_id:    number | null;
+    variant_id:    number | null;
+    variant_sku:   string | null;
+    variant_size:  string | null;
+    quantity:      number | null;
   }>;
-  const items = rawItems.filter(
-    (i): i is { product_id: number; quantity: number } =>
-      i.product_id != null
-  );
 
-  if (items.length === 0) return [];
+  if (rows.length === 0) {
+    log.warn('fulfillment.resolve.no_order_items', { orderId });
+    return [];
+  }
 
-  const productIds = [...new Set(items.map((i) => i.product_id as number))];
+  const lines: OrderLineWithVariant[] = [];
+  const legacyLines: Array<{ orderItemId: string; productId: number | null }> = [];
 
-  // Step 2: fetch default active variants for all products in one query
-  const { data: variants, error: variantsErr } = await sb
-    .from('product_variants')
-    .select('id, product_id, is_default, status')
-    .in('product_id', productIds)
-    .eq('status', 'active')
-    .order('is_default', { ascending: false })  // default variants first
-    .order('id',         { ascending: true });    // tie-break by id
+  for (const row of rows) {
+    const quantity = Number(row.quantity ?? 0);
+    if (quantity <= 0) continue;
 
-  if (variantsErr) throw new Error(`resolveOrderLines: ${variantsErr.message}`);
+    // Legacy line: no variant identity was captured at order time.
+    // Do not guess which size it was — skip variant-level inventory movement.
+    if (row.variant_id == null) {
+      legacyLines.push({ orderItemId: row.id, productId: row.product_id });
+      continue;
+    }
 
-  // Build a product_id → variant_id map (first hit = preferred default)
-  const variantMap = new Map<number, number>();
-  for (const v of variants ?? []) {
-    const pid = v.product_id as number;
-    if (!variantMap.has(pid)) {
-      variantMap.set(pid, v.id as number);
+    const variantId = Number(row.variant_id);
+
+    // Aggregate if the same variant appears on more than one line.
+    const existing = lines.find((l) => l.variant_id === variantId);
+    if (existing) {
+      existing.quantity += quantity;
+    } else {
+      lines.push({
+        product_id:   row.product_id,
+        quantity,
+        variant_id:   variantId,
+        variant_sku:  row.variant_sku,
+        variant_size: row.variant_size,
+      });
     }
   }
 
-  // Step 3: merge quantity with resolved variant IDs
-  const lines: OrderLineWithVariant[] = [];
-  for (const item of items) {
-    const pid = item.product_id as number;
-    const vid = variantMap.get(pid);
-    if (vid === undefined) {
-      log.warn('fulfillment.resolve.no_variant', { orderId, productId: pid });
-      continue; // skip products with no active variant (do not throw)
-    }
-    // Aggregate quantities if the same product appears more than once
-    const existing = lines.find((l) => l.variant_id === vid);
-    if (existing) {
-      existing.quantity += item.quantity as number;
-    } else {
-      lines.push({ product_id: pid, quantity: item.quantity as number, variant_id: vid });
-    }
+  if (legacyLines.length > 0) {
+    log.warn('fulfillment.resolve.legacy_lines_skipped', {
+      orderId,
+      count: legacyLines.length,
+      orderItemIds: legacyLines.map((l) => l.orderItemId),
+      note: 'order_items.variant_id is NULL (pre size-inventory order). No variant-level inventory movement performed — variant was NOT guessed.',
+    });
   }
 
   return lines;

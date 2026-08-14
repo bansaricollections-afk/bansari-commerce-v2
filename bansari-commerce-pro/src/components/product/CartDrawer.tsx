@@ -109,7 +109,7 @@ export default function CartDrawer({ open, onClose }: Props) {
             </div>
           ) : (
             items.map((item) => (
-              <div key={item.id} className="flex gap-3">
+              <div key={cartLineId(item)} className="flex gap-3">
                 {/* Image */}
                 <div className="relative w-16 h-20 flex-shrink-0 bg-slate-50 rounded-sm overflow-hidden">
                   {item.image ? (

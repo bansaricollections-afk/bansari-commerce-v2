@@ -2,6 +2,7 @@ import { createServiceRoleClient } from '@/lib/supabase/service';
 import {
   getSizeAvailabilityMap,
   getVariantAvailability,
+  getVariantAvailabilityIndex,
 } from '@/services/size-inventory.service';
 import {
   logServiceQueryStart,
@@ -274,6 +275,91 @@ export async function getFilteredProducts(
 
   const supabase = createServiceRoleClient();
 
+  // ── Resolve size / availability against real variant inventory ────────────
+  // Both filters are answered from the canonical availability projection for
+  // size-managed products. `products.sizes[]` and `products.stock` are only
+  // consulted for products that have no live variants (legacy path).
+  //
+  // Result is an explicit id allow-list, because "size X is sellable" cannot
+  // be expressed as a column predicate on `products`.
+  let idAllowList: number[] | null = null;
+
+  if (size || inStock !== undefined) {
+    const index = await getVariantAvailabilityIndex();
+
+    // Legacy candidates: products with no live variant at all.
+    const { data: legacyRows } = await supabase
+      .from('products')
+      .select('id, stock, sizes')
+      .eq('active', true);
+
+    const legacy = (legacyRows ?? []).filter(
+      (r) => !index.sizeManagedIds.has(r.id as number)
+    );
+
+    const allow = new Set<number>();
+
+    if (size) {
+      const label = size.trim().toUpperCase();
+
+      if (inStock === false) {
+        // "size X" + "out of stock": size-managed products that offer X but
+        // have none of it available.
+        const offered = index.offeredIdsBySize.get(label) ?? new Set<number>();
+        const sellable = index.sellableIdsBySize.get(label) ?? new Set<number>();
+        for (const id of offered) if (!sellable.has(id)) allow.add(id);
+      } else {
+        // Size-managed: only when that exact size has available > 0.
+        for (const id of index.sellableIdsBySize.get(label) ?? []) allow.add(id);
+      }
+
+      // Legacy: unchanged behaviour — sizes[] membership, plus product stock
+      // when the caller also asked for in-stock only.
+      for (const r of legacy) {
+        const rowSizes = Array.isArray(r.sizes) ? (r.sizes as unknown[]) : [];
+        const hasSize = rowSizes.some(
+          (v) => typeof v === 'string' && v.trim().toUpperCase() === label
+        );
+        if (!hasSize) continue;
+        if (inStock === true && !((r.stock as number) > 0)) continue;
+        if (inStock === false && (r.stock as number) > 0) continue;
+        allow.add(r.id as number);
+      }
+    } else if (inStock === true) {
+      // IN STOCK: a sellable variant, or legacy stock > 0.
+      for (const id of index.sellableIds) allow.add(id);
+      for (const r of legacy) {
+        if ((r.stock as number) > 0) allow.add(r.id as number);
+      }
+    } else if (inStock === false) {
+      // OUT OF STOCK: size-managed with zero sellable sizes, or legacy stock <= 0.
+      for (const id of index.sizeManagedIds) {
+        if (!index.sellableIds.has(id)) allow.add(id);
+      }
+      for (const r of legacy) {
+        if (!((r.stock as number) > 0)) allow.add(r.id as number);
+      }
+    }
+
+    idAllowList = [...allow];
+  }
+
+  // No product satisfies the requested size/availability — return an empty
+  // page rather than issuing a query that would match everything.
+  if (idAllowList !== null && idAllowList.length === 0) {
+    return {
+      products: [],
+      meta: {
+        page: safePage,
+        perPage: safePerPage,
+        total: 0,
+        totalPages: 0,
+        hasNextPage: false,
+        hasPrevPage: safePage > 1,
+      },
+    };
+  }
+
   // ── Build the base query (always filter active products) ──────────────────
   // We use a helper to apply identical filters to both the data query and the
   // count query, so the total count always matches the returned page.
@@ -290,10 +376,10 @@ export async function getFilteredProducts(
     if (priceMin !== undefined) query = query.gte('price', priceMin);
     if (priceMax !== undefined) query = query.lte('price', priceMax);
 
-    if (inStock === true) query = query.gt('stock', 0);
-
-    // sizes is a text[] column; use Supabase .contains() which maps to @>
-    if (size) query = query.contains('sizes', [size]);
+    // Size and availability are pre-resolved above into an id allow-list that
+    // already accounts for variant inventory; `products.stock` / `sizes[]` are
+    // deliberately NOT filtered on here for size-managed products.
+    if (idAllowList !== null) query = query.in('id', idAllowList);
 
     // occasion is stored inside the specifications JSONB column
     // Use Postgres ->> cast and ilike for case-insensitive match

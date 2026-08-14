@@ -83,7 +83,7 @@ export async function PUT(request: NextRequest, context: RouteContext) {
     const code = (err as { code?: string }).code ?? 'INTERNAL';
     log.error('admin.products.update.failed', err, { requestId });
     const statusMap: Record<string, number> = {
-      VALIDATION: 422, DUPLICATE_SKU: 409, DUPLICATE_SLUG: 409, NOT_FOUND: 404, INTERNAL: 500,
+      VALIDATION: 422, SIZE_INVENTORY_REQUIRED: 422, DUPLICATE_SKU: 409, DUPLICATE_SLUG: 409, NOT_FOUND: 404, INTERNAL: 500,
     };
     return apiError(requestId, code, message, statusMap[code] ?? 500);
   }
