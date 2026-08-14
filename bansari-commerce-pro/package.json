@@ -9,7 +9,7 @@
     "lint": "eslint src --fix",
     "deploy:preflight": "sh scripts/deploy-preflight.sh",
     "predeploy": "npm run deploy:preflight",
-    "deploy": "vercel --prod"
+    "deploy": "npx vercel --prod"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.4.0",
