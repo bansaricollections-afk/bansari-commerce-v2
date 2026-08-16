@@ -1,4 +1,8 @@
-@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,500;0,600;0,700;1,400;1,500&family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;1,300;1,400&family=Inter:wght@300;400;500;600&display=swap');
+/* Playfair Display and Inter are loaded via next/font in src/app/layout.tsx
+   and self-hosted from /_next/static/media. The remote Google Fonts @import
+   that used to sit here was stripped by the build, so it shipped no faces at
+   all. Cormorant Garamond is not loaded: its only rule, .bc-serif-thin below,
+   has zero consumers in the component tree. */
 @import "tailwindcss";
 
 /* ==========================================
@@ -7,6 +11,23 @@
    ========================================== */
 
 :root {
+  /* ── Font families ──
+     These two are referenced across the storefront as
+     `var(--font-playfair), 'Playfair Display', Georgia, serif` and via
+     Tailwind's `font-[family:var(--font-playfair)]`, but were never declared.
+     An undefined custom property with no var()-level fallback makes the whole
+     font-family declaration invalid at computed-value time, so it resolved to
+     `inherit` and every serif heading rendered in the default sans — the
+     trailing names in the list are not a var() fallback and never applied.
+     Declaring them here makes the existing chains valid.
+
+     next/font (layout.tsx) redeclares both on <body> with the self-hosted
+     family names, and a body-level custom property overrides :root for every
+     descendant — so these are only a last-resort fallback for <html> itself.
+     Keep the names identical to the next/font `variable` values. */
+  --font-playfair: 'Playfair Display';
+  --font-inter: 'Inter';
+
   /* ── Core Brand ── */
   --primary: #8A5A6A;
   --primary-dark: #714857;

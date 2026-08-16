@@ -1,15 +1,36 @@
 import type { Metadata } from 'next';
-import { Geist, Geist_Mono } from 'next/font/google';
+import { Playfair_Display, Inter } from 'next/font/google';
 import './globals.css';
 
-const geistSans = Geist({
-  variable: '--font-geist-sans',
+/**
+ * Fonts are loaded through next/font so they are downloaded at build time and
+ * served same-origin from /_next/static/media. The previous mechanism — a
+ * remote @import at the top of globals.css — was silently stripped by the
+ * build, so no Playfair/Inter face ever shipped and every serif heading fell
+ * back to Georgia in production.
+ *
+ * The `variable` names deliberately match the custom properties the codebase
+ * already consumes (`var(--font-playfair)` / `var(--font-inter)` across ~56
+ * files, plus `.bc-serif`), so nothing downstream changes. Both families are
+ * variable fonts, so omitting `weight` covers the full range in use
+ * (Playfair 400–700, Inter 300–600). Playfair italic is loaded because serif
+ * headings use <em> for emphasis.
+ *
+ * Geist / Geist Mono were removed: `--font-geist-sans` and `--font-geist-mono`
+ * had no consumer anywhere, body already resolves to Inter, and preloading two
+ * unused faces was the cause of the "preloaded but not used" console warnings.
+ */
+const playfair = Playfair_Display({
+  variable: '--font-playfair',
   subsets: ['latin'],
+  style: ['normal', 'italic'],
+  display: 'swap',
 });
 
-const geistMono = Geist_Mono({
-  variable: '--font-geist-mono',
+const inter = Inter({
+  variable: '--font-inter',
   subsets: ['latin'],
+  display: 'swap',
 });
 
 export const metadata: Metadata = {
@@ -184,7 +205,7 @@ export default function RootLayout({
         />
       </head>
       <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased`}
+        className={`${playfair.variable} ${inter.variable} antialiased`}
       >
         <a
           href="#main-content"

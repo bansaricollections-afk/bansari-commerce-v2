@@ -156,7 +156,14 @@ export default function ProductInfo({ product, canonicalUrl }: Props) {
     <>
       {sizeGuideOpen && <SizeGuideModal onClose={() => setSizeGuideOpen(false)} />}
 
-      <div className="flex flex-col gap-6 lg:sticky lg:top-24 lg:self-start">
+      {/*
+       * Vertical rhythm is set per block rather than by a single uniform
+       * `gap`, so tightly-bound pairs (collection → title, title → price) sit
+       * close and genuine section breaks carry the space. The old uniform
+       * gap-6 spaced a one-line eyebrow exactly like a purchase panel, which
+       * is where most of the dead space on this column came from.
+       */}
+      <div className="flex flex-col lg:sticky lg:top-24 lg:self-start">
 
         {/* ── Breadcrumb ── */}
         <nav aria-label="Breadcrumb">
@@ -168,8 +175,14 @@ export default function ProductInfo({ product, canonicalUrl }: Props) {
               <>
                 <li aria-hidden><span className="mx-1">›</span></li>
                 <li>
+                  {/* Category filter on /shop, not /collections/{slug} — that
+                      route does not exist and returned 404 on every PDP. The
+                      value must be the raw stored category: getFilteredProducts
+                      matches with .eq('category', …), which is exact and
+                      case-sensitive, so lowercasing or hyphenating it yields a
+                      200 with zero products (a soft 404). Encode only. */}
                   <Link
-                    href={`/collections/${product.category.toLowerCase().replace(/\s+/g, '-')}`}
+                    href={`/shop?category=${encodeURIComponent(product.category)}`}
                     className="hover:text-[#8A5A6A] transition-colors"
                   >
                     {product.category}
@@ -187,109 +200,142 @@ export default function ProductInfo({ product, canonicalUrl }: Props) {
 
         {/* ── Collection label ── */}
         {product.collection && (
-          <p className="text-[10px] tracking-[0.22em] uppercase text-[#8A5A6A] font-medium -mb-4">
+          <p className="mt-5 text-[10px] tracking-[0.24em] uppercase text-[#8A5A6A] font-semibold">
             {product.collection}
           </p>
         )}
 
-        {/* ── Product name ── */}
-        <div>
-          <h1 className="font-[family:var(--font-playfair)] text-[1.85rem] lg:text-[2.5rem] font-normal text-slate-900 leading-[1.15] tracking-tight">
-            {product.name}
-          </h1>
-          {product.reviewCount && product.reviewCount > 0 && product.rating ? (
-            <div className="mt-2">
-              <StarRow rating={product.rating} count={product.reviewCount} />
-            </div>
-          ) : null}
-        </div>
+        {/*
+         * ── Product name ──
+         * Scale pulled back from 2.5rem and capped to a ~22ch measure: at the
+         * old size a three-word product name outweighed the price and the
+         * purchase controls beneath it.
+         */}
+        {/* `.bc-serif`, not `font-[family:var(--font-playfair)]`: Tailwind v4's
+            font-family type hint is `family-name`, so the `family:` form
+            generated no rule and this title rendered in the inherited sans. */}
+        {/* Underscores are Tailwind's escape for spaces in an arbitrary value.
+            They are required here: CSS only accepts `+` inside clamp() when it
+            is surrounded by whitespace, so the unspaced form parses to nothing
+            and the heading silently falls back to the inherited size.
 
-        {/* ── Price row ── */}
-        <div className="border-t border-b border-slate-100 py-4 flex flex-col gap-2">
-          <div className="flex items-baseline gap-3 flex-wrap">
-            <span className="text-[1.75rem] font-medium text-slate-900 tabular-nums">
-              ₹{product.price.toLocaleString('en-IN')}
-            </span>
-            {hasDiscount && (
-              <>
-                <span className="text-base text-slate-400 line-through font-light">
-                  ₹{product.oldPrice!.toLocaleString('en-IN')}
-                </span>
-                <span className="text-xs font-semibold bg-green-50 text-green-700 px-2 py-0.5 rounded">
-                  {discountPct}% off
-                </span>
-                {/* Savings amount — explicit rupee value saves customer mental math */}
-                <span className="text-xs text-green-700 font-medium">
-                  You save ₹{savedAmount.toLocaleString('en-IN')}
-                </span>
-              </>
-            )}
+            Scale: 20px at 375px → 31px ceiling. The ceiling sits one step under
+            the price's 32px so the price stays the dominant element in the
+            panel; the title is also font-normal against the price's
+            font-medium, which widens that gap further. */}
+        <h1 className="bc-serif mt-2 max-w-[24ch] text-[clamp(1.25rem,0.95rem_+_1.3vw,1.9375rem)] font-normal text-slate-900 leading-[1.2] tracking-[-0.01em]">
+          {product.name}
+        </h1>
+        {product.reviewCount && product.reviewCount > 0 && product.rating ? (
+          <div className="mt-2.5">
+            <StarRow rating={product.rating} count={product.reviewCount} />
           </div>
+        ) : null}
 
-          {/* Returns reassurance — inline, always visible */}
-          <p className="text-[11px] text-slate-500 flex items-center gap-1.5">
-            <svg className="w-3.5 h-3.5 text-green-600 flex-shrink-0" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24" aria-hidden="true">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182m0-4.991v4.99" />
-            </svg>
-            <a href="/return-refund-policy" className="hover:underline">
-              Returns accepted within 7 days
+        {/* ── Price ── */}
+        <div className="mt-5 flex items-baseline gap-3 flex-wrap">
+          <span className="text-[2rem] leading-none font-medium text-slate-900 tabular-nums tracking-[-0.015em]">
+            ₹{product.price.toLocaleString('en-IN')}
+          </span>
+          {hasDiscount && (
+            <>
+              <span className="text-[0.9375rem] text-slate-400 line-through font-light tabular-nums">
+                ₹{product.oldPrice!.toLocaleString('en-IN')}
+              </span>
+              {/* Discount is a plain typographic mark sitting on the price
+                  baseline — no chip, no border, no tag. Gold token rather than
+                  --bc-gold itself: #C9A96E does not carry enough contrast on
+                  cream for text this small, and --bc-gold-dark is the palette's
+                  designated legible gold. Calculation is untouched. */}
+              <span
+                className="text-[0.9375rem] font-medium tabular-nums tracking-[0.01em]"
+                style={{ color: "var(--bc-gold-dark)" }}
+              >
+                &minus;{discountPct}%
+              </span>
+            </>
+          )}
+        </div>
+        {hasDiscount && (
+          /* Savings amount — explicit rupee value saves customer mental math */
+          <p className="mt-2 text-[12px] text-slate-500">
+            You save ₹{savedAmount.toLocaleString('en-IN')}
+          </p>
+        )}
+
+        {/* ── Shipping / returns ── */}
+        {/* Shipping copy is derived from the same constant the checkout and
+            the order-creation API bill against. This previously read "Free
+            shipping on all orders", which is false for any order under the
+            threshold — those are charged the flat STANDARD_SHIPPING rate. */}
+        <div className="mt-4 flex flex-col gap-1.5 border-t border-slate-100 pt-4 text-[12px] leading-relaxed text-slate-500">
+          <p>
+            Inclusive of all taxes · Free shipping on orders above &#8377;
+            {SHIPPING_THRESHOLD.toLocaleString('en-IN')}
+          </p>
+          <p>
+            <a href="/return-refund-policy" className="text-slate-600 underline underline-offset-2 decoration-slate-300 hover:decoration-slate-600 transition-colors">
+              Returns within 7 days
             </a>
-            {" · "}
-            <a href="/exchange-policy" className="hover:underline">
+            {' · '}
+            <a href="/exchange-policy" className="text-slate-600 underline underline-offset-2 decoration-slate-300 hover:decoration-slate-600 transition-colors">
               Size exchange within 4 days
             </a>
             , subject to policy
           </p>
+        </div>
 
-          {/* Shipping copy is derived from the same constant the checkout and
-              the order-creation API bill against. This previously read "Free
-              shipping on all orders", which is false for any order under the
-              threshold — those are charged the flat STANDARD_SHIPPING rate. */}
-          <p className="text-[11px] text-slate-400 tracking-wide">
-            Inclusive of all taxes · Free shipping on orders above &#8377;
-            {SHIPPING_THRESHOLD.toLocaleString('en-IN')}
-          </p>
-
-          {/* Availability + Style Code */}
-          <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
-            {isOutOfStock ? (
-              <span className="flex items-center gap-1 text-[11px] text-red-500">
-                <span className="w-1.5 h-1.5 rounded-full bg-red-500 inline-block" />
-                {isSizeManaged ? 'Sold Out — all sizes' : 'Out of Stock'}
+        {/*
+         * ── Real availability ──
+         * Promoted out of the old four-item meta cluster into its own line so
+         * the one piece of genuinely decision-changing information on this
+         * panel is legible at a glance. The values themselves are unchanged —
+         * still derived from per-size inventory for size-managed products and
+         * never from a product-level total.
+         */}
+        <div className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-1.5">
+          {isOutOfStock ? (
+            <span className="flex items-center gap-2 text-[13px] font-medium text-red-600">
+              <span className="w-1.5 h-1.5 rounded-full bg-red-500 inline-block flex-shrink-0" />
+              {isSizeManaged ? 'Sold Out — all sizes' : 'Out of Stock'}
+            </span>
+          ) : isSizeManaged ? (
+            <span className="flex items-center gap-2 text-[13px] text-slate-700">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-600 inline-block flex-shrink-0" />
+              <span>
+                <strong className="font-medium text-slate-900">
+                  {sellableSizes.map((s) => s.label).join(' · ')}
+                </strong>{' '}
+                available
               </span>
-            ) : isSizeManaged ? (
-              <span className="flex items-center gap-1 text-[11px] text-green-600">
-                <span className="w-1.5 h-1.5 rounded-full bg-green-500 inline-block" />
-                {sellableSizes.map((s) => s.label).join(' · ')} available
+            </span>
+          ) : isLowStock ? (
+            /* Urgency: pulsing dot + exact count */
+            <span className="flex items-center gap-2 text-[13px] font-medium text-amber-700">
+              <span className="relative flex h-2 w-2 flex-shrink-0">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75" />
+                <span className="relative inline-flex h-2 w-2 rounded-full bg-amber-500" />
               </span>
-            ) : isLowStock ? (
-              /* Urgency: pulsing dot + exact count */
-              <span className="flex items-center gap-1.5 text-[11px] font-medium text-amber-700">
-                <span className="relative flex h-2 w-2 flex-shrink-0">
-                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75" />
-                  <span className="relative inline-flex h-2 w-2 rounded-full bg-amber-500" />
-                </span>
-                Only {product.stock} left — selling fast
-              </span>
-            ) : (
-              <span className="flex items-center gap-1 text-[11px] text-green-600">
-                <span className="w-1.5 h-1.5 rounded-full bg-green-500 inline-block" />
-                In Stock
-              </span>
-            )}
-            {(product.sku || product.styleCode) && (
-              <span className="text-[11px] text-slate-400">
-                Style: {product.styleCode ?? product.sku}
-              </span>
-            )}
-          </div>
+              Only {product.stock} left — selling fast
+            </span>
+          ) : (
+            <span className="flex items-center gap-2 text-[13px] text-slate-700">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-600 inline-block flex-shrink-0" />
+              In Stock
+            </span>
+          )}
+          {(product.sku || product.styleCode) && (
+            <span className="text-[11px] tracking-[0.08em] text-slate-400">
+              Style {product.styleCode ?? product.sku}
+            </span>
+          )}
         </div>
 
         {/* ── Model Info Strip ── */}
         {(modelInfo || sizeWorn) && (
-          <div className="flex items-start gap-2 text-[11px] text-slate-500 bg-slate-50 border border-slate-100 rounded-sm px-3 py-2.5">
+          <p className="mt-3 flex items-start gap-2 text-[12px] text-slate-500">
             <svg
-              className="w-3.5 h-3.5 text-[#8A5A6A] flex-shrink-0 mt-px"
+              className="w-3.5 h-3.5 text-[#8A5A6A] flex-shrink-0 mt-0.5"
               fill="none"
               stroke="currentColor"
               strokeWidth="1.5"
@@ -301,17 +347,17 @@ export default function ProductInfo({ product, canonicalUrl }: Props) {
             <span>
               {modelInfo && <span>{modelInfo}</span>}
               {modelInfo && sizeWorn && <span className="mx-1">·</span>}
-              {sizeWorn && <span>Model wears size <strong className="text-slate-700">{sizeWorn}</strong></span>}
+              {sizeWorn && <span>Model wears size <strong className="font-medium text-slate-700">{sizeWorn}</strong></span>}
             </span>
-          </div>
+          </p>
         )}
 
         {/* ── Size selector + Size Guide affordance ── */}
         {(isSizeManaged || (product.variants && product.variants.length > 0)) && (
-          <div className="flex flex-col gap-2">
+          <div className="mt-7 flex flex-col gap-3">
             <div className="flex items-center justify-between">
-              <p className="text-[10px] tracking-[0.18em] uppercase text-slate-500 font-medium">
-                Size
+              <p className="text-[11px] tracking-[0.2em] uppercase text-slate-900 font-semibold">
+                Select Size
               </p>
               <button
                 type="button"
@@ -334,66 +380,70 @@ export default function ProductInfo({ product, canonicalUrl }: Props) {
 
         {/* ── Quantity ── */}
         {!isOutOfStock && (
-          <div className="flex flex-col gap-2">
-            <p className="text-[10px] tracking-[0.18em] uppercase text-slate-500 font-medium">
+          <div className="mt-6 flex flex-col gap-3">
+            <p className="text-[11px] tracking-[0.2em] uppercase text-slate-900 font-semibold">
               Quantity
             </p>
             <QuantitySelector value={quantity} onChange={setQuantity} max={maxQuantity} />
           </div>
         )}
 
-        {/* ── Action buttons ── */}
-        <ProductActions
-          product={product}
-          quantity={quantity}
-          selectedVariant={selectedVariant}
-          selectedSize={selectedSize}
-          isSizeManaged={isSizeManaged}
-        />
+        {/* ── Purchase actions ── */}
+        <div className="mt-7">
+          <ProductActions
+            product={product}
+            quantity={quantity}
+            selectedVariant={selectedVariant}
+            selectedSize={selectedSize}
+            isSizeManaged={isSizeManaged}
+          />
+        </div>
 
         {/* ── Delivery Estimate + Pincode checker — below purchase controls ── */}
-        {!isOutOfStock && <DeliveryEstimate />}
-        <PincodeChecker />
+        <div className="mt-7 flex flex-col gap-4">
+          {!isOutOfStock && <DeliveryEstimate />}
+          <PincodeChecker />
+        </div>
 
         {/* ── Quick spec pills ── */}
         {specs && (
-          <div className="grid grid-cols-2 gap-x-6 gap-y-2.5 pt-4 border-t border-slate-100">
+          <div className="mt-8 grid grid-cols-2 gap-x-6 gap-y-3.5 pt-6 border-t border-slate-100">
             {specs.fabric && (
               <div>
-                <p className="text-[9px] tracking-[0.18em] uppercase text-slate-400 mb-0.5">Fabric</p>
-                <p className="text-sm text-slate-700 font-light">{specs.fabric}</p>
+                <p className="text-[10px] tracking-[0.18em] uppercase text-slate-500 mb-1">Fabric</p>
+                <p className="text-sm text-slate-800 font-normal">{specs.fabric}</p>
               </div>
             )}
             {specs.occasion && (
               <div>
-                <p className="text-[9px] tracking-[0.18em] uppercase text-slate-400 mb-0.5">Occasion</p>
-                <p className="text-sm text-slate-700 font-light">
+                <p className="text-[10px] tracking-[0.18em] uppercase text-slate-500 mb-1">Occasion</p>
+                <p className="text-sm text-slate-800 font-normal">
                   {Array.isArray(specs.occasion) ? specs.occasion.join(', ') : specs.occasion}
                 </p>
               </div>
             )}
             {specs.fit && (
               <div>
-                <p className="text-[9px] tracking-[0.18em] uppercase text-slate-400 mb-0.5">Fit</p>
-                <p className="text-sm text-slate-700 font-light">{specs.fit}</p>
+                <p className="text-[10px] tracking-[0.18em] uppercase text-slate-500 mb-1">Fit</p>
+                <p className="text-sm text-slate-800 font-normal">{specs.fit}</p>
               </div>
             )}
             {specs.neckline && (
               <div>
-                <p className="text-[9px] tracking-[0.18em] uppercase text-slate-400 mb-0.5">Neckline</p>
-                <p className="text-sm text-slate-700 font-light">{specs.neckline}</p>
+                <p className="text-[10px] tracking-[0.18em] uppercase text-slate-500 mb-1">Neckline</p>
+                <p className="text-sm text-slate-800 font-normal">{specs.neckline}</p>
               </div>
             )}
             {specs.sleeve && (
               <div>
-                <p className="text-[9px] tracking-[0.18em] uppercase text-slate-400 mb-0.5">Sleeve</p>
-                <p className="text-sm text-slate-700 font-light">{specs.sleeve}</p>
+                <p className="text-[10px] tracking-[0.18em] uppercase text-slate-500 mb-1">Sleeve</p>
+                <p className="text-sm text-slate-800 font-normal">{specs.sleeve}</p>
               </div>
             )}
             {specs.work && (
               <div>
-                <p className="text-[9px] tracking-[0.18em] uppercase text-slate-400 mb-0.5">Work</p>
-                <p className="text-sm text-slate-700 font-light">{specs.work}</p>
+                <p className="text-[10px] tracking-[0.18em] uppercase text-slate-500 mb-1">Work</p>
+                <p className="text-sm text-slate-800 font-normal">{specs.work}</p>
               </div>
             )}
           </div>

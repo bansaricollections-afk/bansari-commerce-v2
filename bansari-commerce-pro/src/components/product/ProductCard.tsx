@@ -93,9 +93,10 @@ export default function ProductCard({ product, priority = false }: Props) {
     setTimeout(() => setQuickAdded(false), 1800);
   }
 
-  /* Shared badge base classes */
+  /* Shared badge base classes — restrained brand palette, no marketplace
+     amber/rose. Gold marks the premium signal, ink marks state. */
   const badgeBase =
-    "px-2 py-[3px] text-[9px] font-bold uppercase tracking-[0.12em] leading-none";
+    "px-2.5 py-[5px] text-[9px] font-semibold uppercase tracking-[0.16em] leading-none";
 
   return (
     <article
@@ -103,8 +104,10 @@ export default function ProductCard({ product, priority = false }: Props) {
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
     >
-      {/* ── Image container — 3:4 ── */}
-      <div className="relative aspect-[3/4] w-full overflow-hidden bg-[#F7F3EE]">
+      {/* ── Image container — 2:3, editorial portrait ──
+         Taller than the previous 3:4 so the photograph, not the metadata
+         block, carries the card. ── */}
+      <div className="relative aspect-[2/3] w-full overflow-hidden bg-[#F7F3EE]">
         <Link
           href={`/product/${product.id}`}
           aria-label={`View ${displayName}`}
@@ -151,7 +154,7 @@ export default function ProductCard({ product, priority = false }: Props) {
 
         {/* ── Badges — top left ── */}
         <div
-          className="absolute left-2.5 top-2.5 flex flex-col gap-1.5"
+          className="absolute left-3 top-3 flex flex-col items-start gap-1.5"
           aria-hidden="true"
         >
           {isOnSale && (
@@ -160,27 +163,27 @@ export default function ProductCard({ product, priority = false }: Props) {
             </span>
           )}
           {isNew && !isOnSale && (
-            <span className={`${badgeBase} bg-slate-900 text-white`}>
+            <span className={`${badgeBase} bg-[#1A0F16] text-[#FFFDF9]`}>
               New
             </span>
           )}
           {isBestSeller && (
-            <span className={`${badgeBase} bg-amber-500 text-white`}>
+            <span className={`${badgeBase} bg-[#C9A96E] text-[#1A0F16]`}>
               Best Seller
             </span>
           )}
           {isSoldOut && (
-            <span className={`${badgeBase} bg-slate-500 text-white`}>
+            <span className={`${badgeBase} bg-[#FFFDF9] text-[#1A0F16] border border-[#1A0F16]/15`}>
               Sold Out
             </span>
           )}
           {onlyOneLeftSize && (
-            <span className={`${badgeBase} bg-rose-600 text-white`}>
+            <span className={`${badgeBase} bg-[#8C3A3A] text-white`}>
               {onlyOneLeftSize.label} &middot; Only 1 left
             </span>
           )}
           {isLowStock && (
-            <span className={`${badgeBase} bg-rose-600 text-white`}>
+            <span className={`${badgeBase} bg-[#8C3A3A] text-white`}>
               Low Stock
             </span>
           )}
@@ -196,7 +199,7 @@ export default function ProductCard({ product, priority = false }: Props) {
             e.stopPropagation();
             setWishlisted((v) => !v);
           }}
-          className="absolute right-0 top-0 flex items-center justify-center transition-transform duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#8A5A6A] focus-visible:ring-offset-1"
+          className="absolute right-1 top-1 flex items-center justify-center transition-transform duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#8A5A6A] focus-visible:ring-inset"
           style={{ width: 44, height: 44 }}
         >
           <Heart
@@ -211,59 +214,83 @@ export default function ProductCard({ product, priority = false }: Props) {
           />
         </button>
 
-        {/* ── Hover actions row (Quick View + Quick Add) ── */}
+        {/* ── Hover actions — one flush edge-to-edge bar rather than two
+             floating pills, which read as UI chrome sitting on the image.
+             Revealed by keyboard focus as well as pointer hover: the controls
+             below are always in the natural tab order, so the bar must become
+             visible and interactive when focus lands inside the card, or a
+             keyboard user would be focusing an invisible target. The
+             group-focus-within variants outrank the base opacity/translate
+             utilities on specificity, so they win without touching the
+             existing hover path. ── */}
         <div
-          className="absolute bottom-0 left-0 right-0 flex items-center justify-between px-2.5 pb-2.5"
-          aria-hidden={!hovered}
+          className={[
+            "absolute bottom-0 left-0 right-0 flex items-stretch bg-[#FFFDF9]/95 backdrop-blur-sm",
+            "transition-all duration-300 ease-out",
+            hovered
+              ? "opacity-100 translate-y-0"
+              : "opacity-0 translate-y-full pointer-events-none",
+            "group-focus-within:opacity-100 group-focus-within:translate-y-0 group-focus-within:pointer-events-auto",
+          ].join(" ")}
         >
           {/* Quick View */}
           <Link
             href={`/product/${product.id}`}
             aria-label={`Quick view ${displayName}`}
             className={[
-              "flex items-center gap-1.5 bg-white/90 backdrop-blur-sm border border-white/60 px-3 py-2",
-              "text-[10px] font-semibold uppercase tracking-[0.1em] text-slate-700",
-              "transition-all duration-300 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#8A5A6A]",
-              hovered
-                ? "opacity-100 translate-y-0"
-                : "opacity-0 translate-y-2 pointer-events-none",
+              "flex flex-1 items-center justify-center gap-1.5 py-3",
+              "text-[10px] font-semibold uppercase tracking-[0.14em] text-[#1A0F16]",
+              "transition-colors duration-200 hover:bg-[#1A0F16] hover:text-[#FFFDF9]",
+              "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[#8A5A6A]",
             ].join(" ")}
-            tabIndex={hovered ? 0 : -1}
           >
-            <Eye size={11} aria-hidden="true" />
+            <Eye size={12} aria-hidden="true" />
             Quick View
           </Link>
 
-          {/* Quick Add */}
+          <span className="w-px self-stretch bg-[#1A0F16]/10" aria-hidden="true" />
+
+          {/* The copy now names the action that actually happens. A
+              size-managed product navigates to the PDP, so it reads "View
+              Details"; only a non-size-managed product adds to the cart
+              directly, so only that case reads "Add to Cart". The previous
+              "Quick Add" / "Choose Size" pair described neither outcome
+              accurately. handleQuickAdd itself is unchanged. */}
           <button
             type="button"
-            aria-label={`Quick add ${displayName} to cart`}
+            aria-label={
+              isSizeManaged
+                ? `View details for ${displayName}`
+                : `Add ${displayName} to cart`
+            }
             onClick={handleQuickAdd}
             className={[
-              "flex items-center gap-1.5 border px-3 py-2 backdrop-blur-sm",
-              "text-[10px] font-semibold uppercase tracking-[0.1em]",
-              "transition-all duration-300 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#8A5A6A]",
-              hovered
-                ? "opacity-100 translate-y-0"
-                : "opacity-0 translate-y-2 pointer-events-none",
+              "flex flex-1 items-center justify-center gap-1.5 py-3",
+              "text-[10px] font-semibold uppercase tracking-[0.14em]",
+              "transition-colors duration-200",
+              "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[#8A5A6A]",
               quickAdded
-                ? "border-[#8A5A6A] bg-[#8A5A6A] text-white"
-                : "border-white/60 bg-white/90 text-slate-700",
+                ? "bg-[#8A5A6A] text-white"
+                : "text-[#1A0F16] hover:bg-[#1A0F16] hover:text-[#FFFDF9]",
             ].join(" ")}
-            tabIndex={hovered ? 0 : -1}
           >
-            <ShoppingBag size={11} aria-hidden="true" />
-            {quickAdded ? "Added ✓" : isSizeManaged ? "Select Size" : "Quick Add"}
+            <ShoppingBag size={12} aria-hidden="true" />
+            {quickAdded ? "Added ✓" : isSizeManaged ? "View Details" : "Add to Cart"}
           </button>
         </div>
       </div>
 
-      {/* ── Metadata — below image ── */}
-      <div className="mt-4 flex flex-col gap-1.5">
+      {/* ── Metadata — below image ──
+         Reordered to one editorial run: collection → name → craft → price →
+         availability. The trailing "Discover →" link was removed: the image,
+         the name and the hover bar all already open the same PDP, so it was a
+         fourth duplicate affordance and the row that made the card read as a
+         functional listing rather than a piece of editorial. ── */}
+      <div className="mt-4 flex flex-col">
 
         {/* Collection eyebrow */}
         {product.collection && (
-          <p className="text-[9px] font-semibold uppercase tracking-[0.18em] text-[#8A5A6A]">
+          <p className="text-[9px] font-semibold uppercase tracking-[0.22em] text-[#8A5A6A]">
             {product.collection}
           </p>
         )}
@@ -271,29 +298,24 @@ export default function ProductCard({ product, priority = false }: Props) {
         {/* Product name */}
         <Link
           href={`/product/${product.id}`}
-          className="font-[family:var(--font-playfair)] text-[1rem] font-normal leading-snug text-slate-900 transition-colors duration-200 hover:text-[#8A5A6A] focus-visible:outline-none focus-visible:rounded-sm focus-visible:ring-2 focus-visible:ring-[#8A5A6A] focus-visible:ring-offset-2"
+          /* `.bc-serif`, not `font-[family:var(--font-playfair)]` — the
+             `family:` type hint is not valid in Tailwind v4 (it is
+             `family-name`), so that class emitted no rule and the product name
+             rendered in the inherited sans. */
+          className="bc-serif mt-1.5 text-[1.125rem] font-normal leading-[1.3] text-slate-900 transition-colors duration-200 hover:text-[#8A5A6A] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#8A5A6A] focus-visible:ring-offset-2"
         >
           {displayName}
         </Link>
 
         {/* Craft detail */}
         {craftDetail && (
-          <p className="text-[11px] leading-relaxed text-slate-400">{craftDetail}</p>
-        )}
-
-        {/* Size availability — real per-size inventory, never a product total */}
-        {isSizeManaged && (
-          <p className="text-[10px] tracking-[0.08em] text-slate-500">
-            {isSoldOut
-              ? "Sold out in all sizes"
-              : `${sellableSizes.map((s) => s.label).join(" · ")} available`}
-          </p>
+          <p className="mt-1.5 text-[11px] leading-relaxed text-slate-500">{craftDetail}</p>
         )}
 
         {/* Rating */}
         {rating !== undefined && (
           <div
-            className="flex items-center gap-1.5"
+            className="mt-2 flex items-center gap-1.5"
             aria-label={`Rated ${rating} out of 5${reviewCount !== undefined ? `, ${reviewCount} reviews` : ""}`}
           >
             <div className="flex items-center gap-[2px]" aria-hidden="true">
@@ -302,7 +324,7 @@ export default function ProductCard({ product, priority = false }: Props) {
                   key={i}
                   size={9}
                   strokeWidth={0}
-                  fill={i < Math.floor(rating) ? "#C4A84C" : "#E2E8F0"}
+                  fill={i < Math.floor(rating) ? "#C9A96E" : "#E2E8F0"}
                 />
               ))}
             </div>
@@ -313,28 +335,30 @@ export default function ProductCard({ product, priority = false }: Props) {
         )}
 
         {/* Price row */}
-        <div className="flex items-baseline gap-2">
-          <p className="text-[14px] font-semibold tabular-nums text-slate-900">
+        <div className="mt-2.5 flex items-baseline gap-2.5">
+          <p className="text-[15px] font-medium tabular-nums tracking-[-0.01em] text-slate-900">
             &#x20B9;{product.price.toLocaleString("en-IN")}
           </p>
           {isOnSale && originalPrice && (
-            <p className="text-[12px] tabular-nums text-slate-400 line-through">
+            <p className="text-[12px] tabular-nums font-light text-slate-400 line-through">
               &#x20B9;{originalPrice.toLocaleString("en-IN")}
             </p>
           )}
           {isOnSale && (
-            <p className="text-[10px] font-semibold text-[#8A5A6A]">{discountPct}% off</p>
+            <p className="text-[10px] font-semibold uppercase tracking-[0.1em] text-[#8A5A6A]">
+              {discountPct}% off
+            </p>
           )}
         </div>
 
-        {/* Discover CTA */}
-        <Link
-          href={`/product/${product.id}`}
-          className="w-fit text-[10px] font-semibold uppercase tracking-[0.1em] text-slate-400 underline-offset-4 transition-colors duration-200 hover:text-slate-900 hover:underline focus-visible:outline-none focus-visible:rounded-sm focus-visible:ring-2 focus-visible:ring-[#8A5A6A] focus-visible:ring-offset-2"
-          aria-label={`Discover ${displayName}`}
-        >
-          Discover &rarr;
-        </Link>
+        {/* Size availability — real per-size inventory, never a product total */}
+        {isSizeManaged && (
+          <p className="mt-2 text-[11px] tracking-[0.02em] text-slate-500">
+            {isSoldOut
+              ? "Sold out in all sizes"
+              : `${sellableSizes.map((s) => s.label).join(" · ")} available`}
+          </p>
+        )}
       </div>
     </article>
   );

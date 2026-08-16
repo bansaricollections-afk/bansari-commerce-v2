@@ -21,6 +21,34 @@ export interface HeroSlide {
 
 const INTERVAL = 6000;
 
+/**
+ * Directional scrim, keyed to where the copy actually sits.
+ *
+ * The previous scrim darkened the LEFT of every frame at 0.82 and never fell
+ * below 0.18 anywhere, plus a second 0.70 bottom wash — so the photograph was
+ * dimmed edge to edge even on slides whose copy sits right or centre. Here the
+ * darkening is held high only under the copy and decays to clean image by
+ * ~70% across, which keeps text contrast while letting the garment dominate.
+ */
+function copyScrim(position: HeroSlide["position"]): string {
+  if (position === "center") {
+    return (
+      "radial-gradient(115% 90% at 50% 68%, rgba(26,15,22,0.72) 0%, " +
+      "rgba(26,15,22,0.52) 32%, rgba(26,15,22,0.16) 60%, transparent 82%)"
+    );
+  }
+  const direction = position === "right" ? "to left" : "to right";
+  return (
+    `linear-gradient(${direction}, rgba(26,15,22,0.80) 0%, ` +
+    "rgba(26,15,22,0.70) 26%, rgba(26,15,22,0.34) 48%, " +
+    "rgba(26,15,22,0.06) 66%, transparent 78%)"
+  );
+}
+
+/** Shared foot scrim — anchors the frame without flattening the image. */
+const FOOT_SCRIM =
+  "linear-gradient(to top, rgba(26,15,22,0.45) 0%, rgba(26,15,22,0.10) 28%, transparent 52%)";
+
 export default function EditorialHeroCarousel({ slides }: { slides: HeroSlide[] }) {
   const [current, setCurrent] = useState(0);
   const [transitioning, setTransitioning] = useState(false);
@@ -97,18 +125,18 @@ export default function EditorialHeroCarousel({ slides }: { slides: HeroSlide[] 
             sizes="100vw"
             style={{
               objectFit: "cover",
-              objectPosition: "center top",
+              // Pulled off the very top edge so a full-length garment is not
+              // cropped flush at the crown — reads as a composed frame.
+              objectPosition: "50% 22%",
               animation: i === current ? "bc-ken-burns 7s ease-out forwards" : "none",
             }}
           />
-          {/* Cinematic gradient overlay */}
+          {/* Scrim: held under the copy, released across the image */}
           <div
             style={{
               position: "absolute",
               inset: 0,
-              background:
-                "linear-gradient(to right, rgba(26,15,22,0.82) 0%, rgba(26,15,22,0.45) 50%, rgba(26,15,22,0.18) 100%), " +
-                "linear-gradient(to top, rgba(26,15,22,0.70) 0%, transparent 55%)",
+              background: `${copyScrim(s.position)}, ${FOOT_SCRIM}`,
             }}
           />
         </div>
@@ -129,12 +157,11 @@ export default function EditorialHeroCarousel({ slides }: { slides: HeroSlide[] 
       >
         <div
           style={{
-            maxWidth: "min(600px, 90vw)",
+            maxWidth: "min(620px, 90vw)",
             textAlign: slide.position === "center" ? "center" : "left",
             display: "flex",
             flexDirection: "column",
             alignItems: slide.position === "center" ? "center" : "flex-start",
-            gap: "1.5rem",
             animation: "bc-fade-up 0.9s cubic-bezier(0.16,1,0.3,1) forwards",
           }}
         >
@@ -162,11 +189,13 @@ export default function EditorialHeroCarousel({ slides }: { slides: HeroSlide[] 
               fontFamily: "var(--font-playfair), 'Playfair Display', Georgia, serif",
               fontSize: "clamp(2.5rem, 5vw, 5rem)",
               fontWeight: 500,
-              lineHeight: 1.05,
+              lineHeight: 1.04,
               letterSpacing: "-0.02em",
               color: "var(--bc-cream)",
               whiteSpace: "pre-line",
-              margin: 0,
+              maxWidth: "16ch",
+              textShadow: "0 1px 24px rgba(26,15,22,0.35)",
+              margin: "1.25rem 0 0",
             }}
           >
             {slide.headline}
@@ -177,32 +206,45 @@ export default function EditorialHeroCarousel({ slides }: { slides: HeroSlide[] 
             style={{
               fontFamily: "var(--font-inter), sans-serif",
               fontSize: "clamp(0.9375rem, 1.1vw, 1.125rem)",
-              lineHeight: 1.65,
-              color: "rgba(255,253,249,0.72)",
+              lineHeight: 1.6,
+              color: "rgba(255,253,249,0.86)",
               fontWeight: 300,
-              maxWidth: "42ch",
-              margin: 0,
+              maxWidth: "40ch",
+              margin: "1rem 0 0",
             }}
           >
             {slide.subheadline}
           </p>
 
-          {/* CTAs */}
-          <div style={{ display: "flex", gap: "1rem", alignItems: "center", flexWrap: "wrap" }}>
+          {/* CTAs — primary (solid gold) and secondary (1px ghost) share one
+              height rhythm so the pair reads as a considered lockup. The
+              semantic hierarchy is unchanged: gold fill leads, ghost follows,
+              and both destinations are untouched. */}
+          <div
+            style={{
+              display: "flex",
+              gap: "1rem",
+              alignItems: "center",
+              flexWrap: "wrap",
+              marginTop: "2rem",
+            }}
+          >
             <Link
               href={slide.ctaHref}
               style={{
                 display: "inline-flex",
                 alignItems: "center",
-                gap: "0.625rem",
+                justifyContent: "center",
+                gap: "0.75rem",
                 background: "var(--bc-gold)",
                 color: "var(--bc-dark)",
                 fontFamily: "var(--font-inter), sans-serif",
-                fontSize: "0.75rem",
-                fontWeight: 600,
+                fontSize: "clamp(0.875rem, 0.8rem + 0.25vw, 1.0625rem)",
+                fontWeight: 500,
                 letterSpacing: "0.14em",
                 textTransform: "uppercase",
-                padding: "0.875rem 2rem",
+                minHeight: "clamp(3.5rem, 3.25rem + 1vw, 3.75rem)",
+                padding: "0 clamp(2.25rem, 1.75rem + 1.5vw, 3rem)",
                 transition: "all var(--bc-base-t)",
               }}
               onMouseEnter={e => {
@@ -215,7 +257,7 @@ export default function EditorialHeroCarousel({ slides }: { slides: HeroSlide[] 
               }}
             >
               {slide.cta}
-              <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+              <svg width="16" height="16" viewBox="0 0 14 14" fill="none">
                 <path d="M2.5 7h9M7.5 3l4 4-4 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
               </svg>
             </Link>
@@ -226,16 +268,27 @@ export default function EditorialHeroCarousel({ slides }: { slides: HeroSlide[] 
                 style={{
                   display: "inline-flex",
                   alignItems: "center",
+                  justifyContent: "center",
                   gap: "0.5rem",
-                  color: "rgba(255,253,249,0.85)",
+                  color: "rgba(255,253,249,0.92)",
                   fontFamily: "var(--font-inter), sans-serif",
-                  fontSize: "0.75rem",
+                  fontSize: "clamp(0.875rem, 0.8rem + 0.25vw, 1.0625rem)",
                   fontWeight: 500,
                   letterSpacing: "0.12em",
                   textTransform: "uppercase",
-                  borderBottom: "1px solid rgba(255,253,249,0.35)",
-                  paddingBottom: "0.125rem",
+                  border: "1px solid rgba(255,253,249,0.45)",
+                  background: "transparent",
+                  minHeight: "clamp(3.5rem, 3.25rem + 1vw, 3.75rem)",
+                  padding: "0 clamp(2rem, 1.5rem + 1.5vw, 2.75rem)",
                   transition: "all var(--bc-base-t)",
+                }}
+                onMouseEnter={e => {
+                  (e.currentTarget as HTMLElement).style.borderColor = "var(--bc-cream)";
+                  (e.currentTarget as HTMLElement).style.background = "rgba(255,253,249,0.10)";
+                }}
+                onMouseLeave={e => {
+                  (e.currentTarget as HTMLElement).style.borderColor = "rgba(255,253,249,0.45)";
+                  (e.currentTarget as HTMLElement).style.background = "transparent";
                 }}
               >
                 {slide.secondaryCta}
@@ -243,19 +296,13 @@ export default function EditorialHeroCarousel({ slides }: { slides: HeroSlide[] 
             )}
           </div>
 
-          {/* Accent tag */}
-          <p
-            style={{
-              fontFamily: "var(--font-inter), sans-serif",
-              fontSize: "0.6875rem",
-              letterSpacing: "0.15em",
-              color: "rgba(255,253,249,0.35)",
-              textTransform: "uppercase",
-              margin: 0,
-            }}
-          >
-            {slide.accent}
-          </p>
+          {/*
+           * The accent tag ("category · collection") is deliberately not
+           * rendered: the campaign eyebrow already shows the category and the
+           * headline already shows the collection, so it restated the same two
+           * strings a third time. Kept on HeroSlide so the data contract with
+           * EditorialHero is unchanged.
+           */}
         </div>
       </div>
 

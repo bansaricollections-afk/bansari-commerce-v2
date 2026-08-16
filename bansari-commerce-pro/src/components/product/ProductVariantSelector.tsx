@@ -96,8 +96,8 @@ export default function ProductVariantSelector({
   // ── Size-managed products: one independent inventory unit per size ───────
   if (sizeAvailability && sizeAvailability.length > 0) {
     return (
-      <div className="flex flex-col gap-2">
-        <div className="flex flex-wrap gap-2">
+      <div className="flex flex-col gap-3">
+        <div className="flex flex-wrap gap-2.5">
           {sizeAvailability.map((s) => {
             const soldOut = s.status === 'SOLD_OUT';
             const isSelected = selectedSize?.variantId === s.variantId;
@@ -110,18 +110,24 @@ export default function ProductVariantSelector({
                 disabled={soldOut}
                 aria-pressed={isSelected}
                 aria-label={`Size ${s.label}${soldOut ? ' — sold out' : s.status === 'ONLY_ONE_LEFT' ? ' — only 1 left' : ' — available'}`}
+                /* Selected state is brand mauve (#8A5A6A / --bc-brand-mauve),
+                   matching every other "chosen" affordance on the storefront.
+                   Sharp corners are kept (the brand runs radius 0), as is the
+                   heavier selected weight. Sold-out stays a greyed, struck,
+                   non-interactive chip so the three states remain distinct at a
+                   glance. Availability is still driven entirely by s.status. */
                 className={[
-                  'relative min-w-[52px] h-12 px-4 text-sm font-medium border transition-all duration-150 rounded-sm select-none',
+                  'relative min-w-[56px] h-[52px] px-4 text-sm tracking-[0.04em] border transition-all duration-150 select-none',
                   isSelected
-                    ? 'border-[#8A5A6A] bg-[#8A5A6A] text-white shadow-sm'
+                    ? 'border-[#8A5A6A] bg-[#8A5A6A] text-white font-semibold'
                     : soldOut
-                    ? 'border-slate-150 text-slate-300 cursor-not-allowed bg-slate-50'
-                    : 'border-slate-200 text-slate-700 hover:border-[#8A5A6A] hover:text-[#8A5A6A] bg-white',
+                    ? 'border-slate-200 text-slate-300 cursor-not-allowed bg-slate-50/70 font-normal'
+                    : 'border-slate-300 text-slate-800 font-medium hover:border-[#8A5A6A] hover:text-[#8A5A6A] bg-white',
                 ].join(' ')}
               >
                 {s.label}
                 {soldOut && (
-                  <span className="absolute inset-0 flex items-center justify-center pointer-events-none overflow-hidden rounded-sm">
+                  <span className="absolute inset-0 flex items-center justify-center pointer-events-none overflow-hidden">
                     <span className="absolute w-[130%] h-px bg-slate-300 rotate-[-20deg]" />
                   </span>
                 )}
@@ -131,10 +137,10 @@ export default function ProductVariantSelector({
         </div>
 
         {/* Per-size truth line — never derived from a product-level total. */}
-        <div className="min-h-[16px]">
+        <div className="min-h-[18px]">
           {selectedSize ? (
             selectedSize.status === 'ONLY_ONE_LEFT' ? (
-              <span className="flex items-center gap-1.5 text-[11px] font-medium text-amber-700">
+              <span className="flex items-center gap-2 text-[12px] font-semibold text-amber-700">
                 <span className="relative flex h-2 w-2 flex-shrink-0">
                   <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75" />
                   <span className="relative inline-flex h-2 w-2 rounded-full bg-amber-500" />
@@ -142,16 +148,18 @@ export default function ProductVariantSelector({
                 Size {selectedSize.label} — only 1 left
               </span>
             ) : selectedSize.status === 'LOW_STOCK' ? (
-              <span className="text-[11px] text-amber-700">
+              <span className="flex items-center gap-2 text-[12px] font-medium text-amber-700">
+                <span className="w-1.5 h-1.5 rounded-full bg-amber-500 inline-block flex-shrink-0" />
                 Size {selectedSize.label} — only {selectedSize.available} left
               </span>
             ) : (
-              <span className="text-[11px] text-green-600">
+              <span className="flex items-center gap-2 text-[12px] text-slate-700">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-600 inline-block flex-shrink-0" />
                 Size {selectedSize.label} — in stock
               </span>
             )
           ) : (
-            <span className="text-[11px] text-slate-400 italic">Select your size</span>
+            <span className="text-[12px] text-slate-500">Select a size to see availability</span>
           )}
         </div>
       </div>
@@ -225,17 +233,17 @@ export default function ProductVariantSelector({
                     aria-pressed={isSelected}
                     aria-label={`Size ${size}${isUnavailable ? ' — unavailable' : ''}`}
                     className={[
-                      'relative min-w-[52px] h-12 px-4 text-sm font-medium border transition-all duration-150 rounded-sm select-none',
+                      'relative min-w-[56px] h-[52px] px-4 text-sm tracking-[0.04em] border transition-all duration-150 select-none',
                       isSelected
-                        ? 'border-[#8A5A6A] bg-[#8A5A6A] text-white shadow-sm'
+                        ? 'border-[#8A5A6A] bg-[#8A5A6A] text-white font-semibold'
                         : isUnavailable
-                        ? 'border-slate-150 text-slate-300 cursor-not-allowed bg-slate-50'
-                        : 'border-slate-200 text-slate-700 hover:border-[#8A5A6A] hover:text-[#8A5A6A] bg-white',
+                        ? 'border-slate-200 text-slate-300 cursor-not-allowed bg-slate-50/70 font-normal'
+                        : 'border-slate-300 text-slate-800 font-medium hover:border-[#8A5A6A] hover:text-[#8A5A6A] bg-white',
                     ].join(' ')}
                   >
                     {size}
                     {isUnavailable && (
-                      <span className="absolute inset-0 flex items-center justify-center pointer-events-none overflow-hidden rounded-sm">
+                      <span className="absolute inset-0 flex items-center justify-center pointer-events-none overflow-hidden">
                         <span className="absolute w-[130%] h-px bg-slate-300 rotate-[-20deg]" />
                       </span>
                     )}
@@ -269,10 +277,13 @@ export default function ProductVariantSelector({
                     aria-pressed={isSelected}
                     aria-label={`Colour: ${color}`}
                     className={[
-                      'h-11 px-4 text-sm border rounded-sm transition-all duration-150',
+                      'h-12 px-4 text-sm border transition-all duration-150',
+                      /* Colour keeps its lighter mauve-tint treatment rather
+                         than a solid fill, so a chosen colour never competes
+                         with the chosen size directly above it. */
                       isSelected
-                        ? 'border-[#8A5A6A] bg-[#8A5A6A]/5 text-[#8A5A6A] font-medium'
-                        : 'border-slate-200 text-slate-700 hover:border-[#8A5A6A] hover:text-[#8A5A6A] bg-white',
+                        ? 'border-[#8A5A6A] bg-[#8A5A6A]/[0.06] text-[#8A5A6A] font-medium'
+                        : 'border-slate-300 text-slate-800 hover:border-[#8A5A6A] hover:text-[#8A5A6A] bg-white',
                     ].join(' ')}
                   >
                     {color}

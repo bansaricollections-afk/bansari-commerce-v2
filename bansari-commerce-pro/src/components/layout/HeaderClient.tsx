@@ -87,24 +87,50 @@ export default function HeaderClient({
       >
         <div
           className="mx-auto flex items-center justify-between px-6"
-          style={{ maxWidth: "var(--bc-content-wide)", height: "5rem" }}
+          style={{ maxWidth: "var(--bc-content-wide)", height: "5.5rem" }}
         >
-          {/* ── Logo ── */}
-          <Link
-            href="/"
-            className="font-[family:var(--font-playfair)] tracking-wide"
-            style={{
-              fontSize: "1.75rem",
-              fontWeight: 700,
-              color: "var(--bc-brand-mauve)",
-              letterSpacing: "0.06em",
-            }}
-          >
-            Bansari
+          {/*
+           * ── Wordmark ──
+           * Same "Bansari" mark, given presence rather than redesigned: the
+           * weight comes down from 700 to a more editorial 500, the tracking
+           * opens up, and the brand's second word is restored as a fine gold
+           * underline so the lockup reads as a wordmark instead of a link.
+           */}
+          <Link href="/" aria-label="Bansari Collections — home" className="flex flex-col leading-none">
+            {/* `.bc-serif` (globals.css) rather than
+                `font-[family:var(--font-playfair)]`: Tailwind v4's data-type
+                hint for a font family is `family-name`, so the `family:` form
+                used here generates no CSS rule at all and the mark rendered in
+                the inherited sans. `.bc-serif` is the same documented chain. */}
+            <span
+              className="bc-serif"
+              style={{
+                fontSize: "1.75rem",
+                fontWeight: 500,
+                color: "var(--bc-brand-mauve)",
+                letterSpacing: "0.1em",
+                lineHeight: 1,
+              }}
+            >
+              Bansari
+            </span>
+            <span
+              className="uppercase"
+              style={{
+                marginTop: "0.375rem",
+                fontSize: "0.5625rem",
+                fontWeight: 500,
+                letterSpacing: "0.42em",
+                color: "var(--bc-text-gold)",
+                lineHeight: 1,
+              }}
+            >
+              Collections
+            </span>
           </Link>
 
           {/* ── Desktop Nav ── */}
-          <nav className="hidden items-center lg:flex" style={{ gap: "2.25rem" }}>
+          <nav className="hidden items-center lg:flex" style={{ gap: "2.75rem" }}>
 
             {/* Shop mega-menu — hover-tolerant wrapper */}
             <div
@@ -115,15 +141,16 @@ export default function HeaderClient({
               <button
                 aria-expanded={shopOpen}
                 aria-haspopup="true"
-                className="bc-nav-link uppercase tracking-[0.12em] font-medium"
+                className="bc-nav-link uppercase font-medium"
                 style={{
-                  fontSize: "var(--bc-text-xs)",
+                  fontSize: "0.6875rem",
+                  letterSpacing: "0.18em",
                   background: "none",
                   border: "none",
                   borderBottom: shopOpen
                     ? "1px solid var(--bc-brand-mauve)"
                     : "1px solid transparent",
-                  paddingBottom: "2px",
+                  paddingBottom: "4px",
                   color: "var(--bc-text-primary)",
                   transition: "color var(--bc-transition-fast), border-color var(--bc-transition-fast)",
                 }}
@@ -248,12 +275,13 @@ export default function HeaderClient({
               <Link
                 key={label}
                 href={href}
-                className="bc-nav-link uppercase tracking-[0.12em] font-medium"
+                className="bc-nav-link uppercase font-medium"
                 style={{
-                  fontSize: "var(--bc-text-xs)",
+                  fontSize: "0.6875rem",
+                  letterSpacing: "0.18em",
                   color: "var(--bc-text-primary)",
                   borderBottom: "1px solid transparent",
-                  paddingBottom: "2px",
+                  paddingBottom: "4px",
                   transition: "color var(--bc-transition-fast), border-color var(--bc-transition-fast)",
                 }}
               >
@@ -263,7 +291,7 @@ export default function HeaderClient({
           </nav>
 
           {/* ── Icons ── */}
-          <div className="flex items-center" style={{ gap: "0.125rem" }}>
+          <div className="flex items-center" style={{ gap: "0.375rem" }}>
             {/* ─── Sprint 9C: live search overlay ─── */}
             <HeaderSearchInput categories={categories} collections={collections} />
 
@@ -326,14 +354,43 @@ export default function HeaderClient({
         .bc-dropdown-link:hover {
           color: var(--bc-brand-mauve) !important;
         }
+        /* 44x44 control — the WCAG 2.5.5 target minimum, and the same size the
+           product card's wishlist button already uses. The ring is a box-shadow
+           rather than a border so the icon never shifts by a pixel when it
+           appears, and it follows the existing rounded-full shape. */
         .bc-icon-btn {
           color: var(--bc-text-primary);
           display: inline-flex;
           align-items: center;
           justify-content: center;
+          width: 2.75rem;
+          height: 2.75rem;
+          transition: background-color var(--bc-transition-fast),
+                      color var(--bc-transition-fast),
+                      box-shadow var(--bc-transition-fast),
+                      transform var(--bc-transition-fast);
         }
         .bc-icon-btn:hover {
           background-color: var(--bc-surface-warm);
+          color: var(--bc-brand-mauve);
+          box-shadow: 0 0 0 1px var(--bc-brand-mauve);
+          transform: scale(1.02);
+        }
+        .bc-icon-btn:active {
+          transform: scale(0.98);
+        }
+        .bc-icon-btn:focus-visible {
+          outline: none;
+          box-shadow: 0 0 0 2px var(--bc-brand-mauve);
+        }
+        /* globals.css zeroes --bc-transition-fast under reduced motion, which
+           removes the tween but not the scale itself. A scale IS motion, so
+           suppress the transform outright and keep the colour/ring feedback. */
+        @media (prefers-reduced-motion: reduce) {
+          .bc-icon-btn:hover,
+          .bc-icon-btn:active {
+            transform: none;
+          }
         }
       `}</style>
     </>

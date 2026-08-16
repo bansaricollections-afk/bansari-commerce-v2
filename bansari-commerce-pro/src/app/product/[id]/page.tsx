@@ -116,7 +116,11 @@ export default async function ProductPage({ params }: Props) {
     itemListElement: [
       { '@type': 'ListItem', position: 1, name: 'Home', item: SITE_URL },
       { '@type': 'ListItem', position: 2, name: 'Shop', item: `${SITE_URL}/shop` },
-      { '@type': 'ListItem', position: 3, name: product.category, item: `${SITE_URL}/collections/${product.category?.toLowerCase().replace(/\s+/g, '-')}` },
+      // Same correction as the visible breadcrumb: /collections/{slug} is not a
+      // real route, so this published a 404 into structured data on every
+      // product. The category must stay raw (exact, case-sensitive match in
+      // getFilteredProducts) and be encoded, never slugified.
+      { '@type': 'ListItem', position: 3, name: product.category, item: `${SITE_URL}/shop?category=${encodeURIComponent(product.category ?? '')}` },
       { '@type': 'ListItem', position: 4, name: product.name, item: canonicalUrl },
     ],
   };
