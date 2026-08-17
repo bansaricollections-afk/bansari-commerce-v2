@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useEffect, Suspense } from "react";
+import { useState, useCallback, useEffect, useRef, Suspense } from "react";
 import { useRouter, useSearchParams, usePathname } from "next/navigation";
 import { SlidersHorizontal, X, ChevronDown } from "lucide-react";
 import type { FilterParams, SortOption } from "@/types/filter-params";
@@ -46,6 +46,11 @@ function MobileFilterBarInner({ facets }: { facets: ShopFacets }) {
   const params    = useSearchParams();
   const [open, setOpen] = useState(false);
 
+  // Focus-management refs only — no filter, draft or URL state is held here.
+  const drawerRef      = useRef<HTMLDivElement | null>(null);
+  const closeButtonRef = useRef<HTMLButtonElement | null>(null);
+  const triggerRef     = useRef<HTMLButtonElement | null>(null);
+
   // Draft mirrors URL on open
   const [draft, setDraft] = useState<DraftFilters>({
     category:     "",
@@ -87,6 +92,72 @@ function MobileFilterBarInner({ facets }: { facets: ShopFacets }) {
     return () => { document.body.style.overflow = ""; };
   }, [open]);
 
+  // Escape closes the filter drawer. Mounted only while the drawer is open, so
+  // no always-on global listener, and removed on close/unmount. It only closes
+  // the drawer — the draft filter state is left exactly as it was, so nothing
+  // is applied to the URL and no product query changes.
+  useEffect(() => {
+    if (!open) return;
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setOpen(false);
+    };
+    document.addEventListener("keydown", onKeyDown);
+    return () => document.removeEventListener("keydown", onKeyDown);
+  }, [open]);
+
+  /**
+   * Focus management for the drawer.
+   *
+   * On open, focus moves to the close button so the keyboard lands inside the
+   * dialog rather than remaining on the background page. On close, focus is
+   * restored to the trigger that opened it. Tab is contained within the drawer
+   * while it is open, so background controls cannot be operated behind the
+   * scrim — this is a scoped, native implementation, not a focus-trap library,
+   * and it only reads/moves DOM focus. No filter state, draft, URL parameter or
+   * router call is involved.
+   *
+   * Refs are null during SSR and on the first client render; every access is
+   * optional-chained and the effect only runs after mount.
+   */
+  useEffect(() => {
+    if (!open) return;
+
+    const drawer = drawerRef.current;
+    // Defer one frame so the drawer has committed before focus moves.
+    const raf = requestAnimationFrame(() => closeButtonRef.current?.focus());
+
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key !== "Tab" || !drawer) return;
+      const focusables = drawer.querySelectorAll<HTMLElement>(
+        'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
+      );
+      if (focusables.length === 0) return;
+      const first = focusables[0]!;
+      const last = focusables[focusables.length - 1]!;
+      const active = document.activeElement;
+
+      if (!e.shiftKey && active === last) {
+        e.preventDefault();
+        first.focus();
+      } else if (e.shiftKey && active === first) {
+        e.preventDefault();
+        last.focus();
+      } else if (!drawer.contains(active)) {
+        // Focus escaped (e.g. it was on a background control when the drawer
+        // opened) — pull it back to the start of the dialog.
+        e.preventDefault();
+        first.focus();
+      }
+    };
+
+    document.addEventListener("keydown", onKeyDown);
+    return () => {
+      cancelAnimationFrame(raf);
+      document.removeEventListener("keydown", onKeyDown);
+      triggerRef.current?.focus();
+    };
+  }, [open]);
+
   const applyFilters = useCallback(() => {
     const next = new URLSearchParams();
     if (draft.category)     next.set("category",     draft.category);
@@ -116,6 +187,7 @@ function MobileFilterBarInner({ facets }: { facets: ShopFacets }) {
       <div className="fixed bottom-0 left-0 right-0 z-40 border-t border-slate-100 bg-white px-4 py-3 lg:hidden" role="toolbar" aria-label="Filter and sort controls">
         <div className="flex items-center gap-3">
           <button
+            ref={triggerRef}
             type="button"
             onClick={() => setOpen(true)}
             aria-expanded={open}
@@ -141,7 +213,11 @@ function MobileFilterBarInner({ facets }: { facets: ShopFacets }) {
                 next.set("page", "1");
                 router.replace(`${pathname}?${next.toString()}`, { scroll: false });
               }}
-              className="appearance-none border border-slate-200 bg-white py-2.5 pl-3 pr-7 text-[11px] font-medium text-slate-700 focus:border-[#8A5A6A] focus:outline-none"
+              /* focus-visible ring added alongside the existing focus:border
+                 treatment — `focus:outline-none` removed the only indicator a
+                 keyboard user got beyond a 1px border colour change. Styling
+                 only: no filter state, draft, URL parameter or layout change. */
+              className="appearance-none border border-slate-200 bg-white py-2.5 pl-3 pr-7 text-[11px] font-medium text-slate-700 focus:border-[#8A5A6A] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#8A5A6A] focus-visible:ring-offset-1"
               aria-label="Sort products"
             >
               {SORT_OPTIONS.map((o) => (
@@ -166,10 +242,19 @@ function MobileFilterBarInner({ facets }: { facets: ShopFacets }) {
 
       {/* ── Bottom sheet drawer ───────────────────────────────────────────── */}
       <div
+        ref={drawerRef}
         id="mobile-filter-drawer"
         role="dialog"
         aria-modal="true"
         aria-label="Product filters"
+        /* The drawer stays mounted and is translated off-screen when closed, so
+           every control inside it remained in the tab order while invisible —
+           a keyboard user tabbing the shop page fell into a hidden filter form.
+           `inert` (React 19 / native) removes the subtree from both the tab
+           order and the accessibility tree without any visual change, which
+           `aria-hidden` alone would not do. Layout, classes and the transform
+           animation are untouched. */
+        inert={!open}
         className={[
           "fixed bottom-0 left-0 right-0 z-50 flex max-h-[85vh] flex-col bg-white shadow-2xl transition-transform duration-300 ease-in-out lg:hidden",
           open ? "translate-y-0" : "translate-y-full",
@@ -197,6 +282,7 @@ function MobileFilterBarInner({ facets }: { facets: ShopFacets }) {
               </button>
             )}
             <button
+              ref={closeButtonRef}
               type="button"
               onClick={() => setOpen(false)}
               aria-label="Close filters"
@@ -341,7 +427,7 @@ function MobileFilterBarInner({ facets }: { facets: ShopFacets }) {
                   type="number" placeholder="499"
                   value={draft.priceMin}
                   onChange={(e) => setDraft((d) => ({ ...d, priceMin: e.target.value }))}
-                  className="w-full border border-slate-200 px-3 py-2 text-[12px] focus:border-[#8A5A6A] focus:outline-none"
+                  className="w-full border border-slate-200 px-3 py-2 text-[12px] focus:border-[#8A5A6A] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#8A5A6A] focus-visible:ring-offset-1"
                   aria-label="Minimum price"
                 />
               </div>
@@ -351,7 +437,7 @@ function MobileFilterBarInner({ facets }: { facets: ShopFacets }) {
                   type="number" placeholder="29999"
                   value={draft.priceMax}
                   onChange={(e) => setDraft((d) => ({ ...d, priceMax: e.target.value }))}
-                  className="w-full border border-slate-200 px-3 py-2 text-[12px] focus:border-[#8A5A6A] focus:outline-none"
+                  className="w-full border border-slate-200 px-3 py-2 text-[12px] focus:border-[#8A5A6A] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#8A5A6A] focus-visible:ring-offset-1"
                   aria-label="Maximum price"
                 />
               </div>

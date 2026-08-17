@@ -101,6 +101,20 @@ export default function ProductGallery({ product, selectedVariant }: Props) {
   // ─── Lightbox state ──────────────────────────────────────────────────────
   const [lightboxOpen, setLightboxOpen] = useState(false);
   const [lightboxIndex, setLightboxIndex] = useState(0);
+  /** Focus target when the viewer opens. Focus management only — no gallery state. */
+  const lightboxCloseRef = useRef<HTMLButtonElement | null>(null);
+  /** Viewer container, used to contain Tab within the dialog. */
+  const lightboxRef = useRef<HTMLDivElement | null>(null);
+  /**
+   * The element that actually opened the viewer, recorded at activation time.
+   * Previously this was inferred from document.activeElement inside the open
+   * effect, which is unreliable for the main image: it is a div with
+   * tabIndex={0}, and a mouse click does not focus such an element in every
+   * browser, so focus could be restored to <body> instead of the opener.
+   * Recording e.currentTarget at the moment of activation is exact for both
+   * openers — the main image and the fullscreen button.
+   */
+  const lightboxOpenerRef = useRef<HTMLElement | null>(null);
 
   // ─── Touch swipe — main image ─────────────────────────────────────────
   const [touchStart, setTouchStart] = useState<number | null>(null);
@@ -160,11 +174,71 @@ export default function ProductGallery({ product, selectedVariant }: Props) {
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'ArrowRight') setLightboxIndex((i) => Math.min(i + 1, images.length - 1));
       if (e.key === 'ArrowLeft') setLightboxIndex((i) => Math.max(i - 1, 0));
+      // Home/End jump to the ends of the set. Clamped to the same bounds the
+      // arrows already use — no wrapping is introduced. preventDefault stops
+      // the browser scrolling the page behind the open viewer.
+      if (e.key === 'Home') { e.preventDefault(); setLightboxIndex(0); }
+      if (e.key === 'End') { e.preventDefault(); setLightboxIndex(images.length - 1); }
       if (e.key === 'Escape') setLightboxOpen(false);
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   }, [lightboxOpen, images.length]);
+
+  /**
+   * Lightbox focus management — the one accessibility gap the existing viewer
+   * had. Escape, ArrowLeft/ArrowRight and the clamped (non-wrapping) index
+   * behaviour above are already correct and are deliberately left as they are.
+   *
+   * On open, focus moves to the Close button so the keyboard is inside the
+   * dialog. On close, focus returns to the element recorded in
+   * lightboxOpenerRef at activation time — the main image or the fullscreen
+   * button — falling back to document.activeElement if the viewer was ever
+   * opened by some other path. Nothing here touches image data, indexing,
+   * mouse, touch/swipe or zoom behaviour.
+   */
+  useEffect(() => {
+    if (!lightboxOpen) return;
+    const fallbackOpener = document.activeElement as HTMLElement | null;
+    const raf = requestAnimationFrame(() => lightboxCloseRef.current?.focus());
+
+    // Tab containment — the last gap in this dialog. The viewer is
+    // conditionally rendered, so it unmounts on close and needs no
+    // inert/aria-hidden handling. Arrow/Home/End/Escape are handled by the
+    // separate keyboard effect above and are untouched here.
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key !== 'Tab') return;
+      const dialog = lightboxRef.current;
+      if (!dialog) return;
+      const focusables = dialog.querySelectorAll<HTMLElement>(
+        'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
+      );
+      if (focusables.length === 0) return;
+      const first = focusables[0]!;
+      const last = focusables[focusables.length - 1]!;
+      const active = document.activeElement;
+
+      if (!e.shiftKey && active === last) {
+        e.preventDefault();
+        first.focus();
+      } else if (e.shiftKey && active === first) {
+        e.preventDefault();
+        last.focus();
+      } else if (!dialog.contains(active)) {
+        e.preventDefault();
+        first.focus();
+      }
+    };
+    document.addEventListener('keydown', onKeyDown);
+
+    return () => {
+      cancelAnimationFrame(raf);
+      document.removeEventListener('keydown', onKeyDown);
+      const opener = lightboxOpenerRef.current ?? fallbackOpener;
+      opener?.focus?.();
+      lightboxOpenerRef.current = null;
+    };
+  }, [lightboxOpen]);
 
   if (!allImages.length) {
     return (
@@ -221,7 +295,10 @@ export default function ProductGallery({ product, selectedVariant }: Props) {
               key={img.url + i}
               onClick={() => setActiveIndex(i)}
               aria-label={`View image ${i + 1}`}
-              className={`relative aspect-[3/4] w-full overflow-hidden rounded-sm border transition-all duration-200 ${
+              /* focus-visible only — the mauve ring appears for keyboard focus
+                 and never on pointer interaction, so hover, dimensions,
+                 spacing, layout and image selection are untouched. */
+              className={`relative aspect-[3/4] w-full overflow-hidden rounded-sm border transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#8A5A6A] focus-visible:ring-offset-2 ${
                 i === activeIndex
                   ? 'border-[#8A5A6A] shadow-sm'
                   : 'border-slate-200 opacity-60 hover:opacity-100 hover:border-slate-400'
@@ -244,18 +321,40 @@ export default function ProductGallery({ product, selectedVariant }: Props) {
           {/* Main image */}
           <div
             ref={mainRef}
-            className="relative aspect-[3/4] w-full overflow-hidden rounded-sm bg-slate-50 select-none"
+            className="relative aspect-[3/4] w-full overflow-hidden rounded-sm bg-slate-50 select-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#8A5A6A] focus-visible:ring-offset-2"
             style={{ cursor: isZoomed ? 'crosshair' : 'zoom-in' }}
             onMouseEnter={() => setIsZoomed(true)}
             onMouseLeave={() => setIsZoomed(false)}
             onMouseMove={handleMouseMove}
             onTouchStart={handleTouchStart}
             onTouchEnd={handleTouchEnd}
-            onClick={() => { setLightboxIndex(activeIndex); setLightboxOpen(true); }}
+            onClick={(e) => { lightboxOpenerRef.current = e.currentTarget; setLightboxIndex(activeIndex); setLightboxOpen(true); }}
             role="button"
             tabIndex={0}
-            aria-label="Click to view full size"
-            onKeyDown={(e) => e.key === 'Enter' && setLightboxOpen(true)}
+            aria-label="View full size"
+            /*
+             * Kept as a div with role="button" rather than converted to a native
+             * <button>: this container wraps the "View fullscreen" <button>
+             * below, and a button inside a button is invalid HTML that browsers
+             * silently restructure. Restructuring the gallery is out of scope,
+             * so the ARIA button keyboard contract is honoured manually instead.
+             *
+             * Fixes two defects: Space did nothing (ARIA requires a button to
+             * activate on both Enter and Space), and the old Enter path called
+             * setLightboxOpen without setLightboxIndex, so keyboard users could
+             * open the lightbox on the wrong image. Both now match onClick
+             * exactly. The target guard stops a keypress on the nested
+             * fullscreen button from also triggering this handler.
+             */
+            onKeyDown={(e) => {
+              if (e.target !== e.currentTarget) return;
+              if (e.key === 'Enter' || e.key === ' ' || e.key === 'Spacebar') {
+                e.preventDefault();
+                lightboxOpenerRef.current = e.currentTarget;
+                setLightboxIndex(activeIndex);
+                setLightboxOpen(true);
+              }
+            }}
           >
             {/* Badges */}
             <div className="absolute top-4 left-4 z-10 flex flex-col gap-1.5">
@@ -288,7 +387,7 @@ export default function ProductGallery({ product, selectedVariant }: Props) {
 
             {/* Fullscreen icon */}
             <button
-              onClick={(e) => { e.stopPropagation(); setLightboxIndex(activeIndex); setLightboxOpen(true); }}
+              onClick={(e) => { e.stopPropagation(); lightboxOpenerRef.current = e.currentTarget; setLightboxIndex(activeIndex); setLightboxOpen(true); }}
               aria-label="View fullscreen"
               className="absolute bottom-4 left-4 z-10 bg-white/80 backdrop-blur-sm p-1.5 rounded-sm hover:bg-white transition-colors"
             >
@@ -392,6 +491,7 @@ export default function ProductGallery({ product, selectedVariant }: Props) {
       {/* ── Lightbox ── */}
       {lightboxOpen && (
         <div
+          ref={lightboxRef}
           className="fixed inset-0 z-50 bg-black/95 flex items-center justify-center"
           role="dialog"
           aria-label="Image viewer"
@@ -400,9 +500,10 @@ export default function ProductGallery({ product, selectedVariant }: Props) {
           onTouchEnd={handleLbTouchEnd}
         >
           <button
+            ref={lightboxCloseRef}
             onClick={() => setLightboxOpen(false)}
             aria-label="Close viewer"
-            className="absolute top-4 right-4 text-white/80 hover:text-white transition-colors"
+            className="absolute top-4 right-4 text-white/80 hover:text-white transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white"
           >
             <svg className="w-8 h-8" fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />

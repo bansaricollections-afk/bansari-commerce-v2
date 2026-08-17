@@ -44,8 +44,67 @@ function StarRow({ rating, count }: { rating: number; count: number }) {
 
 // ─── Size Guide Modal ──────────────────────────────────────────────────────
 function SizeGuideModal({ onClose }: { onClose: () => void }) {
+  const dialogRef      = useRef<HTMLDivElement | null>(null);
+  const closeButtonRef = useRef<HTMLButtonElement | null>(null);
+
+  // Escape closes the guide. The listener is scoped to the modal's own
+  // lifetime — it mounts with the modal and is removed on unmount, so there is
+  // no always-on global handler. It only calls onClose; no selection, size,
+  // quantity or cart state is touched.
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+    };
+    document.addEventListener('keydown', onKeyDown);
+    return () => document.removeEventListener('keydown', onKeyDown);
+  }, [onClose]);
+
+  /**
+   * Focus management, matching the MobileFilterBar pattern. This modal is
+   * conditionally rendered, so it unmounts on close and needs no
+   * inert/aria-hidden handling. On mount, focus moves to the Close button;
+   * Tab and Shift+Tab cycle within the dialog; on unmount, focus returns to
+   * the Size Guide button that opened it. DOM focus only — no size, variant,
+   * availability or cart state is read or written.
+   */
+  useEffect(() => {
+    const dialog = dialogRef.current;
+    const opener = document.activeElement as HTMLElement | null;
+    const raf = requestAnimationFrame(() => closeButtonRef.current?.focus());
+
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key !== 'Tab' || !dialog) return;
+      const focusables = dialog.querySelectorAll<HTMLElement>(
+        'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
+      );
+      if (focusables.length === 0) return;
+      const first = focusables[0]!;
+      const last = focusables[focusables.length - 1]!;
+      const active = document.activeElement;
+
+      if (!e.shiftKey && active === last) {
+        e.preventDefault();
+        first.focus();
+      } else if (e.shiftKey && active === first) {
+        e.preventDefault();
+        last.focus();
+      } else if (!dialog.contains(active)) {
+        e.preventDefault();
+        first.focus();
+      }
+    };
+
+    document.addEventListener('keydown', onKeyDown);
+    return () => {
+      cancelAnimationFrame(raf);
+      document.removeEventListener('keydown', onKeyDown);
+      opener?.focus?.();
+    };
+  }, []);
+
   return (
     <div
+      ref={dialogRef}
       className="fixed inset-0 z-50 bg-black/60 flex items-end sm:items-center justify-center p-4"
       role="dialog"
       aria-label="Size guide"
@@ -56,9 +115,10 @@ function SizeGuideModal({ onClose }: { onClose: () => void }) {
         <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100">
           <h2 className="text-sm font-medium tracking-[0.12em] uppercase text-slate-900">Size Guide</h2>
           <button
+            ref={closeButtonRef}
             onClick={onClose}
             aria-label="Close size guide"
-            className="text-slate-400 hover:text-slate-700 transition-colors p-1"
+            className="text-slate-400 hover:text-slate-700 transition-colors p-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#8A5A6A]"
           >
             <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />

@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { Heart, ShoppingBag, User, X } from "lucide-react";
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { FaInstagram, FaFacebookF, FaPinterestP } from "react-icons/fa6";
 import { NAV_TOP_LINKS, type NavEntry } from "./HeaderClient";
 
@@ -47,6 +47,10 @@ export default function MobileMenu({
     };
   }, [open]);
 
+  // Focus-management refs only — no navigation or menu state is held here.
+  const drawerRef      = useRef<HTMLDivElement | null>(null);
+  const closeButtonRef = useRef<HTMLButtonElement | null>(null);
+
   // Dismiss on Escape key.
   useEffect(() => {
     if (!open) return;
@@ -56,6 +60,54 @@ export default function MobileMenu({
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [open, onClose]);
+
+  /**
+   * Focus management, matching the MobileFilterBar pattern — a small local
+   * mechanism, no shared abstraction and no dependency.
+   *
+   * The drawer declared aria-modal="true" but never moved, contained or
+   * restored focus, so the keyboard stayed on the page behind it. On open,
+   * focus goes to the Close button; Tab and Shift+Tab cycle within the drawer;
+   * on close, focus returns to the element that opened it (captured from
+   * document.activeElement, which is the header menu button at that moment).
+   * Nothing here touches navigation data, links or hrefs.
+   */
+  useEffect(() => {
+    if (!open) return;
+
+    const drawer = drawerRef.current;
+    const opener = document.activeElement as HTMLElement | null;
+    const raf = requestAnimationFrame(() => closeButtonRef.current?.focus());
+
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key !== "Tab" || !drawer) return;
+      const focusables = drawer.querySelectorAll<HTMLElement>(
+        'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
+      );
+      if (focusables.length === 0) return;
+      const first = focusables[0]!;
+      const last = focusables[focusables.length - 1]!;
+      const active = document.activeElement;
+
+      if (!e.shiftKey && active === last) {
+        e.preventDefault();
+        first.focus();
+      } else if (e.shiftKey && active === first) {
+        e.preventDefault();
+        last.focus();
+      } else if (!drawer.contains(active)) {
+        e.preventDefault();
+        first.focus();
+      }
+    };
+
+    document.addEventListener("keydown", onKeyDown);
+    return () => {
+      cancelAnimationFrame(raf);
+      document.removeEventListener("keydown", onKeyDown);
+      opener?.focus?.();
+    };
+  }, [open]);
 
   return (
     <>
@@ -71,9 +123,15 @@ export default function MobileMenu({
 
       {/* Drawer */}
       <div
+        ref={drawerRef}
         role="dialog"
         aria-modal="true"
         aria-label="Navigation menu"
+        /* The drawer stays mounted and is translated off-canvas when closed,
+           so every link and button inside it sat in the tab order while
+           invisible. `inert` removes the subtree from both the tab order and
+           the accessibility tree with no visual change. */
+        inert={!open}
         className={[
           "fixed inset-y-0 left-0 z-[var(--bc-z-modal)] flex w-80 max-w-[90vw] flex-col",
           "bg-[var(--bc-surface-cream)] shadow-[var(--bc-shadow-xl)]",
@@ -87,6 +145,7 @@ export default function MobileMenu({
             Bansari
           </span>
           <button
+            ref={closeButtonRef}
             onClick={onClose}
             aria-label="Close navigation menu"
             className="rounded-full p-2 hover:bg-[#F6F0EB] transition-colors"

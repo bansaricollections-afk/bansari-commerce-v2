@@ -141,6 +141,11 @@ function PillRow({
 export default function InstantSearchOverlay({ open, onClose, categories, collections }: Props) {
   const router = useRouter();
   const inputRef = useRef<HTMLInputElement>(null);
+  /* Focus-management refs only — no search query, result or navigation state.
+     Two panels are rendered (desktop sm+ and mobile <sm); exactly one is
+     displayed at any breakpoint, so the handler picks whichever is visible. */
+  const desktopPanelRef = useRef<HTMLDivElement>(null);
+  const mobilePanelRef  = useRef<HTMLDivElement>(null);
 
   // Single hook instance — state shared between desktop and mobile views
   const {
@@ -161,6 +166,59 @@ export default function InstantSearchOverlay({ open, onClose, categories, collec
       openIdle();
     }
   }, [open, openIdle]);
+
+  /**
+   * Tab containment + focus restoration, matching the MobileFilterBar pattern.
+   * The overlay already moved focus to the search input on open and already
+   * handled Escape; what it lacked was containment (Tab escaped to the page
+   * behind it) and returning focus to the search trigger on close. The overlay
+   * unmounts entirely when closed (`if (!open) return null` above), so no
+   * inert/aria-hidden handling is required. DOM focus only — no search, query,
+   * result, recent-search or navigation logic is touched.
+   */
+  useEffect(() => {
+    if (!open) return;
+
+    const opener = document.activeElement as HTMLElement | null;
+
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key !== 'Tab') return;
+      // offsetParent is null for a display:none panel, so this resolves to the
+      // panel actually visible at the current breakpoint.
+      const panel = [desktopPanelRef.current, mobilePanelRef.current].find(
+        (el) => el && el.offsetParent !== null
+      );
+      if (!panel) return;
+
+      const focusables = Array.from(
+        panel.querySelectorAll<HTMLElement>(
+          'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
+        )
+      ).filter((el) => el.offsetParent !== null);
+      if (focusables.length === 0) return;
+
+      const first = focusables[0]!;
+      const last = focusables[focusables.length - 1]!;
+      const active = document.activeElement;
+
+      if (!e.shiftKey && active === last) {
+        e.preventDefault();
+        first.focus();
+      } else if (e.shiftKey && active === first) {
+        e.preventDefault();
+        last.focus();
+      } else if (!panel.contains(active)) {
+        e.preventDefault();
+        first.focus();
+      }
+    };
+
+    document.addEventListener('keydown', onKeyDown);
+    return () => {
+      document.removeEventListener('keydown', onKeyDown);
+      opener?.focus?.();
+    };
+  }, [open]);
 
   useEffect(() => {
     if (open) {
@@ -467,6 +525,7 @@ export default function InstantSearchOverlay({ open, onClose, categories, collec
 
       {/* ── Desktop: top panel (sm+) ─────────────────────────────────────── */}
       <div
+        ref={desktopPanelRef}
         role="dialog"
         aria-modal="true"
         aria-label="Search"
@@ -484,6 +543,7 @@ export default function InstantSearchOverlay({ open, onClose, categories, collec
            Uses CSS translate so we get the native spring feel.
         */}
       <div
+        ref={mobilePanelRef}
         role="dialog"
         aria-modal="true"
         aria-label="Search"

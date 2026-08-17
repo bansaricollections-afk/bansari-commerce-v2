@@ -15,7 +15,7 @@
 
 import Image from 'next/image';
 import Link from 'next/link';
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 
 import { useCart, cartLineId } from '@/store/cart';
 
@@ -29,6 +29,10 @@ export default function CartDrawer({ open, onClose }: Props) {
   const removeItem = useCart((s) => s.removeItem);
   const totalPrice = useCart((s) => s.totalPrice);
 
+  // Focus-management refs only — no cart state is held here.
+  const drawerRef      = useRef<HTMLDivElement | null>(null);
+  const closeButtonRef = useRef<HTMLButtonElement | null>(null);
+
   // Close on Escape
   useEffect(() => {
     if (!open) return;
@@ -38,6 +42,53 @@ export default function CartDrawer({ open, onClose }: Props) {
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   }, [open, onClose]);
+
+  /**
+   * Focus management, matching the MobileFilterBar pattern — a small local
+   * mechanism, no shared abstraction and no dependency.
+   *
+   * The drawer declared aria-modal="true" but never moved, contained or
+   * restored focus. On open, focus goes to the Close button; Tab and
+   * Shift+Tab cycle within the drawer; on close, focus returns to the element
+   * that opened it (the Add to Cart button that triggered this drawer).
+   * Reads and writes DOM focus only — no cart item, price or store access.
+   */
+  useEffect(() => {
+    if (!open) return;
+
+    const drawer = drawerRef.current;
+    const opener = document.activeElement as HTMLElement | null;
+    const raf = requestAnimationFrame(() => closeButtonRef.current?.focus());
+
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key !== 'Tab' || !drawer) return;
+      const focusables = drawer.querySelectorAll<HTMLElement>(
+        'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
+      );
+      if (focusables.length === 0) return;
+      const first = focusables[0]!;
+      const last = focusables[focusables.length - 1]!;
+      const active = document.activeElement;
+
+      if (!e.shiftKey && active === last) {
+        e.preventDefault();
+        first.focus();
+      } else if (e.shiftKey && active === first) {
+        e.preventDefault();
+        last.focus();
+      } else if (!drawer.contains(active)) {
+        e.preventDefault();
+        first.focus();
+      }
+    };
+
+    document.addEventListener('keydown', onKeyDown);
+    return () => {
+      cancelAnimationFrame(raf);
+      document.removeEventListener('keydown', onKeyDown);
+      opener?.focus?.();
+    };
+  }, [open]);
 
   // Prevent body scroll when open
   useEffect(() => {
@@ -63,9 +114,14 @@ export default function CartDrawer({ open, onClose }: Props) {
 
       {/* Drawer panel */}
       <div
+        ref={drawerRef}
         role="dialog"
         aria-modal="true"
         aria-label="Shopping cart"
+        /* Stays mounted and translated off-canvas when closed, so its links
+           and buttons sat in the tab order while invisible. `inert` removes
+           the subtree from tab order and a11y tree, no visual change. */
+        inert={!open}
         className={[
           'fixed top-0 right-0 z-50 h-full w-full max-w-sm bg-white shadow-2xl flex flex-col',
           'transition-transform duration-300 ease-[cubic-bezier(0.16,1,0.3,1)]',
@@ -81,6 +137,7 @@ export default function CartDrawer({ open, onClose }: Props) {
             )}
           </h2>
           <button
+            ref={closeButtonRef}
             onClick={onClose}
             aria-label="Close cart"
             className="w-8 h-8 flex items-center justify-center text-slate-400 hover:text-slate-700 rounded-sm hover:bg-slate-100 transition-colors"

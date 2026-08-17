@@ -371,13 +371,20 @@ export default function CartPage() {
                   </Link>
                 )}
 
-                {/* Mobile fallback within summary — visible when no sticky bar support */}
+                {/* Mobile fallback within summary — visible when no sticky bar support.
+                    It previously carried aria-hidden="true" + tabIndex={-1} while
+                    remaining visually rendered below the sm breakpoint, so mobile
+                    keyboard users saw a Secure Checkout button that Tab skipped and
+                    screen readers never announced. The sticky bar duplicate only
+                    exists once `hasHydrated && items.length > 0`, so before hydration
+                    this was the sole visible checkout control and it was inoperable.
+                    It is now a normal link; the sticky-bar copy is labelled to
+                    distinguish the two for assistive tech. Destination unchanged. */}
                 {!checkoutBlocked && (
                   <Link
                     href="/checkout"
+                    aria-label="Secure checkout (order summary)"
                     className="mt-10 flex sm:hidden items-center justify-center gap-3 rounded-full bg-[#8A5A6A] py-4 font-semibold text-white transition hover:bg-[#734757]"
-                    aria-hidden="true"
-                    tabIndex={-1}
                   >
                     Secure Checkout
                     <ArrowRight size={18} />
@@ -418,6 +425,9 @@ export default function CartPage() {
           ) : (
             <Link
               href="/checkout"
+              /* Distinguishes this from the in-summary checkout link now that
+                 both are exposed to assistive tech. Visible text is unchanged. */
+              aria-label="Secure checkout (sticky bar)"
               className="flex items-center justify-center gap-2 w-full rounded-full bg-[#8A5A6A] py-3.5 font-semibold text-white text-sm transition hover:bg-[#734757]"
             >
               Secure Checkout

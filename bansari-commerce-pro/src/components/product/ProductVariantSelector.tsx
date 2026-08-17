@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import type { ProductVariant, SizeAvailability } from '@/types/product';
 
 interface Props {
@@ -20,6 +20,18 @@ interface Props {
 const SIZE_ORDER = ['XXS','XS','S','M','L','XL','XXL','3XL','4XL','Free Size'];
 
 function SizeGuideModal({ onClose }: { onClose: () => void }) {
+  // Escape closes the guide, matching ProductInfo's SizeGuideModal. The
+  // listener lives and dies with this modal's mount, so there is no always-on
+  // global handler. It only calls onClose — no size, variant, stock,
+  // availability or cart state is read or written here.
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+    };
+    document.addEventListener('keydown', onKeyDown);
+    return () => document.removeEventListener('keydown', onKeyDown);
+  }, [onClose]);
+
   return (
     <div
       role="dialog"

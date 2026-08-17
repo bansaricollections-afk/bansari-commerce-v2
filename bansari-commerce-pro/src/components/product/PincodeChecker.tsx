@@ -64,7 +64,11 @@ export default function PincodeChecker() {
           onKeyDown={(e) => e.key === 'Enter' && handleCheck()}
           placeholder="Enter pincode"
           aria-label="Delivery pincode"
-          className="flex-1 h-10 px-3 text-sm border border-slate-200 rounded-sm bg-white text-slate-800 placeholder:text-slate-300 focus:outline-none focus:border-[#8A5A6A] transition-colors"
+          /* focus:outline-none removed the only keyboard indicator, leaving a
+             1px border-colour change as the sole focus cue. Adds the standard
+             Bansari mauve focus-visible ring. Styling only — no pincode,
+             delivery-estimate or validation logic touched. */
+          className="flex-1 h-10 px-3 text-sm border border-slate-200 rounded-sm bg-white text-slate-800 placeholder:text-slate-300 focus:outline-none focus:border-[#8A5A6A] focus-visible:ring-2 focus-visible:ring-[#8A5A6A] focus-visible:ring-offset-1 transition-colors"
         />
         <button
           onClick={handleCheck}

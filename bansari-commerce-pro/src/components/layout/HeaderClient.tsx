@@ -43,6 +43,7 @@ export default function HeaderClient({
   const [mobileOpen, setMobileOpen] = useState(false);
   const [scrolled, setScrolled]     = useState(false);
   const closeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const shopButtonRef = useRef<HTMLButtonElement | null>(null);
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 48);
@@ -65,9 +66,45 @@ export default function HeaderClient({
     }, 120);
   }, []);
 
+  /** Immediate close — used by keyboard paths, which need no hover grace period. */
+  const closeDropdown = useCallback(() => {
+    if (closeTimerRef.current !== null) {
+      clearTimeout(closeTimerRef.current);
+      closeTimerRef.current = null;
+    }
+    setShopOpen(false);
+  }, []);
+
+  const toggleDropdown = useCallback(() => {
+    if (closeTimerRef.current !== null) {
+      clearTimeout(closeTimerRef.current);
+      closeTimerRef.current = null;
+    }
+    setShopOpen((v) => !v);
+  }, []);
+
   useEffect(() => () => {
     if (closeTimerRef.current !== null) clearTimeout(closeTimerRef.current);
   }, []);
+
+  /**
+   * Escape closes the mega-menu and returns focus to its trigger.
+   * The listener is mounted only while the menu is open, so there is no
+   * always-on global key handler. Hover behaviour is untouched: this only
+   * adds a keyboard path to the same `shopOpen` state the pointer already
+   * drives, and every href stays exactly as it was.
+   */
+  useEffect(() => {
+    if (!shopOpen) return;
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        closeDropdown();
+        shopButtonRef.current?.focus();
+      }
+    };
+    document.addEventListener("keydown", onKeyDown);
+    return () => document.removeEventListener("keydown", onKeyDown);
+  }, [shopOpen, closeDropdown]);
 
   return (
     <>
@@ -137,10 +174,29 @@ export default function HeaderClient({
               className="relative"
               onMouseEnter={openDropdown}
               onMouseLeave={scheduleClose}
+              /* Tabbing past the last menu item closes the panel, mirroring
+                 what moving the pointer away already does. relatedTarget is
+                 the element receiving focus; null (e.g. focus left the
+                 document) is treated as leaving. */
+              onBlur={(e) => {
+                if (!e.currentTarget.contains(e.relatedTarget as Node | null)) {
+                  closeDropdown();
+                }
+              }}
             >
+              {/* Keyboard parity: the trigger was pointer-only (the wrapper's
+                  onMouseEnter/Leave), so Enter/Space did nothing and
+                  aria-expanded could never become true for a keyboard or
+                  screen-reader user. A native <button> already fires onClick
+                  for both Enter and Space, so an onClick toggle is the whole
+                  fix — no key handler needed on the trigger itself. Hover is
+                  unchanged. */}
               <button
+                ref={shopButtonRef}
+                type="button"
+                onClick={toggleDropdown}
                 aria-expanded={shopOpen}
-                aria-haspopup="true"
+                aria-controls="shop-mega-menu"
                 className="bc-nav-link uppercase font-medium"
                 style={{
                   fontSize: "0.6875rem",
@@ -173,8 +229,24 @@ export default function HeaderClient({
               )}
 
               {shopOpen && (
-                <div
-                  role="menu"
+                <nav
+                  /*
+                   * Navigation dropdown, not an ARIA application menu.
+                   * role="menu"/"menuitem" promise a composite widget with
+                   * arrow-key roving focus, typeahead and Home/End — a contract
+                   * this panel never implemented, which left screen-reader users
+                   * with a menu that announced itself as keyboard-driven and
+                   * then ignored the arrow keys. These are ordinary navigation
+                   * links, so a <nav> with a plain list is the honest mapping:
+                   * Tab moves through the links natively and nothing is
+                   * promised that is not delivered. aria-haspopup was dropped
+                   * for the same reason (its valid values describe widget
+                   * popups; there is no "navigation" value). aria-expanded and
+                   * aria-controls are retained — both remain accurate for a
+                   * disclosure that shows and hides this panel.
+                   */
+                  id="shop-mega-menu"
+                  aria-label="Shop categories and collections"
                   className="absolute"
                   onMouseEnter={openDropdown}
                   onMouseLeave={scheduleClose}
@@ -207,7 +279,6 @@ export default function HeaderClient({
                           <Link
                             key={label}
                             href={href}
-                            role="menuitem"
                             className="bc-dropdown-link"
                             style={{ fontSize: "var(--bc-text-sm)", color: "var(--bc-text-primary)" }}
                           >
@@ -235,7 +306,6 @@ export default function HeaderClient({
                           <Link
                             key={label}
                             href={href}
-                            role="menuitem"
                             className="bc-dropdown-link"
                             style={{ fontSize: "var(--bc-text-sm)", color: "var(--bc-text-primary)" }}
                           >
@@ -260,14 +330,13 @@ export default function HeaderClient({
                   >
                     <Link
                       href="/shop"
-                      role="menuitem"
                       className="bc-dropdown-link uppercase tracking-[0.16em]"
                       style={{ fontSize: "var(--bc-text-xs)", fontWeight: 500, color: "var(--bc-brand-mauve)" }}
                     >
                       Browse the full catalogue
                     </Link>
                   </div>
-                </div>
+                </nav>
               )}
             </div>
 
