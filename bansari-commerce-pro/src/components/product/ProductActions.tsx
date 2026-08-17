@@ -85,7 +85,7 @@ export default function ProductActions({
   const whatsappMessage = encodeURIComponent(
     `Hi! I'm interested in: ${product.name} (SKU: ${product.sku ?? product.id}) — ₹${product.price.toLocaleString('en-IN')}. Can you help me?`
   );
-  const whatsappUrl = `https://wa.me/919876543210?text=${whatsappMessage}`;
+  const whatsappUrl = `https://wa.me/918460192745?text=${whatsappMessage}`;
 
   const handleShare = async () => {
     const url = typeof window !== 'undefined' ? window.location.href : '';

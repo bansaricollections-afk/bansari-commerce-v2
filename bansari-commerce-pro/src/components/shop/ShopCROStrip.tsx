@@ -25,7 +25,7 @@ export default function ShopCROStrip() {
                 Not sure what to wear? Our stylists will help you find the perfect outfit for your occasion, size, and budget.
               </p>
               <a
-                href="https://wa.me/919876543210?text=Hi%2C%20I%20need%20help%20choosing%20an%20outfit"
+                href="https://wa.me/918460192745?text=Hi%2C%20I%20need%20help%20choosing%20an%20outfit"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="mt-4 inline-flex items-center gap-2 bg-green-500 px-5 py-2.5 text-[10.5px] font-semibold uppercase tracking-[0.14em] text-white transition-all duration-200 hover:bg-green-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-green-500 focus-visible:ring-offset-2"
