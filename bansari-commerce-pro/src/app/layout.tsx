@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import { Playfair_Display, Inter } from 'next/font/google';
+import { Analytics } from '@vercel/analytics/next';
 import './globals.css';
 
 /**
@@ -214,6 +215,14 @@ export default function RootLayout({
           Skip to main content
         </a>
         {children}
+        {/*
+         * Vercel Web Analytics — the single mount point for the whole app.
+         * In production the script is served first-party from
+         * /_vercel/insights/script.js and events POST to
+         * /_vercel/insights/event, so the existing CSP ('self' in both
+         * script-src and connect-src) already permits it unchanged.
+         */}
+        <Analytics />
       </body>
     </html>
   );

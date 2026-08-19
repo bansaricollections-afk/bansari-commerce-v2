@@ -1,9 +1,10 @@
 "use client";
 
-import { useState, useRef, useCallback, type FocusEvent } from "react";
+import { useState, useRef, useEffect, useCallback, type FocusEvent } from "react";
 import Link from "next/link";
 import Script from "next/script";
 import { ArrowLeft } from "lucide-react";
+import { track } from "@vercel/analytics";
 
 import RazorpayButton from "@/components/checkout/RazorpayButton";
 import CheckoutTrustStrip from "@/components/checkout/CheckoutTrustStrip";
@@ -113,6 +114,24 @@ export default function CheckoutPage() {
   // actually charged via Razorpay. Single source: lib/shipping.ts.
   const shipping = getShippingCost(subtotal);
   const total    = subtotal + shipping;
+
+  /*
+   * begin_checkout — fired once the persisted cart has actually rehydrated and
+   * is non-empty, so a mid-hydration empty render never reports a zero-value
+   * checkout. The ref makes it at-most-once per mount; `value` is the same
+   * client-side estimate shown in the summary (the server still computes the
+   * authoritative charge in api/payment/create-order).
+   */
+  const beginCheckoutTracked = useRef(false);
+  useEffect(() => {
+    if (!hasHydrated || beginCheckoutTracked.current || items.length === 0) return;
+    beginCheckoutTracked.current = true;
+    track("begin_checkout", {
+      value: total,
+      currency: "INR",
+      item_count: items.reduce((n, i) => n + i.quantity, 0),
+    });
+  }, [hasHydrated, items, total]);
 
   const [fields, setFields] = useState<Fields>({
     fullName:     "",

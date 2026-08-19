@@ -1,7 +1,8 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import { track } from '@vercel/analytics';
 
 import { useCart } from '@/hooks/useCart';
 import { useWishlist } from '@/hooks/useWishlist';
@@ -24,6 +25,22 @@ function toCartSize(size: SizeAvailability | null) {
   return size ? { variantId: size.variantId, label: size.label, sku: size.sku } : null;
 }
 
+/**
+ * Analytics identity for a product, shared by every funnel event fired here.
+ * Deliberately contains no PII — only catalogue facts that are already public
+ * on the page. Vercel Web Analytics accepts string | number | boolean | null
+ * and rejects nested objects, so optional fields collapse to null.
+ */
+function productProps(product: Product) {
+  return {
+    product_id: product.id,
+    product_name: product.name,
+    price: product.price,
+    currency: 'INR',
+    category: product.category ?? null,
+  };
+}
+
 export default function ProductActions({
   product,
   quantity,
@@ -40,6 +57,16 @@ export default function ProductActions({
   const [sizeWarningShake, setSizeWarningShake] = useState(false);
 
   const inWishlist = isInWishlist(product.id);
+
+  /*
+   * view_item — top of the funnel. This component is the PDP's only client
+   * entry point (rendered exactly once, from ProductInfo), so the event fires
+   * once per product view without needing a separate client wrapper. The PDP
+   * route itself is a server component and cannot call track().
+   */
+  useEffect(() => {
+    track('view_item', productProps(product));
+  }, [product]);
 
   const sizeAvailability = product.sizeAvailability ?? [];
   const hasSellableSize = sizeAvailability.some((s) => s.status !== 'SOLD_OUT');
@@ -65,6 +92,7 @@ export default function ProductActions({
       return;
     }
     addToCart({ product, quantity, variant: selectedVariant, size: toCartSize(selectedSize) });
+    track('add_to_cart', { ...productProps(product), quantity });
     setAddedToCart(true);
     setCartDrawerOpen(true);
     setTimeout(() => setAddedToCart(false), 2500);
@@ -78,7 +106,10 @@ export default function ProductActions({
       setTimeout(() => setSizeWarningShake(false), 400);
       return;
     }
+    // Buy Now genuinely adds the line to the cart before navigating, so it is
+    // a real add_to_cart. begin_checkout is fired by the checkout page itself.
     addToCart({ product, quantity, variant: selectedVariant, size: toCartSize(selectedSize) });
+    track('add_to_cart', { ...productProps(product), quantity });
     router.push('/checkout');
   };
 
@@ -214,6 +245,7 @@ export default function ProductActions({
             href={whatsappUrl}
             target="_blank"
             rel="noopener noreferrer"
+            onClick={() => track('whatsapp_enquiry', { ...productProps(product), source: 'pdp' })}
             className="flex items-center gap-1.5 hover:text-slate-900 transition-colors duration-200"
             aria-label="Enquire on WhatsApp"
           >

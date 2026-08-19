@@ -217,9 +217,30 @@ h1, h2, h3, h4, h5, h6 {
 }
 
 p { line-height: 1.75; margin: 0; }
-a { color: inherit; text-decoration: none; transition: all var(--bc-fast); }
 img { display: block; max-width: 100%; }
-button { cursor: pointer; transition: all var(--bc-base-t); border: none; background: none; }
+
+/*
+ * `a` and `button` are layered; the element resets above are not.
+ *
+ * Tailwind v4 emits every utility inside `@layer utilities`, and unlayered
+ * author rules beat layered ones regardless of specificity. While these two
+ * rules sat unlayered they silently overrode utilities on every link and
+ * button in the storefront: `background: none` killed `bg-*` (the PDP Add to
+ * Cart rendered with a transparent background under near-white text),
+ * `border: none` killed `border-*` (Buy Now lost its outline), and
+ * `color: inherit` killed `text-*` (the shop VIEW ALL label rendered
+ * dark-on-dark against `bg-slate-900`).
+ *
+ * Inside `@layer base` the declarations are unchanged and still override
+ * Tailwind's own preflight — preflight is also `base` and is imported
+ * earlier, so these win within the layer. Elements carrying no utility class
+ * therefore reset exactly as before. What changes is only that `@layer
+ * utilities` now outranks them, which is the intended cascade order.
+ */
+@layer base {
+  a { color: inherit; text-decoration: none; transition: all var(--bc-fast); }
+  button { cursor: pointer; transition: all var(--bc-base-t); border: none; background: none; }
+}
 
 ::selection { background: var(--bc-brand-mauve); color: #fff; }
 

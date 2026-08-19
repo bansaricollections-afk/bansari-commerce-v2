@@ -2,6 +2,7 @@
 
 import { useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { track } from '@vercel/analytics';
 import { useCart } from '@/store/cart';
 
 declare global {
@@ -43,6 +44,9 @@ export default function RazorpayButton({ customer, shipping, disabled = false }:
   // Store the active Razorpay order id so we can detect retries and skip
   // creating a second Razorpay order if the modal was already opened.
   const activeRzpOrderId = useRef<string | null>(null);
+  // purchase is a once-per-mount event: this guard mirrors the server-side
+  // idempotency so a retried save can never double-count revenue.
+  const purchaseTracked = useRef(false);
 
   async function handlePayment() {
     if (loading || items.length === 0) return;
@@ -155,6 +159,27 @@ export default function RazorpayButton({ customer, shipping, disabled = false }:
               activeRzpOrderId.current = null;
               setLoading(false);
               return;
+            }
+
+            /*
+             * purchase — the only confirmed-success point in the flow. Reached
+             * solely after the signature verified (step 3) AND the order was
+             * committed server-side (saved.success), which also covers the
+             * idempotent replay the API returns at 200 when the webhook won
+             * the race. Opening the modal, creating the Razorpay order and the
+             * 409 branch above deliberately do not fire it.
+             *
+             * value comes from the server-authoritative rzpAmount (paise), not
+             * from any client-side cart total. No customer fields are sent.
+             */
+            if (!purchaseTracked.current) {
+              purchaseTracked.current = true;
+              track('purchase', {
+                order_id: saved.orderNumber ?? response.razorpay_order_id,
+                value: rzpAmount / 100,
+                currency: rzpCurrency,
+                item_count: items.reduce((n, i) => n + i.quantity, 0),
+              });
             }
 
             clearCart();
