@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 
 import { useCart, useCartHasHydrated, cartLineId } from "@/store/cart";
+import CartCrossSell from "@/components/cart/CartCrossSell";
 import CartTrustStrip from "@/components/cart/CartTrustStrip";
 import ShippingProgress from "@/components/cart/ShippingProgress";
 import {
@@ -298,6 +299,17 @@ export default function CartPage() {
                   </div>
                 </article>
               ))}
+
+              {/*
+               * Sits in the wide column beneath the cart lines, not in the
+               * summary aside, so it never competes with Secure Checkout.
+               * Renders nothing once the subtotal clears the free-shipping
+               * threshold — see CartCrossSell.
+               */}
+              <CartCrossSell
+                subtotal={subtotal}
+                cartProductIds={items.map((item) => item.id)}
+              />
             </div>
 
             {/* Order Summary */}

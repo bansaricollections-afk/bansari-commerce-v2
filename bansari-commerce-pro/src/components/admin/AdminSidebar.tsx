@@ -10,6 +10,7 @@ import {
   Package,
   Settings,
   ShoppingBag,
+  ShoppingCart,
   Tags,
   TicketPercent,
   Users,
@@ -37,7 +38,10 @@ const navGroups: {
   },
   {
     label: "Orders",
-    items: [{ title: "Orders", href: "/admin/orders", icon: ShoppingBag }],
+    items: [
+      { title: "Orders", href: "/admin/orders", icon: ShoppingBag },
+      { title: "Abandoned Carts", href: "/admin/abandoned-carts", icon: ShoppingCart },
+    ],
   },
   {
     label: "Customers",

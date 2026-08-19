@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import { AdminHeader } from '@/components/admin/AdminHeader';
 import { AdminSidebar } from '@/components/admin/AdminSidebar';
+import { Toaster } from '@/components/ui/sonner';
 import { requireAdminPage } from '@/lib/auth/requireAdmin';
 import { headers } from 'next/headers';
 
@@ -78,6 +79,21 @@ export default async function AdminLayout({ children }: Readonly<AdminLayoutProp
             </main>
           </div>
         </div>
+
+        {/*
+         * Single application-wide Toaster. Several admin components
+         * (AbandonedCartsTable, CouponManagement, OrderStatusSelect,
+         * ProductManagement) already called toast() while nothing rendered a
+         * Toaster, so every success and error notification was silently
+         * dropped. This is the project's existing components/ui/sonner
+         * wrapper — no new dependency and no second toast system.
+         *
+         * Mounted inside .admin-shell deliberately: the wrapper styles the
+         * toast from var(--popover) / var(--popover-foreground), which are
+         * redefined by the scoped block above. Outside this element they
+         * would fall back to Tailwind's near-black default.
+         */}
+        <Toaster />
       </div>
     </>
   );
