@@ -21,14 +21,14 @@ const PROD_SECURITY_HEADERS: Record<string, string> = {
   'Content-Security-Policy': [
     "default-src 'self'",
     "script-src 'self' 'unsafe-inline' https://checkout.razorpay.com https://sdk.cashfree.com",
-    "frame-src https://api.razorpay.com https://sdk.cashfree.com https://sandbox.cashfree.com",
-    "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://api.razorpay.com https://sdk.cashfree.com https://sandbox.cashfree.com",
+    "frame-src https://api.razorpay.com https://sdk.cashfree.com https://sandbox.cashfree.com https://api.cashfree.com",
+    "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://api.razorpay.com https://sdk.cashfree.com https://sandbox.cashfree.com https://api.cashfree.com",
     "img-src 'self' data: blob: https://*.supabase.co",
     "style-src 'self' 'unsafe-inline'",
     "font-src 'self'",
     "object-src 'none'",
     "base-uri 'self'",
-    "form-action 'self' https://sandbox.cashfree.com",
+    "form-action 'self' https://sandbox.cashfree.com https://api.cashfree.com",
   ].join('; '),
 };
 
