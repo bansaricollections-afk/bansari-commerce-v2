@@ -7,6 +7,7 @@ import { ArrowLeft } from "lucide-react";
 import { track } from "@vercel/analytics";
 
 import RazorpayButton from "@/components/checkout/RazorpayButton";
+import CashfreeButton from "@/components/checkout/CashfreeButton";
 import CheckoutTrustStrip from "@/components/checkout/CheckoutTrustStrip";
 import LuxuryStepIndicator from "@/components/checkout/LuxuryStepIndicator";
 import { useCart, useCartHasHydrated, cartLineId } from "@/store/cart";
@@ -223,12 +224,27 @@ export default function CheckoutPage() {
     );
   }
 
+  /*
+   * Server-controlled provider selection. The value is set by the deployer as
+   * NEXT_PUBLIC_PAYMENT_PROVIDER and baked in at build time — the browser only
+   * reads it, it never chooses. The name is not a secret; the Cashfree secret
+   * stays server-only.
+   *
+   * Fail-closed by design: an unset or unrecognised value renders no payment
+   * button rather than silently falling back to Razorpay, so a misconfigured
+   * deploy cannot quietly charge through the wrong gateway.
+   */
+  const paymentProvider = (process.env.NEXT_PUBLIC_PAYMENT_PROVIDER ?? "").toLowerCase();
+
   return (
     <>
-      <Script
-        src="https://checkout.razorpay.com/v1/checkout.js"
-        strategy="afterInteractive"
-      />
+      {/* Razorpay's checkout script is only needed on the Razorpay path. */}
+      {paymentProvider === "razorpay" && (
+        <Script
+          src="https://checkout.razorpay.com/v1/checkout.js"
+          strategy="afterInteractive"
+        />
+      )}
 
       <main className="min-h-screen bg-[#FFFDF9]" id="main-content">
         <div className="mx-auto max-w-7xl px-6 py-16">
@@ -317,7 +333,7 @@ export default function CheckoutPage() {
                     <label className="flex cursor-pointer items-center gap-3 rounded-xl border border-slate-200 p-4 transition-colors hover:border-[#8A5A6A]/40">
                       <input type="radio" name="payment" defaultChecked className="accent-[#8A5A6A]" />
                       <span className="text-sm text-slate-700">
-                        Razorpay — UPI / Credit Card / Debit Card / Net Banking
+                        UPI / Credit Card / Debit Card / Net Banking
                       </span>
                     </label>
                   </fieldset>
@@ -376,23 +392,47 @@ export default function CheckoutPage() {
                 </div>
 
                 <div onClick={handlePayAttempt}>
-                  <RazorpayButton
-                    customer={{
-                      name:  fields.fullName,
-                      email: fields.email,
-                      phone: fields.phone,
-                    }}
-                    shipping={{
-                      name:         fields.fullName,
-                      phone:        fields.phone,
-                      addressLine1: fields.addressLine1,
-                      addressLine2: fields.addressLine2,
-                      city:         fields.city,
-                      state:        fields.state,
-                      postalCode:   fields.postalCode,
-                    }}
-                    disabled={!isValid}
-                  />
+                  {paymentProvider === "cashfree" ? (
+                    <CashfreeButton
+                      customer={{
+                        name:  fields.fullName,
+                        email: fields.email,
+                        phone: fields.phone,
+                      }}
+                      shipping={{
+                        name:         fields.fullName,
+                        phone:        fields.phone,
+                        addressLine1: fields.addressLine1,
+                        addressLine2: fields.addressLine2,
+                        city:         fields.city,
+                        state:        fields.state,
+                        postalCode:   fields.postalCode,
+                      }}
+                      disabled={!isValid}
+                    />
+                  ) : paymentProvider === "razorpay" ? (
+                    <RazorpayButton
+                      customer={{
+                        name:  fields.fullName,
+                        email: fields.email,
+                        phone: fields.phone,
+                      }}
+                      shipping={{
+                        name:         fields.fullName,
+                        phone:        fields.phone,
+                        addressLine1: fields.addressLine1,
+                        addressLine2: fields.addressLine2,
+                        city:         fields.city,
+                        state:        fields.state,
+                        postalCode:   fields.postalCode,
+                      }}
+                      disabled={!isValid}
+                    />
+                  ) : (
+                    <p className="mt-10 text-center text-sm font-medium text-red-600">
+                      Payments are temporarily unavailable. Please try again shortly.
+                    </p>
+                  )}
                 </div>
 
                 <p className="text-center text-[11px] leading-relaxed text-slate-400">

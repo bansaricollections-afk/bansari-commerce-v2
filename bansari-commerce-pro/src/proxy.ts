@@ -20,15 +20,15 @@ const PROD_SECURITY_HEADERS: Record<string, string> = {
   'Permissions-Policy':        'camera=(), microphone=(), geolocation=(), payment=()',
   'Content-Security-Policy': [
     "default-src 'self'",
-    "script-src 'self' 'unsafe-inline' https://checkout.razorpay.com",
-    "frame-src https://api.razorpay.com",
-    "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://api.razorpay.com",
+    "script-src 'self' 'unsafe-inline' https://checkout.razorpay.com https://sdk.cashfree.com",
+    "frame-src https://api.razorpay.com https://sdk.cashfree.com https://sandbox.cashfree.com",
+    "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://api.razorpay.com https://sdk.cashfree.com https://sandbox.cashfree.com",
     "img-src 'self' data: blob: https://*.supabase.co",
     "style-src 'self' 'unsafe-inline'",
     "font-src 'self'",
     "object-src 'none'",
     "base-uri 'self'",
-    "form-action 'self'",
+    "form-action 'self' https://sandbox.cashfree.com",
   ].join('; '),
 };
 

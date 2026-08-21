@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import { Playfair_Display, Inter } from 'next/font/google';
 import { Analytics } from '@vercel/analytics/next';
+import MetaPixel from '@/analytics/meta-pixel';
 import './globals.css';
 
 /**
@@ -223,6 +224,13 @@ export default function RootLayout({
          * script-src and connect-src) already permits it unchanged.
          */}
         <Analytics />
+        {/*
+         * Meta Pixel — single mount point. Renders nothing when
+         * NEXT_PUBLIC_META_PIXEL_ID is unset, so environments without a pixel
+         * configured are unaffected. Loads afterInteractive, so it never
+         * blocks rendering or hydration.
+         */}
+        <MetaPixel />
       </body>
     </html>
   );

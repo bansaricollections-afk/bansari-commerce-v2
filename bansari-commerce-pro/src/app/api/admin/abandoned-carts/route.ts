@@ -24,7 +24,9 @@ const MAX_WINDOW_MINUTES = 24 * 60;
 
 type PendingRow = {
   id: string;
-  razorpay_order_id: string;
+  razorpay_order_id: string | null;
+  cf_order_id: string | null;
+  payment_provider: string | null;
   status: string;
   grand_total: number | string | null;
   currency: string | null;
@@ -96,7 +98,7 @@ export async function GET(request: NextRequest) {
       // type from the select at the type level, and splitting it degrades that
       // inference to GenericStringError[].
       .select(
-        'id, razorpay_order_id, status, grand_total, currency, items_json, customer_name, customer_email, customer_phone, user_id, created_at, expires_at',
+        'id, razorpay_order_id, cf_order_id, payment_provider, status, grand_total, currency, items_json, customer_name, customer_email, customer_phone, user_id, created_at, expires_at',
         { count: 'exact' }
       )
       .eq('status', 'pending')
@@ -120,49 +122,75 @@ export async function GET(request: NextRequest) {
      * that update at all. So a genuinely paid order can be left at 'pending'.
      * Showing it here would mean chasing a customer who already bought.
      *
-     * orders.razorpay_order_id is the authoritative record of payment, so any
-     * candidate with a matching order row is dropped.
+     * The authoritative record of payment differs by provider:
+     *   Razorpay pending → orders.razorpay_order_id
+     *   Cashfree pending → orders.cf_order_id
+     * so the cross-check is now provider-aware. A candidate whose reference
+     * matches a real order for its own provider is dropped.
      */
-    const candidateIds = rows.map((r) => r.razorpay_order_id).filter(Boolean);
-    let paidIds = new Set<string>();
+    const razorpayIds = rows
+      .filter((r) => r.payment_provider !== 'cashfree' && r.razorpay_order_id)
+      .map((r) => r.razorpay_order_id as string);
+    const cashfreeIds = rows
+      .filter((r) => r.payment_provider === 'cashfree' && r.cf_order_id)
+      .map((r) => r.cf_order_id as string);
 
-    if (candidateIds.length > 0) {
+    const paidRazorpayIds = new Set<string>();
+    const paidCashfreeIds = new Set<string>();
+
+    if (razorpayIds.length > 0) {
       const { data: paidRows, error: paidError } = await sb
         .from('orders')
         .select('razorpay_order_id')
-        .in('razorpay_order_id', candidateIds);
-
+        .in('razorpay_order_id', razorpayIds);
       if (paidError) {
-        // Fail closed: without the cross-check we cannot promise that a paid
-        // customer is excluded, and a false "abandoned" is worse than none.
+        // Fail closed: a false "abandoned" against a paying customer is worse
+        // than withholding the list.
         log.error('admin.abandoned_carts.paid_crosscheck_failed', paidError);
-        return apiError(
-          requestId,
-          'DB_ERROR',
-          'Unable to verify paid orders; abandoned list withheld.',
-          500
-        );
+        return apiError(requestId, 'DB_ERROR', 'Unable to verify paid orders; abandoned list withheld.', 500);
       }
-
-      paidIds = new Set(
-        (paidRows ?? [])
-          .map((o) => (o as { razorpay_order_id: string | null }).razorpay_order_id)
-          .filter((id): id is string => typeof id === 'string')
-      );
+      for (const o of paidRows ?? []) {
+        const id = (o as { razorpay_order_id: string | null }).razorpay_order_id;
+        if (typeof id === 'string') paidRazorpayIds.add(id);
+      }
     }
+
+    if (cashfreeIds.length > 0) {
+      const { data: paidRows, error: paidError } = await sb
+        .from('orders')
+        .select('cf_order_id')
+        .in('cf_order_id', cashfreeIds);
+      if (paidError) {
+        log.error('admin.abandoned_carts.paid_crosscheck_failed_cf', paidError);
+        return apiError(requestId, 'DB_ERROR', 'Unable to verify paid orders; abandoned list withheld.', 500);
+      }
+      for (const o of paidRows ?? []) {
+        const id = (o as { cf_order_id: string | null }).cf_order_id;
+        if (typeof id === 'string') paidCashfreeIds.add(id);
+      }
+    }
+
+    /** A pending row is "already paid" if its provider-specific reference matched. */
+    const isPaid = (row: PendingRow): boolean =>
+      row.payment_provider === 'cashfree'
+        ? row.cf_order_id !== null && paidCashfreeIds.has(row.cf_order_id)
+        : row.razorpay_order_id !== null && paidRazorpayIds.has(row.razorpay_order_id);
 
     // Step 3 — project to the minimum the admin table needs. Shipping address,
     // items_json, coupon and every payment identifier are deliberately not
     // returned; contact fields are passed through only where already captured.
     const carts = rows
-      .filter((row) => !paidIds.has(row.razorpay_order_id))
+      .filter((row) => !isPaid(row))
       .map((row) => {
         const createdMs = new Date(row.created_at).getTime();
         const expiresMs = row.expires_at ? new Date(row.expires_at).getTime() : null;
+        // Provider-specific reference so a Cashfree checkout shows its own id.
+        const reference =
+          row.payment_provider === 'cashfree' ? row.cf_order_id : row.razorpay_order_id;
 
         return {
           id: row.id,
-          reference: row.razorpay_order_id,
+          reference,
           createdAt: row.created_at,
           expiresAt: row.expires_at,
           ageMinutes: Number.isFinite(createdMs)

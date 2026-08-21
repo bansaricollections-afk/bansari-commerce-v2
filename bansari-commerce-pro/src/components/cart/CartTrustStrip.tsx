@@ -1,5 +1,5 @@
 const SIGNALS = [
-  "Secure Razorpay Checkout",
+  "Secure Encrypted Checkout",
   "7-Day Easy Returns",
   "Handcrafted Guarantee",
 ];

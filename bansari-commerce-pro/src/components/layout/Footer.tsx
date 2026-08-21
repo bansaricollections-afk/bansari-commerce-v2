@@ -41,7 +41,6 @@ const PAYMENT_METHODS = [
   "Visa",
   "Mastercard",
   "UPI",
-  "Razorpay",
   "Net Banking",
 ] as const;
 

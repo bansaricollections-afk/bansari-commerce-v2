@@ -9,7 +9,7 @@ import { useEffect, useRef, useState } from "react";
 const MESSAGES = [
   { text: "Shipping across India — dispatched in 1–2 business days", highlight: "Shipping across India" },
   { text: "Handcrafted in India", highlight: "Handcrafted in India" },
-  { text: "Secure payments via Razorpay — UPI, cards & net banking", highlight: "Secure payments" },
+  { text: "Secure payments — UPI, cards & net banking", highlight: "Secure payments" },
   { text: "Easy 7-day returns · WhatsApp support", highlight: "Easy 7-day returns" },
 ];
 

@@ -87,15 +87,26 @@ const nextConfig: NextConfig = {
               // unsafe-eval is required by Next.js/Turbopack in development mode
               // for React call-stack reconstruction and HMR. It is intentionally
               // omitted in production builds via the isDev guard.
+              // connect.facebook.net serves fbevents.js for the Meta Pixel.
+              // Exact origin, no wildcard. Meta needs no frame-src here: that
+              // is only required for Facebook Login and Social Plugins, and
+              // frame-src below stays scoped to the Razorpay payment iframe.
+              // sdk.cashfree.com serves the v3 Cashfree checkout SDK. Exact
+              // origin, no wildcard. The frame-src origin for the checkout
+              // `_modal` iframe is not yet added — it is to be confirmed from
+              // the preview console (Cashfree docs do not pin it) before the
+              // modal can render.
               isDev
-                ? "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://checkout.razorpay.com https://api.razorpay.com"
-                : "script-src 'self' 'unsafe-inline' https://checkout.razorpay.com https://api.razorpay.com",
+                ? "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://checkout.razorpay.com https://api.razorpay.com https://connect.facebook.net https://sdk.cashfree.com"
+                : "script-src 'self' 'unsafe-inline' https://checkout.razorpay.com https://api.razorpay.com https://connect.facebook.net https://sdk.cashfree.com",
               "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
               "font-src 'self' https://fonts.gstatic.com",
-              // Supabase, Razorpay and WhatsApp API calls
-              `connect-src 'self' https://*.supabase.co wss://*.supabase.co https://api.razorpay.com https://wa.me`,
-              // Images: Supabase storage + Unsplash + Pexels + Shopify CDN
-              "img-src 'self' data: blob: https://*.supabase.co https://images.unsplash.com https://images.pexels.com https://cdn.shopify.com",
+              // Supabase, Razorpay and WhatsApp API calls.
+              // www.facebook.com receives Meta Pixel events via fetch/XHR to /tr.
+              `connect-src 'self' https://*.supabase.co wss://*.supabase.co https://api.razorpay.com https://wa.me https://www.facebook.com`,
+              // Images: Supabase storage + Unsplash + Pexels + Shopify CDN.
+              // www.facebook.com is the Meta Pixel image-beacon fallback (/tr).
+              "img-src 'self' data: blob: https://*.supabase.co https://images.unsplash.com https://images.pexels.com https://cdn.shopify.com https://www.facebook.com",
               // Razorpay payment iframe
               "frame-src https://api.razorpay.com https://checkout.razorpay.com",
               "object-src 'none'",
