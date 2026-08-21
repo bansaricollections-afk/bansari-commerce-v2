@@ -114,6 +114,8 @@ export function mapOrderV2(
     paymentReference:         row.payment_reference,
     razorpayOrderId:          row.razorpay_order_id,
     razorpayPaymentId:        row.razorpay_payment_id,
+    cfOrderId:                row.cf_order_id,
+    cfPaymentId:              row.cf_payment_id,
     paymentGatewayResponse:   row.payment_gateway_response,
     courierName:              row.courier_name,
     courierAwb:               row.courier_awb,

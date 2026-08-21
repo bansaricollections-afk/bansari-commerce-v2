@@ -205,6 +205,8 @@ export interface DbOrderV2Row {
   payment_reference: string | null;
   razorpay_order_id: string | null;
   razorpay_payment_id: string | null;
+  cf_order_id: string | null;
+  cf_payment_id: string | null;
   payment_status: string;
   order_status: string;
   // V2 extensions
@@ -395,6 +397,8 @@ export interface OrderV2 {
   paymentReference: string | null;
   razorpayOrderId: string | null;
   razorpayPaymentId: string | null;
+  cfOrderId: string | null;
+  cfPaymentId: string | null;
   paymentGatewayResponse: Record<string, unknown> | null;
   // Shipment
   courierName: string | null;

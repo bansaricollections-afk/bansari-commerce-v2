@@ -333,8 +333,12 @@ export default function OrderDetailPage() {
             <Row label="Provider"       value={order.paymentProvider} />
             <Row label="Method"         value={order.paymentMethod} />
             <Row label="Reference"      value={order.paymentReference} />
+            {/* Gateway references — only the provider that actually handled
+                this order writes its columns, so render whichever is present. */}
             <Row label="Razorpay Order" value={order.razorpayOrderId} />
             <Row label="Razorpay Pmnt"  value={order.razorpayPaymentId} />
+            <Row label="Cashfree Order" value={order.cfOrderId} />
+            <Row label="Cashfree Pmnt"  value={order.cfPaymentId} />
             <Row label="Paid At"        value={order.paidAt ? new Date(order.paidAt).toLocaleString('en-IN') : null} />
           </div>
         </Section>

@@ -60,7 +60,22 @@ export async function POST(request: NextRequest) {
     // webhook payload itself is never trusted as proof of payment.
     const result = await verifyAndPersistCashfreeOrder(orderId, { requestId, source: 'webhook' });
     log.info('cashfree.webhook.processed', { orderId, type, ok: result.ok });
-    // Always 200 on a verified webhook so Cashfree does not retry a handled event.
+
+    /*
+     * Acknowledge (200) anything Cashfree retrying cannot fix: a successful
+     * persist, and non-actionable outcomes such as NOT_PAID, PENDING_NOT_FOUND
+     * or an amount/currency mismatch — all of which return a 4xx status and
+     * would fail identically on every retry.
+     *
+     * A server-side failure (5xx, e.g. DB_ERROR) is different: the payment is
+     * confirmed PAID at Cashfree but we failed to record it. Acknowledging that
+     * would permanently lose the event, so return 500 and let Cashfree retry.
+     */
+    if (!result.ok && result.status >= 500) {
+      log.error('cashfree.webhook.persist_failed_retryable', { orderId, code: result.code });
+      return apiError(requestId, result.code, result.message, 500);
+    }
+
     return NextResponse.json({ success: true, requestId, handled: result.ok }, { status: 200 });
   } catch (err) {
     log.error('cashfree.webhook.unhandled', err);
