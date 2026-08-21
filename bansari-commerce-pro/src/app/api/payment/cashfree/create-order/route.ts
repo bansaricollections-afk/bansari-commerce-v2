@@ -143,12 +143,27 @@ export async function POST(request: NextRequest) {
         { onConflict: 'cf_order_id' }
       );
 
+    /*
+     * Fail CLOSED. The pending_orders row is the server-authoritative snapshot
+     * that verify + webhook both resolve the payment against; without it a
+     * completed payment can never become an order. Returning a usable
+     * paymentSessionId here would let the customer pay into a checkout we
+     * cannot reconcile — exactly the incident that migration 20260822000000
+     * documents. The Cashfree order created above is simply left unpaid, which
+     * is indistinguishable from an abandoned checkout and moves no money.
+     */
     if (pendingError) {
-      log.warn('cashfree.create-order.pending_write_failed', {
+      log.error('cashfree.create-order.pending_write_failed', {
         cfOrderRef,
         errorCode: pendingError.code,
         errorMessage: pendingError.message,
       });
+      return apiError(
+        requestId,
+        'PENDING_WRITE_FAILED',
+        'Unable to initiate payment. Please try again.',
+        500
+      );
     }
 
     return NextResponse.json({
