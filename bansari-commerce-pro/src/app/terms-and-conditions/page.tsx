@@ -55,7 +55,8 @@ export default function TermsAndConditionsPage() {
         <h2 className="pt-2 text-xl font-semibold text-slate-900">Payment</h2>
         <p>
           All orders on this website are prepaid. Payments are processed
-          securely through Razorpay; we do not store your card, UPI or
+          securely through a PCI-DSS compliant third-party payment gateway;
+          we do not store your card, UPI or
           banking credentials. See our{" "}
           <a href="/privacy-policy" className="underline">Privacy Policy</a>{" "}
           for details on how payment-related information is handled. We do

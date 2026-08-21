@@ -33,7 +33,7 @@ const TRUST_ITEMS = [
       </svg>
     ),
     label: "Secure Checkout",
-    sub: "Razorpay encrypted payments",
+    sub: "Encrypted online payments",
   },
   {
     icon: (

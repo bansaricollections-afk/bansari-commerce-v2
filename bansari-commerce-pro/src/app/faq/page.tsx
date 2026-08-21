@@ -16,7 +16,7 @@ const faqs = [
   {
     question: 'Which payment methods are accepted?',
     answer:
-      'We accept secure online payments through Razorpay, including UPI, debit cards, credit cards and net banking.',
+      'We accept secure online payments through our payment gateway, including UPI, debit cards, credit cards and net banking.',
   },
   {
     question: 'How long does delivery take?',
@@ -46,7 +46,7 @@ const faqs = [
   {
     question: 'Do you offer cash on delivery (COD)?',
     answer:
-      'No. All orders on Bansari Collections are prepaid — we accept online payment only via Razorpay.',
+      'No. All orders on Bansari Collections are prepaid — we accept secure online payment only.',
   },
   {
     question: 'How do I contact customer support?',

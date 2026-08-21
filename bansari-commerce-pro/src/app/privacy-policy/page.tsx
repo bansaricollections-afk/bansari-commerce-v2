@@ -34,7 +34,7 @@ export default function PrivacyPolicyPage() {
           </li>
           <li>
             Payment identifiers relating to a transaction (such as a
-            Razorpay order ID and payment ID) — see &ldquo;Payments&rdquo; below
+            payment gateway order ID and payment ID) — see &ldquo;Payments&rdquo; below
           </li>
           <li>Items you add to your cart or wishlist</li>
           <li>
@@ -51,9 +51,9 @@ export default function PrivacyPolicyPage() {
           Payments
         </h2>
         <p>
-          Online payments on our website are processed by Razorpay, a
+          Online payments on our website are processed by a PCI-DSS compliant
           third-party payment gateway. When you pay, your card, UPI, or
-          banking details are entered directly with Razorpay and are not
+          banking details are entered directly with the gateway and are not
           stored on our servers — we receive and store only payment status
           and transaction reference identifiers (such as order ID, payment
           ID, and payment status) needed to confirm and record your order.
@@ -79,7 +79,7 @@ export default function PrivacyPolicyPage() {
           including with:
         </p>
         <ul className="list-disc space-y-2 pl-6">
-          <li>Razorpay, to process online payments</li>
+          <li>Our payment gateway provider, to process online payments</li>
           <li>Our courier/logistics partners, to deliver your order</li>
           <li>
             Our website hosting and database service providers, who store

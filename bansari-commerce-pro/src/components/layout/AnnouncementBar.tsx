@@ -16,7 +16,7 @@ export interface AnnouncementBarProps {
 // and "The Festive Edit is now live" (no such collection exists).
 const MESSAGES = [
   "Shipping across India · Dispatched in 1–2 business days",
-  "Secure online payments via Razorpay · UPI, cards & net banking accepted",
+  "Secure online payments · UPI, cards & net banking accepted",
   "Tracking details sent by SMS and email once your order ships",
   "Easy 7-day returns as per our Return & Refund Policy",
 ];

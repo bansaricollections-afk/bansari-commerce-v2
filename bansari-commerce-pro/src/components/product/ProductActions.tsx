@@ -4,6 +4,7 @@ import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { track } from '@vercel/analytics';
 
+import { metaTrack } from '@/analytics/meta-pixel';
 import { useCart } from '@/hooks/useCart';
 import { useWishlist } from '@/hooks/useWishlist';
 import type { Product, ProductVariant, SizeAvailability } from '@/types/product';
@@ -41,6 +42,30 @@ function productProps(product: Product) {
   };
 }
 
+/**
+ * Meta Pixel payload for a single product.
+ *
+ * content_ids uses product.id rather than sku deliberately: CartItem carries
+ * only variantSku (the size-level code), so a sku-based id would send
+ * "BC-…-001" from the PDP and "BC-…-001-M" from Purchase — two different ids
+ * for the same product, which breaks Meta's funnel and catalogue matching.
+ * product.id is the one identifier present and identical at every event point.
+ * The Meta catalogue feed must therefore be keyed on product id.
+ *
+ * Catalogue facts only — no customer or payment data ever reaches the pixel.
+ */
+function metaProductProps(product: Product, quantity = 1) {
+  return {
+    content_type: 'product',
+    content_ids: [String(product.id)],
+    content_name: product.name,
+    content_category: product.category ?? undefined,
+    contents: [{ id: String(product.id), quantity, item_price: product.price }],
+    value: product.price * quantity,
+    currency: 'INR',
+  };
+}
+
 export default function ProductActions({
   product,
   quantity,
@@ -66,6 +91,7 @@ export default function ProductActions({
    */
   useEffect(() => {
     track('view_item', productProps(product));
+    metaTrack('ViewContent', metaProductProps(product));
   }, [product]);
 
   const sizeAvailability = product.sizeAvailability ?? [];
@@ -93,6 +119,7 @@ export default function ProductActions({
     }
     addToCart({ product, quantity, variant: selectedVariant, size: toCartSize(selectedSize) });
     track('add_to_cart', { ...productProps(product), quantity });
+    metaTrack('AddToCart', metaProductProps(product, quantity));
     setAddedToCart(true);
     setCartDrawerOpen(true);
     setTimeout(() => setAddedToCart(false), 2500);
@@ -110,6 +137,7 @@ export default function ProductActions({
     // a real add_to_cart. begin_checkout is fired by the checkout page itself.
     addToCart({ product, quantity, variant: selectedVariant, size: toCartSize(selectedSize) });
     track('add_to_cart', { ...productProps(product), quantity });
+    metaTrack('AddToCart', metaProductProps(product, quantity));
     router.push('/checkout');
   };
 
