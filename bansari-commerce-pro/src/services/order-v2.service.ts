@@ -15,6 +15,11 @@ import { createLogger } from '@/lib/logger';
 import { OrderError, assertValidTransition } from '@/lib/order-errors';
 import { mapOrderV2, mapOrderItemV2, mapOrderTimeline, mapOrderShipment } from '@/lib/order-mapper';
 import { FulfillmentService } from '@/services/fulfillment.service';
+import {
+  sendOrderShippedEmail,
+  sendOutForDeliveryEmail,
+  sendOrderDeliveredEmail,
+} from '@/services/email.service';
 import type {
   OrderV2,
   OrderItemV2,
@@ -41,6 +46,29 @@ import type {
 import type { RefundPayload } from '@/types/order-v2-extensions';
 
 const log = createLogger({ service: 'order-v2.service' });
+
+/**
+ * Customer notifications are a courtesy, never a precondition: the status
+ * transition has already been committed by the time these run. A bounced or
+ * misconfigured email must not fail an operator's action in the admin UI, so
+ * failures are logged and swallowed.
+ */
+async function notifyCustomer(
+  stage: string,
+  send: () => Promise<{ sent: boolean; error?: string }>
+): Promise<void> {
+  try {
+    const result = await send();
+    if (!result.sent) {
+      log.warn('order-v2.notify.not_sent', { stage, error: result.error });
+    }
+  } catch (err) {
+    log.warn('order-v2.notify.failed', {
+      stage,
+      errorMessage: err instanceof Error ? err.message : String(err),
+    });
+  }
+}
 
 // ============================================================
 // SELECT CLAUSE
@@ -332,7 +360,27 @@ export const OrderV2Service = {
       reason:    opts?.reason,
     });
 
-    return mapOrderV2(data as unknown as DbOrderV2Row);
+    const updated = mapOrderV2(data as unknown as DbOrderV2Row);
+
+    /*
+     * Only out_for_delivery is notified here. shipped and delivered have
+     * dedicated transitions (ship/deliver) that own their emails, so sending
+     * from this generic path too would double-send if an operator moved an
+     * order via updateStatus.
+     */
+    if (newStatus === 'out_for_delivery') {
+      await notifyCustomer('out_for_delivery', () =>
+        sendOutForDeliveryEmail({
+          orderNumber:    updated.orderNumber,
+          customerName:   updated.customerName,
+          customerEmail:  updated.customerEmail,
+          trackingNumber: updated.courierAwb ?? undefined,
+          trackingUrl:    updated.courierUrl ?? undefined,
+        })
+      );
+    }
+
+    return updated;
   },
 
   // ──────────────────────────────────────────────────────
@@ -435,7 +483,19 @@ export const OrderV2Service = {
       },
     });
 
-    return mapOrderV2(data as unknown as DbOrderV2Row);
+    const shipped = mapOrderV2(data as unknown as DbOrderV2Row);
+    await notifyCustomer('shipped', () =>
+      sendOrderShippedEmail({
+        orderNumber:       shipped.orderNumber,
+        customerName:      shipped.customerName,
+        customerEmail:     shipped.customerEmail,
+        trackingNumber:    payload.awbNumber,
+        trackingUrl:       payload.trackingUrl,
+        estimatedDelivery: payload.expectedDeliveryDate,
+      })
+    );
+
+    return shipped;
   },
 
   // ──────────────────────────────────────────────────────
@@ -482,7 +542,18 @@ export const OrderV2Service = {
       actorName:      opts?.actorName,
     });
 
-    return mapOrderV2(data as unknown as DbOrderV2Row);
+    const delivered = mapOrderV2(data as unknown as DbOrderV2Row);
+    await notifyCustomer('delivered', () =>
+      sendOrderDeliveredEmail({
+        orderNumber:    delivered.orderNumber,
+        customerName:   delivered.customerName,
+        customerEmail:  delivered.customerEmail,
+        trackingNumber: delivered.courierAwb ?? undefined,
+        trackingUrl:    delivered.courierUrl ?? undefined,
+      })
+    );
+
+    return delivered;
   },
 
   // ──────────────────────────────────────────────────────

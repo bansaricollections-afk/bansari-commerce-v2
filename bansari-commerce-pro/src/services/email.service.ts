@@ -337,3 +337,94 @@ export async function sendOrderShippedEmail(
     html: orderShippedHtml(data),
   });
 }
+
+export type OrderStageData = {
+  orderNumber: string;
+  customerName: string;
+  customerEmail: string;
+  trackingNumber?: string;
+  trackingUrl?: string;
+};
+
+/**
+ * Shared shell for the later lifecycle stages, matching orderShippedHtml so the
+ * whole sequence reads as one voice.
+ */
+function orderStageHtml(
+  stage: { banner: string; lead: string; closing: string },
+  data: OrderStageData
+): string {
+  const tracking = data.trackingNumber
+    ? `<table width="100%" cellpadding="0" cellspacing="0" style="background:#fdf6f8;border-radius:8px;margin-bottom:24px;">
+        <tr><td style="padding:16px 20px;">
+          <p style="margin:0;font-size:13px;color:#8A5A6A;font-weight:600;text-transform:uppercase;letter-spacing:0.6px;">Tracking Number</p>
+          <p style="margin:4px 0 0;font-size:16px;font-weight:700;">${
+            data.trackingUrl
+              ? `<a href="${data.trackingUrl}" style="color:#8A5A6A;">${data.trackingNumber}</a>`
+              : data.trackingNumber
+          }</p>
+        </td></tr>
+      </table>`
+    : "";
+
+  return `<!DOCTYPE html>
+<html lang="en">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${stage.banner}</title></head>
+<body style="margin:0;padding:0;background:#fdfaf7;font-family:'Helvetica Neue',Arial,sans-serif;color:#2d1f1f;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background:#fdfaf7;padding:32px 0;">
+    <tr><td align="center">
+      <table width="600" cellpadding="0" cellspacing="0" style="background:#ffffff;border-radius:12px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.06);">
+        <tr><td style="background:#8A5A6A;padding:32px 40px;text-align:center;">
+          <p style="margin:0;font-size:22px;font-weight:700;color:#ffffff;">Bansari Collections</p>
+          <p style="margin:8px 0 0;font-size:14px;color:#f0d8df;">${stage.banner}</p>
+        </td></tr>
+        <tr><td style="padding:40px;">
+          <p style="margin:0 0 8px;font-size:18px;font-weight:600;">Hi ${data.customerName},</p>
+          <p style="margin:0 0 24px;font-size:15px;color:#6b5b5b;">${stage.lead.replace("{order}", `<strong>${data.orderNumber}</strong>`)}</p>
+          ${tracking}
+          <p style="margin:0;font-size:14px;color:#6b5b5b;">${stage.closing}</p>
+        </td></tr>
+        <tr><td style="background:#fdf6f8;padding:20px 40px;text-align:center;">
+          <p style="margin:0;font-size:12px;color:#b09090;">&copy; ${new Date().getFullYear()} Bansari Collections. All rights reserved.</p>
+        </td></tr>
+      </table>
+    </td></tr>
+  </table>
+</body>
+</html>`;
+}
+
+export async function sendOutForDeliveryEmail(
+  data: OrderStageData
+): Promise<EmailResult> {
+  return sendEmail({
+    to: data.customerEmail,
+    subject: `Out for Delivery \u2014 ${data.orderNumber} | Bansari Collections`,
+    html: orderStageHtml(
+      {
+        banner: "Arriving today",
+        lead: "Your order {order} is out for delivery and should reach you today.",
+        closing: "Please keep your phone reachable so our courier partner can find you.",
+      },
+      data
+    ),
+  });
+}
+
+export async function sendOrderDeliveredEmail(
+  data: OrderStageData
+): Promise<EmailResult> {
+  return sendEmail({
+    to: data.customerEmail,
+    subject: `Delivered \u2014 ${data.orderNumber} | Bansari Collections`,
+    html: orderStageHtml(
+      {
+        banner: "Your order has arrived",
+        lead: "Order {order} has been delivered. We hope you love it.",
+        closing:
+          "If anything is not right, reply to this email within 7 days and we will make it good \u2014 see our Return &amp; Refund Policy.",
+      },
+      data
+    ),
+  });
+}
