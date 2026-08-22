@@ -5,6 +5,27 @@ import { NextResponse, type NextRequest } from 'next/server';
 const ADMIN_ROUTES     = /^\/admin(?!\/login(?:\/|$))(?:\/|$)/;
 const ADMIN_API_ROUTES = /^\/api\/admin/;
 
+/*
+ * SEC-07 (P1). The DAM / asset / collection APIs live outside /api/admin, so
+ * this middleware never applied its role check to them, and each route gated
+ * only on `if (!user) 401` — no role check anywhere. Any authenticated account
+ * could therefore create, modify, delete and APPROVE assets, alter rights
+ * records, trigger processing and delete collections.
+ *
+ * That was latent while admins were the only accounts. Adding self-service
+ * customer signup made it reachable by any customer, turning a dormant flaw
+ * into a live privilege-escalation path.
+ *
+ * Routing them through the same gate as /api/admin gives the required
+ * semantics — 401 unauthenticated, 403 authenticated non-admin — from one
+ * place, using app_metadata.role, which is server-set and not client-editable.
+ *
+ * Safe to lock down: none of these are reachable anonymously today (all
+ * already answered 401), so no public storefront path depends on them.
+ */
+const PRIVILEGED_API_ROUTES =
+  /^\/api\/(assets|dam|rights|processing|media|collections)(?:\/|$)/;
+
 const IS_DEV = process.env.NODE_ENV === 'development';
 
 // Full security headers applied in production only.
@@ -65,7 +86,7 @@ export default async function proxy(request: NextRequest) {
   requestHeaders.set('x-pathname', pathname);
 
   const isAdminPage = ADMIN_ROUTES.test(pathname);
-  const isAdminApi  = ADMIN_API_ROUTES.test(pathname);
+  const isAdminApi  = ADMIN_API_ROUTES.test(pathname) || PRIVILEGED_API_ROUTES.test(pathname);
 
   // ── Non-admin routes ─────────────────────────────────────────────────────────
   if (!isAdminPage && !isAdminApi) {
