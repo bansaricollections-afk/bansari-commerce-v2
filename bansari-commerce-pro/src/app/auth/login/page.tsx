@@ -97,7 +97,10 @@ export default function LoginPage() {
             </button>
           </form>
 
-          <div className="mt-6 flex justify-center text-sm">
+          <div className="mt-6 flex justify-between text-sm">
+            <Link href="/auth/forgot-password" className="text-[#8A5A6A]">
+              Forgot Password?
+            </Link>
             <Link href="/auth/register" className="text-[#8A5A6A]">
               Create Account
             </Link>

@@ -2,7 +2,21 @@ import { createServerClient } from '@supabase/ssr';
 import { NextResponse, type NextRequest } from 'next/server';
 
 // Protects /admin and every sub-path EXCEPT /admin/login (and /admin/login/*)
-const ADMIN_ROUTES     = /^\/admin(?!\/login(?:\/|$))(?:\/|$)/;
+/*
+ * SEC-01. src/app/(admin)/inventory/* sits in a Next.js ROUTE GROUP, so
+ * "(admin)" never appears in the URL — those pages serve at /inventory/...,
+ * which /^\/admin/ does not match. They had no in-page guard and no group
+ * layout either, so /inventory/adjustments/new answered 200 to anonymous
+ * callers while /admin/orders correctly redirected to login.
+ *
+ * Only the admin UI shell leaked (no data: the mutation APIs live under
+ * /api/admin/v2/fulfillment and were already gated), but an unauthenticated
+ * admin surface should not be reachable at all.
+ *
+ * /api/inventory/availability is unaffected — it starts with /api/ and is
+ * matched by the API patterns below, not this one.
+ */
+const ADMIN_ROUTES     = /^\/(?:admin(?!\/login(?:\/|$))|inventory)(?:\/|$)/;
 const ADMIN_API_ROUTES = /^\/api\/admin/;
 
 /*
