@@ -16,7 +16,9 @@ export async function GET(request: NextRequest) {
 
   const { data, error } = await supabase
     .from('products')
-    .select('id, name, sku, category, stock, price, is_active')
+    // The products table's flag is `active`, not `is_active` — selecting the
+    // wrong name failed the whole query and 500'd the inventory page.
+    .select('id, name, sku, category, stock, price, active')
     .order('stock', { ascending: true });
 
   if (error) {

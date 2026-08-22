@@ -10,8 +10,8 @@ type InventoryRow = {
   category: string;
   stock: number;
   price: number;
-  /** API returns `is_active` — matches the `is_active` column selected in the route */
-  is_active: boolean;
+  /** API returns `active` — matches the `active` column on products */
+  active: boolean;
 };
 
 const LOW = 10;
