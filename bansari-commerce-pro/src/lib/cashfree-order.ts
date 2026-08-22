@@ -238,7 +238,18 @@ export async function verifyAndPersistCashfreeOrder(
    */
   const { error: cfIdError } = await supabase
     .from('orders')
-    .update({ cf_order_id: cfOrderId, cf_payment_id: cfPaymentId })
+    .update({
+      cf_order_id: cfOrderId,
+      cf_payment_id: cfPaymentId,
+      /*
+       * The RPC does not populate the V2 columns, so a fully paid order was
+       * left reading payment_v2_status 'pending' — any admin screen keyed off
+       * the V2 model saw it as unpaid. order_v2_status intentionally stays
+       * 'pending': that is the legitimate start of the lifecycle, and the
+       * merchant advances it via the confirm transition.
+       */
+      payment_v2_status: 'paid',
+    })
     .eq('id', order.id);
 
   if (cfIdError) {

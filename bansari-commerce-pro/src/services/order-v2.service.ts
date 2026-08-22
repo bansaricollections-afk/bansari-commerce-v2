@@ -200,6 +200,18 @@ export const OrderV2Service = {
     if (filters.maxTotal !== undefined) query = query.lte('grand_total', filters.maxTotal);
 
     const { data, error, count } = await query;
+
+    /*
+     * PostgREST answers 416 "Requested range not satisfiable" (PGRST103) when
+     * the requested offset is past the end of the result set — which happens
+     * whenever the caller is on a later page and the result set shrinks under
+     * them (a filter is applied, an order is removed). That is an empty page,
+     * not a server fault, so surfacing it as a 500 was wrong. Report it as an
+     * empty page and let the caller page back.
+     */
+    if (error && error.code === 'PGRST103') {
+      return { data: [], total: count ?? 0, page, pageSize };
+    }
     if (error) throw new OrderError(error.message, 'INTERNAL');
 
     const rows = (data as unknown as DbOrderV2Row[]) ?? [];
