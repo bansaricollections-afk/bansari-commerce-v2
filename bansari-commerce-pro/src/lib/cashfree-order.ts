@@ -20,6 +20,10 @@ import {
   getCashfreeOrder,
   getCashfreePayments,
 } from '@/lib/cashfree';
+import {
+  sendOrderConfirmationEmail,
+  sendOwnerNewOrderEmail,
+} from '@/services/email.service';
 
 export type CashfreePersistResult =
   | { ok: true; orderId: string; orderNumber: string; idempotent: boolean }
@@ -254,6 +258,57 @@ export async function verifyAndPersistCashfreeOrder(
     { order_id: order.id, event: 'created', actor: 'system', metadata: { requestId: ctx.requestId, provider: 'cashfree', source: ctx.source } },
     { order_id: order.id, event: 'paid', actor: 'cashfree', metadata: { cf_payment_id: cfPaymentId, requestId: ctx.requestId } },
   ]);
+
+  /*
+   * Notifications, last and non-blocking. The order is already committed and
+   * paid; email is a courtesy, never a precondition. Both sends are awaited so
+   * they actually run before the serverless function is frozen, but any failure
+   * is logged and swallowed — a bounced email must never turn a successful
+   * payment into an error the customer sees.
+   *
+   * Only sent on first persist. The idempotent returns above exit earlier, so a
+   * webhook arriving after the browser verify cannot re-send.
+   */
+  const emailPayload = {
+    orderNumber:   order.order_number,
+    customerName:  pending.customer_name,
+    customerEmail: pending.customer_email,
+    items: itemsPayload.map((li) => ({
+      product_name: li.product_name,
+      quantity:     Number(li.quantity),
+      unit_price:   Number(li.unit_price),
+      line_total:   Number(li.line_total),
+    })),
+    subtotal:    Number(pending.subtotal),
+    shippingFee: Number(pending.shipping_fee ?? 0),
+    discount:    Number(pending.discount ?? 0),
+    grandTotal:  Number(pending.grand_total),
+    shippingAddress: {
+      addressLine1: pending.shipping_address_line1,
+      addressLine2: pending.shipping_address_line2 ?? undefined,
+      city:         pending.shipping_city,
+      state:        pending.shipping_state,
+      postalCode:   pending.shipping_postal_code,
+    },
+  };
+
+  const [customerEmail, ownerEmail] = await Promise.allSettled([
+    sendOrderConfirmationEmail(emailPayload),
+    sendOwnerNewOrderEmail({
+      ...emailPayload,
+      customerPhone:    pending.customer_phone ?? undefined,
+      paymentProvider:  'cashfree',
+      paymentReference: cfPaymentId,
+    }),
+  ]);
+
+  if (customerEmail.status === 'rejected' || ownerEmail.status === 'rejected') {
+    log.warn('cashfree.persist.email_failed', {
+      orderId: order.id,
+      customer: customerEmail.status,
+      owner: ownerEmail.status,
+    });
+  }
 
   log.info('cashfree.persist.ok', { cfOrderId, orderId: order.id, orderNumber: order.order_number, source: ctx.source });
   return { ok: true, orderId: order.id, orderNumber: order.order_number, idempotent: false };

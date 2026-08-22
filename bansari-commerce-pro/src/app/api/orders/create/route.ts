@@ -5,7 +5,7 @@ import { createServiceRoleClient } from '@/lib/supabase/service';
 import { createServerClient } from '@supabase/ssr';
 import { verifyPaymentSignature } from '@/lib/razorpay';
 import { validateCartItems } from '@/services/product.service';
-import { sendOrderConfirmationEmail } from '@/services/email.service';
+import { sendOrderConfirmationEmail, sendOwnerNewOrderEmail } from '@/services/email.service';
 import { createLogger } from '@/lib/logger';
 import { generateRequestId } from '@/lib/request-id';
 import { checkRateLimit, RATE_LIMIT_CHECKOUT } from '@/lib/rate-limit';
@@ -408,6 +408,34 @@ export async function POST(request: NextRequest) {
           postalCode: shippingData.postalCode,
         },
       });
+
+      // Owner notification — the shop had no "you have an order" alert on any
+      // provider. Same non-blocking contract as the customer email above.
+      await sendOwnerNewOrderEmail({
+        orderNumber: order.order_number,
+        customerName: order.customer_name,
+        customerEmail: order.customer_email,
+        items: lineItems.map((li) => ({
+          product_name: li.productName,
+          quantity: li.quantity,
+          unit_price: li.unitPrice,
+          line_total: Number(li.unitPrice) * Number(li.quantity),
+        })),
+        subtotal: Number(order.subtotal),
+        shippingFee: Number(order.shipping_fee),
+        discount: Number(order.discount),
+        grandTotal: Number(order.grand_total),
+        shippingAddress: {
+          addressLine1: shippingData.addressLine1,
+          city: shippingData.city,
+          state: shippingData.state,
+          postalCode: shippingData.postalCode,
+        },
+        customerPhone: customerPhone ?? undefined,
+        paymentProvider: 'razorpay',
+        paymentReference: razorpay_payment_id,
+      });
+
       rLog.info('orders.create.email.sent', { orderId: order.id });
     } catch (emailErr) {
       rLog.warn('orders.create.email.failed', {

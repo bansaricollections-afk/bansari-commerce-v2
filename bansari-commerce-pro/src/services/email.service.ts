@@ -258,6 +258,71 @@ export async function sendOrderConfirmationEmail(
   });
 }
 
+export type OwnerNewOrderData = OrderConfirmationData & {
+  customerPhone?: string;
+  paymentProvider?: string;
+  paymentReference?: string;
+};
+
+/**
+ * Internal operations alert, not customer-facing \u2014 deliberately plain so the
+ * shop owner can read the essentials on a phone without scrolling.
+ */
+function ownerNewOrderHtml(data: OwnerNewOrderData): string {
+  const rows = data.items
+    .map(
+      (i) =>
+        `<tr><td>${i.product_name}</td><td align="center">${i.quantity}</td>` +
+        `<td align="right">${formatRupees(Number(i.line_total))}</td></tr>`
+    )
+    .join("");
+
+  const addr = data.shippingAddress;
+  const line2 = addr.addressLine2 ? `${addr.addressLine2}<br />` : "";
+
+  return `<!doctype html><html><body style="font-family:Arial,Helvetica,sans-serif;color:#1a0f16">
+<h2 style="margin:0 0 4px">New order ${data.orderNumber}</h2>
+<p style="margin:0 0 16px;font-size:20px"><strong>${formatRupees(data.grandTotal)}</strong></p>
+<table cellpadding="6" style="border-collapse:collapse;width:100%;max-width:520px">
+<tr><th align="left">Item</th><th align="center">Qty</th><th align="right">Total</th></tr>
+${rows}
+</table>
+<p style="margin:16px 0 4px"><strong>Customer</strong><br />
+${data.customerName}<br />${data.customerEmail}${data.customerPhone ? `<br />${data.customerPhone}` : ""}</p>
+<p style="margin:16px 0 4px"><strong>Ship to</strong><br />
+${addr.addressLine1}<br />${line2}${addr.city}, ${addr.state} ${addr.postalCode}</p>
+<p style="margin:16px 0 0;font-size:13px;color:#6b5560">
+Payment: ${data.paymentProvider ?? "\u2014"}${data.paymentReference ? ` \u00b7 ref ${data.paymentReference}` : ""}<br />
+Subtotal ${formatRupees(data.subtotal)} \u00b7 Shipping ${formatRupees(data.shippingFee)} \u00b7 Discount ${formatRupees(data.discount)}
+</p>
+</body></html>`;
+}
+
+/**
+ * Notifies the shop owner that an order was placed and paid.
+ *
+ * Recipient resolution: ORDER_NOTIFICATION_EMAIL, else the configured sender,
+ * else the support address \u2014 so this works with no new configuration, and can
+ * be pointed elsewhere by setting one variable.
+ *
+ * Never throws: a failed notification must never affect an order that has
+ * already been paid for and persisted.
+ */
+export async function sendOwnerNewOrderEmail(
+  data: OwnerNewOrderData
+): Promise<EmailResult> {
+  const to =
+    process.env.ORDER_NOTIFICATION_EMAIL ??
+    process.env.RESEND_FROM_EMAIL ??
+    "support@bansaricollection.in";
+
+  return sendEmail({
+    to,
+    subject: `New order ${data.orderNumber} \u2014 ${formatRupees(data.grandTotal)}`,
+    html: ownerNewOrderHtml(data),
+  });
+}
+
 /**
  * Sends a shipping notification email.
  * Never throws.  Email failure logs a warning only.
