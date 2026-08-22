@@ -1,3 +1,4 @@
+import Image from "next/image";
 import Link from "next/link";
 import { MapPin, Phone, Mail, MessageCircle } from "lucide-react";
 import { FaInstagram, FaFacebookF, FaPinterestP } from "react-icons/fa6";
@@ -81,18 +82,30 @@ export default async function Footer() {
       >
         {/* ── Col 1: Brand ── */}
         <div className="bc-footer-brand">
-          <p
-            className="font-[family:var(--font-playfair)]"
+          {/*
+            The logo is gold artwork on near-black, and this footer already
+            sits on --bc-surface-dark (#1A0F16), so it drops in without any
+            cut-out or treatment. Width-constrained rather than height-
+            constrained because the source is square and the lockup carries
+            its own generous padding.
+
+            alt is empty and aria-hidden: the wordmark inside the artwork
+            repeats the company name that the address block below already
+            announces, so voicing it twice only adds noise for screen readers.
+          */}
+          <Image
+            src="/logo-full.png"
+            alt=""
+            aria-hidden="true"
+            width={1240}
+            height={1240}
+            sizes="200px"
             style={{
-              fontSize: "var(--bc-text-xl)",
-              fontWeight: 400,
-              color: "var(--bc-text-gold)",
-              letterSpacing: "0.04em",
+              width: "200px",
+              height: "auto",
               marginBottom: "var(--bc-space-3)",
             }}
-          >
-            Bansari Collections
-          </p>
+          />
 
           <p
             style={{

@@ -96,9 +96,9 @@ function orderConfirmationHtml(data: OrderConfirmationData): string {
     <tr><td align="center">
       <table width="600" cellpadding="0" cellspacing="0" style="background:#ffffff;border-radius:12px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.06);">
         <!-- Header -->
-        <tr><td style="background:#8A5A6A;padding:32px 40px;text-align:center;">
-          <p style="margin:0;font-size:22px;font-weight:700;color:#ffffff;letter-spacing:0.5px;">Bansari Collections</p>
-          <p style="margin:8px 0 0;font-size:14px;color:#f0d8df;">Your order is confirmed</p>
+        <tr><td style="background:#000000;padding:28px 40px;text-align:center;">
+          <img src="https://www.bansaricollection.in/logo-email.png" alt="Bansari Collections" width="150" style="display:block;margin:0 auto;width:150px;height:auto;border:0;" />
+          <p style="margin:10px 0 0;font-size:13px;color:#C9A96E;letter-spacing:0.08em;">Your order is confirmed</p>
         </td></tr>
         <!-- Body -->
         <tr><td style="padding:40px;">
@@ -178,9 +178,9 @@ function orderShippedHtml(data: OrderShippedData): string {
   <table width="100%" cellpadding="0" cellspacing="0" style="background:#fdfaf7;padding:32px 0;">
     <tr><td align="center">
       <table width="600" cellpadding="0" cellspacing="0" style="background:#ffffff;border-radius:12px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.06);">
-        <tr><td style="background:#8A5A6A;padding:32px 40px;text-align:center;">
-          <p style="margin:0;font-size:22px;font-weight:700;color:#ffffff;">Bansari Collections</p>
-          <p style="margin:8px 0 0;font-size:14px;color:#f0d8df;">Your order is on its way!</p>
+        <tr><td style="background:#000000;padding:28px 40px;text-align:center;">
+          <img src="https://www.bansaricollection.in/logo-email.png" alt="Bansari Collections" width="150" style="display:block;margin:0 auto;width:150px;height:auto;border:0;" />
+          <p style="margin:10px 0 0;font-size:13px;color:#C9A96E;letter-spacing:0.08em;">Your order is on its way!</p>
         </td></tr>
         <tr><td style="padding:40px;">
           <p style="margin:0 0 8px;font-size:18px;font-weight:600;">Hi ${data.customerName},</p>
@@ -353,9 +353,9 @@ export async function sendWelcomeEmail(
   <table width="100%" cellpadding="0" cellspacing="0" style="background:#fdfaf7;padding:32px 0;">
     <tr><td align="center">
       <table width="600" cellpadding="0" cellspacing="0" style="background:#ffffff;border-radius:12px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.06);">
-        <tr><td style="background:#8A5A6A;padding:32px 40px;text-align:center;">
-          <p style="margin:0;font-size:22px;font-weight:700;color:#ffffff;">Bansari Collections</p>
-          <p style="margin:8px 0 0;font-size:14px;color:#f0d8df;">Welcome to the family</p>
+        <tr><td style="background:#000000;padding:28px 40px;text-align:center;">
+          <img src="https://www.bansaricollection.in/logo-email.png" alt="Bansari Collections" width="150" style="display:block;margin:0 auto;width:150px;height:auto;border:0;" />
+          <p style="margin:10px 0 0;font-size:13px;color:#C9A96E;letter-spacing:0.08em;">Welcome to the family</p>
         </td></tr>
         <tr><td style="padding:40px;">
           <p style="margin:0 0 8px;font-size:18px;font-weight:600;">Hi ${data.customerName},</p>
@@ -423,9 +423,9 @@ function orderStageHtml(
   <table width="100%" cellpadding="0" cellspacing="0" style="background:#fdfaf7;padding:32px 0;">
     <tr><td align="center">
       <table width="600" cellpadding="0" cellspacing="0" style="background:#ffffff;border-radius:12px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.06);">
-        <tr><td style="background:#8A5A6A;padding:32px 40px;text-align:center;">
-          <p style="margin:0;font-size:22px;font-weight:700;color:#ffffff;">Bansari Collections</p>
-          <p style="margin:8px 0 0;font-size:14px;color:#f0d8df;">${stage.banner}</p>
+        <tr><td style="background:#000000;padding:28px 40px;text-align:center;">
+          <img src="https://www.bansaricollection.in/logo-email.png" alt="Bansari Collections" width="150" style="display:block;margin:0 auto;width:150px;height:auto;border:0;" />
+          <p style="margin:10px 0 0;font-size:13px;color:#C9A96E;letter-spacing:0.08em;">${stage.banner}</p>
         </td></tr>
         <tr><td style="padding:40px;">
           <p style="margin:0 0 8px;font-size:18px;font-weight:600;">Hi ${data.customerName},</p>
