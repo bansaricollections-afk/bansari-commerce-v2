@@ -53,7 +53,7 @@ export default function LoginPage() {
   return (
     <main className="min-h-screen bg-[#FFFDF9]">
       <div className="mx-auto flex min-h-screen max-w-md items-center px-6">
-        <div className="w-full rounded-3xl bg-white p-10 shadow-lg">
+        <div className="w-full rounded-none bg-white p-10 shadow-lg">
 
           <h1 className="font-[family:var(--font-playfair)] text-4xl font-bold">
             Welcome Back
@@ -71,7 +71,7 @@ export default function LoginPage() {
               placeholder="Email Address"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              className="h-14 w-full rounded-xl border border-[#E6DFDA] px-5 outline-none focus:border-[#8A5A6A]"
+              className="h-14 w-full rounded-none border border-[#E6DFDA] px-5 outline-none focus:border-[#8A5A6A]"
             />
 
             <input
@@ -81,7 +81,7 @@ export default function LoginPage() {
               placeholder="Password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              className="h-14 w-full rounded-xl border border-[#E6DFDA] px-5 outline-none focus:border-[#8A5A6A]"
+              className="h-14 w-full rounded-none border border-[#E6DFDA] px-5 outline-none focus:border-[#8A5A6A]"
             />
 
             {error && (
@@ -91,7 +91,7 @@ export default function LoginPage() {
             <button
               type="submit"
               disabled={loading}
-              className="w-full rounded-full bg-[#8A5A6A] py-4 font-semibold text-white transition hover:bg-[#734757] disabled:opacity-60"
+              className="w-full rounded-none bg-[#8A5A6A] py-4 font-semibold text-white transition hover:bg-[#734757] disabled:opacity-60"
             >
               {loading ? "Signing In…" : "Sign In"}
             </button>

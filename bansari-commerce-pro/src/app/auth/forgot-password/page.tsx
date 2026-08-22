@@ -45,7 +45,7 @@ export default function ForgotPasswordPage() {
   return (
     <main className="min-h-screen bg-[#FFFDF9]">
       <div className="mx-auto flex min-h-screen max-w-md items-center px-6">
-        <div className="w-full rounded-3xl bg-white p-10 shadow-lg">
+        <div className="w-full rounded-none bg-white p-10 shadow-lg">
 
           <h1 className="font-[family:var(--font-playfair)] text-4xl font-bold">
             Reset Password
@@ -53,7 +53,7 @@ export default function ForgotPasswordPage() {
 
           {sent ? (
             <>
-              <p className="mt-6 rounded-xl bg-[#F7F1F3] px-5 py-4 text-sm text-[#714857]">
+              <p className="mt-6 rounded-none bg-[#F7F1F3] px-5 py-4 text-sm text-[#714857]">
                 If an account exists for that address, we have sent a reset link.
                 Please check your inbox.
               </p>
@@ -77,13 +77,13 @@ export default function ForgotPasswordPage() {
                   placeholder="Email Address"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  className="h-14 w-full rounded-xl border border-[#E6DFDA] px-5 outline-none focus:border-[#8A5A6A]"
+                  className="h-14 w-full rounded-none border border-[#E6DFDA] px-5 outline-none focus:border-[#8A5A6A]"
                 />
 
                 <button
                   type="submit"
                   disabled={loading}
-                  className="w-full rounded-full bg-[#8A5A6A] py-4 font-semibold text-white transition hover:bg-[#734757] disabled:opacity-60"
+                  className="w-full rounded-none bg-[#8A5A6A] py-4 font-semibold text-white transition hover:bg-[#734757] disabled:opacity-60"
                 >
                   {loading ? "Sending…" : "Send Reset Link"}
                 </button>

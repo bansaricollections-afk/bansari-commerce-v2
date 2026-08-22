@@ -67,19 +67,19 @@ export default function ResetPasswordPage() {
   return (
     <main className="min-h-screen bg-[#FFFDF9]">
       <div className="mx-auto flex min-h-screen max-w-md items-center px-6">
-        <div className="w-full rounded-3xl bg-white p-10 shadow-lg">
+        <div className="w-full rounded-none bg-white p-10 shadow-lg">
 
           <h1 className="font-[family:var(--font-playfair)] text-4xl font-bold">
             New Password
           </h1>
 
           {done ? (
-            <p className="mt-6 rounded-xl bg-[#F7F1F3] px-5 py-4 text-sm text-[#714857]">
+            <p className="mt-6 rounded-none bg-[#F7F1F3] px-5 py-4 text-sm text-[#714857]">
               Password updated. Redirecting you to sign in…
             </p>
           ) : ready === false ? (
             <>
-              <p className="mt-6 rounded-xl bg-[#F7F1F3] px-5 py-4 text-sm text-[#714857]">
+              <p className="mt-6 rounded-none bg-[#F7F1F3] px-5 py-4 text-sm text-[#714857]">
                 This page needs a valid reset link. Please request a new one.
               </p>
               <div className="mt-6 text-center text-sm">
@@ -101,7 +101,7 @@ export default function ResetPasswordPage() {
                   placeholder="New Password (min 8 characters)"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  className="h-14 w-full rounded-xl border border-[#E6DFDA] px-5 outline-none focus:border-[#8A5A6A]"
+                  className="h-14 w-full rounded-none border border-[#E6DFDA] px-5 outline-none focus:border-[#8A5A6A]"
                 />
 
                 <input
@@ -112,7 +112,7 @@ export default function ResetPasswordPage() {
                   placeholder="Confirm New Password"
                   value={confirm}
                   onChange={(e) => setConfirm(e.target.value)}
-                  className="h-14 w-full rounded-xl border border-[#E6DFDA] px-5 outline-none focus:border-[#8A5A6A]"
+                  className="h-14 w-full rounded-none border border-[#E6DFDA] px-5 outline-none focus:border-[#8A5A6A]"
                 />
 
                 {error && <p className="text-sm font-medium text-red-600">{error}</p>}
@@ -120,7 +120,7 @@ export default function ResetPasswordPage() {
                 <button
                   type="submit"
                   disabled={loading || ready === null}
-                  className="w-full rounded-full bg-[#8A5A6A] py-4 font-semibold text-white transition hover:bg-[#734757] disabled:opacity-60"
+                  className="w-full rounded-none bg-[#8A5A6A] py-4 font-semibold text-white transition hover:bg-[#734757] disabled:opacity-60"
                 >
                   {loading ? "Updating…" : "Update Password"}
                 </button>

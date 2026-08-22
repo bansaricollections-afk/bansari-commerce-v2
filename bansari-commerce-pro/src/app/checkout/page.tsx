@@ -67,7 +67,7 @@ function CheckoutSkeleton() {
       {/* Left column skeleton */}
       <div className="space-y-8">
         {[1, 2, 3].map((n) => (
-          <div key={n} className="rounded-3xl bg-white p-8 shadow-sm">
+          <div key={n} className="rounded-none bg-white p-8 shadow-sm">
             <div className="mb-6 h-7 w-48 animate-pulse rounded-lg bg-slate-100" />
             <div className="grid gap-5">
               {[1, 2, 3].map((r) => (
@@ -82,7 +82,7 @@ function CheckoutSkeleton() {
       </div>
 
       {/* Right column skeleton */}
-      <div className="sticky top-24 h-fit rounded-3xl bg-white p-8 shadow-sm">
+      <div className="sticky top-24 h-fit rounded-none bg-white p-8 shadow-sm">
         <div className="mb-8 h-8 w-40 animate-pulse rounded-lg bg-slate-100" />
         <div className="space-y-4">
           {[1, 2, 3].map((r) => (
@@ -211,7 +211,7 @@ export default function CheckoutPage() {
           aria-required="true"
           aria-invalid={error ? "true" : "false"}
           aria-describedby={error ? errId : undefined}
-          className={`rounded-xl border p-4 text-sm outline-none transition-colors duration-150 focus:border-[#8A5A6A] focus:ring-1 focus:ring-[#8A5A6A]/30 ${
+          className={`rounded-none border p-4 text-sm outline-none transition-colors duration-150 focus:border-[#8A5A6A] focus:ring-1 focus:ring-[#8A5A6A]/30 ${
             error ? "border-rose-400 bg-rose-50/30" : "border-slate-200 bg-white"
           }`}
         />
@@ -288,7 +288,7 @@ export default function CheckoutPage() {
 
               {/* LEFT — Form */}
               <div className="space-y-8">
-                <section aria-labelledby="section-contact" className="rounded-3xl bg-white p-8 shadow-sm">
+                <section aria-labelledby="section-contact" className="rounded-none bg-white p-8 shadow-sm">
                   <h2 id="section-contact" className="mb-6 text-2xl font-semibold">Contact Information</h2>
                   <div className="grid gap-5">
                     {field("fullName",     "Full Name",      "text",  { autoComplete: "name" })}
@@ -297,7 +297,7 @@ export default function CheckoutPage() {
                   </div>
                 </section>
 
-                <section aria-labelledby="section-address" className="rounded-3xl bg-white p-8 shadow-sm">
+                <section aria-labelledby="section-address" className="rounded-none bg-white p-8 shadow-sm">
                   <h2 id="section-address" className="mb-6 text-2xl font-semibold">Delivery Address</h2>
                   <div className="grid gap-5">
                     {field("addressLine1", "House / Flat No.", "text", { autoComplete: "address-line1" })}
@@ -316,7 +316,7 @@ export default function CheckoutPage() {
                         onChange={setField("addressLine2")}
                         placeholder="Street / Area"
                         autoComplete="address-line2"
-                        className="rounded-xl border border-slate-200 bg-white p-4 text-sm outline-none transition-colors duration-150 focus:border-[#8A5A6A] focus:ring-1 focus:ring-[#8A5A6A]/30"
+                        className="rounded-none border border-slate-200 bg-white p-4 text-sm outline-none transition-colors duration-150 focus:border-[#8A5A6A] focus:ring-1 focus:ring-[#8A5A6A]/30"
                       />
                     </div>
                     <div className="grid gap-5 md:grid-cols-2">
@@ -327,10 +327,10 @@ export default function CheckoutPage() {
                   </div>
                 </section>
 
-                <section aria-labelledby="section-payment" className="rounded-3xl bg-white p-8 shadow-sm">
+                <section aria-labelledby="section-payment" className="rounded-none bg-white p-8 shadow-sm">
                   <fieldset>
                     <legend id="section-payment" className="mb-6 text-2xl font-semibold">Payment Method</legend>
-                    <label className="flex cursor-pointer items-center gap-3 rounded-xl border border-slate-200 p-4 transition-colors hover:border-[#8A5A6A]/40">
+                    <label className="flex cursor-pointer items-center gap-3 rounded-none border border-slate-200 p-4 transition-colors hover:border-[#8A5A6A]/40">
                       <input type="radio" name="payment" defaultChecked className="accent-[#8A5A6A]" />
                       <span className="text-sm text-slate-700">
                         UPI / Credit Card / Debit Card / Net Banking
@@ -343,7 +343,7 @@ export default function CheckoutPage() {
               {/* RIGHT — Order summary */}
               <aside
                 aria-labelledby="summary-heading"
-                className="sticky top-24 h-fit rounded-3xl bg-white p-8 shadow-sm"
+                className="sticky top-24 h-fit rounded-none bg-white p-8 shadow-sm"
               >
                 <h2 id="summary-heading" className="mb-8 text-3xl font-bold">Order Summary</h2>
 

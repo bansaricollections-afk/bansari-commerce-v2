@@ -39,7 +39,7 @@ function CartPageSkeleton() {
         {[1, 2, 3].map((n) => (
           <div
             key={n}
-            className="flex gap-6 rounded-3xl bg-white p-6 shadow-sm"
+            className="flex gap-6 rounded-none bg-white p-6 shadow-sm"
           >
             <div className="h-[180px] w-[140px] animate-pulse rounded-2xl bg-slate-100" />
             <div className="flex flex-1 flex-col justify-between">
@@ -57,7 +57,7 @@ function CartPageSkeleton() {
       </div>
 
       {/* Right column — summary skeleton */}
-      <div className="sticky top-28 h-fit rounded-3xl bg-white shadow-sm overflow-hidden">
+      <div className="sticky top-28 h-fit rounded-none bg-white shadow-sm overflow-hidden">
         <div className="p-8 space-y-4">
           <div className="h-8 w-48 animate-pulse rounded-lg bg-slate-100" />
           {[1, 2, 3].map((r) => (
@@ -172,7 +172,7 @@ export default function CartPage() {
         {!hasHydrated ? (
           <CartPageSkeleton />
         ) : items.length === 0 ? (
-          <div className="rounded-3xl bg-white p-20 text-center shadow-sm">
+          <div className="rounded-none bg-white p-20 text-center shadow-sm">
             <ShoppingBag
               size={56}
               className="mx-auto text-[#8A5A6A]"
@@ -189,7 +189,7 @@ export default function CartPage() {
 
             <Link
               href="/shop"
-              className="mt-8 inline-flex rounded-full bg-[#8A5A6A] px-10 py-4 font-semibold text-white transition hover:bg-[#734757]"
+              className="mt-8 inline-flex rounded-none bg-[#8A5A6A] px-10 py-4 font-semibold text-white transition hover:bg-[#734757]"
             >
               Continue Shopping
             </Link>
@@ -201,7 +201,7 @@ export default function CartPage() {
               {items.map((item) => (
                 <article
                   key={cartLineId(item)}
-                  className="flex gap-6 rounded-3xl bg-white p-6 shadow-sm"
+                  className="flex gap-6 rounded-none bg-white p-6 shadow-sm"
                 >
                   <Image
                     src={item.image}
@@ -209,7 +209,7 @@ export default function CartPage() {
                     width={140}
                     height={180}
                     sizes="140px"
-                    className="rounded-2xl object-cover"
+                    className="rounded-none object-cover"
                   />
 
                   <div className="flex flex-1 flex-col justify-between">
@@ -255,7 +255,7 @@ export default function CartPage() {
                     </div>
 
                     <div className="flex items-center justify-between">
-                      <div className="flex items-center rounded-xl border">
+                      <div className="flex items-center rounded-none border">
                         <button
                           type="button"
                           onClick={() => decreaseQuantity(cartLineId(item))}
@@ -313,7 +313,7 @@ export default function CartPage() {
             </div>
 
             {/* Order Summary */}
-            <aside className="sticky top-28 h-fit rounded-3xl bg-white shadow-sm overflow-hidden">
+            <aside className="sticky top-28 h-fit rounded-none bg-white shadow-sm overflow-hidden">
               <ShippingProgress totalAmount={subtotal} />
 
               <div className="p-8">
@@ -322,13 +322,13 @@ export default function CartPage() {
                 </h2>
 
                 {remainingForFreeShipping > 0 ? (
-                  <div className="mb-6 rounded-2xl bg-[#FFF5F7] p-4 text-sm text-[#8A5A6A]">
+                  <div className="mb-6 rounded-none bg-[#FFF5F7] p-4 text-sm text-[#8A5A6A]">
                     Add ₹
                     {remainingForFreeShipping.toLocaleString("en-IN")}
                     {" "}more to unlock FREE shipping.
                   </div>
                 ) : (
-                  <div className="mb-6 rounded-2xl bg-green-100 p-4 text-sm font-medium text-green-700">
+                  <div className="mb-6 rounded-none bg-green-100 p-4 text-sm font-medium text-green-700">
                     🎉 You qualify for FREE shipping.
                   </div>
                 )}
@@ -368,7 +368,7 @@ export default function CartPage() {
                   <button
                     type="button"
                     disabled
-                    className="mt-10 hidden sm:flex w-full items-center justify-center gap-3 rounded-full bg-slate-300 py-4 font-semibold text-white cursor-not-allowed"
+                    className="mt-10 hidden sm:flex w-full items-center justify-center gap-3 rounded-none bg-slate-300 py-4 font-semibold text-white cursor-not-allowed"
                   >
                     Secure Checkout
                     <ArrowRight size={18} />
@@ -376,7 +376,7 @@ export default function CartPage() {
                 ) : (
                   <Link
                     href="/checkout"
-                    className="mt-10 hidden sm:flex items-center justify-center gap-3 rounded-full bg-[#8A5A6A] py-4 font-semibold text-white transition hover:bg-[#734757]"
+                    className="mt-10 hidden sm:flex items-center justify-center gap-3 rounded-none bg-[#8A5A6A] py-4 font-semibold text-white transition hover:bg-[#734757]"
                   >
                     Secure Checkout
                     <ArrowRight size={18} />
@@ -396,7 +396,7 @@ export default function CartPage() {
                   <Link
                     href="/checkout"
                     aria-label="Secure checkout (order summary)"
-                    className="mt-10 flex sm:hidden items-center justify-center gap-3 rounded-full bg-[#8A5A6A] py-4 font-semibold text-white transition hover:bg-[#734757]"
+                    className="mt-10 flex sm:hidden items-center justify-center gap-3 rounded-none bg-[#8A5A6A] py-4 font-semibold text-white transition hover:bg-[#734757]"
                   >
                     Secure Checkout
                     <ArrowRight size={18} />
@@ -430,7 +430,7 @@ export default function CartPage() {
             <button
               type="button"
               disabled
-              className="flex items-center justify-center gap-2 w-full rounded-full bg-slate-300 py-3.5 font-semibold text-white text-sm cursor-not-allowed"
+              className="flex items-center justify-center gap-2 w-full rounded-none bg-slate-300 py-3.5 font-semibold text-white text-sm cursor-not-allowed"
             >
               Adjust quantity to continue
             </button>
@@ -440,7 +440,7 @@ export default function CartPage() {
               /* Distinguishes this from the in-summary checkout link now that
                  both are exposed to assistive tech. Visible text is unchanged. */
               aria-label="Secure checkout (sticky bar)"
-              className="flex items-center justify-center gap-2 w-full rounded-full bg-[#8A5A6A] py-3.5 font-semibold text-white text-sm transition hover:bg-[#734757]"
+              className="flex items-center justify-center gap-2 w-full rounded-none bg-[#8A5A6A] py-3.5 font-semibold text-white text-sm transition hover:bg-[#734757]"
             >
               Secure Checkout
               <ArrowRight size={16} />
