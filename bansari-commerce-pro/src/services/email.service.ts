@@ -338,6 +338,55 @@ export async function sendOrderShippedEmail(
   });
 }
 
+export type WelcomeEmailData = {
+  customerName: string;
+  customerEmail: string;
+};
+
+export async function sendWelcomeEmail(
+  data: WelcomeEmailData
+): Promise<EmailResult> {
+  const html = `<!DOCTYPE html>
+<html lang="en">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Welcome</title></head>
+<body style="margin:0;padding:0;background:#fdfaf7;font-family:'Helvetica Neue',Arial,sans-serif;color:#2d1f1f;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background:#fdfaf7;padding:32px 0;">
+    <tr><td align="center">
+      <table width="600" cellpadding="0" cellspacing="0" style="background:#ffffff;border-radius:12px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.06);">
+        <tr><td style="background:#8A5A6A;padding:32px 40px;text-align:center;">
+          <p style="margin:0;font-size:22px;font-weight:700;color:#ffffff;">Bansari Collections</p>
+          <p style="margin:8px 0 0;font-size:14px;color:#f0d8df;">Welcome to the family</p>
+        </td></tr>
+        <tr><td style="padding:40px;">
+          <p style="margin:0 0 8px;font-size:18px;font-weight:600;">Hi ${data.customerName},</p>
+          <p style="margin:0 0 20px;font-size:15px;color:#6b5b5b;">
+            Thank you for creating an account with us. Your account is ready, and your order history and
+            addresses will now be saved for a faster checkout next time.
+          </p>
+          <p style="margin:0 0 28px;font-size:15px;color:#6b5b5b;">
+            Every piece we make is chosen with care — handcrafted fabrics, considered detail, and quality
+            we stand behind.
+          </p>
+          <table cellpadding="0" cellspacing="0"><tr><td style="background:#8A5A6A;border-radius:999px;">
+            <a href="https://www.bansaricollection.in/shop" style="display:inline-block;padding:14px 32px;font-size:15px;font-weight:600;color:#ffffff;text-decoration:none;">Start Shopping</a>
+          </td></tr></table>
+        </td></tr>
+        <tr><td style="background:#fdf6f8;padding:20px 40px;text-align:center;">
+          <p style="margin:0;font-size:12px;color:#b09090;">&copy; ${new Date().getFullYear()} Bansari Collections. All rights reserved.</p>
+        </td></tr>
+      </table>
+    </td></tr>
+  </table>
+</body>
+</html>`;
+
+  return sendEmail({
+    to: data.customerEmail,
+    subject: "Welcome to Bansari Collections",
+    html,
+  });
+}
+
 export type OrderStageData = {
   orderNumber: string;
   customerName: string;
