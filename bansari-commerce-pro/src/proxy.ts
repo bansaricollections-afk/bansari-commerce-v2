@@ -20,10 +20,15 @@ const PROD_SECURITY_HEADERS: Record<string, string> = {
   'Permissions-Policy':        'camera=(), microphone=(), geolocation=(), payment=()',
   'Content-Security-Policy': [
     "default-src 'self'",
-    "script-src 'self' 'unsafe-inline' https://checkout.razorpay.com https://sdk.cashfree.com",
+    // connect.facebook.net serves fbevents.js; www.facebook.com receives the
+    // pixel's events via fetch to /tr, with an image beacon as fallback. All
+    // three were already declared in next.config.ts, which this header
+    // overrides — so the pixel initialised but every request it made was
+    // blocked. Confirmed live: the page requested fbevents.js and CSP refused.
+    "script-src 'self' 'unsafe-inline' https://checkout.razorpay.com https://sdk.cashfree.com https://connect.facebook.net",
     "frame-src https://api.razorpay.com https://sdk.cashfree.com https://sandbox.cashfree.com https://api.cashfree.com",
-    "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://api.razorpay.com https://sdk.cashfree.com https://sandbox.cashfree.com https://api.cashfree.com",
-    "img-src 'self' data: blob: https://*.supabase.co",
+    "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://api.razorpay.com https://sdk.cashfree.com https://sandbox.cashfree.com https://api.cashfree.com https://www.facebook.com",
+    "img-src 'self' data: blob: https://*.supabase.co https://www.facebook.com",
     "style-src 'self' 'unsafe-inline'",
     "font-src 'self'",
     "object-src 'none'",
