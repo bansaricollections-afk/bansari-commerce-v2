@@ -18,7 +18,9 @@ const log = createLogger({ service: 'orders.create' });
  * Shape returned by the create_order_with_items RPC.
  * Mirrors the `orders` table columns that are read after insert.
  *
- * create_order_with_items is a RETURNS TABLE (SETOF) Postgres function.
+ * create_order_with_items is declared RETURNS public.orders (a single
+ * composite row), so its result arrives as an object, not an array — see the
+ * normalisation at the call site.
  * postgrest-js 2.110.x infers the RPC result as an error-sentinel union when
  * the generated database types don't include the function signature. The only
  * reliable escape is to cast through `unknown` after the await so TypeScript
@@ -290,8 +292,19 @@ export async function POST(request: NextRequest) {
       { p_order: orderPayload, p_items: itemsPayload },
     );
     const rpcErr = rpcResult.error;
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const rows = (rpcResult.data as any) as DbOrderRow[] | null;
+    /*
+     * create_order_with_items is declared RETURNS public.orders and ends with
+     * `RETURN v_order`, so PostgREST surfaces a single OBJECT — not the array
+     * a RETURNS TABLE/SETOF function would produce. Reading `rows[0]`
+     * unconditionally yielded undefined and returned DB_ERROR AFTER the insert
+     * had already committed, orphaning a captured payment. Accept either shape
+     * so the reader survives whichever variant the database has. Same fix as
+     * the Cashfree path in lib/cashfree-order.ts.
+     */
+    const rpcData = rpcResult.data as unknown;
+    const rows: DbOrderRow[] | null = rpcData == null
+      ? null
+      : (Array.isArray(rpcData) ? rpcData : [rpcData]) as DbOrderRow[];
 
     if (rpcErr) {
       if (rpcErr.code === '23505') {
