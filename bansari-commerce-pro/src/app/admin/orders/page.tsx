@@ -18,9 +18,18 @@ type OrderRow = {
   createdAt: string;
 };
 
+/*
+ * The route returns apiSuccess({ ...result }), which SPREADS the service
+ * result, so data/total/page/pageSize sit at the top level — not nested under
+ * `data`. Reading json.data.data yielded undefined, so the list silently
+ * rendered "0 orders" with no error while the API was returning rows fine.
+ */
 type ApiResponse = {
   success: boolean;
-  data: { data: OrderRow[]; total: number; page: number; pageSize: number };
+  data: OrderRow[];
+  total: number;
+  page: number;
+  pageSize: number;
 };
 
 const ORDER_STATUSES = [
@@ -83,8 +92,8 @@ export default function OrdersPage() {
       const json = (await res.json()) as ApiResponse;
       if (!json.success) throw new Error('Failed to load orders');
 
-      setOrders(json.data.data);
-      setTotal(json.data.total);
+      setOrders(json.data);
+      setTotal(json.total);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Unknown error');
     } finally {
