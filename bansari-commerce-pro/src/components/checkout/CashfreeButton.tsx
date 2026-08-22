@@ -77,6 +77,23 @@ export default function CashfreeButton({ customer, shipping, disabled = false }:
   async function handlePayment() {
     if (loading || items.length === 0 || activeOrderId.current) return;
 
+    /*
+     * Once the Cashfree modal has closed, money may already have moved. From
+     * that point on nothing may re-arm the button: a retry mints a NEW Cashfree
+     * order and charges the customer a second time for the same cart.
+     */
+    let checkoutClosed = false;
+
+    /** Payment may have succeeded but we could not confirm it. Stay locked. */
+    function lockPendingConfirmation() {
+      // setLoading stays true so the button remains visibly disabled.
+      alert(
+        'Your payment may have been completed. Please do NOT pay again — ' +
+        'we are confirming it and will email your order confirmation shortly. ' +
+        'Contact us if you do not hear back.'
+      );
+    }
+
     try {
       setLoading(true);
 
@@ -105,6 +122,7 @@ export default function CashfreeButton({ customer, shipping, disabled = false }:
       const cashfree = window.Cashfree({ mode });
       // The modal result is intentionally not trusted — server verify decides.
       await cashfree.checkout({ paymentSessionId: created.paymentSessionId, redirectTarget: '_modal' });
+      checkoutClosed = true;
 
       // ── 3. Server-side verification (the only proof of payment) ──
       const verifyRes = await fetch('/api/payment/cashfree/verify', {
@@ -120,12 +138,34 @@ export default function CashfreeButton({ customer, shipping, disabled = false }:
         return;
       }
 
-      // Not paid / dropped / failed — let the customer retry.
+      /*
+       * A 5xx means the server could not establish or record the outcome — it
+       * does NOT mean the customer did not pay. Previously every failure was
+       * treated as "not paid", which released the guard and let a second
+       * Cashfree order be created for an already-paid cart. The webhook is the
+       * authoritative reconciliation path and is idempotent, so the safe move
+       * is to stop and let it settle.
+       */
+      if (verifyRes.status >= 500) {
+        lockPendingConfirmation();
+        return;
+      }
+
+      // 4xx: Cashfree itself reports the payment did not complete — safe to retry.
       activeOrderId.current = null;
       setLoading(false);
       alert(verified.message ?? 'Payment was not completed. Please try again.');
     } catch (err) {
       console.error(err);
+
+      // Thrown after the modal closed (network drop, bad JSON): outcome unknown,
+      // money may have moved. Never re-arm.
+      if (checkoutClosed) {
+        lockPendingConfirmation();
+        return;
+      }
+
+      // Failed before the modal ever opened — nothing was charged.
       activeOrderId.current = null;
       setLoading(false);
       alert(err instanceof Error ? err.message : 'Unable to process payment.');
