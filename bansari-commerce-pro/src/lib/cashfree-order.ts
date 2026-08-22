@@ -187,8 +187,18 @@ export async function verifyAndPersistCashfreeOrder(
     p_items: itemsPayload,
   });
   const rpcErr = rpcResult.error;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const rows = (rpcResult.data as any) as DbOrderRow[] | null;
+  /*
+   * create_order_with_items returns a single composite `public.orders` row
+   * (`RETURN v_order`), which PostgREST surfaces as an OBJECT — not the array
+   * a RETURNS TABLE/SETOF function would produce. Reading `rows[0]`
+   * unconditionally yielded undefined and reported "Order not created" AFTER
+   * the insert had already committed, orphaning the payment. Accept either
+   * shape so the reader survives whichever variant the database has.
+   */
+  const rpcData = rpcResult.data as unknown;
+  const rows: DbOrderRow[] | null = rpcData == null
+    ? null
+    : (Array.isArray(rpcData) ? rpcData : [rpcData]) as DbOrderRow[];
 
   if (rpcErr) {
     // 23505 = unique violation: the cf_payment_id index caught a concurrent
@@ -211,6 +221,31 @@ export async function verifyAndPersistCashfreeOrder(
   if (!order) {
     log.error('cashfree.persist.rpc_no_row', { cfOrderId });
     return { ok: false, code: 'DB_ERROR', message: 'Order not created.', status: 500 };
+  }
+
+  /*
+   * Guarantee the Cashfree identity is on the row. Migration 20260820010000
+   * teaches create_order_with_items to persist cf_order_id / cf_payment_id in
+   * the same INSERT, but that migration is not applied everywhere and older
+   * RPC versions silently drop both columns. Without them the idempotency
+   * pre-check above is blind, so a webhook retry would insert a SECOND order
+   * for the same payment. Writing them here is redundant when the RPC already
+   * did it (same values) and load-bearing when it did not.
+   */
+  const { error: cfIdError } = await supabase
+    .from('orders')
+    .update({ cf_order_id: cfOrderId, cf_payment_id: cfPaymentId })
+    .eq('id', order.id);
+
+  if (cfIdError) {
+    // Not fatal — the order and the payment are both real — but it leaves the
+    // duplicate guard disarmed for this order, so surface it loudly.
+    log.error('cashfree.persist.cf_ids_not_written', {
+      cfOrderId,
+      orderId: order.id,
+      errorCode: cfIdError.code,
+      errorMessage: cfIdError.message,
+    });
   }
 
   // ── 5. Reconcile the pending row and write the audit trail ──
