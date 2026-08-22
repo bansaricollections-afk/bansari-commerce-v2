@@ -6,6 +6,56 @@
 @import "tailwindcss";
 
 /* ==========================================
+   SEMANTIC UI TOKENS (shadcn primitives)
+   ==========================================
+   The components in src/components/ui use shadcn's semantic colour names —
+   bg-popover, bg-card, text-muted-foreground, border-input and so on. In
+   Tailwind v4 those utilities resolve against --color-* theme variables, and
+   this project had no @theme block at all, so every one of them emitted NO
+   colour.
+
+   The visible result was an admin "Add New Product" sheet with a fully
+   transparent panel (the page showed through it) and near-invisible labels,
+   inputs and buttons. Dialogs, dropdowns, selects and badges share the same
+   primitives and were affected the same way.
+
+   Mapped onto the existing --bc-* palette rather than importing shadcn's
+   default greys, so the primitives inherit the brand instead of competing
+   with it. `inline` keeps a single source of truth: utilities emit
+   var(--bc-*) and resolve at use time, so declaration order does not matter.
+   ========================================== */
+@theme inline {
+  --color-background:           var(--bc-surface-cream);
+  --color-foreground:           var(--bc-text-ink);
+
+  /* Raised surfaces: solid white so content never shows through. */
+  --color-card:                 #FFFFFF;
+  --color-card-foreground:      var(--bc-text-ink);
+  --color-popover:              #FFFFFF;
+  --color-popover-foreground:   var(--bc-text-ink);
+
+  --color-primary:              var(--bc-brand-mauve);
+  --color-primary-foreground:   var(--bc-text-inverse);
+
+  --color-secondary:            var(--bc-surface-warm);
+  --color-secondary-foreground: var(--bc-text-ink);
+
+  --color-muted:                var(--bc-surface-warm);
+  --color-muted-foreground:     var(--bc-text-muted);
+
+  --color-accent:               var(--bc-brand-mauve-faint);
+  --color-accent-foreground:    var(--bc-brand-mauve-dark);
+
+  /* Matches the red already used inline elsewhere (text-red-600). */
+  --color-destructive:            #DC2626;
+  --color-destructive-foreground: var(--bc-text-inverse);
+
+  --color-border:               var(--bc-border);
+  --color-input:                var(--bc-border);
+  --color-ring:                 var(--bc-brand-mauve);
+}
+
+/* ==========================================
    BANSARI COLLECTION — DESIGN SYSTEM v2.0
    World-class luxury ethnic fashion
    ========================================== */
