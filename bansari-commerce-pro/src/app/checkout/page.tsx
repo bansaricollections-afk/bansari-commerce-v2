@@ -10,6 +10,7 @@ import RazorpayButton from "@/components/checkout/RazorpayButton";
 import CashfreeButton from "@/components/checkout/CashfreeButton";
 import CheckoutTrustStrip from "@/components/checkout/CheckoutTrustStrip";
 import LuxuryStepIndicator from "@/components/checkout/LuxuryStepIndicator";
+import CouponBanner from "@/components/coupon/CouponBanner";
 import { useCart, useCartHasHydrated, cartLineId } from "@/store/cart";
 import { getShippingCost } from "@/lib/shipping";
 
@@ -454,6 +455,17 @@ export default function CheckoutPage() {
                     and recomputes the discount before charging, so a tampered
                     client cannot widen its own discount.
                   */}
+                  {/*
+                    Shown only while no coupon is applied — once one is on the
+                    order, promoting another offer just invites second-guessing
+                    at the moment of payment.
+                  */}
+                  {!appliedCode && (
+                    <div className="pt-1">
+                      <CouponBanner subtotal={subtotal} />
+                    </div>
+                  )}
+
                   <div className="pt-1">
                     {appliedCode ? (
                       <div className="flex items-center justify-between text-sm">

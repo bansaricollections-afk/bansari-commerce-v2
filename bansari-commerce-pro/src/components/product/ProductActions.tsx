@@ -11,6 +11,7 @@ import type { Product, ProductVariant, SizeAvailability } from '@/types/product'
 
 import CartDrawer from './CartDrawer';
 import NotifyMe from './NotifyMe';
+import CouponBanner from '@/components/coupon/CouponBanner';
 
 interface Props {
   product: Product;
@@ -187,6 +188,15 @@ export default function ProductActions({
           <NotifyMe productId={product.id} productName={product.name} />
         ) : (
           <>
+            {/*
+             * Compact offer line above the CTA. No subtotal is passed: on a
+             * product page there is no cart to measure against, so the banner
+             * states the offer without promising eligibility it cannot check.
+             */}
+            <div className="mb-3">
+              <CouponBanner variant="compact" />
+            </div>
+
             {/*
              * Purchase hierarchy is now explicit rather than flat. Add to Cart
              * is the single dominant action (solid ink, tallest target); Buy

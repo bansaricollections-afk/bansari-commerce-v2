@@ -15,6 +15,7 @@ import { useCart, useCartHasHydrated, cartLineId } from "@/store/cart";
 import CartCrossSell from "@/components/cart/CartCrossSell";
 import CartTrustStrip from "@/components/cart/CartTrustStrip";
 import ShippingProgress from "@/components/cart/ShippingProgress";
+import CouponBanner from "@/components/coupon/CouponBanner";
 import {
   getShippingCost,
   getRemainingForFreeShipping,
@@ -315,6 +316,11 @@ export default function CartPage() {
             {/* Order Summary */}
             <aside className="sticky top-28 h-fit rounded-none bg-white shadow-sm overflow-hidden">
               <ShippingProgress totalAmount={subtotal} />
+
+              {/* Live offer, or nothing when no coupon is currently valid. */}
+              <div className="mt-4">
+                <CouponBanner subtotal={subtotal} />
+              </div>
 
               <div className="p-8">
                 <h2 className="mb-8 text-3xl font-bold">

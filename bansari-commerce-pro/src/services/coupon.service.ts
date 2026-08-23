@@ -106,6 +106,58 @@ export async function validateCoupon(
   return { ok: true, coupon, discount };
 }
 
+export type FeaturedCoupon = {
+  code: string;
+  description: string | null;
+  discountType: 'percentage' | 'flat';
+  discountValue: number;
+  minOrder: number;
+};
+
+/**
+ * The coupon currently worth promoting, or null when there isn't one.
+ *
+ * Derived live from the table rather than hardcoded anywhere, so a banner can
+ * never advertise a code that has expired or hit its usage limit — a customer
+ * meeting "invalid coupon" at the moment they pay is worse than never seeing an
+ * offer. When a coupon lapses every banner disappears on its own; when a new one
+ * is created they all update with no code change.
+ *
+ * Newest-first: creating a code is how a merchant signals the current campaign.
+ */
+export async function getFeaturedCoupon(): Promise<FeaturedCoupon | null> {
+  const supabase = createServiceRoleClient();
+  const nowIso = new Date().toISOString();
+
+  const { data, error } = await supabase
+    .from('coupons')
+    .select('*')
+    .eq('active', true)
+    .or(`expires_at.is.null,expires_at.gt.${nowIso}`)
+    .order('created_at', { ascending: false })
+    .limit(5);
+
+  if (error) {
+    log.warn('coupon.featured_lookup_failed', { errorMessage: error.message });
+    return null;
+  }
+
+  // max_uses is filtered here rather than in SQL: PostgREST cannot compare two
+  // columns, and the candidate set is tiny.
+  const usable = (data as CouponRow[] | null)?.find(
+    (c) => c.max_uses === null || c.uses_count < c.max_uses
+  );
+  if (!usable) return null;
+
+  return {
+    code: usable.code,
+    description: usable.description,
+    discountType: usable.discount_type,
+    discountValue: Number(usable.discount_value),
+    minOrder: Number(usable.min_order ?? 0),
+  };
+}
+
 /**
  * Records a redemption after an order is successfully persisted.
  *
