@@ -183,6 +183,14 @@ export async function POST(request: NextRequest) {
       orderId: cfOrderRef,
       paymentSessionId: cf.paymentSessionId,
       mode: cashfreeMode(),
+      /*
+       * Returned so the browser's Meta Purchase event reports the amount
+       * actually charged, including shipping, rather than a client-side cart
+       * estimate. Reporting only, never an input: the charge is decided by the
+       * Cashfree order created above from this same server-computed figure.
+       */
+      amount: grandTotal,
+      currency: 'INR',
     });
   } catch (err) {
     log.error('cashfree.create-order.unhandled', err);

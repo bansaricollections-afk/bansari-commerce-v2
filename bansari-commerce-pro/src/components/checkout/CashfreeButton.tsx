@@ -2,6 +2,7 @@
 
 import { useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { metaTrack } from '@/analytics/meta-pixel';
 import { useCart } from '@/store/cart';
 
 /**
@@ -133,6 +134,38 @@ export default function CashfreeButton({ customer, shipping, disabled = false }:
       const verified = await verifyRes.json();
 
       if (verified.success) {
+        /*
+         * Purchase was fired on the Razorpay path but never here, so since
+         * production switched to Cashfree the pixel has recorded no conversions
+         * at all — Meta could only optimise toward traffic, not buyers.
+         *
+         * Fired before clearCart(), which empties `items`. `value` is the
+         * server-computed amount returned by create-order, so it matches what
+         * was actually charged including shipping.
+         *
+         * eventID is the Cashfree order id so a later server-side Conversions
+         * API event can deduplicate against this one.
+         *
+         * Catalogue facts and totals only — no name, email, phone, address or
+         * payment detail.
+         */
+        metaTrack(
+          'Purchase',
+          {
+            content_type: 'product',
+            content_ids: items.map((i) => String(i.id)),
+            contents: items.map((i) => ({
+              id: String(i.id),
+              quantity: i.quantity,
+              item_price: i.price,
+            })),
+            num_items: items.reduce((n, i) => n + i.quantity, 0),
+            value: typeof created.amount === 'number' ? created.amount : undefined,
+            currency: created.currency ?? 'INR',
+          },
+          orderId
+        );
+
         clearCart();
         router.push('/order-success');
         return;
