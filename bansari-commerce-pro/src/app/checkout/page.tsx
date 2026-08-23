@@ -114,7 +114,61 @@ export default function CheckoutPage() {
   // the authoritative amount from its own validated cart and that is what is
   // actually charged via Razorpay. Single source: lib/shipping.ts.
   const shipping = getShippingCost(subtotal);
-  const total    = subtotal + shipping;
+
+  /*
+   * Coupon state. `discount` here is display only — the amount actually charged
+   * is recomputed by create-order from the code, so this never decides money.
+   */
+  const [couponInput, setCouponInput]     = useState("");
+  const [appliedCode, setAppliedCode]     = useState<string | null>(null);
+  const [discount, setDiscount]           = useState(0);
+  const [couponLoading, setCouponLoading] = useState(false);
+  const [couponMessage, setCouponMessage] = useState<string | null>(null);
+
+  const total = Math.max(0, subtotal + shipping - discount);
+
+  async function applyCoupon(e: React.FormEvent) {
+    e.preventDefault();
+    if (couponLoading) return;
+
+    setCouponLoading(true);
+    setCouponMessage(null);
+
+    try {
+      const res = await fetch("/api/coupons/validate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          code: couponInput.trim(),
+          items: items.map((i) => ({
+            productId: i.id,
+            quantity: i.quantity,
+            variantId: i.variantId ?? null,
+          })),
+        }),
+      });
+      const json = await res.json();
+
+      if (!json.success) {
+        setCouponMessage(json.message ?? "That coupon could not be applied.");
+        return;
+      }
+
+      setAppliedCode(json.code);
+      setDiscount(Number(json.discount) || 0);
+      setCouponInput("");
+    } catch {
+      setCouponMessage("Could not check that coupon. Please try again.");
+    } finally {
+      setCouponLoading(false);
+    }
+  }
+
+  function removeCoupon() {
+    setAppliedCode(null);
+    setDiscount(0);
+    setCouponMessage(null);
+  }
 
   /*
    * begin_checkout — fired once the persisted cart has actually rehydrated and
@@ -374,6 +428,17 @@ export default function CheckoutPage() {
                     <span className="tabular-nums">&#x20B9;{subtotal.toLocaleString("en-IN")}</span>
                   </div>
 
+                  {discount > 0 && (
+                    <div className="flex justify-between text-sm">
+                      <span className="text-emerald-700">
+                        Discount {appliedCode && <span className="text-slate-400">({appliedCode})</span>}
+                      </span>
+                      <span className="tabular-nums font-medium text-emerald-700">
+                        &minus;&#x20B9;{discount.toLocaleString("en-IN")}
+                      </span>
+                    </div>
+                  )}
+
                   <div className="flex justify-between text-sm">
                     <span className="text-slate-500">Shipping</span>
                     <span className="tabular-nums font-medium">
@@ -381,6 +446,49 @@ export default function CheckoutPage() {
                         ? <span className="text-emerald-600 font-semibold">FREE</span>
                         : `\u20b9${shipping.toLocaleString("en-IN")}`}
                     </span>
+                  </div>
+
+                  {/*
+                    Coupon entry. The figure shown here is a PREVIEW returned by
+                    /api/coupons/validate \u2014 create-order re-validates the code
+                    and recomputes the discount before charging, so a tampered
+                    client cannot widen its own discount.
+                  */}
+                  <div className="pt-1">
+                    {appliedCode ? (
+                      <div className="flex items-center justify-between text-sm">
+                        <span className="text-emerald-700">Coupon {appliedCode} applied</span>
+                        <button
+                          type="button"
+                          onClick={removeCoupon}
+                          className="text-xs uppercase tracking-[0.08em] text-slate-500 underline"
+                        >
+                          Remove
+                        </button>
+                      </div>
+                    ) : (
+                      <form onSubmit={applyCoupon} className="flex gap-2">
+                        <input
+                          type="text"
+                          value={couponInput}
+                          onChange={(e) => setCouponInput(e.target.value.toUpperCase())}
+                          placeholder="Coupon code"
+                          maxLength={40}
+                          aria-label="Coupon code"
+                          className="h-11 min-w-0 flex-1 rounded-none border border-[#E6DFDA] px-3 text-sm uppercase outline-none focus:border-[#8A5A6A]"
+                        />
+                        <button
+                          type="submit"
+                          disabled={couponLoading || couponInput.trim().length === 0}
+                          className="h-11 rounded-none border border-[#8A5A6A] px-4 text-xs font-semibold uppercase tracking-[0.08em] text-[#8A5A6A] disabled:opacity-40"
+                        >
+                          {couponLoading ? "\u2026" : "Apply"}
+                        </button>
+                      </form>
+                    )}
+                    {couponMessage && (
+                      <p className="mt-2 text-xs text-red-600">{couponMessage}</p>
+                    )}
                   </div>
 
                   <div aria-hidden="true" className="border-t border-slate-100" />
@@ -394,6 +502,7 @@ export default function CheckoutPage() {
                 <div onClick={handlePayAttempt}>
                   {paymentProvider === "cashfree" ? (
                     <CashfreeButton
+                      coupon={appliedCode}
                       customer={{
                         name:  fields.fullName,
                         email: fields.email,

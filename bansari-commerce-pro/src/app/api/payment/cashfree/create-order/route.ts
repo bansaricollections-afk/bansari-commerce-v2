@@ -9,6 +9,7 @@ import { generateRequestId } from '@/lib/request-id';
 import { checkRateLimit, RATE_LIMIT_CHECKOUT } from '@/lib/rate-limit';
 import { apiError } from '@/lib/api-response';
 import { getShippingCost } from '@/lib/shipping';
+import { validateCoupon } from '@/services/coupon.service';
 
 export const dynamic = 'force-dynamic';
 
@@ -104,9 +105,46 @@ export async function POST(request: NextRequest) {
     // ── Authoritative pricing — RUPEES, never paise, never client-supplied ──
     const subtotal = round2(lineItems.reduce((s, r) => s + r.lineTotal, 0));
     const shippingFee = getShippingCost(subtotal);
-    const discount = 0;
+
+    /*
+     * The browser may send a coupon CODE; it may never send a discount AMOUNT.
+     * The code is re-validated here against the database and the rupee figure
+     * recomputed, so /api/coupons/validate is only ever a preview — this is the
+     * number that reaches Cashfree.
+     *
+     * An invalid or expired code is NOT an error: it is simply ignored and the
+     * order proceeds at full price. Failing the whole checkout because someone
+     * pasted a stale code would cost a sale.
+     */
+    let discount = 0;
+    let appliedCouponCode: string | null = null;
+
+    const couponInput =
+      typeof body?.coupon === 'string' && body.coupon.trim().length > 0
+        ? body.coupon.trim().slice(0, 40)
+        : null;
+
+    if (couponInput) {
+      const couponResult = await validateCoupon(couponInput, subtotal);
+      if (couponResult.ok) {
+        discount = couponResult.discount;
+        appliedCouponCode = couponResult.coupon.code;
+      } else {
+        log.info('cashfree.create-order.coupon_rejected', {
+          code: couponInput,
+          reason: couponResult.reason,
+        });
+      }
+    }
+
     const grandTotal = round2(subtotal + shippingFee - discount);
-    log.info('cashfree.create-order.pricing', { subtotal, shippingFee, grandTotal });
+    log.info('cashfree.create-order.pricing', {
+      subtotal,
+      shippingFee,
+      discount,
+      coupon: appliedCouponCode,
+      grandTotal,
+    });
 
     const cfOrderRef = generateCfOrderRef();
     const userId = await resolveUserId(request);
@@ -135,6 +173,10 @@ export async function POST(request: NextRequest) {
           subtotal,
           shipping_fee:           shippingFee,
           discount,
+          // Carried through so the persist path can write orders.coupon_code
+          // and count the redemption. Without it the applied code is lost
+          // between payment and order creation.
+          coupon_code:            appliedCouponCode,
           grand_total:            grandTotal,
           currency:               'INR',
           items_json:             lineItems,

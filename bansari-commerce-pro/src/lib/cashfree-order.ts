@@ -24,6 +24,7 @@ import {
   sendOrderConfirmationEmail,
   sendOwnerNewOrderEmail,
 } from '@/services/email.service';
+import { recordCouponRedemption } from '@/services/coupon.service';
 
 export type CashfreePersistResult =
   | { ok: true; orderId: string; orderNumber: string; idempotent: boolean }
@@ -155,6 +156,10 @@ export async function verifyAndPersistCashfreeOrder(
     currency:           pending.currency ?? 'INR',
     subtotal:           String(pending.subtotal),
     discount:           String(pending.discount ?? 0),
+    // Copied from the snapshot, not recomputed: the discount was already
+    // applied to the amount Cashfree charged, so re-deriving it here could
+    // disagree with what the customer actually paid.
+    coupon_code:        pending.coupon_code ?? null,
     shipping_fee:       String(pending.shipping_fee ?? 0),
     tax:                '0',
     grand_total:        String(pending.grand_total),
@@ -260,6 +265,21 @@ export async function verifyAndPersistCashfreeOrder(
       orderId: order.id,
       errorCode: cfIdError.code,
       errorMessage: cfIdError.message,
+    });
+  }
+
+  /*
+   * Count the redemption once, here, on first persist only. The idempotent
+   * returns above exit earlier, so a webhook arriving after the browser verify
+   * cannot double-count a coupon toward its max_uses limit.
+   *
+   * Best-effort: the customer has already paid and the order exists, so a
+   * failed counter update is logged rather than surfaced.
+   */
+  if (pending.coupon_code) {
+    await recordCouponRedemption(pending.coupon_code, {
+      orderId: order.id,
+      requestId: ctx.requestId,
     });
   }
 

@@ -31,7 +31,13 @@ type ShippingDetails = {
   country?: string;
 };
 
-type Props = { customer: CustomerDetails; shipping: ShippingDetails; disabled?: boolean };
+type Props = {
+  customer: CustomerDetails;
+  shipping: ShippingDetails;
+  disabled?: boolean;
+  /** Applied coupon CODE only — the discount amount is decided server-side. */
+  coupon?: string | null;
+};
 
 type CashfreeInstance = {
   checkout: (opts: { paymentSessionId: string; redirectTarget?: string }) => Promise<unknown>;
@@ -67,7 +73,7 @@ function loadCashfreeSdk(): Promise<void> {
   });
 }
 
-export default function CashfreeButton({ customer, shipping, disabled = false }: Props) {
+export default function CashfreeButton({ customer, shipping, disabled = false, coupon = null }: Props) {
   const router = useRouter();
   const { items, clearCart } = useCart();
 
@@ -106,6 +112,7 @@ export default function CashfreeButton({ customer, shipping, disabled = false }:
           items: items.map((i) => ({ productId: i.id, quantity: i.quantity, variantId: i.variantId ?? null })),
           customer,
           shipping,
+          coupon,
         }),
       });
       const created = await createRes.json();
