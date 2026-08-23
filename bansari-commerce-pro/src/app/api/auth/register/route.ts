@@ -41,6 +41,16 @@ export async function POST(request: NextRequest) {
   const email    = typeof body.email === 'string' ? body.email.trim().toLowerCase() : '';
   const password = typeof body.password === 'string' ? body.password : '';
 
+  /*
+   * SEC-03. Field caps on a public, unauthenticated endpoint. Without them a
+   * multi-megabyte string is regex-tested and forwarded to Supabase on every
+   * request. The limits are generous versus real data (RFC 5321 caps an address
+   * at 254) and bcrypt ignores input beyond 72 bytes anyway.
+   */
+  if (name.length > 100 || email.length > 254 || password.length > 200) {
+    return apiError(requestId, 'VALIDATION_ERROR', 'One or more fields are too long.', 400);
+  }
+
   if (!name)  return apiError(requestId, 'MISSING_FIELD', 'Please enter your name.', 400);
   if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) {
     return apiError(requestId, 'INVALID_EMAIL', 'Please enter a valid email address.', 400);

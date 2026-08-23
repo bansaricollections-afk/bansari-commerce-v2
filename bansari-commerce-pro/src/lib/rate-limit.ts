@@ -48,6 +48,9 @@ export const RATE_LIMIT_CHECKOUT: RateLimitConfig  = { limit: 20,  windowMs: 60_
 export const RATE_LIMIT_PAYMENT: RateLimitConfig   = { limit: 10,  windowMs: 60_000 };
 export const RATE_LIMIT_WEBHOOK: RateLimitConfig   = { limit: 120, windowMs: 60_000 };
 export const RATE_LIMIT_ADMIN: RateLimitConfig     = { limit: 60,  windowMs: 60_000 };
+// Public search: generous for humans, bounded for scrapers hitting an
+// unindexed leading-wildcard ILIKE on every call.
+export const RATE_LIMIT_SEARCH: RateLimitConfig    = { limit: 30,  windowMs: 60_000 };
 
 /**
  * Extracts the best-available client IP from the request.

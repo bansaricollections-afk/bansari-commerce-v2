@@ -7,6 +7,15 @@ export async function POST(req: NextRequest) {
     const body = await req.json();
     const email: unknown = body?.email;
 
+    // SEC-03. Cap before the regex runs: this endpoint is public and
+    // unauthenticated, and 254 is the RFC 5321 maximum for an address.
+    if (typeof email === "string" && email.length > 254) {
+      return NextResponse.json(
+        { error: "Please enter a valid email address." },
+        { status: 400 }
+      );
+    }
+
     if (typeof email !== "string" || !EMAIL_RE.test(email)) {
       return NextResponse.json(
         { error: "Please enter a valid email address." },

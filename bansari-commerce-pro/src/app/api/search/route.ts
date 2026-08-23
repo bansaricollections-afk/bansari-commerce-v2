@@ -4,6 +4,8 @@
 // Returns JSON matching SearchResult shape.
 import { NextRequest, NextResponse } from 'next/server';
 import { searchProducts, logSearch } from '@/services/search.service';
+import { checkRateLimit, RATE_LIMIT_SEARCH } from '@/lib/rate-limit';
+import { generateRequestId } from '@/lib/request-id';
 import type { SearchParams } from '@/types/search';
 import type { SortOption } from '@/types/filter-params';
 
@@ -29,10 +31,28 @@ function parsePositiveFloat(raw: string | null): number | undefined {
 export async function GET(req: NextRequest): Promise<NextResponse> {
   const sp = req.nextUrl.searchParams;
 
+  /*
+   * SEC-04. Public, unauthenticated, and each call runs a leading-wildcard
+   * ILIKE that cannot use an index — so every request is a sequential scan.
+   * That is the cheapest resource-amplification target on the site once the
+   * store is publicly promoted and crawled.
+   */
+  const limited = checkRateLimit(req, 'search', RATE_LIMIT_SEARCH, generateRequestId());
+  if (limited) return limited;
+
   const query = sp.get('q')?.trim() ?? '';
   if (!query) {
     return NextResponse.json(
       { error: 'Missing required query parameter: q' },
+      { status: 400 }
+    );
+  }
+
+  // Bound the term itself: nothing legitimate is this long, and it caps the
+  // work handed to the database.
+  if (query.length > 100) {
+    return NextResponse.json(
+      { error: 'Search query is too long.' },
       { status: 400 }
     );
   }

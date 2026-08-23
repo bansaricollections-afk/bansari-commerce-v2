@@ -57,6 +57,43 @@ export type OrderShippedData = {
   estimatedDelivery?: string;
 };
 
+/**
+ * SEC-02. Every template below builds HTML with template literals, and most of
+ * the interpolated values are attacker-supplied: customer name, address lines,
+ * product names. Unescaped, someone registering as
+ * `<a href="evil.example">Verify your account</a>` gets that markup rendered
+ * inside mail sent from our own verified domain — phishing with our SPF/DKIM
+ * on it, and the owner notification carries it straight to the shop inbox.
+ *
+ * Escaping is applied at the BOUNDARY (deepEscape below) rather than at each of
+ * the ~26 interpolation sites, so a template added later cannot forget to do
+ * it. Applied only to the HTML argument: subjects and the `to:` header are not
+ * HTML, and escaping those would corrupt real addresses and show &amp; to
+ * customers.
+ */
+function escapeHtml(value: string): string {
+  return value
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
+/** Recursively escapes every string in a payload, preserving shape and types. */
+function deepEscape<T>(input: T): T {
+  if (typeof input === "string") return escapeHtml(input) as unknown as T;
+  if (Array.isArray(input)) return input.map(deepEscape) as unknown as T;
+  if (input && typeof input === "object") {
+    const out: Record<string, unknown> = {};
+    for (const [k, v] of Object.entries(input as Record<string, unknown>)) {
+      out[k] = deepEscape(v);
+    }
+    return out as T;
+  }
+  return input;
+}
+
 function formatRupees(amount: number): string {
   return `\u20b9${amount.toLocaleString("en-IN", {
     minimumFractionDigits: 2,
@@ -254,7 +291,7 @@ export async function sendOrderConfirmationEmail(
   return sendEmail({
     to: data.customerEmail,
     subject: `Order Confirmed \u2014 ${data.orderNumber} | Bansari Collections`,
-    html: orderConfirmationHtml(data),
+    html: orderConfirmationHtml(deepEscape(data)),
   });
 }
 
@@ -319,7 +356,7 @@ export async function sendOwnerNewOrderEmail(
   return sendEmail({
     to,
     subject: `New order ${data.orderNumber} \u2014 ${formatRupees(data.grandTotal)}`,
-    html: ownerNewOrderHtml(data),
+    html: ownerNewOrderHtml(deepEscape(data)),
   });
 }
 
@@ -334,7 +371,7 @@ export async function sendOrderShippedEmail(
   return sendEmail({
     to: data.customerEmail,
     subject: `Your Order Has Shipped \u2014 ${data.orderNumber} | Bansari Collections`,
-    html: orderShippedHtml(data),
+    html: orderShippedHtml(deepEscape(data)),
   });
 }
 
@@ -346,6 +383,7 @@ export type WelcomeEmailData = {
 export async function sendWelcomeEmail(
   data: WelcomeEmailData
 ): Promise<EmailResult> {
+  const d = deepEscape(data);
   const html = `<!DOCTYPE html>
 <html lang="en">
 <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Welcome</title></head>
@@ -358,7 +396,7 @@ export async function sendWelcomeEmail(
           <p style="margin:10px 0 0;font-size:13px;color:#C9A96E;letter-spacing:0.08em;">Welcome to the family</p>
         </td></tr>
         <tr><td style="padding:40px;">
-          <p style="margin:0 0 8px;font-size:18px;font-weight:600;">Hi ${data.customerName},</p>
+          <p style="margin:0 0 8px;font-size:18px;font-weight:600;">Hi ${d.customerName},</p>
           <p style="margin:0 0 20px;font-size:15px;color:#6b5b5b;">
             Thank you for creating an account with us. Your account is ready, and your order history and
             addresses will now be saved for a faster checkout next time.
@@ -455,7 +493,7 @@ export async function sendOutForDeliveryEmail(
         lead: "Your order {order} is out for delivery and should reach you today.",
         closing: "Please keep your phone reachable so our courier partner can find you.",
       },
-      data
+      deepEscape(data)
     ),
   });
 }
@@ -473,7 +511,7 @@ export async function sendOrderDeliveredEmail(
         closing:
           "If anything is not right, reply to this email within 7 days and we will make it good \u2014 see our Return &amp; Refund Policy.",
       },
-      data
+      deepEscape(data)
     ),
   });
 }

@@ -60,6 +60,17 @@ export async function POST(request: NextRequest) {
 
     // ── Validate cart (server-authoritative) ──
     const rawItems = Array.isArray(body?.items) ? (body.items as CartItem[]) : null;
+
+    /*
+     * SEC-03. validateCartItems() performs a database lookup per line, so an
+     * unbounded items array turns one cheap anonymous request into thousands
+     * of queries — a free amplification primitive on a public endpoint. No
+     * genuine cart approaches this cap.
+     */
+    if (rawItems && rawItems.length > 50) {
+      return apiError(requestId, 'VALIDATION_ERROR', 'Too many items in cart.', 400);
+    }
+
     if (!rawItems || rawItems.length === 0) {
       return apiError(requestId, 'VALIDATION_ERROR', 'Cart is empty.', 400);
     }
