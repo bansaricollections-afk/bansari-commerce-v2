@@ -71,16 +71,31 @@ function clamp(value: unknown): string | undefined {
 /**
  * Resolve the client IP.
  *
- * On Vercel `x-forwarded-for` is set by the edge and its FIRST entry is the
- * real client; later entries are proxies. `x-real-ip` is the fallback. Both
- * are spoofable in principle, but on Vercel the platform overwrites
- * x-forwarded-for, so the first hop is trustworthy in practice.
+ * Cloudflare sits in front of this domain, so Vercel's connecting client is a
+ * Cloudflare edge node, not the visitor. Reading `x-forwarded-for` alone
+ * therefore reported a Cloudflare address (172.64.0.0/13) as the customer's
+ * IP on every single order — observed live as 172.70.189.124 — which is a
+ * fact that simply isn't true being sent to Meta, degrading match quality and
+ * mis-attributing geography.
+ *
+ * `cf-connecting-ip` is set by Cloudflare and holds the true visitor IP. It
+ * is checked first, then Akamai/Cloudflare's `true-client-ip`, then the
+ * generic proxy headers for any path that does not pass through Cloudflare.
+ *
+ * These headers are spoofable by anyone talking to the origin directly, but
+ * this value is REPORTING METADATA only — it never influences pricing,
+ * payment or authorisation — so a forged value costs nothing beyond one wrong
+ * analytics row.
  *
  * An IPv4-mapped IPv6 prefix is stripped — Meta rejects `::ffff:1.2.3.4`.
  */
 function resolveClientIp(request: NextRequest): string | undefined {
   const forwarded = request.headers.get('x-forwarded-for');
-  const raw = forwarded?.split(',')[0]?.trim() || request.headers.get('x-real-ip')?.trim();
+  const raw =
+    request.headers.get('cf-connecting-ip')?.trim() ||
+    request.headers.get('true-client-ip')?.trim() ||
+    forwarded?.split(',')[0]?.trim() ||
+    request.headers.get('x-real-ip')?.trim();
   if (!raw) return undefined;
   const normalised = raw.startsWith('::ffff:') ? raw.slice(7) : raw;
   return clamp(normalised);
