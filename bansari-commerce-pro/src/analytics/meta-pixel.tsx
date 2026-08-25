@@ -84,9 +84,25 @@ export default function MetaPixel() {
   if (!PIXEL_ID) return null;
 
   return (
+    /*
+     * beforeInteractive, NOT afterInteractive — this is load-bearing.
+     *
+     * This snippet defines window.fbq (with its own internal queue) and then
+     * async-injects fbevents.js. afterInteractive ran it AFTER hydration, but
+     * ProductActions fires ViewContent from a useEffect that runs AT
+     * hydration, and metaTrack() silently returns when window.fbq is
+     * undefined. ViewContent therefore never fired on a direct product-page
+     * landing — the exact path ad traffic takes — while PageView worked,
+     * because the snippet emits that itself once it finally runs.
+     *
+     * Defining fbq first means events fired during hydration land in its
+     * queue and flush when fbevents.js loads. This is why Meta documents the
+     * snippet as belonging in <head>. Nothing is fetched synchronously: the
+     * inline script only injects an async <script>, so nothing blocks.
+     */
     <Script
       id="meta-pixel"
-      strategy="afterInteractive"
+      strategy="beforeInteractive"
       dangerouslySetInnerHTML={{
         __html: `
 !function(f,b,e,v,n,t,s)
