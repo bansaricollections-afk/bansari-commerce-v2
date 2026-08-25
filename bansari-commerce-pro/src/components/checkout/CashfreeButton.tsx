@@ -2,7 +2,7 @@
 
 import { useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { metaTrack } from '@/analytics/meta-pixel';
+import { trackPurchase } from '@/analytics/events';
 import { useCart } from '@/store/cart';
 
 /**
@@ -142,36 +142,51 @@ export default function CashfreeButton({ customer, shipping, disabled = false, c
 
       if (verified.success) {
         /*
-         * Purchase was fired on the Razorpay path but never here, so since
-         * production switched to Cashfree the pixel has recorded no conversions
-         * at all — Meta could only optimise toward traffic, not buyers.
+         * The confirmed-success point: reached only after /verify has
+         * established server-side, against Cashfree, that the order is PAID.
+         * The SDK's own modal result is never treated as proof.
+         *
+         * This one call reports Vercel Analytics, GA4, the Meta Pixel and the
+         * Google Ads conversion. Until now this path fired ONLY the Meta
+         * pixel, so since production switched to Cashfree neither GA-style
+         * analytics nor Vercel recorded a single purchase — the same class of
+         * gap that previously left Meta itself blind here.
          *
          * Fired before clearCart(), which empties `items`. `value` is the
          * server-computed amount returned by create-order, so it matches what
          * was actually charged including shipping.
          *
-         * eventID is the Cashfree order id so a later server-side Conversions
-         * API event can deduplicate against this one.
+         * transactionId is the Cashfree order id, which the server-side
+         * Conversions API Purchase reuses as its event_id — that pairing is
+         * what stops the conversion being counted twice.
          *
-         * Catalogue facts and totals only — no name, email, phone, address or
-         * payment detail.
+         * Email and phone are passed only for Google Ads Enhanced
+         * Conversions, which is off unless
+         * NEXT_PUBLIC_GOOGLE_ADS_ENHANCED_CONVERSIONS is explicitly set. No
+         * address or payment detail is ever sent.
          */
-        metaTrack(
-          'Purchase',
-          {
-            content_type: 'product',
-            content_ids: items.map((i) => String(i.id)),
-            contents: items.map((i) => ({
-              id: String(i.id),
-              quantity: i.quantity,
-              item_price: i.price,
-            })),
-            num_items: items.reduce((n, i) => n + i.quantity, 0),
-            value: typeof created.amount === 'number' ? created.amount : undefined,
-            currency: created.currency ?? 'INR',
-          },
-          orderId
-        );
+        trackPurchase({
+          transactionId: orderId,
+          /*
+           * created.amount is the server-computed charge and is what should
+           * be reported. The fallback is the client-side cart total, NOT 0 —
+           * a zero-value purchase is worse than a slightly stale one, because
+           * it silently drags every ROAS and value-optimisation calculation
+           * toward zero rather than being visibly missing.
+           */
+          value:
+            typeof created.amount === 'number'
+              ? created.amount
+              : items.reduce((sum, i) => sum + i.price * i.quantity, 0),
+          currency: created.currency ?? 'INR',
+          items: items.map((i) => ({
+            id: i.id,
+            name: i.name,
+            price: i.price,
+            quantity: i.quantity,
+          })),
+          customer: { email: customer.email, phone: customer.phone },
+        });
 
         clearCart();
         router.push('/order-success');

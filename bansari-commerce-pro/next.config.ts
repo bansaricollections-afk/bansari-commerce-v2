@@ -96,17 +96,41 @@ const nextConfig: NextConfig = {
               // `_modal` iframe is not yet added — it is to be confirmed from
               // the preview console (Cashfree docs do not pin it) before the
               // modal can render.
+              // www.googletagmanager.com serves gtag.js for GA4 and Google Ads.
+              // Exact origin, no wildcard — this is gtag.js loaded directly,
+              // NOT Google Tag Manager, which would need a far looser policy
+              // to run container-injected tags. See src/analytics/google-tag.tsx.
+              //
+              // googleads.g.doubleclick.net and googleadservices.com are loaded
+              // as SCRIPTS by the Ads conversion tag (/pagead/viewthrough-
+              // conversion). Verified against a live tag: without them the
+              // conversion is blocked and Ads records nothing, while GA4 keeps
+              // working — a failure that is invisible unless you read the CSP
+              // console.
               isDev
-                ? "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://checkout.razorpay.com https://api.razorpay.com https://connect.facebook.net https://sdk.cashfree.com"
-                : "script-src 'self' 'unsafe-inline' https://checkout.razorpay.com https://api.razorpay.com https://connect.facebook.net https://sdk.cashfree.com",
+                ? "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://checkout.razorpay.com https://api.razorpay.com https://connect.facebook.net https://sdk.cashfree.com https://www.googletagmanager.com https://googleads.g.doubleclick.net https://www.googleadservices.com"
+                : "script-src 'self' 'unsafe-inline' https://checkout.razorpay.com https://api.razorpay.com https://connect.facebook.net https://sdk.cashfree.com https://www.googletagmanager.com https://googleads.g.doubleclick.net https://www.googleadservices.com",
               "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
               "font-src 'self' https://fonts.gstatic.com",
               // Supabase, Razorpay and WhatsApp API calls.
               // www.facebook.com receives Meta Pixel events via fetch/XHR to /tr.
-              `connect-src 'self' https://*.supabase.co wss://*.supabase.co https://api.razorpay.com https://wa.me https://www.facebook.com`,
+              // GA4 beacons go to *.google-analytics.com (region-sharded, so a
+              // wildcard is unavoidable) and *.analytics.google.com; gtag also
+              // POSTs back to googletagmanager.com.
+              //
+              // The Google Ads CONVERSION itself is sent to the visitor's local
+              // Google ccTLD (/pagead/1p-conversion) and to the DoubleClick
+              // origins — not to google.com. www.google.co.in is listed because
+              // this store sells into India; a visitor browsing from another
+              // country hits their own ccTLD and their remarketing ping is
+              // dropped, which costs audience signal but never the order.
+              `connect-src 'self' https://*.supabase.co wss://*.supabase.co https://api.razorpay.com https://wa.me https://www.facebook.com https://www.googletagmanager.com https://*.google-analytics.com https://*.analytics.google.com https://www.google.com https://www.google.co.in https://www.googleadservices.com https://googleads.g.doubleclick.net https://ad.doubleclick.net`,
               // Images: Supabase storage + Unsplash + Pexels + Shopify CDN.
               // www.facebook.com is the Meta Pixel image-beacon fallback (/tr).
-              "img-src 'self' data: blob: https://*.supabase.co https://images.unsplash.com https://images.pexels.com https://cdn.shopify.com https://www.facebook.com",
+              // google-analytics.com and the Google Ads/DoubleClick origins are
+              // the equivalent image-beacon fallbacks for gtag when fetch is
+              // unavailable, and carry the Ads conversion pings.
+              "img-src 'self' data: blob: https://*.supabase.co https://images.unsplash.com https://images.pexels.com https://cdn.shopify.com https://www.facebook.com https://*.google-analytics.com https://www.googletagmanager.com https://www.google.com https://www.google.co.in https://googleads.g.doubleclick.net",
               // Razorpay payment iframe
               "frame-src https://api.razorpay.com https://checkout.razorpay.com",
               "object-src 'none'",

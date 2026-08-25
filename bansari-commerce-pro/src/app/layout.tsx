@@ -3,6 +3,7 @@ import { Playfair_Display, Inter } from 'next/font/google';
 import { Analytics } from '@vercel/analytics/next';
 import MetaPixel from '@/analytics/meta-pixel';
 import AttributionCapture from '@/analytics/attribution-capture';
+import GoogleTag from '@/analytics/google-tag';
 import './globals.css';
 
 /**
@@ -232,6 +233,14 @@ export default function RootLayout({
          * blocks rendering or hydration.
          */}
         <MetaPixel />
+        {/*
+         * GA4 + Google Ads via gtag.js — single mount point, mirroring
+         * MetaPixel. Renders nothing when NEXT_PUBLIC_GA_MEASUREMENT_ID is
+         * unset. Loads afterInteractive, so it never blocks rendering or
+         * hydration. Commerce events are fired through
+         * src/analytics/events.ts, not from here.
+         */}
+        <GoogleTag />
         {/*
          * Ad attribution — records the campaign/click id a visitor arrived
          * with into a first-party cookie, so the server can attach it to the
