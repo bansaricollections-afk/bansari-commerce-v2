@@ -79,9 +79,27 @@ export default function GoogleTag() {
         strategy="afterInteractive"
         src={`https://www.googletagmanager.com/gtag/js?id=${GA_MEASUREMENT_ID}`}
       />
+      {/*
+        * beforeInteractive, NOT afterInteractive — this is load-bearing.
+        *
+        * This snippet defines window.gtag. afterInteractive injects it AFTER
+        * hydration, but ProductActions fires view_item from a useEffect that
+        * runs AT hydration, and gtagEvent() silently returns when window.gtag
+        * is undefined. The result was that view_item never fired on a direct
+        * product-page landing — which is precisely how ad traffic arrives —
+        * while page_view and scroll worked, because gtag.js emits those
+        * itself once it eventually loads.
+        *
+        * Defining the shim first means any event fired before gtag.js
+        * finishes loading is queued on dataLayer and drained on load, which
+        * is exactly why Google documents this snippet as belonging in <head>.
+        * The inline script is a few hundred bytes and loads nothing, so it
+        * costs no meaningful blocking time; gtag.js itself still loads
+        * afterInteractive below.
+        */}
       <Script
         id="gtag-init"
-        strategy="afterInteractive"
+        strategy="beforeInteractive"
         dangerouslySetInnerHTML={{
           __html: `
 window.dataLayer = window.dataLayer || [];
