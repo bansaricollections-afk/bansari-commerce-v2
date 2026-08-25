@@ -3,7 +3,14 @@
 import { useEffect, useState } from "react";
 import { Users, Search, ChevronUp, ChevronDown } from "lucide-react";
 
+/**
+ * Must match what /api/admin/customers actually sends. The route emitted
+ * camelCase (orderCount / totalSpent / lastOrderAt) while this type declared
+ * snake_case, so those columns rendered blank and sorting compared undefined.
+ * The route now emits these names.
+ */
 type CustomerSummary = {
+  user_id: string | null;
   email: string;
   name: string;
   phone: string | null;
@@ -39,10 +46,32 @@ export function AdminCustomers() {
   const [sortAsc, setSortAsc] = useState(false);
 
   useEffect(() => {
+    /*
+     * The route replies { success, requestId, data: CustomerSummary[] }.
+     * This previously did setCustomers(d) with the WHOLE envelope, so
+     * `customers` became an object and the `.filter()` below threw
+     * "filter is not a function" during render — which is what surfaced as
+     * the admin error page, not any server fault.
+     *
+     * The response is read on both branches so a failure shows the API's own
+     * message; `r.statusText` alone is empty over HTTP/2, so the error box
+     * used to render blank.
+     */
     fetch("/api/admin/customers")
-      .then((r) => (r.ok ? r.json() : Promise.reject(r.statusText)))
-      .then((d) => setCustomers(d))
-      .catch((e) => setError(String(e)))
+      .then(async (r) => {
+        const body = await r.json().catch(() => null);
+        if (!r.ok || !body?.success) {
+          throw new Error(
+            body?.message || `Request failed (${r.status})`
+          );
+        }
+        // Defensive: never hand a non-array to the render path again.
+        return Array.isArray(body.data) ? (body.data as CustomerSummary[]) : [];
+      })
+      .then(setCustomers)
+      .catch((e: unknown) =>
+        setError(e instanceof Error ? e.message : String(e))
+      )
       .finally(() => setLoading(false));
   }, []);
 
