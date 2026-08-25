@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import { Playfair_Display, Inter } from 'next/font/google';
 import { Analytics } from '@vercel/analytics/next';
 import MetaPixel from '@/analytics/meta-pixel';
+import AttributionCapture from '@/analytics/attribution-capture';
 import './globals.css';
 
 /**
@@ -231,6 +232,14 @@ export default function RootLayout({
          * blocks rendering or hydration.
          */}
         <MetaPixel />
+        {/*
+         * Ad attribution — records the campaign/click id a visitor arrived
+         * with into a first-party cookie, so the server can attach it to the
+         * order at checkout. Independent of any pixel: it captures channels
+         * whose tag is not installed. Renders nothing and reads no personal
+         * data. See src/analytics/attribution-capture.tsx.
+         */}
+        <AttributionCapture />
       </body>
     </html>
   );

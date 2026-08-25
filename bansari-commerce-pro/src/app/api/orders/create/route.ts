@@ -11,6 +11,8 @@ import { generateRequestId } from '@/lib/request-id';
 import { checkRateLimit, RATE_LIMIT_CHECKOUT } from '@/lib/rate-limit';
 import { apiError } from '@/lib/api-response';
 import { getShippingCost } from '@/lib/shipping';
+import { sendMetaPurchase, isMetaCapiConfigured, splitName } from '@/lib/meta-capi';
+import { readAttribution } from '@/lib/attribution';
 
 const log = createLogger({ service: 'orders.create' });
 
@@ -385,6 +387,75 @@ export async function POST(request: NextRequest) {
       { order_id: order.id, event: 'paid', actor: 'razorpay', metadata: { razorpay_payment_id, requestId } },
     ];
     await supabase.from('order_audit_trail').insert(auditRows);
+
+    /*
+     * ── Meta Conversions API: the server-side Purchase ──
+     *
+     * Unlike the Cashfree path, this route is always invoked by the browser
+     * immediately after the Razorpay handler fires, so the request still
+     * carries the `_fbp`/`_fbc` cookies and attribution can be read straight
+     * off it — no pending-row round trip needed.
+     *
+     * `razorpay_order_id` is the event id because RazorpayButton passes that
+     * exact value as the pixel's `eventID`. When both events arrive Meta
+     * collapses them into one conversion; any other id here would double-count
+     * revenue.
+     *
+     * Reached only past the idempotency guard at the top of this handler, so a
+     * retried submission returns early and cannot re-report. Awaited so it
+     * runs before the function freezes, but never surfaced: the payment is
+     * captured and the order is committed, so a Meta failure is logged and
+     * swallowed exactly like the emails below.
+     */
+    if (isMetaCapiConfigured()) {
+      const attribution = readAttribution(request);
+      const { first, last } = splitName(customerName);
+
+      const capiSent = await sendMetaPurchase({
+        eventId: razorpay_order_id,
+        value: Number(order.grand_total),
+        currency: 'INR',
+        contents: lineItems.map((li) => ({
+          id: String(li.productId),
+          quantity: Number(li.quantity),
+          item_price: Number(li.unitPrice),
+        })),
+        orderNumber: order.order_number,
+        customer: {
+          email: customerEmail,
+          phone: customerPhone,
+          firstName: first,
+          lastName: last,
+          city: shippingData.city,
+          state: shippingData.state,
+          postalCode: shippingData.postalCode,
+          country: shippingData.country ?? 'IN',
+          userId,
+        },
+        attribution,
+        requestId,
+      });
+
+      // marketing_json is written regardless of whether Meta accepted the
+      // event — it is the record of where the order came from, and it stays
+      // useful for reconciliation even when the report failed. capi_sent_at is
+      // set only on success, leaving a failed send retryable.
+      const { error: attrError } = await supabase
+        .from('orders')
+        .update({
+          marketing_json: attribution,
+          ...(capiSent ? { capi_sent_at: new Date().toISOString() } : {}),
+        })
+        .eq('id', order.id);
+
+      if (attrError) {
+        rLog.warn('orders.create.attribution_not_written', {
+          orderId: order.id,
+          errorCode: attrError.code,
+          errorMessage: attrError.message,
+        });
+      }
+    }
 
     try {
       await sendOrderConfirmationEmail({
