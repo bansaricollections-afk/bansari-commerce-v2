@@ -7,8 +7,23 @@ import type { OrderV2, OrderTimelineEntry } from '@/types/order-v2';
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
-type ApiOrderResponse  = { success: boolean; data: OrderV2 };
-type ApiListResponse   = { success: boolean; data: OrderTimelineEntry[] };
+/*
+ * These must mirror what the routes actually send. apiSuccess() SPREADS its
+ * argument — `{ success: true, ...data }` — so `apiSuccess({ order })` puts
+ * the order under `order`, not under `data`. There is no `data` key at all.
+ *
+ * Typing it as `{ data: OrderV2 }` compiled perfectly and silently read
+ * undefined, so the page reported "Order not found" for orders that existed
+ * and loaded fine. The list page works only because ITS route spreads a
+ * result object that happens to contain a `data` field of its own.
+ */
+type ApiOrderResponse =
+  | { success: true; order: OrderV2 }
+  | { success: false; code?: string; message?: string };
+
+type ApiListResponse =
+  | { success: true; timeline: OrderTimelineEntry[] }
+  | { success: false; code?: string; message?: string };
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
@@ -141,9 +156,22 @@ export default function OrderDetailPage() {
         fetch(`/api/admin/orders/${id}`).then((r) => r.json() as Promise<ApiOrderResponse>),
         fetch(`/api/admin/orders/${id}/timeline`).then((r) => r.json() as Promise<ApiListResponse>),
       ]);
-      if (!orderRes.success) throw new Error('Order not found');
-      setOrder(orderRes.data);
-      if (timelineRes.success) setTimeline(timelineRes.data);
+      /*
+       * Surface the API's own message rather than a blanket "Order not
+       * found". A 500 from a bad column or an expired admin session used to
+       * render as "Order not found", which sends you looking for a missing
+       * row instead of the actual fault.
+       */
+      if (!orderRes.success) {
+        throw new Error(orderRes.message || 'Order could not be loaded.');
+      }
+      if (!orderRes.order) {
+        throw new Error('Order response did not include an order.');
+      }
+      setOrder(orderRes.order);
+
+      // Timeline is supplementary: the order still renders without it.
+      if (timelineRes.success) setTimeline(timelineRes.timeline ?? []);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to load order');
     } finally {
