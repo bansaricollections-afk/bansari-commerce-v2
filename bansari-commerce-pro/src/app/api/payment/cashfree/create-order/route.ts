@@ -10,6 +10,7 @@ import { checkRateLimit, RATE_LIMIT_CHECKOUT } from '@/lib/rate-limit';
 import { apiError } from '@/lib/api-response';
 import { getShippingCost } from '@/lib/shipping';
 import { validateCoupon } from '@/services/coupon.service';
+import { readAttribution } from '@/lib/attribution';
 
 export const dynamic = 'force-dynamic';
 
@@ -192,6 +193,20 @@ export async function POST(request: NextRequest) {
           shipping_state:         sState,
           shipping_postal_code:   sPin,
           shipping_country:       'IN',
+          /*
+           * Ad attribution, captured HERE because this is the last moment the
+           * browser is in the loop. The `_fbc`/`_fbp` cookies the Meta
+           * Conversions API matches on live only in the browser, and the
+           * request that ultimately confirms this payment may well be a
+           * Cashfree webhook with no browser attached at all. Snapshotting it
+           * onto the pending row is what lets the persist path report an
+           * attributable server-side Purchase.
+           *
+           * Reporting metadata only — never read by pricing, payment or any
+           * authorisation decision, so an attacker-supplied value costs
+           * nothing beyond a wrong analytics row.
+           */
+          marketing_json:         readAttribution(request),
         },
         { onConflict: 'cf_order_id' }
       );

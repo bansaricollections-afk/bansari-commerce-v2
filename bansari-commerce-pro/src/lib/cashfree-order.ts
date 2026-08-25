@@ -25,6 +25,8 @@ import {
   sendOwnerNewOrderEmail,
 } from '@/services/email.service';
 import { recordCouponRedemption } from '@/services/coupon.service';
+import { sendMetaPurchase, isMetaCapiConfigured, splitName } from '@/lib/meta-capi';
+import { asAttribution } from '@/lib/attribution';
 
 export type CashfreePersistResult =
   | { ok: true; orderId: string; orderNumber: string; idempotent: boolean }
@@ -254,6 +256,18 @@ export async function verifyAndPersistCashfreeOrder(
        * merchant advances it via the confirm transition.
        */
       payment_v2_status: 'paid',
+      /*
+       * Carry the ad attribution captured at create-order time onto the order
+       * itself. The RPC has no such parameter, and adding one would mean
+       * changing a function both payment providers depend on; this update is
+       * already happening, so the column rides along at zero extra cost.
+       *
+       * Storing it on the order — not just the pending row, which is a
+       * short-lived checkout artefact — is what makes it possible to answer
+       * "which orders did this campaign actually produce", independently of
+       * whatever the ad platform claims.
+       */
+      marketing_json: pending.marketing_json ?? null,
     })
     .eq('id', order.id);
 
@@ -281,6 +295,67 @@ export async function verifyAndPersistCashfreeOrder(
       orderId: order.id,
       requestId: ctx.requestId,
     });
+  }
+
+  /*
+   * ── Meta Conversions API: the server-side Purchase ──
+   *
+   * This is the only conversion report that is actually reliable. The browser
+   * pixel fires Purchase from CashfreeButton's success callback, which never
+   * runs when the customer is returned by redirect, closes the tab, or blocks
+   * the script — and it never runs at all for a payment reconciled solely by
+   * webhook. This path, by contrast, executes exactly once per genuinely
+   * confirmed payment, because everything above it is the idempotency guard.
+   *
+   * `cfOrderId` is the event id: the browser passes the same value as
+   * `eventID`, so when both events do arrive Meta collapses them into one
+   * conversion. Any other id here would double-count revenue.
+   *
+   * Placed on the first-persist path only — every idempotent return exits
+   * above — and awaited so it runs before the serverless function freezes,
+   * but its result never affects the customer: the payment is captured and
+   * the order is committed, so a Meta failure is logged and swallowed exactly
+   * like the emails below.
+   */
+  if (isMetaCapiConfigured()) {
+    const { first, last } = splitName(pending.customer_name);
+    const sent = await sendMetaPurchase({
+      eventId: cfOrderId,
+      value: Number(pending.grand_total),
+      currency: pending.currency ?? 'INR',
+      contents: itemsPayload.map((li) => ({
+        id: String(li.product_id),
+        quantity: Number(li.quantity),
+        item_price: Number(li.unit_price),
+      })),
+      orderNumber: order.order_number,
+      customer: {
+        email: pending.customer_email,
+        phone: pending.customer_phone,
+        firstName: first,
+        lastName: last,
+        city: pending.shipping_city,
+        state: pending.shipping_state,
+        postalCode: pending.shipping_postal_code,
+        country: pending.shipping_country ?? 'IN',
+        userId: pending.user_id ?? null,
+      },
+      attribution: asAttribution(pending.marketing_json),
+      requestId: ctx.requestId,
+    });
+
+    /*
+     * Mark only on success. A failed send leaves capi_sent_at NULL so a later
+     * reconciliation can retry: duplicate delivery is harmless (event_id
+     * dedupes it), a silently dropped conversion is not.
+     */
+    if (sent) {
+      await supabase
+        .from('orders')
+        .update({ capi_sent_at: new Date().toISOString() })
+        .eq('id', order.id)
+        .is('capi_sent_at', null);
+    }
   }
 
   // ── 5. Reconcile the pending row and write the audit trail ──
