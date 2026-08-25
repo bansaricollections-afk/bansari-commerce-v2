@@ -71,7 +71,22 @@ const PROD_SECURITY_HEADERS: Record<string, string> = {
     // above for the Meta pixel; it is the single easiest mistake to make in
     // this file.
     "script-src 'self' 'unsafe-inline' https://checkout.razorpay.com https://sdk.cashfree.com https://connect.facebook.net https://www.googletagmanager.com https://googleads.g.doubleclick.net https://www.googleadservices.com",
-    "frame-src https://api.razorpay.com https://sdk.cashfree.com https://sandbox.cashfree.com https://api.cashfree.com",
+    /*
+     * www.facebook.com is required by the PIXEL, not by Facebook Login.
+     *
+     * fbevents.js picks a transport per payload size. Small events (PageView)
+     * go out as an image beacon, which img-src already allows. Larger ones —
+     * ViewContent, AddToCart, Purchase, which carry content_ids, contents,
+     * value and category — exceed what a GET can hold, so the pixel falls back
+     * to a hidden FORM POST and an invisible IFRAME.
+     *
+     * Both were blocked, so exactly the commerce events Meta optimises on were
+     * dropped while PageView sailed through. Confirmed from a real browser
+     * console: "Framing 'https://www.facebook.com/' violates ... frame-src"
+     * and "Sending form data to 'https://www.facebook.com/tr/' violates ...
+     * form-action".
+     */
+    "frame-src https://api.razorpay.com https://sdk.cashfree.com https://sandbox.cashfree.com https://api.cashfree.com https://www.facebook.com",
     // GA4 beacons go to *.google-analytics.com (region-sharded) and
     // *.analytics.google.com. The Google Ads CONVERSION is sent to the
     // visitor's local Google ccTLD (/pagead/1p-conversion) and to the
@@ -83,7 +98,10 @@ const PROD_SECURITY_HEADERS: Record<string, string> = {
     "font-src 'self'",
     "object-src 'none'",
     "base-uri 'self'",
-    "form-action 'self' https://sandbox.cashfree.com https://api.cashfree.com",
+    // www.facebook.com: the pixel's form-POST transport for large events.
+    // See the frame-src note above — these two must be added together, because
+    // the pixel tries the form first and the iframe as its next fallback.
+    "form-action 'self' https://sandbox.cashfree.com https://api.cashfree.com https://www.facebook.com",
   ].join('; '),
 };
 
