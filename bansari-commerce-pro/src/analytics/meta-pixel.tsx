@@ -4,8 +4,6 @@ import Script from "next/script";
 import { usePathname } from "next/navigation";
 import { useEffect, useRef } from "react";
 
-import { useCart, useCartHasHydrated } from "@/store/cart";
-
 /**
  * Meta Pixel — browser-side only.
  *
@@ -55,22 +53,22 @@ export function metaTrack(
 }
 
 /**
- * Loads fbevents.js and owns the two events that are route-driven rather than
- * interaction-driven: PageView and InitiateCheckout.
+ * Loads fbevents.js and owns exactly one event: PageView, which is
+ * route-driven and belongs to no component.
  *
- * ViewContent, AddToCart and Purchase are fired from the components that
- * already own those moments (ProductActions, RazorpayButton), so the pixel
- * never has to re-derive product or payment state.
+ * Every commerce event — ViewContent, AddToCart, InitiateCheckout, Purchase —
+ * is fired through src/analytics/events.ts by the component that owns the
+ * moment, so the pixel never re-derives product, cart or payment state.
+ * InitiateCheckout in particular used to live here, which forced this
+ * component to read the cart store and duplicate the checkout page's
+ * hydration guard; that is now the checkout page's own concern.
  */
 export default function MetaPixel() {
   const pathname = usePathname();
-  const { items } = useCart();
-  const hasHydrated = useCartHasHydrated();
 
   // The bootstrap snippet fires the first PageView itself; this ref stops the
   // route-change effect from firing a duplicate for the initial render.
   const initialPageViewSkipped = useRef(false);
-  const checkoutTracked = useRef(false);
 
   useEffect(() => {
     if (!PIXEL_ID) return;
@@ -82,37 +80,6 @@ export default function MetaPixel() {
     // never sees them. Without this, every page after the first is invisible.
     metaTrack("PageView");
   }, [pathname]);
-
-  useEffect(() => {
-    if (!PIXEL_ID) return;
-
-    if (pathname !== "/checkout") {
-      // Allow a fresh InitiateCheckout if the customer leaves and returns.
-      checkoutTracked.current = false;
-      return;
-    }
-
-    // Gated exactly like the existing begin_checkout instrumentation: wait for
-    // the persisted cart to rehydrate and require a non-empty cart, so a
-    // mid-hydration empty render never reports a zero-value checkout.
-    if (!hasHydrated || checkoutTracked.current || items.length === 0) return;
-    checkoutTracked.current = true;
-
-    const value = items.reduce((sum, i) => sum + i.price * i.quantity, 0);
-
-    metaTrack("InitiateCheckout", {
-      content_type: "product",
-      content_ids: items.map((i) => String(i.id)),
-      contents: items.map((i) => ({
-        id: String(i.id),
-        quantity: i.quantity,
-        item_price: i.price,
-      })),
-      num_items: items.reduce((n, i) => n + i.quantity, 0),
-      value,
-      currency: "INR",
-    });
-  }, [pathname, hasHydrated, items]);
 
   if (!PIXEL_ID) return null;
 

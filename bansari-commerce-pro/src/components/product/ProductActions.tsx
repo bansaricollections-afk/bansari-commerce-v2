@@ -2,9 +2,13 @@
 
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
-import { track } from '@vercel/analytics';
 
-import { metaTrack } from '@/analytics/meta-pixel';
+import {
+  trackViewItem,
+  trackAddToCart,
+  trackWhatsAppEnquiry,
+  type CommerceItem,
+} from '@/analytics/events';
 import { useCart } from '@/hooks/useCart';
 import { useWishlist } from '@/hooks/useWishlist';
 import type { Product, ProductVariant, SizeAvailability } from '@/types/product';
@@ -28,42 +32,27 @@ function toCartSize(size: SizeAvailability | null) {
 }
 
 /**
- * Analytics identity for a product, shared by every funnel event fired here.
- * Deliberately contains no PII — only catalogue facts that are already public
- * on the page. Vercel Web Analytics accepts string | number | boolean | null
- * and rejects nested objects, so optional fields collapse to null.
+ * Analytics identity for a product — one mapper, consumed by every
+ * destination. The per-vendor payload shapes (Vercel's flat scalars, GA4's
+ * items[], Meta's content_ids) now live together in src/analytics/events.ts,
+ * so this component no longer maintains a builder per vendor.
+ *
+ * Deliberately contains no PII — only catalogue facts already public on the
+ * page.
+ *
+ * `id` is product.id rather than sku: CartItem carries only variantSku (the
+ * size-level code), so a sku-keyed id would report "BC-…-001" from the PDP and
+ * "BC-…-001-M" from Purchase — two identities for one product, which breaks
+ * funnel reporting and catalogue matching. product.id is the one identifier
+ * present and identical at every event point.
  */
-function productProps(product: Product) {
+function toCommerceItem(product: Product, quantity = 1): CommerceItem {
   return {
-    product_id: product.id,
-    product_name: product.name,
-    price: product.price,
-    currency: 'INR',
+    id: product.id,
+    name: product.name,
     category: product.category ?? null,
-  };
-}
-
-/**
- * Meta Pixel payload for a single product.
- *
- * content_ids uses product.id rather than sku deliberately: CartItem carries
- * only variantSku (the size-level code), so a sku-based id would send
- * "BC-…-001" from the PDP and "BC-…-001-M" from Purchase — two different ids
- * for the same product, which breaks Meta's funnel and catalogue matching.
- * product.id is the one identifier present and identical at every event point.
- * The Meta catalogue feed must therefore be keyed on product id.
- *
- * Catalogue facts only — no customer or payment data ever reaches the pixel.
- */
-function metaProductProps(product: Product, quantity = 1) {
-  return {
-    content_type: 'product',
-    content_ids: [String(product.id)],
-    content_name: product.name,
-    content_category: product.category ?? undefined,
-    contents: [{ id: String(product.id), quantity, item_price: product.price }],
-    value: product.price * quantity,
-    currency: 'INR',
+    price: product.price,
+    quantity,
   };
 }
 
@@ -91,8 +80,7 @@ export default function ProductActions({
    * route itself is a server component and cannot call track().
    */
   useEffect(() => {
-    track('view_item', productProps(product));
-    metaTrack('ViewContent', metaProductProps(product));
+    trackViewItem(toCommerceItem(product));
   }, [product]);
 
   const sizeAvailability = product.sizeAvailability ?? [];
@@ -119,8 +107,7 @@ export default function ProductActions({
       return;
     }
     addToCart({ product, quantity, variant: selectedVariant, size: toCartSize(selectedSize) });
-    track('add_to_cart', { ...productProps(product), quantity });
-    metaTrack('AddToCart', metaProductProps(product, quantity));
+    trackAddToCart(toCommerceItem(product, quantity));
     setAddedToCart(true);
     setCartDrawerOpen(true);
     setTimeout(() => setAddedToCart(false), 2500);
@@ -137,8 +124,7 @@ export default function ProductActions({
     // Buy Now genuinely adds the line to the cart before navigating, so it is
     // a real add_to_cart. begin_checkout is fired by the checkout page itself.
     addToCart({ product, quantity, variant: selectedVariant, size: toCartSize(selectedSize) });
-    track('add_to_cart', { ...productProps(product), quantity });
-    metaTrack('AddToCart', metaProductProps(product, quantity));
+    trackAddToCart(toCommerceItem(product, quantity));
     router.push('/checkout');
   };
 
@@ -283,7 +269,7 @@ export default function ProductActions({
             href={whatsappUrl}
             target="_blank"
             rel="noopener noreferrer"
-            onClick={() => track('whatsapp_enquiry', { ...productProps(product), source: 'pdp' })}
+            onClick={() => trackWhatsAppEnquiry(toCommerceItem(product), 'pdp')}
             className="flex items-center gap-1.5 hover:text-slate-900 transition-colors duration-200"
             aria-label="Enquire on WhatsApp"
           >

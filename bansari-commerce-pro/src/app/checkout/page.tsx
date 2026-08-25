@@ -4,7 +4,7 @@ import { useState, useRef, useEffect, useCallback, type FocusEvent } from "react
 import Link from "next/link";
 import Script from "next/script";
 import { ArrowLeft } from "lucide-react";
-import { track } from "@vercel/analytics";
+import { trackBeginCheckout } from "@/analytics/events";
 
 import RazorpayButton from "@/components/checkout/RazorpayButton";
 import CashfreeButton from "@/components/checkout/CashfreeButton";
@@ -177,16 +177,27 @@ export default function CheckoutPage() {
    * checkout. The ref makes it at-most-once per mount; `value` is the same
    * client-side estimate shown in the summary (the server still computes the
    * authoritative charge in api/payment/create-order).
+   *
+   * This is now the SOLE owner of the moment. Meta's InitiateCheckout used to
+   * be fired separately by MetaPixel, which had to re-derive the cart and
+   * duplicate this exact hydration guard from a component that has no business
+   * knowing about checkout. trackBeginCheckout() reports every destination
+   * from this one call, so the two can no longer disagree about what a
+   * checkout is worth.
    */
   const beginCheckoutTracked = useRef(false);
   useEffect(() => {
     if (!hasHydrated || beginCheckoutTracked.current || items.length === 0) return;
     beginCheckoutTracked.current = true;
-    track("begin_checkout", {
-      value: total,
-      currency: "INR",
-      item_count: items.reduce((n, i) => n + i.quantity, 0),
-    });
+    trackBeginCheckout(
+      items.map((i) => ({
+        id: i.id,
+        name: i.name,
+        price: i.price,
+        quantity: i.quantity,
+      })),
+      total
+    );
   }, [hasHydrated, items, total]);
 
   const [fields, setFields] = useState<Fields>({

@@ -2,8 +2,7 @@
 
 import { useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { track } from '@vercel/analytics';
-import { metaTrack } from '@/analytics/meta-pixel';
+import { trackPurchase } from '@/analytics/events';
 import { useCart } from '@/store/cart';
 
 declare global {
@@ -171,49 +170,44 @@ export default function RazorpayButton({ customer, shipping, disabled = false }:
              * 409 branch above deliberately do not fire it.
              *
              * value comes from the server-authoritative rzpAmount (paise), not
-             * from any client-side cart total. No customer fields are sent.
+             * from any client-side cart total. Email and phone are passed only
+             * for Google Ads Enhanced Conversions, which is off unless
+             * NEXT_PUBLIC_GOOGLE_ADS_ENHANCED_CONVERSIONS is explicitly set;
+             * no payment detail or Razorpay signature is ever sent.
              */
             if (!purchaseTracked.current) {
               purchaseTracked.current = true;
-              track('purchase', {
-                order_id: saved.orderNumber ?? response.razorpay_order_id,
-                value: rzpAmount / 100,
-                currency: rzpCurrency,
-                item_count: items.reduce((n, i) => n + i.quantity, 0),
-              });
 
               /*
-               * Meta Purchase — same confirmed-success point, same once-per-
-               * mount guard, so it cannot fire on modal open, on order
-               * creation, or twice on a re-render.
+               * One call, every destination — Vercel Analytics, GA4, the Meta
+               * Pixel and the Google Ads conversion. Previously each was
+               * written out here by hand, which is how CashfreeButton ended up
+               * with a Meta Purchase but no Vercel one.
                *
-               * eventID is razorpay_order_id: it is the only identifier
+               * transactionId is razorpay_order_id: the only identifier
                * available both here and in the Razorpay webhook, and it
-               * carries a UNIQUE index. order_number is unusable for this
-               * because the webhook can fire before the order row exists.
-               * The Conversions API is not implemented yet — setting the id
-               * now means the later server-side Purchase can deduplicate
-               * against this event without changing what the browser sends.
+               * carries a UNIQUE index. order_number is unusable because the
+               * webhook can fire before the order row exists. The server-side
+               * Conversions API Purchase uses this same id as its event_id, so
+               * Meta collapses the browser and server events into one
+               * conversion instead of counting the revenue twice.
                *
-               * Catalogue and totals only: no customer name, email, phone,
-               * address, payment detail or Razorpay signature.
+               * value comes from the server-authoritative rzpAmount (paise),
+               * never from a client-side cart total.
                */
-              metaTrack(
-                'Purchase',
-                {
-                  content_type: 'product',
-                  content_ids: items.map((i) => String(i.id)),
-                  contents: items.map((i) => ({
-                    id: String(i.id),
-                    quantity: i.quantity,
-                    item_price: i.price,
-                  })),
-                  num_items: items.reduce((n, i) => n + i.quantity, 0),
-                  value: rzpAmount / 100,
-                  currency: rzpCurrency,
-                },
-                response.razorpay_order_id
-              );
+              trackPurchase({
+                transactionId: response.razorpay_order_id,
+                value: rzpAmount / 100,
+                currency: rzpCurrency,
+                items: items.map((i) => ({
+                  id: i.id,
+                  name: i.name,
+                  price: i.price,
+                  quantity: i.quantity,
+                })),
+                customer: { email: customer.email, phone: customer.phone },
+              });
+
             }
 
             clearCart();
