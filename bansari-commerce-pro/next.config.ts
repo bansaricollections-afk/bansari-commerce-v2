@@ -88,9 +88,15 @@ const nextConfig: NextConfig = {
               // for React call-stack reconstruction and HMR. It is intentionally
               // omitted in production builds via the isDev guard.
               // connect.facebook.net serves fbevents.js for the Meta Pixel.
-              // Exact origin, no wildcard. Meta needs no frame-src here: that
-              // is only required for Facebook Login and Social Plugins, and
-              // frame-src below stays scoped to the Razorpay payment iframe.
+              // Exact origin, no wildcard.
+              //
+              // This comment previously asserted that Meta needs no frame-src
+              // because that is "only required for Facebook Login and Social
+              // Plugins". That is wrong, and it cost real conversions: the
+              // pixel also uses an iframe and a form POST as its transport for
+              // events too large to send as an image beacon, which is every
+              // commerce event. frame-src and form-action below now list
+              // www.facebook.com for that reason.
               // sdk.cashfree.com serves the v3 Cashfree checkout SDK. Exact
               // origin, no wildcard. The frame-src origin for the checkout
               // `_modal` iframe is not yet added — it is to be confirmed from
@@ -132,10 +138,15 @@ const nextConfig: NextConfig = {
               // unavailable, and carry the Ads conversion pings.
               "img-src 'self' data: blob: https://*.supabase.co https://images.unsplash.com https://images.pexels.com https://cdn.shopify.com https://www.facebook.com https://*.google-analytics.com https://www.googletagmanager.com https://www.google.com https://www.google.co.in https://googleads.g.doubleclick.net",
               // Razorpay payment iframe
-              "frame-src https://api.razorpay.com https://checkout.razorpay.com",
+              // www.facebook.com is the Meta PIXEL's iframe transport for large
+              // events, not Facebook Login. Kept in sync with src/proxy.ts,
+              // which overwrites this header in production.
+              "frame-src https://api.razorpay.com https://checkout.razorpay.com https://www.facebook.com",
               "object-src 'none'",
               "base-uri 'self'",
-              "form-action 'self'",
+              // www.facebook.com: the pixel's form-POST transport for large
+              // events. Must accompany the frame-src entry above.
+              "form-action 'self' https://www.facebook.com",
               "upgrade-insecure-requests",
             ].join('; '),
           },
