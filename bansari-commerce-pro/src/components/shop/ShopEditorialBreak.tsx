@@ -1,7 +1,11 @@
 const PILLARS = [
   {
     label: "Designed in India",
-    body: "Every silhouette is conceived by our in-house studio in Surat, drawing from centuries of craft tradition.",
+    // Vadodara, not Surat — the same founding-location correction made in
+    // home/CraftsmanshipStory.tsx. Kept in step deliberately: the brand's
+    // stated home must not differ between the homepage, the shop page and the
+    // JSON-LD address in app/layout.tsx.
+    body: "Every silhouette is conceived by our in-house studio in Vadodara, drawing from centuries of craft tradition.",
     symbol: "✦",
   },
   {

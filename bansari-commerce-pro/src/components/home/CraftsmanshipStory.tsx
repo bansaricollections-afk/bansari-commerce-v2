@@ -107,7 +107,13 @@ export default async function CraftsmanshipStory() {
               {/* Founding year removed: "Est. 2011" here contradicted
                   "Est. 2018" in the announcement bar and no authoritative
                   source exists in the project to settle it. */}
-              Surat, India
+              {/* Vadodara, not Surat. This is the founding city and it must
+                  match the Organization / ClothingStore JSON-LD in
+                  app/layout.tsx, which gives addressLocality "Vadodara" and
+                  addressRegion "Gujarat". The two disagreeing is a real SEO
+                  problem: Google cross-checks on-page location against
+                  structured data for local relevance. */}
+              Vadodara, Gujarat
             </span>
           </div>
         </div>
@@ -185,7 +191,13 @@ export default async function CraftsmanshipStory() {
                 margin: 0,
               }}
             >
-              Born in Surat — the city of silk and celebration — Bansari Collection was founded on one belief: that every Indian woman deserves to wear something that tells her story.
+              {/* The epithet changed with the city, deliberately. "The city of
+                  silk" is Surat's — it is what Surat is actually known for —
+                  so carrying it over to Vadodara would have replaced one
+                  false claim with another. Vadodara is Gujarat's cultural
+                  capital, so "culture" is the accurate substitution and keeps
+                  the original cadence. */}
+              Born in Vadodara — Gujarat&rsquo;s city of culture and celebration — Bansari Collection was founded on one belief: that every Indian woman deserves to wear something that tells her story.
             </p>
             <p
               style={{
