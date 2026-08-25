@@ -60,10 +60,25 @@ const PROD_SECURITY_HEADERS: Record<string, string> = {
     // three were already declared in next.config.ts, which this header
     // overrides — so the pixel initialised but every request it made was
     // blocked. Confirmed live: the page requested fbevents.js and CSP refused.
-    "script-src 'self' 'unsafe-inline' https://checkout.razorpay.com https://sdk.cashfree.com https://connect.facebook.net",
+    // Google: www.googletagmanager.com serves gtag.js (GA4 + Google Ads).
+    // googleads.g.doubleclick.net and googleadservices.com are loaded as
+    // SCRIPTS by the Ads conversion tag, not merely as image beacons.
+    //
+    // These MUST be kept in sync with next.config.ts. This header overwrites
+    // that one in production, so an origin present only there is allowed in
+    // development and blocked in production — which is exactly how gtag.js
+    // shipped blocked while local testing passed. The same trap is documented
+    // above for the Meta pixel; it is the single easiest mistake to make in
+    // this file.
+    "script-src 'self' 'unsafe-inline' https://checkout.razorpay.com https://sdk.cashfree.com https://connect.facebook.net https://www.googletagmanager.com https://googleads.g.doubleclick.net https://www.googleadservices.com",
     "frame-src https://api.razorpay.com https://sdk.cashfree.com https://sandbox.cashfree.com https://api.cashfree.com",
-    "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://api.razorpay.com https://sdk.cashfree.com https://sandbox.cashfree.com https://api.cashfree.com https://www.facebook.com",
-    "img-src 'self' data: blob: https://*.supabase.co https://www.facebook.com",
+    // GA4 beacons go to *.google-analytics.com (region-sharded) and
+    // *.analytics.google.com. The Google Ads CONVERSION is sent to the
+    // visitor's local Google ccTLD (/pagead/1p-conversion) and to the
+    // DoubleClick origins — not to google.com. www.google.co.in is listed
+    // because this store sells into India.
+    "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://api.razorpay.com https://sdk.cashfree.com https://sandbox.cashfree.com https://api.cashfree.com https://www.facebook.com https://www.googletagmanager.com https://*.google-analytics.com https://*.analytics.google.com https://www.google.com https://www.google.co.in https://www.googleadservices.com https://googleads.g.doubleclick.net https://ad.doubleclick.net",
+    "img-src 'self' data: blob: https://*.supabase.co https://www.facebook.com https://*.google-analytics.com https://www.googletagmanager.com https://www.google.com https://www.google.co.in https://googleads.g.doubleclick.net",
     "style-src 'self' 'unsafe-inline'",
     "font-src 'self'",
     "object-src 'none'",
