@@ -87,12 +87,24 @@ const PROD_SECURITY_HEADERS: Record<string, string> = {
      * form-action".
      */
     "frame-src https://api.razorpay.com https://sdk.cashfree.com https://sandbox.cashfree.com https://api.cashfree.com https://www.facebook.com",
-    // GA4 beacons go to *.google-analytics.com (region-sharded) and
-    // *.analytics.google.com. The Google Ads CONVERSION is sent to the
-    // visitor's local Google ccTLD (/pagead/1p-conversion) and to the
-    // DoubleClick origins — not to google.com. www.google.co.in is listed
-    // because this store sells into India.
-    "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://api.razorpay.com https://sdk.cashfree.com https://sandbox.cashfree.com https://api.cashfree.com https://www.facebook.com https://www.googletagmanager.com https://*.google-analytics.com https://*.analytics.google.com https://www.google.com https://www.google.co.in https://www.googleadservices.com https://googleads.g.doubleclick.net https://ad.doubleclick.net",
+    /*
+     * GA4 beacons go to *.google-analytics.com (region-sharded) and
+     * *.analytics.google.com — but a CSP wildcard `*.example.com` matches
+     * SUBDOMAINS ONLY, never the bare apex. gtag.js sometimes posts straight
+     * to the apex `analytics.google.com` (observed live, blocked, in the
+     * console: "Connecting to 'https://analytics.google.com/g/collect...'
+     * violates ... connect-src"), so the wildcard alone was never enough —
+     * the bare host has to be listed too.
+     *
+     * stats.g.doubleclick.net/g/collect is GA4/Ads cross-domain measurement's
+     * own fallback collector and was missing outright, also observed live.
+     *
+     * The Google Ads CONVERSION is sent to the visitor's local Google ccTLD
+     * (/pagead/1p-conversion) and to the DoubleClick origins — not to
+     * google.com. www.google.co.in is listed because this store sells into
+     * India.
+     */
+    "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://api.razorpay.com https://sdk.cashfree.com https://sandbox.cashfree.com https://api.cashfree.com https://www.facebook.com https://www.googletagmanager.com https://*.google-analytics.com https://google-analytics.com https://*.analytics.google.com https://analytics.google.com https://www.google.com https://www.google.co.in https://www.googleadservices.com https://googleads.g.doubleclick.net https://ad.doubleclick.net https://stats.g.doubleclick.net",
     "img-src 'self' data: blob: https://*.supabase.co https://www.facebook.com https://*.google-analytics.com https://www.googletagmanager.com https://www.google.com https://www.google.co.in https://googleads.g.doubleclick.net",
     "style-src 'self' 'unsafe-inline'",
     "font-src 'self'",
