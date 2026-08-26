@@ -124,13 +124,21 @@ const nextConfig: NextConfig = {
               // wildcard is unavoidable) and *.analytics.google.com; gtag also
               // POSTs back to googletagmanager.com.
               //
+              // A CSP wildcard `*.example.com` matches SUBDOMAINS ONLY, never
+              // the bare apex — gtag.js sometimes posts straight to the apex
+              // analytics.google.com, which the wildcard alone does not cover
+              // (confirmed blocked live). stats.g.doubleclick.net/g/collect is
+              // GA4/Ads cross-domain measurement's own fallback and was
+              // missing outright, also confirmed blocked live. Kept in sync
+              // with src/proxy.ts, which overwrites this header in production.
+              //
               // The Google Ads CONVERSION itself is sent to the visitor's local
               // Google ccTLD (/pagead/1p-conversion) and to the DoubleClick
               // origins — not to google.com. www.google.co.in is listed because
               // this store sells into India; a visitor browsing from another
               // country hits their own ccTLD and their remarketing ping is
               // dropped, which costs audience signal but never the order.
-              `connect-src 'self' https://*.supabase.co wss://*.supabase.co https://api.razorpay.com https://wa.me https://www.facebook.com https://www.googletagmanager.com https://*.google-analytics.com https://*.analytics.google.com https://www.google.com https://www.google.co.in https://www.googleadservices.com https://googleads.g.doubleclick.net https://ad.doubleclick.net`,
+              `connect-src 'self' https://*.supabase.co wss://*.supabase.co https://api.razorpay.com https://wa.me https://www.facebook.com https://www.googletagmanager.com https://*.google-analytics.com https://google-analytics.com https://*.analytics.google.com https://analytics.google.com https://www.google.com https://www.google.co.in https://www.googleadservices.com https://googleads.g.doubleclick.net https://ad.doubleclick.net https://stats.g.doubleclick.net`,
               // Images: Supabase storage + Unsplash + Pexels + Shopify CDN.
               // www.facebook.com is the Meta Pixel image-beacon fallback (/tr).
               // google-analytics.com and the Google Ads/DoubleClick origins are
