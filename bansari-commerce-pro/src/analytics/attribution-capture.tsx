@@ -3,6 +3,8 @@
 import { useEffect } from 'react';
 import { usePathname } from 'next/navigation';
 
+import { effectiveConsent } from '@/analytics/consent';
+
 /**
  * AttributionCapture
  * ------------------
@@ -75,6 +77,18 @@ export default function AttributionCapture() {
   const pathname = usePathname();
 
   useEffect(() => {
+    /*
+     * Consent gate. bc_attr is a marketing cookie, not a functional one — it
+     * exists solely to attribute an order to an ad click — so it must not be
+     * written by a visitor who has declined, nor by a European visitor who has
+     * not yet answered.
+     *
+     * Checked inside the effect rather than at module scope so it re-evaluates
+     * on every navigation: a visitor who accepts partway through a session
+     * starts being attributed from that point on, without a reload.
+     */
+    if (effectiveConsent() !== 'granted') return;
+
     /*
      * `window.location.search` rather than useSearchParams(): this component
      * is mounted in the root layout, and useSearchParams() there forces every
