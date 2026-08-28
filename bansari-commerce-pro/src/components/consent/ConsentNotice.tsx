@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useRef, useSyncExternalStore } from 'react';
+import { useEffect, useRef, useSyncExternalStore } from 'react';
 
 import {
   readConsent,
@@ -56,6 +56,43 @@ export default function ConsentNotice() {
    * node directly means every reopen starts from a clean element.
    */
   const panelRef = useRef<HTMLDivElement | null>(null);
+
+  /*
+   * Publish this bar's height as --bc-consent-offset so the other fixed
+   * bottom bars can sit above it.
+   *
+   * The mobile Add to Cart bar on a product page and the shop's filter
+   * toolbar are both `fixed bottom-0 z-40`. This notice is z-toast (500), so
+   * without this it would sit on top and COVER the buy button for exactly the
+   * visitors most likely to see it: first-time mobile arrivals, which is what
+   * ad traffic landing on a product page is. A consent notice must not be a
+   * conversion blocker.
+   *
+   * Declared before the early return because hooks cannot be conditional; the
+   * ref is null when the notice is not rendered, and the cleanup removes the
+   * property so the bars fall back to bottom: 0.
+   */
+  useEffect(() => {
+    const panel = panelRef.current;
+    if (!panel) return;
+
+    const publishHeight = () =>
+      document.documentElement.style.setProperty(
+        '--bc-consent-offset',
+        `${panel.offsetHeight}px`
+      );
+
+    publishHeight();
+    // The bar reflows on rotation and at the md breakpoint, where it changes
+    // from stacked to a single row.
+    const observer = new ResizeObserver(publishHeight);
+    observer.observe(panel);
+
+    return () => {
+      observer.disconnect();
+      document.documentElement.style.removeProperty('--bc-consent-offset');
+    };
+  }, [hasAnswered]);
 
   function choose(state: 'granted' | 'denied') {
     /*
