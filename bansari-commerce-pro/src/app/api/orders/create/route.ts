@@ -386,7 +386,20 @@ export async function POST(request: NextRequest) {
       { order_id: order.id, event: 'created', actor: 'system', metadata: { requestId, authenticated: userId !== null } },
       { order_id: order.id, event: 'paid', actor: 'razorpay', metadata: { razorpay_payment_id, requestId } },
     ];
-    await supabase.from('order_audit_trail').insert(auditRows);
+    // Non-fatal, but the error is read and logged. Discarding it is how a
+    // completely absent order_audit_trail table went unnoticed for months:
+    // supabase-js returns errors rather than throwing, so a write to a
+    // non-existent relation looks exactly like success here.
+    const { error: auditError } = await supabase
+      .from('order_audit_trail')
+      .insert(auditRows);
+    if (auditError) {
+      rLog.error('orders.create.audit_write_failed', {
+        orderId: order.id,
+        errorCode: auditError.code,
+        errorMessage: auditError.message,
+      });
+    }
 
     /*
      * ── Meta Conversions API: the server-side Purchase ──

@@ -60,12 +60,20 @@ export async function POST(request: NextRequest) {
     // Append to audit trail
     const supabase = createServiceRoleClient();
     const actorStr = typeof actor === 'string' ? actor : 'admin';
-    await supabase.from('order_audit_trail').insert({
+    // Non-fatal, but read and logged — see the note in orders/create.
+    const { error: auditError } = await supabase.from('order_audit_trail').insert({
       order_id: id,
       event: status,
       actor: actorStr,
       metadata: { requestId },
     });
+    if (auditError) {
+      rLog.error('orders.status.audit_write_failed', {
+        orderId: id,
+        errorCode: auditError.code,
+        errorMessage: auditError.message,
+      });
+    }
 
     rLog.info('orders.status.updated', { orderId: id, status, actor: actorStr });
   } catch (error) {

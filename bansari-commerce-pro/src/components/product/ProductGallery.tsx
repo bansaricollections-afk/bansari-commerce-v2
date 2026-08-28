@@ -31,7 +31,59 @@ function toProductImages(
       url: img.url!,
       alt: img.alt ?? '',
       type: (img.type as ProductImage['type']) ?? 'front',
+      /*
+       * mediaType was being dropped here. ProductImage has declared
+       * `mediaType?: 'image' | 'video'` all along, but this normaliser did not
+       * carry it through, so a video entry reached the render path looking
+       * exactly like an image and was handed to next/image — which would have
+       * produced a broken tile rather than a video.
+       */
+      mediaType: (img as ProductImage).mediaType ?? 'image',
+      caption: (img as ProductImage).caption,
     }));
+}
+
+/** True when this entry should render as a <video> rather than an <Image>. */
+function isVideo(media: Pick<ProductImage, 'mediaType' | 'url'>): boolean {
+  if (media.mediaType === 'video') return true;
+  // Belt and braces: entries uploaded before mediaType was recorded are
+  // identified by extension, so existing rows do not need backfilling.
+  return /\.(mp4|webm|mov)(\?|$)/i.test(media.url ?? '');
+}
+
+/**
+ * Thumbnail for a video entry.
+ *
+ * A <video> with preload="metadata" renders its first frame, which avoids
+ * requiring a separately uploaded poster image for every clip — one less
+ * thing for whoever adds the product to get wrong, and one less asset to pay
+ * egress on.
+ *
+ * The play badge is the only affordance telling a shopper this tile behaves
+ * differently from its neighbours; without it a video thumbnail is
+ * indistinguishable from a slightly odd photograph.
+ */
+function VideoThumb({ src, label }: { src: string; label: string }) {
+  return (
+    <>
+      <video
+        src={src}
+        className="absolute inset-0 h-full w-full object-cover"
+        muted
+        playsInline
+        preload="metadata"
+        aria-label={label}
+      />
+      <span
+        aria-hidden
+        className="absolute inset-0 flex items-center justify-center bg-black/25"
+      >
+        <svg viewBox="0 0 24 24" fill="currentColor" className="h-4 w-4 text-white drop-shadow">
+          <path d="M8 5v14l11-7z" />
+        </svg>
+      </span>
+    </>
+  );
 }
 
 interface Props {
@@ -304,14 +356,18 @@ export default function ProductGallery({ product, selectedVariant }: Props) {
                   : 'border-slate-200 opacity-60 hover:opacity-100 hover:border-slate-400'
               }`}
             >
-              <Image
-                src={img.url || '/placeholder.png'}
-                alt={img.alt || `Product view ${i + 1}`}
-                fill
-                className="object-cover"
-                sizes="64px"
-                loading="lazy"
-              />
+              {isVideo(img) ? (
+                <VideoThumb src={img.url} label={img.alt || `Product view ${i + 1}`} />
+              ) : (
+                <Image
+                  src={img.url || '/placeholder.png'}
+                  alt={img.alt || `Product view ${i + 1}`}
+                  fill
+                  className="object-cover"
+                  sizes="64px"
+                  loading="lazy"
+                />
+              )}
             </button>
           ))}
         </div>
@@ -396,14 +452,43 @@ export default function ProductGallery({ product, selectedVariant }: Props) {
               </svg>
             </button>
 
-            <Image
-              src={images[activeIndex]?.url ?? ''}
-              alt={images[activeIndex]?.alt || product.name}
-              fill
-              priority={activeIndex === 0}
-              className="object-cover transition-opacity duration-300"
-              sizes="(max-width: 768px) 100vw, 55vw"
-            />
+            {isVideo(images[activeIndex] ?? { url: '' }) ? (
+              /*
+               * Muted + autoPlay + playsInline is the only combination every
+               * mobile browser will start without a tap; iOS blocks autoplay
+               * outright unless the clip is muted and inline.
+               *
+               * `controls` is still present so sound and scrubbing remain
+               * reachable — an autoplaying muted loop with no way to hear it
+               * is a worse product page, not a slicker one.
+               *
+               * preload="metadata" fetches only the header, so the poster
+               * frame appears without pulling the whole file for a shopper who
+               * never opens this slide.
+               */
+              <video
+                key={images[activeIndex]?.url}
+                src={images[activeIndex]?.url}
+                poster={images[activeIndex]?.hiResUrl}
+                className="absolute inset-0 h-full w-full object-cover"
+                autoPlay
+                muted
+                loop
+                playsInline
+                controls
+                preload="metadata"
+                aria-label={images[activeIndex]?.alt || `${product.name} — video`}
+              />
+            ) : (
+              <Image
+                src={images[activeIndex]?.url ?? ''}
+                alt={images[activeIndex]?.alt || product.name}
+                fill
+                priority={activeIndex === 0}
+                className="object-cover transition-opacity duration-300"
+                sizes="(max-width: 768px) 100vw, 55vw"
+              />
+            )}
           </div>
 
           {/* ── Mobile: Horizontal thumbnail strip (below lg) ── */}
@@ -428,14 +513,18 @@ export default function ProductGallery({ product, selectedVariant }: Props) {
                       : 'border-slate-200 opacity-55 hover:opacity-100 hover:border-slate-400',
                   ].join(' ')}
                 >
-                  <Image
-                    src={img.url || '/placeholder.png'}
-                    alt={img.alt || `Product view ${i + 1}`}
-                    fill
-                    className="object-cover"
-                    sizes="56px"
-                    loading="lazy"
-                  />
+                  {isVideo(img) ? (
+                    <VideoThumb src={img.url} label={img.alt || `Product view ${i + 1}`} />
+                  ) : (
+                    <Image
+                      src={img.url || '/placeholder.png'}
+                      alt={img.alt || `Product view ${i + 1}`}
+                      fill
+                      className="object-cover"
+                      sizes="56px"
+                      loading="lazy"
+                    />
+                  )}
                 </button>
               ))}
             </div>
@@ -468,12 +557,30 @@ export default function ProductGallery({ product, selectedVariant }: Props) {
           isZoomed ? 'opacity-100' : 'opacity-0',
         ].join(' ')}
       >
-        {zoomSrc && (
+        {/*
+          Mounted only while actually zooming.
+
+          This panel deliberately uses the FULL-resolution source — that is the
+          point of a zoom — but it was mounted on page load, so every visitor
+          downloaded it whether or not they ever hovered. Measured on
+          production: 2.2MB of a 4.0MB product page, and the single heaviest
+          asset by a wide margin.
+
+          It is also `hidden lg:block`, so mobile visitors — who cannot use
+          hover zoom at all — were paying that cost for an element they can
+          never see. Browsers fetch images inside display:none containers.
+
+          Deferring to first hover costs a short delay the first time the panel
+          opens, on desktop, as a deliberate interaction. That is a far better
+          trade than 2.2MB on every page view.
+        */}
+        {isZoomed && zoomSrc && (
           // eslint-disable-next-line @next/next/no-img-element
           <img
             src={zoomSrc}
             alt=""
             aria-hidden="true"
+            decoding="async"
             style={{
               position: 'absolute',
               width: '220%',

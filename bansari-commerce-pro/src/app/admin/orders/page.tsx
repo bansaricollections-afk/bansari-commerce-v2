@@ -1,6 +1,8 @@
 'use client';
 
 import { useEffect, useState, useCallback, useRef } from 'react';
+
+import { requestApi } from '@/lib/api-client';
 import Link from 'next/link';
 
 // ─── Types ──────────────────────────────────────────────────────────────────
@@ -88,12 +90,20 @@ export default function OrdersPage() {
       if (q)  params.set('q',             q);
       if (st) params.set('orderV2Status', st);
 
-      const res  = await fetch(`/api/admin/orders?${params.toString()}`);
-      const json = (await res.json()) as ApiResponse;
-      if (!json.success) throw new Error('Failed to load orders');
+      /*
+       * requestApi rather than a bare fetch: the previous version threw a
+       * hardcoded 'Failed to load orders' and discarded the server's own
+       * code/message, so an expired admin session and a database error were
+       * indistinguishable on screen.
+       */
+      const json = await requestApi<ApiResponse>(
+        `/api/admin/orders?${params.toString()}`
+      );
 
-      setOrders(json.data);
-      setTotal(json.total);
+      // Defensive: the render path maps over this, and a shape change
+      // upstream should not surface as "x.map is not a function".
+      setOrders(Array.isArray(json.data) ? json.data : []);
+      setTotal(typeof json.total === 'number' ? json.total : 0);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Unknown error');
     } finally {

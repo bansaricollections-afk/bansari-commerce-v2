@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
+
+import { requestApi } from "@/lib/api-client";
 import { Boxes, Search, AlertTriangle, Check, X } from "lucide-react";
 
 type InventoryRow = {
@@ -37,11 +39,14 @@ export function AdminInventory() {
 
   const load = useCallback(() => {
     setLoading(true);
-    fetch("/api/admin/inventory")
-      .then((r) => (r.ok ? r.json() : Promise.reject(r.statusText)))
-      // API returns { success, requestId, data } — extract the data array
-      .then((d) => setItems(d.data ?? []))
-      .catch((e) => setError(String(e)))
+    /*
+     * Reads .data correctly, but the old Promise.reject(r.statusText)
+     * resolved to '' over HTTP/2, so a real failure set an empty error and
+     * the screen looked merely empty. requestApi reports the server's message.
+     */
+    requestApi<{ data: InventoryRow[] }>("/api/admin/inventory")
+      .then((res) => setItems(Array.isArray(res.data) ? res.data : []))
+      .catch((e: unknown) => setError(e instanceof Error ? e.message : String(e)))
       .finally(() => setLoading(false));
   }, []);
 

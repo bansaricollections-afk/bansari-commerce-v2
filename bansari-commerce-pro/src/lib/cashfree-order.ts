@@ -360,10 +360,30 @@ export async function verifyAndPersistCashfreeOrder(
 
   // ── 5. Reconcile the pending row and write the audit trail ──
   await supabase.from('pending_orders').update({ status: 'consumed' }).eq('id', pending.id);
-  await supabase.from('order_audit_trail').insert([
+  /*
+   * The audit write stays non-fatal — the order is committed and paid, and a
+   * missing history row must never fail a completed purchase — but the error
+   * is now READ and logged.
+   *
+   * Discarding it is why nobody noticed that order_audit_trail did not exist
+   * at all: supabase-js returns errors rather than throwing, so
+   * `await ...insert(...)` against a non-existent relation is
+   * indistinguishable from success at the call site. Every order silently
+   * failed to record its history for months. One line of error checking would
+   * have surfaced it on the first order.
+   */
+  const { error: auditError } = await supabase.from('order_audit_trail').insert([
     { order_id: order.id, event: 'created', actor: 'system', metadata: { requestId: ctx.requestId, provider: 'cashfree', source: ctx.source } },
     { order_id: order.id, event: 'paid', actor: 'cashfree', metadata: { cf_payment_id: cfPaymentId, requestId: ctx.requestId } },
   ]);
+
+  if (auditError) {
+    log.error('cashfree.persist.audit_write_failed', {
+      orderId: order.id,
+      errorCode: auditError.code,
+      errorMessage: auditError.message,
+    });
+  }
 
   /*
    * Notifications, last and non-blocking. The order is already committed and

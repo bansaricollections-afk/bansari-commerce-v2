@@ -73,6 +73,11 @@ export default function ShopByCategory() {
                   src={category.image}
                   alt={category.name}
                   fill
+                  // Grid is 1 / 2 / 3 columns. Without `sizes`, a `fill` image
+                  // defaults to 100vw, so Next requests the widest configured
+                  // device size for a tile that is at most a third of the
+                  // viewport — wasted transformations and a large download.
+                  sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
                   className="object-cover transition duration-700 group-hover:scale-110"
                 />
 

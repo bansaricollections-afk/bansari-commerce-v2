@@ -46,7 +46,43 @@ const nextConfig: NextConfig = {
         pathname: '/**',
       },
     ],
-    deviceSizes: [375, 640, 750, 828, 1080, 1200, 1920, 2048, 3840],
+    /*
+     * IMAGE OPTIMISATION BUDGET
+     *
+     * The Vercel free tier allows 5,000 image transformations a month, and
+     * this project exhausted them — at which point further transformations
+     * ERROR, i.e. product images break on a live storefront.
+     *
+     * Three things were driving it:
+     *
+     * 1. minimumCacheTTL defaulted to 4 HOURS, so every optimised variant was
+     *    re-transformed six times a day forever. With ~240 source images that
+     *    is tens of thousands of transformations a month on its own, and it
+     *    is by far the largest contributor. 31 days is the value Next's own
+     *    docs suggest for reducing cost.
+     *
+     * 2. deviceSizes listed nine widths up to 3840. No page here needs a 4K
+     *    product photo — the widest content container is 1360px — and every
+     *    extra width is another billable transformation per image. Trimmed to
+     *    four that actually correspond to this layout: small phone, large
+     *    phone/2x, desktop, and 1920 for large or retina screens.
+     *
+     * 3. Neither `formats` nor `qualities` was pinned. Each additional format
+     *    or quality multiplies the variants generated per image.
+     *
+     * Not addressed here because it is a content problem rather than a config
+     * one: the source images are enormous — 1MB, 2.4MB and 4.9MB PNGs were
+     * measured in production. Optimisation was masking that. Re-exporting the
+     * catalogue as compressed JPEG/WebP would cut both this bill and Supabase
+     * egress, and is the real fix.
+     */
+    minimumCacheTTL: 2678400, // 31 days
+    deviceSizes: [640, 828, 1080, 1920],
+    imageSizes: [128, 256, 384],
+    qualities: [75],
+    // One format, not two. Serving both AVIF and WebP doubles the
+    // transformations for every image to save a few KB per request.
+    formats: ['image/webp'],
     contentDispositionType: 'inline',
   },
 
