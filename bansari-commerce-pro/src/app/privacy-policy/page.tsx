@@ -86,16 +86,61 @@ export default function PrivacyPolicyPage() {
             and process data on our behalf under appropriate confidentiality
             obligations
           </li>
+          <li>
+            Google and Meta, for the analytics and advertising measurement
+            described under &ldquo;Cookies and tracking&rdquo; below — and
+            only where you have not declined
+          </li>
         </ul>
 
         <h2 className="pt-2 text-xl font-semibold text-slate-900">
           Cookies and tracking
         </h2>
         <p>
-          Our website may use essential cookies/local storage required for
-          core functionality such as keeping items in your cart and keeping
-          you signed in. We do not currently use third-party advertising or
-          analytics tracking cookies on this website.
+          We use two kinds of cookies and similar storage.
+        </p>
+        <p>
+          <strong>Essential</strong> — required for the site to work at all:
+          keeping items in your cart and keeping you signed in. These cannot
+          be switched off, and we do not use them to track you across other
+          websites.
+        </p>
+        <p>
+          <strong>Analytics and advertising</strong> — used to understand how
+          our collections are found and which of our advertisements led you
+          here. These are provided by Google (Google Analytics and Google
+          Ads) and Meta (the Facebook/Instagram pixel), and we also store a
+          first-party cookie recording the campaign or link you arrived from
+          so that an order can be attributed to it.
+        </p>
+        <p>
+          When you place an order, we also send a record of that purchase
+          directly from our servers to Meta so the sale can be matched to any
+          advertisement you saw. Where that record includes your email
+          address or phone number, it is converted into an irreversible
+          cryptographic hash before it leaves our systems — Meta receives the
+          hash, never the address or number itself.
+        </p>
+
+        <h2 className="pt-2 text-xl font-semibold text-slate-900">
+          Your cookie choices
+        </h2>
+        <p>
+          When you first visit, we show a notice explaining this and offering
+          a choice. If you decline, we stop writing the attribution cookie,
+          withdraw consent from the Google and Meta tags, and the purchase
+          record described above is sent without your email address, phone
+          number, name, address or any other identifier — leaving only the
+          order value and currency, which we use for our own sales reporting.
+        </p>
+        <p>
+          Visitors in the United Kingdom and the European Economic Area are
+          treated differently by default: nothing analytics- or
+          advertising-related is loaded until consent is given.
+        </p>
+        <p>
+          You can change your decision at any time using the{" "}
+          <strong>Cookie preferences</strong> link at the bottom of any page.
         </p>
 
         <h2 className="pt-2 text-xl font-semibold text-slate-900">

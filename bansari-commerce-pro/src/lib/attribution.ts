@@ -59,6 +59,18 @@ export type Attribution = Partial<Record<AttrKey, string>> & {
   user_agent?: string;
   /** The page the customer was on when the order was created. */
   event_source_url?: string;
+  /**
+   * The visitor's cookie choice at checkout, as 'granted' | 'denied'.
+   *
+   * Recorded on the order because consent cannot live only in the browser:
+   * the Conversions API sends hashed email and phone from the SERVER, long
+   * after the page has gone, and a decision made in a banner has to survive
+   * that far to mean anything. lib/meta-capi.ts reads it.
+   *
+   * Absent for orders placed before consent existed, which meta-capi treats
+   * as granted — the pre-existing behaviour, unchanged.
+   */
+  consent?: string;
 };
 
 function clamp(value: unknown): string | undefined {
@@ -131,6 +143,9 @@ export function readAttribution(request: NextRequest): Attribution {
       // order matters, the marketing metadata does not.
     }
   }
+
+  const consent = request.cookies.get('bc_consent')?.value;
+  if (consent === 'granted' || consent === 'denied') attribution.consent = consent;
 
   const ip = resolveClientIp(request);
   if (ip) attribution.client_ip = ip;

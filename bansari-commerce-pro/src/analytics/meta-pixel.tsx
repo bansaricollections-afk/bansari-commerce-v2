@@ -113,6 +113,35 @@ n.queue=[];t=b.createElement(e);t.async=!0;
 t.src=v;s=b.getElementsByTagName(e)[0];
 s.parentNode.insertBefore(t,s)}(window,document,'script',
 'https://connect.facebook.net/en_US/fbevents.js');
+
+/*
+ * Consent, decided before init.
+ *
+ * fbq has no region concept the way Consent Mode does, so the default has to
+ * be chosen here. An explicit stored choice always wins. With no choice yet,
+ * European visitors start revoked (consent must precede tracking) and
+ * everyone else starts granted, matching the opt-out model for this store's
+ * Indian market.
+ *
+ * The timezone test mirrors isLikelyEeaOrUk() in analytics/consent.ts. It is
+ * duplicated rather than imported because this is an inline bootstrap string
+ * that runs before any module has loaded — the two must be kept in step.
+ *
+ * revoke is issued BEFORE init: fbq queues calls in order, so revoking after
+ * init would let the automatic PageView through first.
+ */
+(function(){
+  var m = document.cookie.match(/(?:^|; )bc_consent=(granted|denied)/);
+  var choice = m ? m[1] : null;
+  var eu = false;
+  try {
+    var tz = Intl.DateTimeFormat().resolvedOptions().timeZone || '';
+    eu = tz.indexOf('Europe/') === 0 || tz === 'Atlantic/Reykjavik' || tz === 'Atlantic/Canary';
+  } catch (e) { eu = false; }
+  var granted = choice ? choice === 'granted' : !eu;
+  if (!granted) fbq('consent', 'revoke');
+})();
+
 fbq('init', '${PIXEL_ID}');
 fbq('track', 'PageView');
         `,

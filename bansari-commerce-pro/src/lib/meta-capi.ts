@@ -192,22 +192,49 @@ export async function sendMetaPurchase(input: MetaPurchaseInput): Promise<boolea
   const rLog = log.child({ requestId: input.requestId ?? 'n/a' });
   const attribution = input.attribution ?? {};
 
-  const userData = compact({
-    em: hashEmail(input.customer.email),
-    ph: hashPhone(input.customer.phone),
-    fn: hashText(input.customer.firstName),
-    ln: hashText(input.customer.lastName),
-    ct: hashText(input.customer.city),
-    st: hashText(input.customer.state),
-    zp: hashPostalCode(input.customer.postalCode),
-    country: hashCountry(input.customer.country),
-    external_id: input.customer.userId ? sha256(input.customer.userId) : undefined,
-    // fbc/fbp are already opaque Meta identifiers and must NOT be hashed.
-    fbc: attribution.fbc,
-    fbp: attribution.fbp,
-    client_ip_address: attribution.client_ip,
-    client_user_agent: attribution.user_agent,
-  });
+  /*
+   * Consent, as recorded at checkout by lib/attribution.ts.
+   *
+   * Absent means the order predates the consent banner; those are treated as
+   * granted, which preserves the behaviour those orders were placed under.
+   * Only an explicit 'denied' withholds anything.
+   */
+  const consentDenied = attribution.consent === 'denied';
+
+  /*
+   * When consent is denied the event is still sent, but stripped of every
+   * personal identifier: no hashed email, phone, name or address, no external
+   * id, no IP, and no fbc/fbp click identifiers.
+   *
+   * Sending the purchase without identifiers, rather than not sending it,
+   * is deliberate. Meta still receives an accurate count and value for
+   * aggregate reporting, but has nothing to attribute to an individual — which
+   * is what the visitor declined. Suppressing the event entirely would instead
+   * understate revenue and quietly bias optimisation toward the consenting
+   * half of the audience.
+   */
+  const userData = consentDenied
+    ? compact({
+        // Country alone is coarse enough to retain for regional reporting and
+        // is not a personal identifier.
+        country: hashCountry(input.customer.country),
+      })
+    : compact({
+        em: hashEmail(input.customer.email),
+        ph: hashPhone(input.customer.phone),
+        fn: hashText(input.customer.firstName),
+        ln: hashText(input.customer.lastName),
+        ct: hashText(input.customer.city),
+        st: hashText(input.customer.state),
+        zp: hashPostalCode(input.customer.postalCode),
+        country: hashCountry(input.customer.country),
+        external_id: input.customer.userId ? sha256(input.customer.userId) : undefined,
+        // fbc/fbp are already opaque Meta identifiers and must NOT be hashed.
+        fbc: attribution.fbc,
+        fbp: attribution.fbp,
+        client_ip_address: attribution.client_ip,
+        client_user_agent: attribution.user_agent,
+      });
 
   const payload = {
     data: [
@@ -264,6 +291,9 @@ export async function sendMetaPurchase(input: MetaPurchaseInput): Promise<boolea
       eventId: input.eventId,
       value: input.value,
       matchKeys: Object.keys(userData).length,
+      // Logged so a sudden drop in match quality can be explained by consent
+      // rather than mistaken for a regression in the hashing.
+      consentDenied,
     });
     return true;
   } catch (err) {

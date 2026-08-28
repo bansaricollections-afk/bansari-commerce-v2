@@ -4,6 +4,7 @@ import { Analytics } from '@vercel/analytics/next';
 import MetaPixel from '@/analytics/meta-pixel';
 import AttributionCapture from '@/analytics/attribution-capture';
 import GoogleTag from '@/analytics/google-tag';
+import ConsentNotice from '@/components/consent/ConsentNotice';
 import './globals.css';
 
 /**
@@ -249,6 +250,13 @@ export default function RootLayout({
          * data. See src/analytics/attribution-capture.tsx.
          */}
         <AttributionCapture />
+        {/*
+         * Cookie notice. Renders nothing once a choice is stored, so it costs
+         * a returning visitor nothing. Opt-out for this store's Indian market;
+         * genuinely opt-in for EEA/UK visitors, where the tags start denied.
+         * See src/analytics/consent.ts.
+         */}
+        <ConsentNotice />
       </body>
     </html>
   );

@@ -184,7 +184,14 @@ function MobileFilterBarInner({ facets }: { facets: ShopFacets }) {
   return (
     <>
       {/* ── Floating trigger bar (mobile only) ────────────────────────────── */}
-      <div className="fixed bottom-0 left-0 right-0 z-40 border-t border-slate-100 bg-white px-4 py-3 lg:hidden" role="toolbar" aria-label="Filter and sort controls">
+      {/* Offset by the cookie notice while it is on screen — same reason as
+          the product page's Add to Cart bar. See ConsentNotice. */}
+      <div
+        className="fixed left-0 right-0 z-40 border-t border-slate-100 bg-white px-4 py-3 lg:hidden"
+        style={{ bottom: 'var(--bc-consent-offset, 0px)' }}
+        role="toolbar"
+        aria-label="Filter and sort controls"
+      >
         <div className="flex items-center gap-3">
           <button
             ref={triggerRef}

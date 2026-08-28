@@ -105,6 +105,39 @@ export default function GoogleTag() {
 window.dataLayer = window.dataLayer || [];
 function gtag(){dataLayer.push(arguments);}
 window.gtag = gtag;
+
+/*
+ * Consent Mode v2 defaults — declared BEFORE gtag('js') and gtag('config'),
+ * which is the only order Google accepts. A default set after config has
+ * already fired is ignored, and the tag behaves as if consent were granted.
+ *
+ * Two defaults are declared. The region-scoped one wins for visitors Google
+ * resolves (by IP, server-side) to the EEA or the UK, where consent must
+ * precede tracking. The unscoped one applies everywhere else, matching the
+ * opt-out model appropriate to this store's Indian market.
+ *
+ * This is why no geo lookup exists in our own code: Google does the region
+ * resolution itself, before any tag fires.
+ *
+ * wait_for_update gives the banner 500ms to apply a stored choice before
+ * Google models anything, so a returning visitor who already consented is
+ * not measured as a denied session.
+ */
+gtag('consent', 'default', {
+  ad_storage: 'denied',
+  analytics_storage: 'denied',
+  ad_user_data: 'denied',
+  ad_personalization: 'denied',
+  wait_for_update: 500,
+  region: ['AT','BE','BG','HR','CY','CZ','DK','EE','FI','FR','DE','GR','HU','IE','IT','LV','LT','LU','MT','NL','PL','PT','RO','SK','SI','ES','SE','IS','LI','NO','GB','CH']
+});
+gtag('consent', 'default', {
+  ad_storage: 'granted',
+  analytics_storage: 'granted',
+  ad_user_data: 'granted',
+  ad_personalization: 'granted'
+});
+
 gtag('js', new Date());
 gtag('config', '${GA_MEASUREMENT_ID}');
 ${GOOGLE_ADS_ID ? `gtag('config', '${GOOGLE_ADS_ID}');` : ''}

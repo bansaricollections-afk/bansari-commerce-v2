@@ -3,6 +3,8 @@ import Link from "next/link";
 import { MapPin, Phone, Mail, MessageCircle } from "lucide-react";
 import { FaInstagram, FaFacebookF, FaPinterestP } from "react-icons/fa6";
 
+import CookiePreferencesLink from "@/components/consent/CookiePreferencesLink";
+
 import { getShopFacets } from "@/services/shop-facets";
 
 // Fixed destinations that are not catalog-derived. The collection links used
@@ -339,9 +341,14 @@ export default async function Footer() {
           className="mx-auto flex flex-col sm:flex-row items-center justify-between gap-3"
           style={{ maxWidth: "var(--bc-content-wide)" }}
         >
-          <p style={{ fontSize: "var(--bc-text-xs)", opacity: 0.35 }}>
-            © {new Date().getFullYear()} Bansari Collections. All rights reserved.
-          </p>
+          <div className="flex items-center gap-4">
+            <p style={{ fontSize: "var(--bc-text-xs)", opacity: 0.35 }}>
+              © {new Date().getFullYear()} Bansari Collections. All rights reserved.
+            </p>
+            {/* Lets a visitor revisit the cookie decision. See the component
+                for why it is separate from this server-rendered footer. */}
+            <CookiePreferencesLink />
+          </div>
           <p style={{ fontSize: "var(--bc-text-xs)", opacity: 0.35 }}>
             We accept: {PAYMENT_METHODS.join(" · ")} &nbsp;|&nbsp; Online Payment Only
           </p>

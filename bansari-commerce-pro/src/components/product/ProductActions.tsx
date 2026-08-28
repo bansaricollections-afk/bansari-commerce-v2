@@ -286,7 +286,15 @@ export default function ProductActions({
          * before tapping a CTA without needing to scroll.
          */}
         {!isOutOfStock && (
-          <div className="fixed bottom-0 left-0 right-0 z-40 bg-white border-t border-slate-200 lg:hidden">
+          /* bottom is offset by the cookie notice's height while it is on
+             screen. That notice is z-toast and would otherwise sit on top of
+             this bar, hiding Add to Cart from first-time mobile visitors —
+             i.e. exactly the ad traffic that lands on a product page. The
+             variable is unset once a choice is made, so this returns to 0. */
+          <div
+            className="fixed left-0 right-0 z-40 bg-white border-t border-slate-200 lg:hidden"
+            style={{ bottom: 'var(--bc-consent-offset, 0px)' }}
+          >
             {/* Narrow-screen fit: at 320px the old `gap-3 px-4` with a
                 `min-w-0` price column left ~72px per button, so the price
                 could compress and the CTA labels wrapped. The price column is
