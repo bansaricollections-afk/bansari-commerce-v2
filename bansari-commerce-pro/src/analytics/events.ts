@@ -29,6 +29,7 @@
 import { track as vercelTrack } from '@vercel/analytics';
 
 import { metaTrack } from '@/analytics/meta-pixel';
+import { effectiveConsent } from '@/analytics/consent';
 
 const GA_MEASUREMENT_ID = process.env.NEXT_PUBLIC_GA_MEASUREMENT_ID;
 const GOOGLE_ADS_ID = process.env.NEXT_PUBLIC_GOOGLE_ADS_ID;
@@ -240,7 +241,28 @@ export function trackPurchase(input: PurchaseInput): void {
    * Google, which looks identical to working.
    */
   if (GOOGLE_ADS_ID && GOOGLE_ADS_PURCHASE_LABEL && typeof window !== 'undefined') {
-    if (ENHANCED_CONVERSIONS_ENABLED && customer && typeof window.gtag === 'function') {
+    /*
+     * Enhanced Conversions send the customer's email and phone to Google.
+     * They are gated on CONSENT as well as on the feature flag.
+     *
+     * Consent Mode already sets ad_user_data to denied for a visitor who
+     * declined, and Google undertakes not to use the data in that case — but
+     * declining to send is not the same as sending and asking the recipient
+     * to ignore it. The privacy policy tells the customer we stop; this is
+     * what makes that true rather than a promise about someone else's
+     * behaviour.
+     *
+     * Checked at call time rather than read once at module scope, so a
+     * decision made partway through the session applies to this order.
+     */
+    const consented = effectiveConsent() === 'granted';
+
+    if (
+      ENHANCED_CONVERSIONS_ENABLED &&
+      consented &&
+      customer &&
+      typeof window.gtag === 'function'
+    ) {
       // Google's tag hashes these in the browser before they are transmitted.
       window.gtag('set', 'user_data', {
         ...(customer.email ? { email: customer.email } : {}),
