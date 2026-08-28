@@ -61,7 +61,7 @@ import { logAdminSavePayload } from "@/lib/debug/product-debug";
 const PRODUCT_IMAGES_BUCKET = "product-images";
 const PAGE_SIZE = 12;
 const LOW_STOCK_THRESHOLD = 5;
-const MAX_FILE_SIZE_BYTES = 5 * 1024 * 1024;
+const MAX_FILE_SIZE_BYTES = 8 * 1024 * 1024;
 
 /*
  * VIDEO LIMITS — deliberately strict.
@@ -894,7 +894,9 @@ export default function ProductManagement() {
             continue;
           }
         } else if (f.size > MAX_FILE_SIZE_BYTES) {
-          toast.error(`${f.name} exceeds 5 MB.`);
+          toast.error(
+            `${f.name} exceeds ${MAX_FILE_SIZE_BYTES / 1024 / 1024} MB.`
+          );
           continue;
         }
 

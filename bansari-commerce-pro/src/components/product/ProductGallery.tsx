@@ -557,12 +557,30 @@ export default function ProductGallery({ product, selectedVariant }: Props) {
           isZoomed ? 'opacity-100' : 'opacity-0',
         ].join(' ')}
       >
-        {zoomSrc && (
+        {/*
+          Mounted only while actually zooming.
+
+          This panel deliberately uses the FULL-resolution source — that is the
+          point of a zoom — but it was mounted on page load, so every visitor
+          downloaded it whether or not they ever hovered. Measured on
+          production: 2.2MB of a 4.0MB product page, and the single heaviest
+          asset by a wide margin.
+
+          It is also `hidden lg:block`, so mobile visitors — who cannot use
+          hover zoom at all — were paying that cost for an element they can
+          never see. Browsers fetch images inside display:none containers.
+
+          Deferring to first hover costs a short delay the first time the panel
+          opens, on desktop, as a deliberate interaction. That is a far better
+          trade than 2.2MB on every page view.
+        */}
+        {isZoomed && zoomSrc && (
           // eslint-disable-next-line @next/next/no-img-element
           <img
             src={zoomSrc}
             alt=""
             aria-hidden="true"
+            decoding="async"
             style={{
               position: 'absolute',
               width: '220%',
