@@ -76,6 +76,47 @@ const nextConfig: NextConfig = {
      * catalogue as compressed JPEG/WebP would cut both this bill and Supabase
      * egress, and is the real fix.
      */
+    /*
+     * ─────────────────────────────────────────────────────────────────────
+     * EMERGENCY: image optimisation is BYPASSED.
+     * ─────────────────────────────────────────────────────────────────────
+     *
+     * The Vercel transformation quota is fully exhausted. Every uncached
+     * variant returns 402 OPTIMIZED_IMAGE_REQUEST_PAYMENT_REQUIRED, verified
+     * across four product images at every configured width — only a single
+     * variant that happened to be cached still returned 200. The practical
+     * effect was broken product images across the storefront.
+     *
+     * `unoptimized` makes next/image emit a plain <img> pointing at the
+     * original file, so nothing touches the optimiser and images render
+     * again. It is a deliberate trade, not a fix: the source files are
+     * 1-5MB each, so pages are now considerably heavier and Supabase egress
+     * rises accordingly. Working and slow beats broken.
+     *
+     * TO REVERT — once the quota resets (monthly) or the plan is upgraded:
+     * delete the `unoptimized` line below. Everything else here is already
+     * tuned for that state and needs no other change.
+     *
+     * The settings that follow are intentionally kept even though they are
+     * inert while unoptimized is on, so re-enabling is a one-line change:
+     *
+     *   minimumCacheTTL  the real cause of the burn. The 4 hour default was
+     *                    re-transforming every variant six times a day
+     *                    forever; 31 days should keep usage inside the free
+     *                    allowance next cycle.
+     *   deviceSizes /    left at their ORIGINAL values on purpose. Narrowing
+     *   imageSizes       them is a cache invalidation, not a saving: the
+     *                    width set decides which URLs the HTML requests, and
+     *                    every cached variant is keyed by width. Narrowing
+     *                    them while the quota was spent is what turned a
+     *                    partial outage into a general one.
+     *
+     * The durable fix is neither of these: the catalogue should be exported
+     * at web weight (~300KB JPEG/WebP) rather than 1-5MB PNGs. At that size
+     * unoptimized serving is entirely reasonable and this whole problem
+     * disappears.
+     */
+    unoptimized: true,
     minimumCacheTTL: 2678400, // 31 days
     /*
      * REVERTED to the original width lists — do not narrow these again while
