@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
+
+import { requestApi } from "@/lib/api-client";
 import { Tags, Pencil, Check, X } from "lucide-react";
 
 type CategorySummary = {
@@ -20,10 +22,20 @@ export function AdminCategories() {
 
   function load() {
     setLoading(true);
-    fetch("/api/admin/categories")
-      .then((r) => (r.ok ? r.json() : Promise.reject(r.statusText)))
-      .then((d) => setCategories(d))
-      .catch((e) => setError(String(e)))
+    /*
+     * The route replies { success, requestId, data: CategorySummary[] }.
+     * This previously did setCategories(d) with the WHOLE envelope, so
+     * `categories` was an object: categories.length was undefined, neither
+     * the empty state nor the table matched, and the page rendered a blank
+     * panel with no error. Same defect as the customers and order screens.
+     *
+     * requestApi surfaces the server's own message; the old
+     * Promise.reject(r.statusText) resolved to '' over HTTP/2, which is
+     * falsy, so a genuine 500 showed nothing at all.
+     */
+    requestApi<{ data: CategorySummary[] }>("/api/admin/categories")
+      .then((res) => setCategories(Array.isArray(res.data) ? res.data : []))
+      .catch((e: unknown) => setError(e instanceof Error ? e.message : String(e)))
       .finally(() => setLoading(false));
   }
 
