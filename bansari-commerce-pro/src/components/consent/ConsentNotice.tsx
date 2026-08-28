@@ -1,9 +1,14 @@
 'use client';
 
 import Link from 'next/link';
-import { useState, useSyncExternalStore } from 'react';
+import { useRef, useSyncExternalStore } from 'react';
 
-import { readConsent, setConsent, isLikelyEeaOrUk } from '@/analytics/consent';
+import {
+  readConsent,
+  setConsent,
+  isLikelyEeaOrUk,
+  subscribeConsent,
+} from '@/analytics/consent';
 
 /**
  * ConsentNotice — the storefront cookie notice.
@@ -22,10 +27,6 @@ import { readConsent, setConsent, isLikelyEeaOrUk } from '@/analytics/consent';
  * style objects referencing the brand tokens, sharp corners (--radius-* is 0
  * brand-wide), Playfair for the heading, Inter for body and controls.
  */
-/** Consent lives in a cookie, which React cannot subscribe to — and it only
- *  ever changes via this component, so there is nothing to listen for. */
-const noopSubscribe = () => () => {};
-
 export default function ConsentNotice() {
   /*
    * useSyncExternalStore rather than useState + useEffect.
@@ -41,22 +42,38 @@ export default function ConsentNotice() {
    * reads the real cookie, and the notice appears only where it should.
    */
   const hasAnswered = useSyncExternalStore(
-    noopSubscribe,
+    subscribeConsent,
     () => readConsent() !== null,
     () => true
   );
 
-  const [dismissed, setDismissed] = useState(false);
-  const [leaving, setLeaving] = useState(false);
+  /*
+   * The slide-out is driven through a ref rather than state.
+   *
+   * A `leaving` state flag would persist after the store unmounts this, so
+   * reopening via the footer's "Cookie preferences" link would bring the
+   * notice back already translated off-screen and invisible. Touching the
+   * node directly means every reopen starts from a clean element.
+   */
+  const panelRef = useRef<HTMLDivElement | null>(null);
 
   function choose(state: 'granted' | 'denied') {
-    setConsent(state);
-    setLeaving(true);
-    // Let the slide-out finish before unmounting.
-    setTimeout(() => setDismissed(true), 240);
+    /*
+     * Animate first, write second. Writing immediately flips the store and
+     * unmounts synchronously, so the transition would never be seen. The
+     * store — not a local flag — owns visibility, which is what allows the
+     * footer link to bring this back: clearing the cookie notifies
+     * subscribers and this re-renders.
+     */
+    const panel = panelRef.current;
+    if (panel) {
+      panel.style.transform = 'translateY(100%)';
+      panel.style.opacity = '0';
+    }
+    setTimeout(() => setConsent(state), 240);
   }
 
-  if (hasAnswered || dismissed) return null;
+  if (hasAnswered) return null;
 
   const strict = isLikelyEeaOrUk();
 
@@ -64,6 +81,7 @@ export default function ConsentNotice() {
     <div
       role="region"
       aria-label="Cookie preferences"
+      ref={panelRef}
       style={{
         position: 'fixed',
         insetInline: 0,
@@ -71,8 +89,8 @@ export default function ConsentNotice() {
         zIndex: 'var(--bc-z-toast)' as unknown as number,
         background: 'var(--bc-dark)',
         borderTop: '1px solid var(--bc-border-gold)',
-        transform: leaving ? 'translateY(100%)' : 'translateY(0)',
-        opacity: leaving ? 0 : 1,
+        transform: 'translateY(0)',
+        opacity: 1,
         transition: 'transform var(--bc-base-t), opacity var(--bc-base-t)',
       }}
     >

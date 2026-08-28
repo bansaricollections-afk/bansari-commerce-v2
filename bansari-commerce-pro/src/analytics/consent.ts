@@ -84,11 +84,44 @@ export function effectiveConsent(): ConsentState {
   return readConsent() ?? (isLikelyEeaOrUk() ? 'denied' : 'granted');
 }
 
+/**
+ * A cookie is not observable, and React cannot subscribe to one. Since the
+ * value only ever changes through the functions in this module, an in-process
+ * listener set is sufficient and avoids polling.
+ */
+const listeners = new Set<() => void>();
+
+export function subscribeConsent(onChange: () => void): () => void {
+  listeners.add(onChange);
+  return () => listeners.delete(onChange);
+}
+
+function notifyConsentChanged(): void {
+  for (const listener of listeners) listener();
+}
+
 export function writeConsent(state: ConsentState): void {
   if (typeof document === 'undefined') return;
   const maxAge = CONSENT_MAX_AGE_DAYS * 24 * 60 * 60;
   const secure = window.location.protocol === 'https:' ? '; Secure' : '';
   document.cookie = `${CONSENT_COOKIE}=${state}; Path=/; Max-Age=${maxAge}; SameSite=Lax${secure}`;
+  notifyConsentChanged();
+}
+
+/**
+ * Clear the stored choice so the notice reappears, for the "Cookie
+ * preferences" link in the footer.
+ *
+ * Deliberately does NOT re-grant anything. Clearing returns the visitor to
+ * their regional default — which for a European visitor is denied — so
+ * reopening the notice can never silently re-enable tracking someone had
+ * previously turned off.
+ */
+export function reopenConsentNotice(): void {
+  if (typeof document === 'undefined') return;
+  document.cookie = `${CONSENT_COOKIE}=; Path=/; Max-Age=0; SameSite=Lax`;
+  applyConsent(effectiveConsent());
+  notifyConsentChanged();
 }
 
 /**
