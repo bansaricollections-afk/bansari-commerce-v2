@@ -62,6 +62,47 @@ const PRODUCT_IMAGES_BUCKET = "product-images";
 const PAGE_SIZE = 12;
 const LOW_STOCK_THRESHOLD = 5;
 const MAX_FILE_SIZE_BYTES = 5 * 1024 * 1024;
+
+/*
+ * VIDEO LIMITS — deliberately strict.
+ *
+ * Product clips are served straight from Supabase storage: Vercel does not
+ * optimise video, so every play is raw egress against a small free-tier
+ * allowance. A single unconstrained 15MB clip watched a few hundred times
+ * would exhaust a month of bandwidth and start failing requests — the same
+ * class of silent breakage the image-transformation quota just caused.
+ *
+ * These caps keep a clip to roughly the weight of one product photo. An 8
+ * second 720p H.264 export lands comfortably under 3MB.
+ */
+const ALLOWED_VIDEO_MIME_TYPES = ["video/mp4", "video/webm"];
+const MAX_VIDEO_SIZE_BYTES = 3 * 1024 * 1024;
+const MAX_VIDEO_DURATION_SECONDS = 8;
+
+/**
+ * Read a video's duration without uploading it.
+ *
+ * Size alone is not a sufficient guard: a heavily compressed two-minute clip
+ * can sit under the byte cap while being entirely wrong for a product page.
+ * Resolves null when the browser cannot read the metadata, and the caller
+ * treats that as acceptable rather than blocking a valid upload on a codec
+ * quirk.
+ */
+function readVideoDuration(file: File): Promise<number | null> {
+  return new Promise((resolve) => {
+    const url = URL.createObjectURL(file);
+    const probe = document.createElement("video");
+    probe.preload = "metadata";
+    const done = (value: number | null) => {
+      URL.revokeObjectURL(url);
+      resolve(value);
+    };
+    probe.onloadedmetadata = () =>
+      done(Number.isFinite(probe.duration) ? probe.duration : null);
+    probe.onerror = () => done(null);
+    probe.src = url;
+  });
+}
 const ALLOWED_MIME_TYPES = ["image/jpeg", "image/png", "image/webp", "image/gif"];
 const SEARCH_DEBOUNCE_MS = 350;
 
@@ -820,11 +861,46 @@ export default function ProductManagement() {
   const handleImageUpload = useCallback(
     async (files: FileList | null) => {
       if (!files || files.length === 0) return;
-      const valid = Array.from(files).filter((f) => {
-        if (f.size > MAX_FILE_SIZE_BYTES) { toast.error(`${f.name} exceeds 5 MB.`); return false; }
-        if (!ALLOWED_MIME_TYPES.includes(f.type)) { toast.error(`${f.name}: unsupported type.`); return false; }
-        return true;
-      });
+
+      /*
+       * Validation is async now because a video's duration can only be read
+       * by loading its metadata. Images keep exactly the rules they had.
+       */
+      const candidates = Array.from(files);
+      const valid: File[] = [];
+
+      for (const f of candidates) {
+        const isVideoFile = ALLOWED_VIDEO_MIME_TYPES.includes(f.type);
+
+        if (!isVideoFile && !ALLOWED_MIME_TYPES.includes(f.type)) {
+          toast.error(`${f.name}: unsupported type.`);
+          continue;
+        }
+
+        if (isVideoFile) {
+          if (f.size > MAX_VIDEO_SIZE_BYTES) {
+            toast.error(
+              `${f.name} exceeds ${MAX_VIDEO_SIZE_BYTES / 1024 / 1024} MB. Export a shorter or more compressed clip.`
+            );
+            continue;
+          }
+          const duration = await readVideoDuration(f);
+          // null means the browser could not read metadata — allow it rather
+          // than block a valid upload over a codec quirk.
+          if (duration !== null && duration > MAX_VIDEO_DURATION_SECONDS) {
+            toast.error(
+              `${f.name} is ${Math.round(duration)}s. Product clips must be ${MAX_VIDEO_DURATION_SECONDS}s or shorter.`
+            );
+            continue;
+          }
+        } else if (f.size > MAX_FILE_SIZE_BYTES) {
+          toast.error(`${f.name} exceeds 5 MB.`);
+          continue;
+        }
+
+        valid.push(f);
+      }
+
       if (valid.length === 0) return;
       setUploadingImages(true);
       try {
@@ -834,7 +910,16 @@ export default function ProductManagement() {
           const { error } = await supabase.storage.from(PRODUCT_IMAGES_BUCKET).upload(path, file, { upsert: false });
           if (error) { toast.error(`Upload failed: ${error.message}`); continue; }
           const { data: { publicUrl } } = supabase.storage.from(PRODUCT_IMAGES_BUCKET).getPublicUrl(path);
-          uploaded.push({ url: publicUrl, alt: form.name || file.name });
+          // mediaType is what ProductGallery switches on to render a <video>
+          // instead of next/image. Without it the clip would be handed to the
+          // image optimiser and fail.
+          uploaded.push({
+            url: publicUrl,
+            alt: form.name || file.name,
+            ...(ALLOWED_VIDEO_MIME_TYPES.includes(file.type)
+              ? { mediaType: "video" as const }
+              : {}),
+          });
         }
         if (uploaded.length > 0) {
           setForm((prev) => ({ ...prev, images: [...prev.images, ...uploaded] }));
@@ -1279,7 +1364,7 @@ export default function ProductManagement() {
                   ref={fileInputRef}
                   type="file"
                   multiple
-                  accept={ALLOWED_MIME_TYPES.join(",")}
+                  accept={[...ALLOWED_MIME_TYPES, ...ALLOWED_VIDEO_MIME_TYPES].join(",")}
                   className="hidden"
                   onChange={(e) => handleImageUpload(e.target.files)}
                 />
