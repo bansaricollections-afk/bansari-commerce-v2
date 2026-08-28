@@ -77,8 +77,30 @@ const nextConfig: NextConfig = {
      * egress, and is the real fix.
      */
     minimumCacheTTL: 2678400, // 31 days
-    deviceSizes: [640, 828, 1080, 1920],
-    imageSizes: [128, 256, 384],
+    /*
+     * REVERTED to the original width lists — do not narrow these again while
+     * the transformation quota is exhausted.
+     *
+     * Narrowing them looked like a pure saving, but the width set determines
+     * the URLs the HTML requests, and every already-cached variant is keyed by
+     * width. Dropping 375/750/1200/2048/3840 and the small imageSizes moved
+     * EVERY image on the site onto variants that had never been generated —
+     * and with the quota spent, Vercel answers those with
+     * 402 OPTIMIZED_IMAGE_REQUEST_PAYMENT_REQUIRED. The result was broken
+     * images across the storefront, including product thumbnails, which had
+     * been serving fine from the w=64 cache.
+     *
+     * The lesson: changing the width set silently invalidates the entire warm
+     * cache. It is safe to do only when there is quota available to refill it.
+     *
+     * The other options here are safe by comparison, because none of them
+     * changes the requested URL:
+     *   - minimumCacheTTL only extends how long an existing entry lives.
+     *   - qualities [75] matches the default the URLs already used.
+     *   - formats webp matches the Next default.
+     */
+    deviceSizes: [375, 640, 750, 828, 1080, 1200, 1920, 2048, 3840],
+    imageSizes: [16, 32, 48, 64, 96, 128, 256, 384],
     qualities: [75],
     // One format, not two. Serving both AVIF and WebP doubles the
     // transformations for every image to save a few KB per request.
