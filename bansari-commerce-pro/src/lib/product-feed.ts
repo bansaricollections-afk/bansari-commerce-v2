@@ -89,19 +89,84 @@ type ProductRow = {
  * the cheapest optimisation available here.
  */
 const GOOGLE_CATEGORY_FALLBACK = 'Apparel & Accessories > Clothing';
+const GOOGLE_CATEGORY_TOPS = 'Apparel & Accessories > Clothing > Shirts & Tops';
+const GOOGLE_CATEGORY_DRESSES = 'Apparel & Accessories > Clothing > Dresses';
 
-const GOOGLE_CATEGORY_BY_KEYWORD: Array<[RegExp, string]> = [
-  [/dupatta|stole|scarf|shawl/i, 'Apparel & Accessories > Clothing Accessories > Scarves & Shawls'],
-  [/saree|sari|lehenga|gown|dress|anarkali|kurti/i, 'Apparel & Accessories > Clothing > Dresses'],
-  [/salwar|palazzo|pant|trouser|churidar/i, 'Apparel & Accessories > Clothing > Pants'],
-  [/blouse|top|kurta|shirt/i, 'Apparel & Accessories > Clothing > Shirts & Tops'],
-  [/skirt|ghagra/i, 'Apparel & Accessories > Clothing > Skirts'],
+/**
+ * Driven by products.category — a curated field with a small known set of
+ * values — rather than by keyword-matching the title.
+ *
+ * The previous implementation matched loose substrings against the title and
+ * got this badly wrong in two ways, both visible in the live feed:
+ *
+ *   1. "Bansari" CONTAINS "sari". Every product whose title began with the
+ *      brand name matched the saree rule, so shirts and co-ord sets were all
+ *      published as Dresses.
+ *
+ *   2. A three-piece kurta set whose title mentions its dupatta matched the
+ *      scarf rule first, so complete outfits were published under
+ *      "Scarves & Shawls".
+ *
+ * This is not cosmetic: Google uses google_product_category to decide which
+ * searches a product may appear in, so a kurta set listed as a scarf competes
+ * in the wrong auctions and depresses Shopping performance.
+ *
+ * A multi-garment set (kurta + pants + dupatta) has no precise equivalent in
+ * Google's taxonomy, and the generic "Clothing" node is always valid. A
+ * correct broad category beats a confidently wrong specific one, so sets
+ * deliberately stay generic rather than being forced into Dresses.
+ */
+const CATEGORY_TO_GOOGLE: Record<string, string> = {
+  kurtis: GOOGLE_CATEGORY_TOPS,
+  tops: GOOGLE_CATEGORY_TOPS,
+  shirts: GOOGLE_CATEGORY_TOPS,
+  'kurta sets': GOOGLE_CATEGORY_FALLBACK,
+  'co-ord sets': GOOGLE_CATEGORY_FALLBACK,
+  suits: GOOGLE_CATEGORY_FALLBACK,
+};
+
+/**
+ * Every pattern is word-boundary matched, so "Bansari" can never again match
+ * "sari". Used only for products whose category is absent or unrecognised.
+ */
+const NAME_FALLBACK_RULES: Array<[RegExp, string]> = [
+  [/\bdress(es)?\b/i, GOOGLE_CATEGORY_DRESSES],
+  [/\b(saree|sarees|lehenga|lehengas|gown|gowns|anarkali)\b/i, GOOGLE_CATEGORY_DRESSES],
+  [/\b(skirt|skirts|ghagra)\b/i, 'Apparel & Accessories > Clothing > Skirts'],
+  [/\b(shirt|shirts|blouse|blouses|kurti|kurtis|top|tops)\b/i, GOOGLE_CATEGORY_TOPS],
 ];
 
+/** Categories that are a coordinated multi-garment outfit, not one garment. */
+const SET_CATEGORIES = new Set(['kurta sets', 'co-ord sets', 'suits']);
+
 function googleCategoryFor(category: string | null, name: string): string {
-  const haystack = `${category ?? ''} ${name}`;
-  for (const [pattern, value] of GOOGLE_CATEGORY_BY_KEYWORD) {
-    if (pattern.test(haystack)) return value;
+  const key = (category ?? '').trim().toLowerCase();
+
+  /*
+   * A set stays generic, full stop. No name rule may refine it: "Co-Ord Set
+   * with Shirt & Wide-Leg Pants" is not a shirt, and "Kurta Set with Printed
+   * Dupatta" is emphatically not a scarf. Letting the title speak here is the
+   * precise mistake that produced the wrong categories in the live feed.
+   */
+  if (SET_CATEGORIES.has(key)) return GOOGLE_CATEGORY_FALLBACK;
+
+  const fromCategory = CATEGORY_TO_GOOGLE[key];
+  if (fromCategory) {
+    /*
+     * One deliberate refinement: several products are categorised "Kurtis"
+     * but are described in their own title as dresses. That is a genuine
+     * single-garment distinction Google cares about, and the title is the
+     * more specific source.
+     */
+    if (fromCategory === GOOGLE_CATEGORY_TOPS && /\bdress(es)?\b/i.test(name)) {
+      return GOOGLE_CATEGORY_DRESSES;
+    }
+    return fromCategory;
+  }
+
+  // Unrecognised category — fall back to reading the name.
+  for (const [pattern, value] of NAME_FALLBACK_RULES) {
+    if (pattern.test(name)) return value;
   }
   return GOOGLE_CATEGORY_FALLBACK;
 }
@@ -128,6 +193,25 @@ function plainText(value: string | null | undefined, maxLength: number): string 
     .replace(/\s+/g, ' ')
     .trim()
     .slice(0, maxLength);
+}
+
+/**
+ * Truncate to a word boundary rather than mid-character.
+ *
+ * Google caps titles at 150 characters. A hard slice produced titles ending
+ * "...Regular Fit, Baby Pi" in the live feed, which reads as broken to a
+ * shopper seeing it in a Shopping ad. Cutting at the last space and dropping
+ * any trailing punctuation keeps the title legible; the lost words were never
+ * going to be displayed anyway.
+ */
+function truncateWords(value: string, maxLength: number): string {
+  if (value.length <= maxLength) return value;
+  const clipped = value.slice(0, maxLength);
+  const lastSpace = clipped.lastIndexOf(' ');
+  // Guard against a single enormous "word", where cutting at the last space
+  // would discard almost everything.
+  const base = lastSpace > maxLength * 0.6 ? clipped.slice(0, lastSpace) : clipped;
+  return base.replace(/[\s,;:\-–—]+$/, '');
 }
 
 /** Absolute URLs only — a relative image_link is rejected on import. */
@@ -238,7 +322,7 @@ export async function getFeedItems(): Promise<FeedItem[]> {
 
     items.push({
       id: String(row.id),
-      title: plainText(row.name, 150),
+      title: truncateWords(plainText(row.name, 400), 150),
       description,
       link: `${base}/product/${row.id}`,
       imageLink: images[0],
