@@ -694,6 +694,15 @@ export default function ProductManagement() {
 
   const [isSheetOpen, setIsSheetOpen]   = useState(false);
   const [editProduct, setEditProduct]   = useState<Product | null>(null);
+  /**
+   * The form exactly as it was loaded for editing.
+   *
+   * Used to work out which fields the user actually changed, so an update
+   * validates only those. Without it there is no way to distinguish "left
+   * alone" from "cleared", and every edit ends up re-validating the whole
+   * product.
+   */
+  const initialFormRef = useRef<ProductFormState | null>(null);
   const [currentStep, setCurrentStep]   = useState(0);
   const [form, setForm]                 = useState<ProductFormState>({ ...emptyForm });
   const [fieldErrors, setFieldErrors]   = useState<FieldErrors>({});
@@ -840,6 +849,8 @@ export default function ProductManagement() {
 
   const openNew = useCallback(() => {
     setEditProduct(null);
+    // Creating: there is no baseline, so validateAll() applies in full.
+    initialFormRef.current = null;
     setForm({ ...emptyForm });
     setFieldErrors({});
     setCurrentStep(0);
@@ -849,7 +860,9 @@ export default function ProductManagement() {
 
   const openEdit = useCallback((p: Product) => {
     setEditProduct(p);
-    setForm(mapApiProductToForm(p as unknown as ApiProductRecord));
+    const mapped = mapApiProductToForm(p as unknown as ApiProductRecord);
+    initialFormRef.current = mapped;
+    setForm(mapped);
     setFieldErrors({});
     setCurrentStep(0);
     setImagePreviews(p.images.map((img) => img.url));
@@ -978,6 +991,67 @@ export default function ProductManagement() {
     return errors;
   }
 
+  /**
+   * Validation for EDITING an existing product: only the fields the user
+   * actually changed are checked.
+   *
+   * validateAll() enforces the whole schema — 15 required fields. That is
+   * right when creating a product. Applied to an edit it means changing one
+   * attribute is refused until every other field is filled, which made routine
+   * updates cumbersome: adjusting a price demanded SKU, sizes and the SEO
+   * description as well.
+   *
+   * Two things made this unavoidable in practice. Products created before
+   * fields like hsn / seoTitle existed carry them empty, and the mapper fills
+   * the form with `?? ""`. And some older products hold values that no longer
+   * satisfy today's rules — a description shorter than the current minimum,
+   * for instance — so even validating "whatever is filled in" would still
+   * block an unrelated change.
+   *
+   * Comparing against the form as it was loaded solves both: an untouched
+   * field is never judged, whatever state it is in, while anything the user
+   * edits is validated exactly as strictly as before. A negative price or a
+   * malformed slug is still rejected.
+   *
+   * Creating and publishing still use validateAll(). A product going live on
+   * the storefront should be complete; editing a draft should not require it.
+   */
+  function validateForEdit(): FieldErrors {
+    const errors: FieldErrors = {};
+    const initial = initialFormRef.current;
+    if (!initial) return validateAll();
+
+    const changedKeys = (Object.keys(form) as Array<keyof ProductFormState>).filter(
+      (k) => JSON.stringify(form[k]) !== JSON.stringify(initial[k])
+    );
+    if (changedKeys.length === 0) return errors;
+
+    const candidate: Record<string, unknown> = {
+      ...form,
+      sizes: form.sizes.split(",").map((v) => v.trim()).filter(Boolean),
+      price: form.price,
+      comparePrice: form.comparePrice || undefined,
+      cost: form.cost || undefined,
+      stock: form.stock,
+      gst: form.gst,
+    };
+
+    const subset = Object.fromEntries(
+      changedKeys
+        .filter((k) => candidate[k as string] !== undefined)
+        .map((k) => [k as string, candidate[k as string]])
+    );
+
+    const result = productFormSchema.partial().safeParse(subset);
+    if (!result.success) {
+      for (const issue of result.error.issues) {
+        const field = issue.path[0] as keyof ProductFormState;
+        if (!errors[field]) errors[field] = issue.message;
+      }
+    }
+    return errors;
+  }
+
   // ── Step navigation ────────────────────────────────────────────────────────
 
   const handleNext = useCallback(() => {
@@ -1046,7 +1120,12 @@ export default function ProductManagement() {
   // ── Save ───────────────────────────────────────────────────────────────────
 
   const handleSave = useCallback(async (publishNow = false) => {
-    const errors = validateAll();
+    /*
+     * Creating a product, or publishing one, still requires the complete
+     * schema. Editing an existing draft validates only what is filled in, so
+     * a single attribute can be changed without completing unrelated fields.
+     */
+    const errors = editProduct && !publishNow ? validateForEdit() : validateAll();
     if (Object.keys(errors).length > 0) { setFieldErrors(errors); toast.error("Please fix validation errors."); return; }
 
     if (publishNow) setIsPublishing(true); else setIsSaving(true);
@@ -1083,6 +1162,7 @@ export default function ProductManagement() {
       setIsPublishing(false);
     }
   }, [editProduct, form, loadProducts]);
+
 
   // ── Delete ─────────────────────────────────────────────────────────────────
 
@@ -1358,7 +1438,12 @@ export default function ProductManagement() {
                     <>
                       <ImagePlus className="h-10 w-10 text-neutral-300 mx-auto mb-3" />
                       <p className="text-sm text-neutral-700 font-medium">Drag and drop, or click to upload</p>
-                      <p className="text-xs text-neutral-500 mt-1">JPEG, PNG, WebP, GIF · max 5 MB each</p>
+                      <p className="text-xs text-neutral-500 mt-1">
+                        Images: JPEG, PNG, WebP, GIF · max {MAX_FILE_SIZE_BYTES / 1024 / 1024} MB each
+                      </p>
+                      <p className="text-xs text-neutral-500">
+                        Video: MP4, WebM · max {MAX_VIDEO_SIZE_BYTES / 1024 / 1024} MB, {MAX_VIDEO_DURATION_SECONDS}s
+                      </p>
                     </>
                   )}
                 </div>
@@ -1370,6 +1455,7 @@ export default function ProductManagement() {
                   className="hidden"
                   onChange={(e) => handleImageUpload(e.target.files)}
                 />
+
 
                 {imagePreviews.length > 0 && (
                   <div className="grid grid-cols-3 sm:grid-cols-4 gap-3">
