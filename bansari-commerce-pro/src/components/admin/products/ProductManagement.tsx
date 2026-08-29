@@ -959,8 +959,26 @@ export default function ProductManagement() {
     const errors: FieldErrors = {};
     const step = STEPS.find((s) => s.id === stepId);
     if (!step || step.fields.length === 0) return errors;
+
+    /*
+     * When editing an existing product, a step only gates on fields the user
+     * has actually touched.
+     *
+     * The wizard forces every step in order, and each one demanded its own
+     * required fields, so reaching Publish after changing a title meant
+     * filling in fabric, collection, sizes, SEO title and SEO description
+     * first. The Save/Publish validation was relaxed for edits, but this ran
+     * earlier and still blocked the journey there.
+     */
+    const initial = initialFormRef.current;
+
     for (const field of step.fields) {
       const val = form[field];
+      const untouched =
+        initial !== null &&
+        JSON.stringify(val) === JSON.stringify(initial[field]);
+      if (untouched) continue;
+
       if (REQUIRED_FIELDS.includes(field)) {
         const strVal = typeof val === "string" ? val.trim() : String(val ?? "");
         if (!strVal) {
@@ -1125,7 +1143,17 @@ export default function ProductManagement() {
      * schema. Editing an existing draft validates only what is filled in, so
      * a single attribute can be changed without completing unrelated fields.
      */
-    const errors = editProduct && !publishNow ? validateForEdit() : validateAll();
+    /*
+     * Creating a product still requires the complete schema. Editing an
+     * existing one validates only what changed — including when publishing.
+     *
+     * Requiring completeness to re-publish was over-strict: the product
+     * already exists, and the server's own publish rule (assertPublishable)
+     * only cares that a size-managed product has active size inventory. It
+     * never asks for fabric, collection or SEO. Blocking a title change on
+     * those bought no data guarantee and simply made routine edits painful.
+     */
+    const errors = editProduct ? validateForEdit() : validateAll();
     if (Object.keys(errors).length > 0) { setFieldErrors(errors); toast.error("Please fix validation errors."); return; }
 
     if (publishNow) setIsPublishing(true); else setIsSaving(true);
