@@ -978,6 +978,56 @@ export default function ProductManagement() {
     return errors;
   }
 
+  /**
+   * Validation for EDITING an existing product.
+   *
+   * validateAll() enforces the whole schema — 15 required fields. That is
+   * correct when creating a product, but applying it to an edit means
+   * changing one attribute (a price, a category, a photograph) is refused
+   * until every other field is filled. Products created before fields like
+   * hsn / seoTitle / seoDescription existed carry them empty, and the mapper
+   * fills the form with `?? ""`, so those edits were effectively blocked.
+   *
+   * This validates only the fields that actually have a value: anything the
+   * user has filled in is still checked properly — a malformed slug or a
+   * negative price is still rejected — while untouched empty legacy fields no
+   * longer stand in the way of an unrelated change.
+   *
+   * Publishing still uses validateAll(). A product going live on the
+   * storefront should be complete; a draft edit should not have to be.
+   */
+  function validateForEdit(): FieldErrors {
+    const errors: FieldErrors = {};
+    const candidate: Record<string, unknown> = {
+      ...form,
+      sizes: form.sizes.split(",").map((s) => s.trim()).filter(Boolean),
+      price: form.price,
+      comparePrice: form.comparePrice || undefined,
+      cost: form.cost || undefined,
+      stock: form.stock,
+      gst: form.gst,
+    };
+
+    // Drop empty values so `.partial()` skips them entirely.
+    const present = Object.fromEntries(
+      Object.entries(candidate).filter(([, v]) => {
+        if (v === undefined || v === null) return false;
+        if (typeof v === "string") return v.trim() !== "";
+        if (Array.isArray(v)) return v.length > 0;
+        return true;
+      })
+    );
+
+    const result = productFormSchema.partial().safeParse(present);
+    if (!result.success) {
+      for (const issue of result.error.issues) {
+        const field = issue.path[0] as keyof ProductFormState;
+        if (!errors[field]) errors[field] = issue.message;
+      }
+    }
+    return errors;
+  }
+
   // ── Step navigation ────────────────────────────────────────────────────────
 
   const handleNext = useCallback(() => {
@@ -1046,7 +1096,12 @@ export default function ProductManagement() {
   // ── Save ───────────────────────────────────────────────────────────────────
 
   const handleSave = useCallback(async (publishNow = false) => {
-    const errors = validateAll();
+    /*
+     * Creating a product, or publishing one, still requires the complete
+     * schema. Editing an existing draft validates only what is filled in, so
+     * a single attribute can be changed without completing unrelated fields.
+     */
+    const errors = editProduct && !publishNow ? validateForEdit() : validateAll();
     if (Object.keys(errors).length > 0) { setFieldErrors(errors); toast.error("Please fix validation errors."); return; }
 
     if (publishNow) setIsPublishing(true); else setIsSaving(true);
@@ -1084,40 +1139,6 @@ export default function ProductManagement() {
     }
   }, [editProduct, form, loadProducts]);
 
-  /**
-   * Save ONLY the images of an existing product.
-   *
-   * handleSave runs validateAll(), which enforces the entire product schema —
-   * 15 required fields including sku, slug, hsn, sizes, seoTitle and
-   * seoDescription. That is right when creating a product, but it means
-   * changing a photograph on an existing one is blocked until every legacy
-   * field is filled in. Products created before those fields existed have
-   * them empty, so editing their images demanded unrelated data entry first.
-   *
-   * The API accepts a partial payload: ProductV2Service.update guards every
-   * field with `payload.x !== undefined` and only re-checks sku/slug
-   * uniqueness when those are actually changing. Sending just { images } is
-   * therefore safe and touches nothing else.
-   */
-  const handleSaveImagesOnly = useCallback(async () => {
-    if (!editProduct) return;
-    setIsSaving(true);
-    try {
-      const result = await apiFetch<ApiSingleResponse>(
-        `/api/admin/products/${editProduct.id}`,
-        {
-          method: "PUT",
-          body: JSON.stringify({ images: form.images }),
-        }
-      );
-      toast.success(`Images updated for "${result.data.name}".`);
-      await loadProducts();
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Could not update images.");
-    } finally {
-      setIsSaving(false);
-    }
-  }, [editProduct, form.images, loadProducts]);
 
   // ── Delete ─────────────────────────────────────────────────────────────────
 
@@ -1411,29 +1432,6 @@ export default function ProductManagement() {
                   onChange={(e) => handleImageUpload(e.target.files)}
                 />
 
-                {/*
-                  Images-only save, shown when editing an existing product.
-                  The main Save runs the full product schema, so a product
-                  missing a legacy field (hsn, seoTitle, sizes...) could not
-                  have its photographs changed without filling in unrelated
-                  data first. This writes just the images.
-                */}
-                {editProduct && (
-                  <div className="flex items-center justify-between gap-3 rounded-md border border-neutral-200 bg-neutral-50 px-4 py-3">
-                    <p className="text-xs text-neutral-600">
-                      Changing photos only? Save them without completing the rest of the form.
-                    </p>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      disabled={isSaving || uploadingImages}
-                      onClick={handleSaveImagesOnly}
-                    >
-                      {isSaving ? "Saving…" : "Save images only"}
-                    </Button>
-                  </div>
-                )}
 
                 {imagePreviews.length > 0 && (
                   <div className="grid grid-cols-3 sm:grid-cols-4 gap-3">
