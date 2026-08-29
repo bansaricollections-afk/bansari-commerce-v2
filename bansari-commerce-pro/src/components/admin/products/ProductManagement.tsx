@@ -694,6 +694,15 @@ export default function ProductManagement() {
 
   const [isSheetOpen, setIsSheetOpen]   = useState(false);
   const [editProduct, setEditProduct]   = useState<Product | null>(null);
+  /**
+   * The form exactly as it was loaded for editing.
+   *
+   * Used to work out which fields the user actually changed, so an update
+   * validates only those. Without it there is no way to distinguish "left
+   * alone" from "cleared", and every edit ends up re-validating the whole
+   * product.
+   */
+  const initialFormRef = useRef<ProductFormState | null>(null);
   const [currentStep, setCurrentStep]   = useState(0);
   const [form, setForm]                 = useState<ProductFormState>({ ...emptyForm });
   const [fieldErrors, setFieldErrors]   = useState<FieldErrors>({});
@@ -840,6 +849,8 @@ export default function ProductManagement() {
 
   const openNew = useCallback(() => {
     setEditProduct(null);
+    // Creating: there is no baseline, so validateAll() applies in full.
+    initialFormRef.current = null;
     setForm({ ...emptyForm });
     setFieldErrors({});
     setCurrentStep(0);
@@ -849,7 +860,9 @@ export default function ProductManagement() {
 
   const openEdit = useCallback((p: Product) => {
     setEditProduct(p);
-    setForm(mapApiProductToForm(p as unknown as ApiProductRecord));
+    const mapped = mapApiProductToForm(p as unknown as ApiProductRecord);
+    initialFormRef.current = mapped;
+    setForm(mapped);
     setFieldErrors({});
     setCurrentStep(0);
     setImagePreviews(p.images.map((img) => img.url));
@@ -979,28 +992,43 @@ export default function ProductManagement() {
   }
 
   /**
-   * Validation for EDITING an existing product.
+   * Validation for EDITING an existing product: only the fields the user
+   * actually changed are checked.
    *
    * validateAll() enforces the whole schema — 15 required fields. That is
-   * correct when creating a product, but applying it to an edit means
-   * changing one attribute (a price, a category, a photograph) is refused
-   * until every other field is filled. Products created before fields like
-   * hsn / seoTitle / seoDescription existed carry them empty, and the mapper
-   * fills the form with `?? ""`, so those edits were effectively blocked.
+   * right when creating a product. Applied to an edit it means changing one
+   * attribute is refused until every other field is filled, which made routine
+   * updates cumbersome: adjusting a price demanded SKU, sizes and the SEO
+   * description as well.
    *
-   * This validates only the fields that actually have a value: anything the
-   * user has filled in is still checked properly — a malformed slug or a
-   * negative price is still rejected — while untouched empty legacy fields no
-   * longer stand in the way of an unrelated change.
+   * Two things made this unavoidable in practice. Products created before
+   * fields like hsn / seoTitle existed carry them empty, and the mapper fills
+   * the form with `?? ""`. And some older products hold values that no longer
+   * satisfy today's rules — a description shorter than the current minimum,
+   * for instance — so even validating "whatever is filled in" would still
+   * block an unrelated change.
    *
-   * Publishing still uses validateAll(). A product going live on the
-   * storefront should be complete; a draft edit should not have to be.
+   * Comparing against the form as it was loaded solves both: an untouched
+   * field is never judged, whatever state it is in, while anything the user
+   * edits is validated exactly as strictly as before. A negative price or a
+   * malformed slug is still rejected.
+   *
+   * Creating and publishing still use validateAll(). A product going live on
+   * the storefront should be complete; editing a draft should not require it.
    */
   function validateForEdit(): FieldErrors {
     const errors: FieldErrors = {};
+    const initial = initialFormRef.current;
+    if (!initial) return validateAll();
+
+    const changedKeys = (Object.keys(form) as Array<keyof ProductFormState>).filter(
+      (k) => JSON.stringify(form[k]) !== JSON.stringify(initial[k])
+    );
+    if (changedKeys.length === 0) return errors;
+
     const candidate: Record<string, unknown> = {
       ...form,
-      sizes: form.sizes.split(",").map((s) => s.trim()).filter(Boolean),
+      sizes: form.sizes.split(",").map((v) => v.trim()).filter(Boolean),
       price: form.price,
       comparePrice: form.comparePrice || undefined,
       cost: form.cost || undefined,
@@ -1008,17 +1036,13 @@ export default function ProductManagement() {
       gst: form.gst,
     };
 
-    // Drop empty values so `.partial()` skips them entirely.
-    const present = Object.fromEntries(
-      Object.entries(candidate).filter(([, v]) => {
-        if (v === undefined || v === null) return false;
-        if (typeof v === "string") return v.trim() !== "";
-        if (Array.isArray(v)) return v.length > 0;
-        return true;
-      })
+    const subset = Object.fromEntries(
+      changedKeys
+        .filter((k) => candidate[k as string] !== undefined)
+        .map((k) => [k as string, candidate[k as string]])
     );
 
-    const result = productFormSchema.partial().safeParse(present);
+    const result = productFormSchema.partial().safeParse(subset);
     if (!result.success) {
       for (const issue of result.error.issues) {
         const field = issue.path[0] as keyof ProductFormState;
