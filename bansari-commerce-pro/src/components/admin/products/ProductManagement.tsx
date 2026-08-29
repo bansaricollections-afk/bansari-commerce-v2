@@ -1084,6 +1084,41 @@ export default function ProductManagement() {
     }
   }, [editProduct, form, loadProducts]);
 
+  /**
+   * Save ONLY the images of an existing product.
+   *
+   * handleSave runs validateAll(), which enforces the entire product schema —
+   * 15 required fields including sku, slug, hsn, sizes, seoTitle and
+   * seoDescription. That is right when creating a product, but it means
+   * changing a photograph on an existing one is blocked until every legacy
+   * field is filled in. Products created before those fields existed have
+   * them empty, so editing their images demanded unrelated data entry first.
+   *
+   * The API accepts a partial payload: ProductV2Service.update guards every
+   * field with `payload.x !== undefined` and only re-checks sku/slug
+   * uniqueness when those are actually changing. Sending just { images } is
+   * therefore safe and touches nothing else.
+   */
+  const handleSaveImagesOnly = useCallback(async () => {
+    if (!editProduct) return;
+    setIsSaving(true);
+    try {
+      const result = await apiFetch<ApiSingleResponse>(
+        `/api/admin/products/${editProduct.id}`,
+        {
+          method: "PUT",
+          body: JSON.stringify({ images: form.images }),
+        }
+      );
+      toast.success(`Images updated for "${result.data.name}".`);
+      await loadProducts();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Could not update images.");
+    } finally {
+      setIsSaving(false);
+    }
+  }, [editProduct, form.images, loadProducts]);
+
   // ── Delete ─────────────────────────────────────────────────────────────────
 
   const handleDelete = useCallback(async () => {
@@ -1358,7 +1393,12 @@ export default function ProductManagement() {
                     <>
                       <ImagePlus className="h-10 w-10 text-neutral-300 mx-auto mb-3" />
                       <p className="text-sm text-neutral-700 font-medium">Drag and drop, or click to upload</p>
-                      <p className="text-xs text-neutral-500 mt-1">JPEG, PNG, WebP, GIF · max 5 MB each</p>
+                      <p className="text-xs text-neutral-500 mt-1">
+                        Images: JPEG, PNG, WebP, GIF · max {MAX_FILE_SIZE_BYTES / 1024 / 1024} MB each
+                      </p>
+                      <p className="text-xs text-neutral-500">
+                        Video: MP4, WebM · max {MAX_VIDEO_SIZE_BYTES / 1024 / 1024} MB, {MAX_VIDEO_DURATION_SECONDS}s
+                      </p>
                     </>
                   )}
                 </div>
@@ -1370,6 +1410,30 @@ export default function ProductManagement() {
                   className="hidden"
                   onChange={(e) => handleImageUpload(e.target.files)}
                 />
+
+                {/*
+                  Images-only save, shown when editing an existing product.
+                  The main Save runs the full product schema, so a product
+                  missing a legacy field (hsn, seoTitle, sizes...) could not
+                  have its photographs changed without filling in unrelated
+                  data first. This writes just the images.
+                */}
+                {editProduct && (
+                  <div className="flex items-center justify-between gap-3 rounded-md border border-neutral-200 bg-neutral-50 px-4 py-3">
+                    <p className="text-xs text-neutral-600">
+                      Changing photos only? Save them without completing the rest of the form.
+                    </p>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      disabled={isSaving || uploadingImages}
+                      onClick={handleSaveImagesOnly}
+                    >
+                      {isSaving ? "Saving…" : "Save images only"}
+                    </Button>
+                  </div>
+                )}
 
                 {imagePreviews.length > 0 && (
                   <div className="grid grid-cols-3 sm:grid-cols-4 gap-3">
