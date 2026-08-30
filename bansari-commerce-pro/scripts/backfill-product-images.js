@@ -74,7 +74,22 @@ function keyFromUrl(u) {
 
   console.log(`${APPLY ? 'APPLY' : 'DRY RUN'} — ${products.length} products\n`);
 
-  const manifest = [];
+  /*
+   * Load any existing manifest and append to it. A later batch must not erase
+   * the rollback mapping written by an earlier one.
+   */
+  let manifest = [];
+  if (fs.existsSync(MANIFEST)) {
+    try {
+      manifest = JSON.parse(fs.readFileSync(MANIFEST, 'utf8'));
+      console.log(`resuming: ${manifest.length} entries already in ${MANIFEST}\n`);
+    } catch {
+      console.error(`${MANIFEST} is unreadable; refusing to overwrite it.`);
+      process.exitCode = 1;
+      return;
+    }
+  }
+
   let before = 0;
   let after = 0;
   let converted = 0;
@@ -91,6 +106,19 @@ function keyFromUrl(u) {
       const objKey = typeof img?.url === 'string' ? keyFromUrl(img.url) : null;
       if (!objKey || img.mediaType === 'video') {
         nextImages.push(img);
+        continue;
+      }
+
+      /*
+       * Anything this script already produced carries the -c.jpg suffix. Never
+       * touch it again: re-encoding an existing JPEG applies a second lossy
+       * pass for no benefit. Checked before the download so a re-run over an
+       * already-converted catalogue costs nothing. This is what makes resuming
+       * after a partial batch safe.
+       */
+      if (/-c\.jpg$/i.test(objKey)) {
+        nextImages.push(img);
+        skipped++;
         continue;
       }
 
