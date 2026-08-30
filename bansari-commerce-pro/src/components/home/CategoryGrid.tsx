@@ -6,7 +6,7 @@ import ImageWithFallback from '@/components/ui/ImageWithFallback';
 const featured = {
   title: 'Sarees',
   occasion: 'Wedding & Celebration',
-  image: '/categories/sarees.png',
+  image: '/categories/sarees.jpg',
   alt: 'Model in embroidered silk saree — face, neck embroidery and pallu border visible',
   link: '/shop?category=sarees',
   objectPosition: 'center top',
@@ -15,25 +15,25 @@ const featured = {
 const supporting = [
   {
     title: 'Kurta Sets', occasion: 'Contemporary Ease',
-    image: '/categories/kurta.png',
+    image: '/categories/kurta.jpg',
     alt: 'Model in embroidered kurta set — yoke embroidery and sleeve detail',
     link: '/shop?category=kurta-sets', objectPosition: 'center 20%',
   },
   {
     title: 'Co-ord Sets', occasion: 'Modern Ease',
-    image: '/categories/coords.png',
+    image: '/categories/coords.jpg',
     alt: 'Model in co-ord set — full silhouette visible',
     link: '/shop?category=co-ord-sets', objectPosition: 'center center',
   },
   {
     title: 'Anarkali', occasion: 'Timeless Grace',
-    image: '/categories/anarkali.png',
+    image: '/categories/anarkali.jpg',
     alt: 'Model in Anarkali — flared silhouette visible',
     link: '/shop?category=anarkali', objectPosition: 'center top',
   },
   {
     title: 'Western Wear', occasion: 'Modern Silhouettes',
-    image: '/categories/western-wear.png',
+    image: '/categories/western-wear.jpg',
     alt: 'Model in western wear — full silhouette visible',
     link: '/shop?category=western-wear', objectPosition: 'center center',
   },
@@ -42,7 +42,7 @@ const supporting = [
 const closing = {
   title: 'Ethnic Glory',
   occasion: 'Heritage Craft',
-  image: '/categories/ethnic-glory.png',
+  image: '/categories/ethnic-glory.jpg',
   alt: 'Model in ethnic ensemble — border embroidery and heritage detail visible',
   link: '/shop?category=ethnic-glory',
   objectPosition: 'center 30%',

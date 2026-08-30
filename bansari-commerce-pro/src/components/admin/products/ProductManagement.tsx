@@ -52,6 +52,7 @@ import {
   SheetHeader,
   SheetTitle,
 } from "@/components/ui/sheet";
+import { compressImage } from "@/lib/compress-image";
 import { createClient } from "@/lib/supabase/client";
 import { cn } from "@/lib/utils";
 import { logAdminSavePayload } from "@/lib/debug/product-debug";
@@ -920,7 +921,19 @@ export default function ProductManagement() {
       setUploadingImages(true);
       try {
         const uploaded: ProductImage[] = [];
-        for (const file of valid) {
+        let savedBytes = 0;
+
+        for (const original of valid) {
+          /*
+           * Photographs exported as PNG arrive at 2-5MB. Image optimisation is
+           * bypassed (see next.config.ts), so whatever is stored here is what
+           * every visitor downloads. Re-encode to JPEG before upload; videos and
+           * GIFs are returned untouched by compressImage.
+           */
+          const isVideoFile = ALLOWED_VIDEO_MIME_TYPES.includes(original.type);
+          const file = isVideoFile ? original : (await compressImage(original)).file;
+          if (file !== original) savedBytes += original.size - file.size;
+
           const path = buildStoragePath(file);
           const { error } = await supabase.storage.from(PRODUCT_IMAGES_BUCKET).upload(path, file, { upsert: false });
           if (error) { toast.error(`Upload failed: ${error.message}`); continue; }
@@ -939,7 +952,10 @@ export default function ProductManagement() {
         if (uploaded.length > 0) {
           setForm((prev) => ({ ...prev, images: [...prev.images, ...uploaded] }));
           setImagePreviews((prev) => [...prev, ...uploaded.map((u) => u.url)]);
-          toast.success(`${uploaded.length} image(s) uploaded.`);
+          const saved = savedBytes > 0
+            ? ` (compressed, saved ${(savedBytes / 1048576).toFixed(1)} MB)`
+            : "";
+          toast.success(`${uploaded.length} image(s) uploaded.${saved}`);
         }
       } finally {
         setUploadingImages(false);

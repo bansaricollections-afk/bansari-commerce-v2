@@ -35,7 +35,7 @@ export const kurtaSets: Product[] = [
     images: [
       {
         id: "1",
-        url: "/products/p1.png",
+        url: "/products/p1.jpg",
         alt: "Pink Kurta Front",
         type: "front",
       },
@@ -80,7 +80,7 @@ export const kurtaSets: Product[] = [
     images: [
       {
         id: "1",
-        url: "/products/p1.png",
+        url: "/products/p1.jpg",
         alt: "Pink Kurta Front",
         type: "front",
       },
