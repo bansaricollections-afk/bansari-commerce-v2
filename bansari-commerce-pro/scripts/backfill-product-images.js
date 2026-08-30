@@ -27,7 +27,8 @@ const { createClient } = require('@supabase/supabase-js');
 
 const BUCKET = 'product-images';
 const MAX_EDGE = 2000;
-const QUALITY = 82;
+/** Kept in step with QUALITY in src/lib/compress-image.ts — see the note there. */
+const QUALITY = 90;
 /** Leave anything already this small alone — not worth a rewrite. */
 const SIZE_FLOOR = 400 * 1024;
 const MANIFEST = 'image-backfill-manifest.json';

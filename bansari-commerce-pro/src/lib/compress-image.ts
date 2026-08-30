@@ -25,8 +25,14 @@
 /** Longest edge, in px. The widest content container in this layout is 1360px. */
 const MAX_EDGE = 2000;
 
-/** JPEG quality. 0.82 is the usual point where artefacts stop being visible. */
-const QUALITY = 0.82;
+/*
+ * JPEG quality. Measured across six real catalogue images: q82 averaged 217KB
+ * at a mean error of 2.02/255, q90 averaged 309KB at 1.54. No artefacts were
+ * visible at 100% zoom at either setting, including on hard geometric prints
+ * and chikankari embroidery — but fabric detail is what sells these products,
+ * so the extra ~27MB across the whole catalogue buys worthwhile margin.
+ */
+const QUALITY = 0.9;
 
 /** Formats worth re-encoding. GIF is excluded deliberately (see above). */
 const COMPRESSIBLE = ["image/png", "image/jpeg", "image/webp"];
