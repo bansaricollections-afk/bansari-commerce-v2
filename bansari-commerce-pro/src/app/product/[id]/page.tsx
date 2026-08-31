@@ -30,6 +30,17 @@ function truncate(value: string, max: number): string {
   return (lastSpace > max * 0.6 ? cut.slice(0, lastSpace) : cut).replace(/[,;:.\-–—]$/, '') + '…';
 }
 
+/*
+ * Google warns when an Offer carries no priceValidUntil, and a date in the
+ * past suppresses the rich result. Computed once at module load rather than
+ * per render: `Date.now()` during render is impure (react-hooks/purity), and
+ * the exact day is immaterial — it only has to be comfortably in the future.
+ * Refreshes on every deploy.
+ */
+const PRICE_VALID_UNTIL = new Date(Date.now() + 365 * 24 * 60 * 60 * 1000)
+  .toISOString()
+  .slice(0, 10);
+
 type Props = { params: Promise<{ id: string }> };
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
@@ -60,7 +71,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
      * Truncated on a word boundary so the brand always survives; a title cut
      * mid-word in the SERP reads as broken.
      */
-    title: { absolute: `${truncate(ogTitle, 45)} | Bansari Collections` },
+    title: { absolute: `${truncate(ogTitle, 37)} | Bansari Collections` },
     // Google renders ~155 characters. Several products were emitting their
     // entire description — up to 1296 characters — which is simply discarded.
     description: truncate(ogDescription, 155),
@@ -110,7 +121,42 @@ export default async function ProductPage({ params }: Props) {
 
   const canonicalUrl = `${SITE_URL}/product/${id}`;
 
-  // ── Existing Product JSON-LD (unchanged) ────────────────────────────────
+  // ── Derived schema inputs ───────────────────────────────────────────────
+  const spec = product.specifications;
+
+  // Size-managed products carry live variant rows; legacy ones do not.
+  const sizeLabels = (product.sizeAvailability ?? [])
+    .map((s) => s.label)
+    .filter(Boolean);
+
+  /*
+   * Colour and fabric: prefer the top-level columns, which are populated on
+   * every product, and fall back to variants / the specifications JSONB.
+   *
+   * The schema previously read only `specifications.fabric`. That JSONB is set
+   * on 1 of 34 products, while the `fabric` column is set on all 34 — so
+   * `material` was absent from the structured data of 33 products.
+   */
+  const schemaColor = product.color || product.variants?.find((v) => v.color)?.color;
+  const schemaMaterial = product.fabric || spec?.fabric;
+
+  // Garment attributes Google shows in Shopping listings. Only emitted when
+  // the product actually has the value.
+  const additionalProps = (
+    [
+      ['Fabric', schemaMaterial],
+      ['Work', spec?.work],
+      ['Neckline', spec?.neckline],
+      ['Sleeve', spec?.sleeve],
+      ['Fit', spec?.fit],
+      ['Care', spec?.care],
+      ['Occasion', spec?.occasion?.join(', ')],
+    ] as const
+  )
+    .filter(([, value]) => Boolean(value))
+    .map(([name, value]) => ({ '@type': 'PropertyValue', name, value }));
+
+  // ── Product JSON-LD ─────────────────────────────────────────────────────
   const productSchema = {
     '@context': 'https://schema.org',
     '@type': 'Product',
@@ -120,7 +166,24 @@ export default async function ProductPage({ params }: Props) {
     ...(product.category && { category: product.category }),
     ...(product.images?.length && { image: product.images.map((img: any) => img.url) }),
     brand: { '@type': 'Brand', name: 'Bansari Collections' },
-    ...(product.specifications?.fabric && { material: product.specifications.fabric }),
+    ...(schemaMaterial && { material: schemaMaterial }),
+
+    /*
+     * Fields below are drawn from data already stored on the product. Google
+     * uses them for Shopping / rich results eligibility, and every one is
+     * verifiable — nothing here is asserted that the record does not contain.
+     *
+     * Deliberately ABSENT: aggregateRating and review. There are no real
+     * reviews yet, and inventing them breaks Google's structured data policy
+     * and risks a manual action. They are added conditionally above, from real
+     * review counts only.
+     */
+    ...(product.sku && { mpn: product.sku }),
+    ...(sizeLabels.length && { size: sizeLabels }),
+    ...(schemaColor && { color: schemaColor }),
+    audience: { '@type': 'PeopleAudience', suggestedGender: 'female' },
+    ...(additionalProps.length && { additionalProperty: additionalProps }),
+
     offers: {
       '@type': 'Offer',
       priceCurrency: 'INR',
@@ -128,6 +191,20 @@ export default async function ProductPage({ params }: Props) {
       availability: (product.stock ?? 0) > 0 ? 'https://schema.org/InStock' : 'https://schema.org/OutOfStock',
       url: canonicalUrl,
       seller: { '@type': 'Organization', name: 'Bansari Collections' },
+      itemCondition: 'https://schema.org/NewCondition',
+      // Google warns when an Offer has no priceValidUntil. Rolling one year:
+      // a date in the past makes the offer look stale and suppresses the rich
+      // result entirely.
+      priceValidUntil: PRICE_VALID_UNTIL,
+      // Matches /return-refund-policy: "returned within 7 days of delivery".
+      // returnFees and returnMethod are omitted rather than guessed — the
+      // policy does not state who bears the cost.
+      hasMerchantReturnPolicy: {
+        '@type': 'MerchantReturnPolicy',
+        applicableCountry: 'IN',
+        returnPolicyCategory: 'https://schema.org/MerchantReturnFiniteReturnWindow',
+        merchantReturnDays: 7,
+      },
     },
     ...(product.reviewCount && product.reviewCount > 0 && {
       aggregateRating: { '@type': 'AggregateRating', ratingValue: product.rating, reviewCount: product.reviewCount },

@@ -1,7 +1,7 @@
 export const metadata = {
   title: "Privacy Policy",
   description:
-    "Privacy Policy for Bansari Collections — what information we collect, how it is used, and how it is protected.",
+    "Privacy Policy for Bansari Collections — what personal information we collect, how it is used and stored, your rights over it, and how to contact us about it.",
   alternates: {
     canonical: "https://www.bansaricollection.in/privacy-policy",
   },

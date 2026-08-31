@@ -3,7 +3,7 @@ import { FaInstagram, FaFacebookF, FaPinterestP } from "react-icons/fa6";
 export const metadata = {
   title: "About Us",
   description:
-    "Learn about Bansari Collections — a premium ethnic wear boutique based in Vadodara, Gujarat, crafting timeless Indian fashion for weddings, celebrations and every occasion.",
+    "Bansari Collections is a premium ethnic wear boutique in Vadodara, Gujarat, crafting timeless Indian fashion for weddings, festivals and everyday wear.",
   openGraph: {
     title: "About Bansari Collections",
     description: "Premium ethnic wear boutique based in Vadodara, Gujarat.",

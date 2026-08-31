@@ -1,11 +1,11 @@
 /** Crawl every sitemap URL and report on-page SEO signals. */
-const SITE = 'https://www.bansaricollection.in';
+const SITE = process.env.SEO_SITE || 'https://www.bansaricollection.in';
 
 const pick = (html, re) => { const m = html.match(re); return m ? m[1] : null; };
 const decode = (s) => (s || '').replace(/&#x27;/g, "'").replace(/&amp;/g, '&').replace(/&quot;/g, '"');
 
 (async () => {
-  const xml = await (await fetch(`${SITE}/sitemap.xml`)).text();
+  const xml = (await (await fetch(`${SITE}/sitemap.xml`)).text()).replace(/https:\/\/www\.bansaricollection\.in/g, SITE);
   const urls = [...xml.matchAll(/<loc>([^<]+)<\/loc>/g)].map((m) => m[1]);
 
   const rows = [];
