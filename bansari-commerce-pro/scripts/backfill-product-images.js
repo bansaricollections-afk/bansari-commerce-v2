@@ -193,7 +193,9 @@ function keyFromUrl(u) {
     }
   }
 
-  if (manifest.length) fs.writeFileSync(MANIFEST, JSON.stringify(manifest, null, 2));
+  // Only on --apply. A dry run that appends to the manifest records conversions
+  // that never happened, and the entries are then duplicated by the real run.
+  if (APPLY && manifest.length) fs.writeFileSync(MANIFEST, JSON.stringify(manifest, null, 2));
 
   console.log('\n' + '-'.repeat(60));
   console.log(`converted ${converted}   skipped ${skipped}   failed ${failed}`);
