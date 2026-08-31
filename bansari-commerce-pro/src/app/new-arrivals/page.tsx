@@ -7,9 +7,9 @@ import { getNewArrivals, type Product } from "@/services/product.service";
 export const revalidate = 60;
 
 export const metadata = {
-  title: "New Arrivals | Bansari Collections",
+  title: "New Arrivals — Latest Ethnic Wear",
   description:
-    "The latest additions to the Bansari Collections catalogue — shop our newest ethnic wear pieces.",
+    "Shop the newest arrivals at Bansari Collections — freshly added cotton kurta sets, linen co-ords and embroidered ethnic wear for women. Free shipping over Rs 2,999.",
   alternates: {
     canonical: "https://www.bansaricollection.in/new-arrivals",
   },
@@ -18,6 +18,7 @@ export const metadata = {
     description: "The latest additions to the Bansari Collections catalogue.",
     url: "https://www.bansaricollection.in/new-arrivals",
     siteName: "Bansari Collections",
+    images: ["/opengraph-image"],
   },
 };
 

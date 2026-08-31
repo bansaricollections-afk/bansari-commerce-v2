@@ -1,5 +1,5 @@
 export const metadata = {
-  title: "Return & Refund Policy | Bansari Collections",
+  title: "Return & Refund Policy",
   description:
     "Return and refund policy for Bansari Collections — 7-day return window, 7-day refund processing after approved return and quality check.",
   alternates: {

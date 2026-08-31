@@ -15,9 +15,17 @@ import LuxuryNewsletter from "@/components/home/LuxuryNewsletter";
 export const revalidate = 60;
 
 export const metadata = {
-  title: "Bansari Collection — Luxury Indian Ethnic Fashion",
+  /*
+   * `title.absolute` opts out of the root layout's "%s | Bansari Collections"
+   * template. Without it the brand appeared twice in one title, wasting the
+   * ~60 characters Google actually renders.
+   */
+  title: {
+    absolute: "Bansari Collections — Indian Ethnic Wear for Women",
+  },
   description:
-    "Discover handcrafted luxury Indian ethnic wear — sarees, lehengas, kurtas and more. Shop the finest artisanal fashion at Bansari Collection.",
+    "Shop handcrafted Indian ethnic wear for women — cotton kurta sets, linen co-ords, chikankari and printed suits. Free shipping over ₹2,999.",
+  alternates: { canonical: "/" },
 };
 
 export default function HomePage() {

@@ -7,15 +7,16 @@ import { createServiceRoleClient } from "@/lib/supabase/service";
 export const revalidate = 60;
 
 export const metadata: Metadata = {
-  title: "Collections — Bansari Collections",
+  title: "Shop by Collection",
   description:
-    "Explore Bansari Collections' curated ethnic wear collections, drawn directly from our current catalogue.",
+    "Explore curated ethnic wear collections from Bansari Collections — cotton kurta sets, linen co-ords, chikankari and printed suits for every occasion.",
   alternates: { canonical: "https://www.bansaricollection.in/collections" },
   openGraph: {
     title: "Collections — Bansari Collections",
     description: "Explore Bansari Collections' curated ethnic wear collections.",
     url: "https://www.bansaricollection.in/collections",
     type: "website",
+    images: ["/opengraph-image"],
   },
   twitter: {
     card: "summary_large_image",

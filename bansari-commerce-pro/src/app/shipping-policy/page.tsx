@@ -1,7 +1,7 @@
 export const metadata = {
-  title: "Shipping Policy | Bansari Collections",
+  title: "Shipping Policy",
   description:
-    "Shipping and delivery policy for Bansari Collections — order processing, dispatch, and tracking information.",
+    "Shipping and delivery policy for Bansari Collections — order processing times, dispatch, courier partners, tracking and delivery timelines across India.",
   alternates: {
     canonical: "https://www.bansaricollection.in/shipping-policy",
   },

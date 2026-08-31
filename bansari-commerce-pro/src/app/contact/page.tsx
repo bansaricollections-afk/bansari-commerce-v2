@@ -4,11 +4,14 @@ import { FaInstagram, FaFacebookF, FaPinterestP } from "react-icons/fa6";
 export const metadata = {
   title: "Contact Us",
   description:
-    "Get in touch with Bansari Collections. Visit us at GF-4, Aruma Park, Vadodara, or reach us on WhatsApp and Instagram.",
+    "Contact Bansari Collections for orders, sizing help or wholesale enquiries. Visit our Vadodara boutique at GF-4, Aruma Park, or reach us on WhatsApp and Instagram.",
   openGraph: {
     title: "Contact Bansari Collections",
     description: "Reach out for product enquiries, order support or wholesale information.",
+    images: ["/opengraph-image"],
   },
+  // Was inheriting the root layout's homepage canonical.
+  alternates: { canonical: "/contact" },
 };
 
 const WHATSAPP_NUMBER = "918460192745";
