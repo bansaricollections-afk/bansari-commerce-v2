@@ -1,5 +1,5 @@
 export const metadata = {
-  title: "Privacy Policy | Bansari Collections",
+  title: "Privacy Policy",
   description:
     "Privacy Policy for Bansari Collections — what information we collect, how it is used, and how it is protected.",
   alternates: {

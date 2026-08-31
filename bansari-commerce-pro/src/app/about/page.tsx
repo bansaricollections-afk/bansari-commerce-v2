@@ -7,7 +7,10 @@ export const metadata = {
   openGraph: {
     title: "About Bansari Collections",
     description: "Premium ethnic wear boutique based in Vadodara, Gujarat.",
+    images: ["/opengraph-image"],
   },
+  // Was inheriting the root layout's homepage canonical.
+  alternates: { canonical: "/about" },
 };
 
 export default function AboutPage() {

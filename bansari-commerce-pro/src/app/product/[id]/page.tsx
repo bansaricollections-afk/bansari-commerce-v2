@@ -17,6 +17,19 @@ export const dynamic = 'force-dynamic';
 const SITE_URL =
   process.env.NEXT_PUBLIC_SITE_URL ?? 'https://www.bansaricollection.in';
 
+/**
+ * Trim to `max` characters on a word boundary, collapsing whitespace first.
+ * Product descriptions are authored in the admin and contain newlines, which
+ * would otherwise land in a meta tag verbatim.
+ */
+function truncate(value: string, max: number): string {
+  const clean = value.replace(/\s+/g, ' ').trim();
+  if (clean.length <= max) return clean;
+  const cut = clean.slice(0, max);
+  const lastSpace = cut.lastIndexOf(' ');
+  return (lastSpace > max * 0.6 ? cut.slice(0, lastSpace) : cut).replace(/[,;:.\-–—]$/, '') + '…';
+}
+
 type Props = { params: Promise<{ id: string }> };
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
@@ -37,8 +50,20 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const inStock = (product.stock ?? 0) > 0;
 
   return {
-    title: `${ogTitle} | Bansari Collections`,
-    description: ogDescription,
+    /*
+     * `absolute` opts out of the root layout's "%s | Bansari Collections"
+     * template. This line previously appended the brand itself, so the
+     * template appended it a second time — titles read
+     * "... | Bansari Collections | Bansari Collections" and ran to 146
+     * characters against the ~60 Google renders.
+     *
+     * Truncated on a word boundary so the brand always survives; a title cut
+     * mid-word in the SERP reads as broken.
+     */
+    title: { absolute: `${truncate(ogTitle, 45)} | Bansari Collections` },
+    // Google renders ~155 characters. Several products were emitting their
+    // entire description — up to 1296 characters — which is simply discarded.
+    description: truncate(ogDescription, 155),
     alternates: { canonical: canonicalUrl },
 
     openGraph: {

@@ -1,5 +1,5 @@
 export const metadata = {
-  title: "Shipping Policy | Bansari Collections",
+  title: "Shipping Policy",
   description:
     "Shipping and delivery policy for Bansari Collections — order processing, dispatch, and tracking information.",
   alternates: {

@@ -7,7 +7,7 @@ import { createServiceRoleClient } from "@/lib/supabase/service";
 export const revalidate = 60;
 
 export const metadata: Metadata = {
-  title: "Collections — Bansari Collections",
+  title: "Shop by Collection",
   description:
     "Explore Bansari Collections' curated ethnic wear collections, drawn directly from our current catalogue.",
   alternates: { canonical: "https://www.bansaricollection.in/collections" },

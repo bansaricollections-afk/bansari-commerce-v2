@@ -1,5 +1,5 @@
 export const metadata = {
-  title: "Terms & Conditions | Bansari Collections",
+  title: "Terms & Conditions",
   description:
     "Terms and Conditions governing the use of www.bansaricollection.in and purchases from Bansari Collections.",
   alternates: {

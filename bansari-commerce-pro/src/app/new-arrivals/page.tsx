@@ -7,7 +7,7 @@ import { getNewArrivals, type Product } from "@/services/product.service";
 export const revalidate = 60;
 
 export const metadata = {
-  title: "New Arrivals | Bansari Collections",
+  title: "New Arrivals — Latest Ethnic Wear",
   description:
     "The latest additions to the Bansari Collections catalogue — shop our newest ethnic wear pieces.",
   alternates: {

@@ -100,9 +100,19 @@ export const metadata: Metadata = {
     },
   },
   manifest: '/site.webmanifest',
-  alternates: {
-    canonical: 'https://www.bansaricollection.in',
-  },
+  /*
+   * NO `alternates.canonical` HERE.
+   *
+   * Metadata set on the root layout is inherited by every page that does not
+   * override it. A hardcoded homepage canonical here meant /shop, /about and
+   * /contact each told Google "I am a duplicate of the homepage" — which asks
+   * Google not to rank them at all. /shop is the main commercial page, so this
+   * was suppressing the most valuable non-product URL on the site.
+   *
+   * Product and policy pages were unaffected because they set their own.
+   * Each page now declares its own canonical; the homepage's lives in
+   * (storefront)/page.tsx.
+   */
 };
 
 const organizationSchema = {

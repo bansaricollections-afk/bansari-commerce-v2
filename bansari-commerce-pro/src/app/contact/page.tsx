@@ -8,7 +8,10 @@ export const metadata = {
   openGraph: {
     title: "Contact Bansari Collections",
     description: "Reach out for product enquiries, order support or wholesale information.",
+    images: ["/opengraph-image"],
   },
+  // Was inheriting the root layout's homepage canonical.
+  alternates: { canonical: "/contact" },
 };
 
 const WHATSAPP_NUMBER = "918460192745";

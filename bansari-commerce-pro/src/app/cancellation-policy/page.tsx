@@ -1,5 +1,5 @@
 export const metadata = {
-  title: "Cancellation Policy | Bansari Collections",
+  title: "Cancellation Policy",
   description:
     "Order cancellation policy for Bansari Collections — cancel before dispatch for a full refund to your original payment method.",
   alternates: {

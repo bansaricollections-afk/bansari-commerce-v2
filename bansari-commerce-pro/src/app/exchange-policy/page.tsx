@@ -1,5 +1,5 @@
 export const metadata = {
-  title: "Exchange Policy | Bansari Collections",
+  title: "Exchange Policy",
   description:
     "Size and exchange policy for Bansari Collections — exchange requests within 4 days of delivery, subject to eligibility conditions.",
   alternates: {

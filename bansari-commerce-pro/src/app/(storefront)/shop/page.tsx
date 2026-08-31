@@ -22,14 +22,21 @@ export const revalidate = 60;
 // ─── Metadata ────────────────────────────────────────────────────────────────
 
 export const metadata: Metadata = {
-  title: "Shop — Bansari Collection | Luxury Indian Ethnic Fashion",
+  // Short, so the layout's "| Bansari Collections" suffix still fits in the
+  // ~60 characters Google renders. The old title already carried the brand,
+  // so the template appended it a second time.
+  title: "Shop Indian Ethnic Wear for Women",
   description:
-    "Browse the full Bansari Collection catalogue of Indian ethnic wear. Filter by category, collection, fabric, colour, size and price.",
+    "Browse cotton kurta sets, linen co-ords, chikankari suits and printed kurtis. Filter by fabric, colour, size and price. Free shipping over ₹2,999.",
   openGraph: {
-    title: "Shop — Bansari Collection",
-    description: "Browse the full Bansari Collection catalogue of Indian ethnic wear.",
+    title: "Shop Indian Ethnic Wear — Bansari Collections",
+    description: "Cotton kurta sets, linen co-ords, chikankari suits and printed kurtis.",
     type: "website",
+    images: ["/opengraph-image"],
   },
+  // Was inheriting the root layout's homepage canonical, which told Google
+  // this page was a duplicate and should not rank.
+  alternates: { canonical: "/shop" },
 };
 
 // ─── Types ───────────────────────────────────────────────────────────────────
