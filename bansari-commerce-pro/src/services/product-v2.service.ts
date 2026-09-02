@@ -224,10 +224,138 @@ async function assembleProduct(
 // PUBLIC SERVICE
 // ============================================================
 
+/**
+ * Stock at or below this is "low" but not yet out. Mirrors LOW_STOCK_THRESHOLD
+ * in the admin ProductManagement client, which is where it is displayed.
+ */
+const LOW_STOCK_THRESHOLD = 5;
+
+type AdminProductFilters = ProductSearchFilters & {
+  minStock?: number;
+  maxStock?: number;
+};
+
+/**
+ * Slug filters need a lookup before they can be applied as an id equality.
+ * Resolved once so a caller issuing several queries with the same filters does
+ * not repeat the lookup per query.
+ */
+async function resolveFilterIds(
+  sb: ReturnType<typeof createServiceRoleClient>,
+  filters: AdminProductFilters
+): Promise<{ categoryId?: number; collectionId?: number }> {
+  const out: { categoryId?: number; collectionId?: number } = {};
+
+  if (filters.categorySlug) {
+    const { data } = await sb
+      .from('categories').select('id').eq('slug', filters.categorySlug).maybeSingle();
+    if (data) out.categoryId = (data as { id: number }).id;
+  }
+  if (filters.collectionSlug) {
+    const { data } = await sb
+      .from('collections').select('id').eq('slug', filters.collectionSlug).maybeSingle();
+    if (data) out.collectionId = (data as { id: number }).id;
+  }
+  return out;
+}
+
+/**
+ * Apply every admin filter to a query builder.
+ *
+ * Extracted so `search` and `stats` cannot drift apart. They previously would
+ * have: the admin stat cards were computed client-side from the current page of
+ * results, so with PAGE_SIZE 12 a 40-product catalogue reported "Total 12".
+ */
+function applyProductFilters<T>(
+  query: T,
+  filters: AdminProductFilters,
+  resolved: { categoryId?: number; collectionId?: number }
+): T {
+  // The Supabase builder is fluent; each call returns the same shape.
+  let q = query as unknown as {
+    or: (s: string) => typeof q;
+    eq: (c: string, v: unknown) => typeof q;
+    gte: (c: string, v: unknown) => typeof q;
+    lte: (c: string, v: unknown) => typeof q;
+  };
+
+  if (filters.query) {
+    q = q.or(
+      `name.ilike.%${filters.query}%,sku.ilike.%${filters.query}%,slug.ilike.%${filters.query}%,description.ilike.%${filters.query}%`
+    );
+  }
+
+  if (filters.category)   q = q.eq('category', filters.category);
+  if (filters.categoryId) q = q.eq('category_id', filters.categoryId);
+  if (resolved.categoryId !== undefined) q = q.eq('category_id', resolved.categoryId);
+
+  if (filters.collection)   q = q.eq('collection', filters.collection);
+  if (filters.collectionId) q = q.eq('collection_id', filters.collectionId);
+  if (resolved.collectionId !== undefined) q = q.eq('collection_id', resolved.collectionId);
+
+  if (filters.featured   !== undefined) q = q.eq('featured',    filters.featured);
+  if (filters.newArrival !== undefined) q = q.eq('new_arrival', filters.newArrival);
+  if (filters.bestSeller !== undefined) q = q.eq('best_seller', filters.bestSeller);
+  if (filters.active     !== undefined) q = q.eq('active',      filters.active);
+
+  if (filters.minPrice !== undefined) q = q.gte('price', filters.minPrice);
+  if (filters.maxPrice !== undefined) q = q.lte('price', filters.maxPrice);
+  if (filters.minStock !== undefined) q = q.gte('stock', filters.minStock);
+  if (filters.maxStock !== undefined) q = q.lte('stock', filters.maxStock);
+
+  return q as unknown as T;
+}
+
 export const ProductV2Service = {
   // ────────────────────────────────────────────────────────
   // SEARCH / LIST
   // ────────────────────────────────────────────────────────
+
+  /**
+   * Catalogue-wide counts for the admin stat cards.
+   *
+   * Honours the same filters as `search` but ignores pagination, so the cards
+   * always describe the same set the list header reports rather than whichever
+   * page happens to be loaded.
+   */
+  async stats(filters: AdminProductFilters = {}): Promise<{
+    total: number;
+    active: number;
+    featured: number;
+    lowStock: number;
+    outOfStock: number;
+  }> {
+    const sb = createServiceRoleClient();
+    const resolved = await resolveFilterIds(sb, filters);
+
+    const countOf = async (
+      refine?: (q: ReturnType<typeof buildBase>) => ReturnType<typeof buildBase>
+    ) => {
+      const base = buildBase();
+      const { count, error } = await (refine ? refine(base) : base);
+      if (error) throw new ProductError(error.message, 'INTERNAL');
+      return count ?? 0;
+    };
+
+    function buildBase() {
+      return applyProductFilters(
+        sb.from('products').select('id', { count: 'exact', head: true }),
+        filters,
+        resolved
+      );
+    }
+
+    const [total, active, featured, lowStock, outOfStock] = await Promise.all([
+      countOf(),
+      countOf((q) => q.eq('active', true)),
+      countOf((q) => q.eq('featured', true)),
+      // Low stock is "some left, but few" — 0 belongs to outOfStock, not here.
+      countOf((q) => q.gt('stock', 0).lte('stock', LOW_STOCK_THRESHOLD)),
+      countOf((q) => q.eq('stock', 0)),
+    ]);
+
+    return { total, active, featured, lowStock, outOfStock };
+  },
 
   /**
    * Paginated product search supporting all admin filters.
@@ -248,56 +376,19 @@ export const ProductV2Service = {
     const from      = page * limit;
     const to        = from + limit - 1;
 
-    let query = sb
-      .from('products')
-      .select(PRODUCT_V2_SELECT, { count: 'exact' })
-      .range(from, to)
-      .order(orderBy, { ascending });
+    const resolved = await resolveFilterIds(sb, filters);
 
-    // Text search
-    if (filters.query) {
-      query = query.or(
-        `name.ilike.%${filters.query}%,sku.ilike.%${filters.query}%,slug.ilike.%${filters.query}%,description.ilike.%${filters.query}%`
-      );
-    }
-
-    // Category filter (text OR FK)
-    if (filters.category)     query = query.eq('category', filters.category);
-    if (filters.categoryId)   query = query.eq('category_id', filters.categoryId);
-    if (filters.categorySlug) {
-      const { data: cat } = await sb
-        .from('categories')
-        .select('id')
-        .eq('slug', filters.categorySlug)
-        .maybeSingle();
-      if (cat) query = query.eq('category_id', (cat as { id: number }).id);
-    }
-
-    // Collection
-    if (filters.collection)   query = query.eq('collection',    filters.collection);
-    if (filters.collectionId) query = query.eq('collection_id', filters.collectionId);
-    if (filters.collectionSlug) {
-      const { data: col } = await sb
-        .from('collections')
-        .select('id')
-        .eq('slug', filters.collectionSlug)
-        .maybeSingle();
-      if (col) query = query.eq('collection_id', (col as { id: number }).id);
-    }
-
-    // Booleans
-    if (filters.featured    !== undefined) query = query.eq('featured',    filters.featured);
-    if (filters.newArrival  !== undefined) query = query.eq('new_arrival', filters.newArrival);
-    if (filters.bestSeller  !== undefined) query = query.eq('best_seller', filters.bestSeller);
-    if (filters.active      !== undefined) query = query.eq('active',      filters.active);
-
-    // Price
-    if (filters.minPrice !== undefined) query = query.gte('price', filters.minPrice);
-    if (filters.maxPrice !== undefined) query = query.lte('price', filters.maxPrice);
-
-    // Stock (extended, not in base interface)
-    if (filters.minStock !== undefined) query = query.gte('stock', filters.minStock);
-    if (filters.maxStock !== undefined) query = query.lte('stock', filters.maxStock);
+    // Filters live in applyProductFilters so `stats` applies exactly the same
+    // set — see the note there.
+    const query = applyProductFilters(
+      sb
+        .from('products')
+        .select(PRODUCT_V2_SELECT, { count: 'exact' })
+        .range(from, to)
+        .order(orderBy, { ascending }),
+      filters,
+      resolved
+    );
 
     const { data, error, count } = await query;
     if (error) throw new ProductError(error.message, 'INTERNAL');
