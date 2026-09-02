@@ -191,6 +191,21 @@ export default function OrderDetailPage() {
     void load();
   }
 
+  /**
+   * Moves a shipped order to out_for_delivery, which is what sends the
+   * "out for delivery" email to the customer.
+   */
+  async function doOutForDelivery() {
+    if (!confirm('Mark as out for delivery? This emails the customer.')) return;
+    setBusy(true);
+    try {
+      await apiPost(`/api/admin/orders/${id}/out-for-delivery`, {});
+    } finally {
+      setBusy(false);
+    }
+    void load();
+  }
+
   async function doShip() {
     if (!courier || !awb) return;
     setBusy(true);
@@ -289,6 +304,12 @@ export default function OrderDetailPage() {
   const status = order.orderV2Status;
   const canShip     = ['confirmed','processing','packed'].includes(status);
   const canDeliver  = status === 'shipped' || status === 'out_for_delivery';
+  /*
+   * Only offered from `shipped` — it is the sole transition into
+   * out_for_delivery, and the only one that sends that customer email.
+   * Skipping it and going straight to Delivered stays valid.
+   */
+  const canOutForDelivery = status === 'shipped';
   const canCancel   = !['cancelled','delivered','refunded','returned','exchanged'].includes(status);
   const canRefund   = ['delivered','shipped','partially_refunded'].includes(status);
   const canReturn   = ['delivered','shipped','out_for_delivery'].includes(status);
@@ -328,6 +349,7 @@ export default function OrderDetailPage() {
         {/* ── Action Bar ── */}
         <div className="flex flex-wrap gap-2.5">
           {canShip     && <ActionBtn primary={primaryAction === 'ship'}     onClick={() => { setCourier(''); setAwb(''); setTracking(''); setExpected(''); setModal('ship'); }}>Ship Order</ActionBtn>}
+          {canOutForDelivery && <ActionBtn onClick={() => { void doOutForDelivery(); }} disabled={busy}>Out for Delivery</ActionBtn>}
           {canDeliver  && <ActionBtn primary={primaryAction === 'deliver'}  onClick={() => { void doDeliver(); }} disabled={busy}>Mark Delivered</ActionBtn>}
           {canReturn   && <ActionBtn primary={primaryAction === 'return'}   onClick={() => { setReason(''); setModal('return'); }}>Request Return</ActionBtn>}
           {canExchange && <ActionBtn primary={primaryAction === 'exchange'} onClick={() => { setReason(''); setModal('exchange'); }}>Request Exchange</ActionBtn>}
