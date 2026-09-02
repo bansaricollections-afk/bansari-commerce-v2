@@ -69,11 +69,23 @@ export async function GET(request: NextRequest) {
   const maxStock = sp.get('maxStock');
 
   try {
-    const result = await ProductV2Service.search({
+    const searchFilters = {
       ...filters,
       ...(minStock !== null ? { minStock: Number(minStock) } : {}),
       ...(maxStock !== null ? { maxStock: Number(maxStock) } : {}),
-    });
+    };
+
+    /*
+     * Stats are computed server-side across the whole filtered set. The admin
+     * client used to derive them from the rows it had in hand, which is one
+     * page — so a 40-product catalogue showed "Total 12" next to a header
+     * reading "40 products total", and "Low Stock 12" meant only that all 12
+     * rows on that page were low.
+     */
+    const [result, stats] = await Promise.all([
+      ProductV2Service.search(searchFilters),
+      ProductV2Service.stats(searchFilters),
+    ]);
 
     log.info('admin.products.list.ok', { page, limit, total: result.total, requestId });
 
@@ -87,6 +99,7 @@ export async function GET(request: NextRequest) {
       page: result.page,
       pageSize: result.limit,
       totalPages: result.totalPages,
+      stats,
     });
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Unknown error';

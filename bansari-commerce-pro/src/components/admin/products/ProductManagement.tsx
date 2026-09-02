@@ -387,12 +387,22 @@ type ApiProductRecord = {
   } | null;
 };
 
+/** Catalogue-wide counts, computed server-side across the whole filtered set. */
+type ApiProductStats = {
+  total: number;
+  active: number;
+  featured: number;
+  lowStock: number;
+  outOfStock: number;
+};
+
 type ApiListResponse = {
   success: boolean;
   data: ApiProductRecord[];
   total: number;
   page: number;
   pageSize: number;
+  stats?: ApiProductStats;
 };
 
 type ApiSingleResponse = {
@@ -688,6 +698,7 @@ export default function ProductManagement() {
   // ── State ──────────────────────────────────────────────────────────────────
   const [products, setProducts]         = useState<Product[]>([]);
   const [total, setTotal]               = useState(0);
+  const [stats, setStats]               = useState<ApiProductStats | null>(null);
   const [currentPage, setCurrentPage]   = useState(0);
   const [isLoading, setIsLoading]       = useState(true);
   const [searchQuery, setSearchQuery]   = useState("");
@@ -816,6 +827,7 @@ export default function ProductManagement() {
       const res = await apiFetch<ApiListResponse>(`/api/admin/products?${params.toString()}`);
       setProducts((res.data ?? []).map(mapApiProductToProduct));
       setTotal(res.total ?? 0);
+      setStats(res.stats ?? null);
     } catch (err) {
       toast.error("Failed to load products.");
     } finally {
@@ -1228,13 +1240,23 @@ export default function ProductManagement() {
 
   // ── Stats ──────────────────────────────────────────────────────────────────
 
-  const stats = useMemo(() => ({
+  /*
+   * Counts come from the API, which computes them across the whole filtered
+   * catalogue. They were previously derived from `products` — one page of
+   * PAGE_SIZE (12) rows — so a 40-product catalogue rendered "Total 12"
+   * directly beneath a header reading "40 products total", and "Low Stock 12"
+   * only ever meant "all 12 rows on this page are low".
+   *
+   * The page-derived values remain as a fallback for the first paint, before
+   * the response lands.
+   */
+  const cardStats = useMemo(() => stats ?? {
     total:      products.length,
     active:     products.filter((p) => p.active).length,
     featured:   products.filter((p) => p.featured).length,
     lowStock:   products.filter((p) => p.stock <= LOW_STOCK_THRESHOLD && p.stock > 0).length,
     outOfStock: products.filter((p) => p.stock === 0).length,
-  }), [products]);
+  }, [stats, products]);
 
   // ── Render ─────────────────────────────────────────────────────────────────
 
@@ -1257,11 +1279,11 @@ export default function ProductManagement() {
       {/* Stats bar */}
       <div className="max-w-7xl mx-auto px-6 py-5 grid grid-cols-2 sm:grid-cols-5 gap-3">
         {[
-          { label: "Total",       value: stats.total,      icon: Package,   color: "text-neutral-600" },
-          { label: "Active",      value: stats.active,     icon: CheckCircle2, color: "text-green-600" },
-          { label: "Featured",    value: stats.featured,   icon: Sparkles,  color: "text-amber-700" },
-          { label: "Low Stock",   value: stats.lowStock,   icon: AlertTriangle, color: "text-yellow-600" },
-          { label: "Out of Stock",value: stats.outOfStock, icon: ShoppingBag, color: "text-red-600" },
+          { label: "Total",       value: cardStats.total,      icon: Package,   color: "text-neutral-600" },
+          { label: "Active",      value: cardStats.active,     icon: CheckCircle2, color: "text-green-600" },
+          { label: "Featured",    value: cardStats.featured,   icon: Sparkles,  color: "text-amber-700" },
+          { label: "Low Stock",   value: cardStats.lowStock,   icon: AlertTriangle, color: "text-yellow-600" },
+          { label: "Out of Stock",value: cardStats.outOfStock, icon: ShoppingBag, color: "text-red-600" },
         ].map(({ label, value, icon: Icon, color }) => (
           <div key={label} className="bg-white rounded-xl border border-neutral-200 p-3.5 flex items-center gap-3 hover:shadow-sm hover:border-neutral-300 transition-all">
             <Icon className={cn("h-5 w-5", color)} />
