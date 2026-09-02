@@ -224,12 +224,6 @@ async function assembleProduct(
 // PUBLIC SERVICE
 // ============================================================
 
-/**
- * Stock at or below this is "low" but not yet out. Mirrors LOW_STOCK_THRESHOLD
- * in the admin ProductManagement client, which is where it is displayed.
- */
-const LOW_STOCK_THRESHOLD = 5;
-
 type AdminProductFilters = ProductSearchFilters & {
   minStock?: number;
   maxStock?: number;
@@ -322,7 +316,6 @@ export const ProductV2Service = {
     total: number;
     active: number;
     featured: number;
-    lowStock: number;
     outOfStock: number;
   }> {
     const sb = createServiceRoleClient();
@@ -345,16 +338,20 @@ export const ProductV2Service = {
       );
     }
 
-    const [total, active, featured, lowStock, outOfStock] = await Promise.all([
+    /*
+     * No lowStock count. The boutique stocks about one set per style, so a
+     * threshold of 5 matched all 40 products — an accurate number carrying no
+     * information. Removed rather than retuned; if stock depth grows, add it
+     * back with a threshold that reflects the new inventory model.
+     */
+    const [total, active, featured, outOfStock] = await Promise.all([
       countOf(),
       countOf((q) => q.eq('active', true)),
       countOf((q) => q.eq('featured', true)),
-      // Low stock is "some left, but few" — 0 belongs to outOfStock, not here.
-      countOf((q) => q.gt('stock', 0).lte('stock', LOW_STOCK_THRESHOLD)),
       countOf((q) => q.eq('stock', 0)),
     ]);
 
-    return { total, active, featured, lowStock, outOfStock };
+    return { total, active, featured, outOfStock };
   },
 
   /**

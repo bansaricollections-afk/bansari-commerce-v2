@@ -63,11 +63,19 @@ export default function ProductCard({ product, priority = false }: Props) {
     isSizeManaged && sellableSizes.length === 1 && sellableSizes[0]!.status === "ONLY_ONE_LEFT"
       ? sellableSizes[0]!
       : null;
-  const isLowStock = isSizeManaged
-    ? !isSoldOut &&
-      !onlyOneLeftSize &&
-      sellableSizes.some((s) => s.status === "LOW_STOCK" || s.status === "ONLY_ONE_LEFT")
-    : ((product as any).stock ?? 999) <= 5;
+  /*
+   * NO GENERIC "LOW STOCK" BADGE.
+   *
+   * The boutique stocks roughly one set per style, so every size sits at one or
+   * two units and the badge rendered on effectively the entire catalogue.
+   * Urgency shown on every product is not urgency — it is decoration, and it
+   * reads as manufactured scarcity, which is exactly what the badge rules in
+   * this project forbid.
+   *
+   * The two signals that remain are specific and true: `isSoldOut`, and
+   * `onlyOneLeftSize` for the case where a single named size is down to its
+   * last unit. Both tell a shopper something they can act on.
+   */
   const originalPrice = (product as any).originalPrice as number | undefined;
   const discountPct =
     originalPrice && originalPrice > product.price
@@ -180,11 +188,6 @@ export default function ProductCard({ product, priority = false }: Props) {
           {onlyOneLeftSize && (
             <span className={`${badgeBase} bg-[#8C3A3A] text-white`}>
               {onlyOneLeftSize.label} &middot; Only 1 left
-            </span>
-          )}
-          {isLowStock && (
-            <span className={`${badgeBase} bg-[#8C3A3A] text-white`}>
-              Low Stock
             </span>
           )}
         </div>
