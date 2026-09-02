@@ -61,7 +61,6 @@ import { logAdminSavePayload } from "@/lib/debug/product-debug";
 
 const PRODUCT_IMAGES_BUCKET = "product-images";
 const PAGE_SIZE = 12;
-const LOW_STOCK_THRESHOLD = 5;
 const MAX_FILE_SIZE_BYTES = 8 * 1024 * 1024;
 
 /*
@@ -392,7 +391,6 @@ type ApiProductStats = {
   total: number;
   active: number;
   featured: number;
-  lowStock: number;
   outOfStock: number;
 };
 
@@ -1254,7 +1252,6 @@ export default function ProductManagement() {
     total:      products.length,
     active:     products.filter((p) => p.active).length,
     featured:   products.filter((p) => p.featured).length,
-    lowStock:   products.filter((p) => p.stock <= LOW_STOCK_THRESHOLD && p.stock > 0).length,
     outOfStock: products.filter((p) => p.stock === 0).length,
   }, [stats, products]);
 
@@ -1282,7 +1279,6 @@ export default function ProductManagement() {
           { label: "Total",       value: cardStats.total,      icon: Package,   color: "text-neutral-600" },
           { label: "Active",      value: cardStats.active,     icon: CheckCircle2, color: "text-green-600" },
           { label: "Featured",    value: cardStats.featured,   icon: Sparkles,  color: "text-amber-700" },
-          { label: "Low Stock",   value: cardStats.lowStock,   icon: AlertTriangle, color: "text-yellow-600" },
           { label: "Out of Stock",value: cardStats.outOfStock, icon: ShoppingBag, color: "text-red-600" },
         ].map(({ label, value, icon: Icon, color }) => (
           <div key={label} className="bg-white rounded-xl border border-neutral-200 p-3.5 flex items-center gap-3 hover:shadow-sm hover:border-neutral-300 transition-all">
@@ -1367,11 +1363,17 @@ export default function ProductManagement() {
                   <p className="text-xs text-neutral-500 mt-0.5">{p.sku} · {p.category}</p>
                   <div className="flex items-center justify-between mt-2">
                     <span className="font-semibold text-neutral-900">₹{p.price.toLocaleString("en-IN")}</span>
-                    {p.stock <= LOW_STOCK_THRESHOLD && (
-                      <span className={cn("text-xs font-medium", p.stock === 0 ? "text-red-600" : "text-yellow-600")}>
-                        {p.stock === 0 ? "Out of stock" : `${p.stock} left`}
-                      </span>
-                    )}
+                    {/*
+                      Unit count is always shown, and only zero is coloured as a
+                      warning. It used to appear only below a threshold of 5 and
+                      in amber — but the boutique stocks about one set per style,
+                      so every product qualified and the whole grid was amber.
+                      The count itself is the useful part; the warning styling
+                      was not.
+                    */}
+                    <span className={cn("text-xs font-medium", p.stock === 0 ? "text-red-600" : "text-neutral-500")}>
+                      {p.stock === 0 ? "Out of stock" : `${p.stock} left`}
+                    </span>
                   </div>
 
                   {/* Actions */}
@@ -2212,7 +2214,7 @@ export default function ProductManagement() {
                 )}
                 <div>
                   <span className="text-neutral-500">Stock</span>
-                  <p className={cn("font-semibold", viewProduct.stock === 0 ? "text-red-600" : viewProduct.stock <= LOW_STOCK_THRESHOLD ? "text-yellow-600" : "text-neutral-900")}>
+                  <p className={cn("font-semibold", viewProduct.stock === 0 ? "text-red-600" : "text-neutral-900")}>
                     {viewProduct.stock}
                   </p>
                 </div>
