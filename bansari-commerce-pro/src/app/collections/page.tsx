@@ -171,13 +171,26 @@ export default async function CollectionsPage() {
                   className="group relative flex flex-col overflow-hidden border border-slate-200 bg-white transition-all duration-500 hover:border-slate-300 hover:shadow-[0_8px_40px_rgba(0,0,0,0.07)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#8A5A6A] focus-visible:ring-offset-2"
                   aria-label={`Browse ${col.name}`}
                 >
-                  {/* Real product image hero */}
-                  <div className="relative h-56 w-full overflow-hidden bg-[#F7F3EE]">
+                  {/*
+                    Real product image hero.
+
+                    The frame is portrait (3/4), matching the product
+                    photography and the aspect ratio used everywhere else on the
+                    site. It was a fixed h-56, which on a ~300-400px wide card
+                    is a landscape box — so object-cover centre-cropped portrait
+                    shots and cut off the model's head and the hem of the
+                    garment.
+
+                    object-top biases the remaining crop upward, so where the
+                    source is taller than 3/4 the neckline and yoke survive
+                    rather than the floor.
+                  */}
+                  <div className="relative aspect-[3/4] w-full overflow-hidden bg-[#F7F3EE]">
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img
                       src={col.image}
                       alt={col.name}
-                      className="h-full w-full object-cover transition-transform duration-700 ease-out group-hover:scale-[1.04]"
+                      className="h-full w-full object-cover object-top transition-transform duration-700 ease-out group-hover:scale-[1.04]"
                       loading="lazy"
                     />
                   </div>
