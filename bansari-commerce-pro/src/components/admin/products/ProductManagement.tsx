@@ -20,6 +20,7 @@ import {
   Wand2,
   X,
   AlertTriangle,
+  Ruler,
   Camera,
   Tag,
   DollarSign,
@@ -53,6 +54,8 @@ import {
   SheetTitle,
 } from "@/components/ui/sheet";
 import { compressImage } from "@/lib/compress-image";
+import { useRouter } from "next/navigation";
+
 import { createClient } from "@/lib/supabase/client";
 import { cn } from "@/lib/utils";
 import { logAdminSavePayload } from "@/lib/debug/product-debug";
@@ -656,14 +659,24 @@ function ToggleSwitch({
   onChange,
   label,
   description,
+  disabled = false,
 }: {
   checked: boolean;
   onChange: (v: boolean) => void;
   label: string;
   description?: string;
+  /** Renders the switch inert. Used where a rule, not the operator, owns the value. */
+  disabled?: boolean;
 }) {
   return (
-    <label className="flex items-center justify-between cursor-pointer rounded-xl border border-neutral-200 bg-white px-4 py-3.5 hover:border-neutral-300 hover:shadow-sm transition-all">
+    <label
+      className={cn(
+        "flex items-center justify-between rounded-xl border border-neutral-200 bg-white px-4 py-3.5 transition-all",
+        disabled
+          ? "cursor-not-allowed opacity-60"
+          : "cursor-pointer hover:border-neutral-300 hover:shadow-sm"
+      )}
+    >
       <div>
         <span className="font-medium text-sm text-neutral-900">{label}</span>
         {description && <p className="text-xs text-neutral-500 mt-0.5">{description}</p>}
@@ -672,11 +685,14 @@ function ToggleSwitch({
         type="button"
         role="switch"
         aria-checked={checked}
-        onClick={() => onChange(!checked)}
+        aria-disabled={disabled}
+        disabled={disabled}
+        onClick={() => { if (!disabled) onChange(!checked); }}
         className={cn(
           "relative inline-flex h-6 w-11 flex-shrink-0 rounded-full border-2 border-transparent",
           "transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-amber-600 focus:ring-offset-1",
-          checked ? "bg-neutral-900" : "bg-neutral-200"
+          checked ? "bg-neutral-900" : "bg-neutral-200",
+          disabled && "cursor-not-allowed"
         )}
       >
         <span
@@ -718,6 +734,7 @@ export default function ProductManagement() {
   const [fieldErrors, setFieldErrors]   = useState<FieldErrors>({});
   const [isSaving, setIsSaving]         = useState(false);
   const [isPublishing, setIsPublishing] = useState(false);
+  const router = useRouter();
 
   const [uploadingImages, setUploadingImages] = useState(false);
   const [imagePreviews, setImagePreviews]     = useState<string[]>([]);
@@ -1110,6 +1127,16 @@ export default function ProductManagement() {
 
   // ── Build API payload ──────────────────────────────────────────────────────
 
+  /*
+   * A NEW size-managed product cannot be created active.
+   *
+   * Its sizes live in product_variants, which need a product id that does not
+   * exist yet, and the server refuses to publish a size-managed product with no
+   * sellable size (assertPublishable). Editing is unaffected — an existing
+   * product already has an id and can have sizes.
+   */
+  const mustDraftFirst = !editProduct && form.isSizeManaged;
+
   function buildPayload(publishNow: boolean): ApiProductPayload {
     const sizesArr = form.sizes.split(",").map((s) => s.trim()).filter(Boolean);
     return {
@@ -1134,7 +1161,10 @@ export default function ProductManagement() {
       featured:       form.featured,
       new_arrival:    form.newArrival,
       best_seller:    form.bestSeller,
-      active:         publishNow ? true : form.active,
+      // mustDraftFirst wins over both the toggle and the Publish button: the
+      // server would reject an active size-managed create either way, and the
+      // toggle defaulting to true is what made Save Draft fail too.
+      active:         mustDraftFirst ? false : publishNow ? true : form.active,
       is_size_managed: form.isSizeManaged,
       images:         form.images,
       // V2 FK IDs
@@ -1202,6 +1232,18 @@ export default function ProductManagement() {
         });
       }
 
+      /*
+       * A new size-managed product is saved as a draft and the operator is
+       * taken straight to its Inventory page. Without this they were told to
+       * "add stock under Sizes" with no link, and no Sizes step in this wizard.
+       */
+      if (mustDraftFirst && !editProduct) {
+        toast.success(`"${result.data.name}" saved as a draft — add stock per size to publish.`);
+        setIsSheetOpen(false);
+        router.push(`/admin/products/${result.data.id}/inventory`);
+        return;
+      }
+
       toast.success(
         publishNow
           ? `"${result.data.name}" published successfully.`
@@ -1215,7 +1257,7 @@ export default function ProductManagement() {
       setIsSaving(false);
       setIsPublishing(false);
     }
-  }, [editProduct, form, loadProducts]);
+  }, [editProduct, form, loadProducts, mustDraftFirst, router]);
 
 
   // ── Delete ─────────────────────────────────────────────────────────────────
@@ -2064,18 +2106,45 @@ export default function ProductManagement() {
             {currentStep === 4 && (
               <div className="space-y-4">
                 <div className="flex items-center gap-2"><span className="h-3.5 w-0.5 rounded-full bg-amber-600" /><p className="text-xs font-bold uppercase tracking-[0.12em] text-neutral-900">Product Status</p></div>
+
+                {/*
+                  Stated before the operator acts, not discovered through a
+                  failed save. A size-managed product is sold through size rows
+                  in product_variants, and those need a product id — which does
+                  not exist until the product is saved. The server rejects
+                  publishing one (assertPublishable), and this wizard has no
+                  Sizes step, so the previous behaviour was a dead end: both
+                  Publish and Save Draft failed, because `active` defaults to
+                  true and the guard fires on `active`, not on the button.
+                */}
+                {mustDraftFirst && (
+                  <div className="flex gap-2.5 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3">
+                    <AlertTriangle className="mt-0.5 h-4 w-4 flex-shrink-0 text-amber-700" />
+                    <div className="text-xs leading-relaxed text-amber-900">
+                      <span className="font-semibold">Sizes come next.</span> This product is
+                      sold by size, so it is saved as a draft first. You will land on its
+                      Inventory page to set stock per size — publish it from there once at
+                      least one size has stock.
+                    </div>
+                  </div>
+                )}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <ToggleSwitch
-                  checked={form.active}
+                  checked={mustDraftFirst ? false : form.active}
                   onChange={(v) => setField("active", v)}
                   label="Active"
-                  description="Product is visible to customers"
+                  description={
+                    mustDraftFirst
+                      ? "Set after sizes have stock — a size-managed product is saved as a draft first."
+                      : "Product is visible to customers"
+                  }
+                  disabled={mustDraftFirst}
                 />
                 <ToggleSwitch
                   checked={form.isSizeManaged}
                   onChange={(v) => setField("isSizeManaged", v)}
                   label="Size-managed product"
-                  description="Sold by size. Stock is set per size under Sizes, and the product cannot be published until at least one size has stock."
+                  description="Sold by size. Stock is set per size on the product's Inventory page."
                 />
                 <ToggleSwitch
                   checked={form.featured}
@@ -2118,6 +2187,23 @@ export default function ProductManagement() {
                   Next <ChevronRight className="h-4 w-4" />
                 </Button>
               ) : (
+                /*
+                  A new size-managed product gets ONE action, because only one
+                  can succeed: the server rejects publishing it before its sizes
+                  exist. Offering "Publish Product" here presented a button that
+                  could only ever fail.
+                */
+                mustDraftFirst ? (
+                  <Button
+                    type="button"
+                    onClick={() => handleSave(false)}
+                    disabled={isSaving || isPublishing}
+                    className="bg-neutral-900 hover:bg-amber-700 transition-colors flex items-center gap-1"
+                  >
+                    {isSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Ruler className="h-4 w-4" />}
+                    Save Draft &amp; Add Sizes
+                  </Button>
+                ) : (
                 <>
                   <Button
                     type="button"
@@ -2138,6 +2224,7 @@ export default function ProductManagement() {
                     Publish Product
                   </Button>
                 </>
+                )
               )}
             </div>
           </SheetFooter>
