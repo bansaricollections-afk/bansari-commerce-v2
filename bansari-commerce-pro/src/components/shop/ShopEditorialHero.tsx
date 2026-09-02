@@ -1,23 +1,36 @@
-// Real catalog destinations only. Removed in this pass:
-//   • "✦ Festive 2025 Edit ✦" kicker — no such edit, and a stale year.
-//   • /shop?category=festive-wear and /shop?category=new-arrivals — slugified
-//     values that match nothing in products.category (both returned 0 products).
-//   • The five ?edit= chips (Wedding Edit, Office Collection, Celebrity
-//     Inspired, Summer Collection, Editor's Picks) — the shop page has no
-//     `edit` filter at all, so every chip silently returned the full catalogue.
-// Collections below use the exact stored products.collection values.
-const HERO_COLLECTIONS = [
-  "SUMMER 2026",
-  "Celebration Edit",
-  "New Arrivals",
-] as const;
+/*
+ * Shop hero.
+ *
+ * This is a LISTING page, not the homepage. Measured before this pass, the
+ * first product sat 951px down on desktop and 1110px on mobile — 1.3 screens
+ * of scroll before a visitor who clicked SHOP saw a single garment. The hero
+ * alone was 385px of that.
+ *
+ * Trimmed to a kicker, the headline and the collection chips. Removed:
+ *   • The subline ("Every piece we currently stock… Filter by category…") —
+ *     instructions for a filter panel that is self-evident.
+ *   • The "View All" button — it linked to /shop, which is the page you are
+ *     already on, showing all products.
+ *   • The "New Arrivals" button — duplicated the New Arrivals chip directly
+ *     beneath it.
+ *
+ * Collections are now derived from the live catalogue rather than a hardcoded
+ * list. The previous constant was a stale snapshot; the design system requires
+ * taxonomy to come from the catalog so chips cannot rot into dead links.
+ */
+import { getShopFacets } from "@/services/shop-facets";
 
-export default function ShopEditorialHero() {
+/** Chips are a glance, not a directory — cap so the hero cannot grow tall again. */
+const MAX_CHIPS = 4;
+
+export default async function ShopEditorialHero() {
+  const facets = await getShopFacets();
+  const collections = facets.collections.slice(0, MAX_CHIPS);
+
   return (
     <section
       aria-label="Seasonal campaign"
       className="relative overflow-hidden bg-[#F5F0EC]"
-      style={{ minHeight: "clamp(180px, 28vw, 340px)" }}
     >
       {/* Decorative rule lines — desktop */}
       <div
@@ -33,43 +46,21 @@ export default function ShopEditorialHero() {
         ))}
       </div>
 
-      <div className="mx-auto flex max-w-[1440px] flex-col items-center justify-center px-5 py-12 text-center md:px-10 lg:px-16 lg:py-16">
+      <div className="mx-auto flex max-w-[1440px] flex-col items-center justify-center px-5 py-7 text-center md:px-10 lg:px-16 lg:py-9">
 
         {/* Kicker */}
-        <p className="mb-4 text-[9px] font-bold uppercase tracking-[0.32em] text-[#8A5A6A]">
+        <p className="mb-2.5 text-[9px] font-bold uppercase tracking-[0.32em] text-[#8A5A6A]">
           ✦ The Bansari Catalogue ✦
         </p>
 
         {/* Editorial headline */}
-        <h2 className="font-[family:var(--font-playfair)] text-[clamp(1.5rem,5vw,3.5rem)] font-normal leading-[1.1] text-slate-900">
+        <h2 className="font-[family:var(--font-playfair)] text-[clamp(1.4rem,3.6vw,2.4rem)] font-normal leading-[1.1] text-slate-900">
           Dressed for Every Story
         </h2>
 
-        {/* Subline */}
-        <p className="mx-auto mt-4 max-w-lg text-[12px] leading-relaxed text-slate-500 md:text-[13px]">
-          Every piece we currently stock, in one place. Filter by category,
-          collection, fabric, colour, size and price.
-        </p>
-
-        {/* CTA row */}
-        <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
-          <a
-            href="/shop"
-            className="inline-flex items-center gap-2 bg-slate-900 px-7 py-3 text-[10.5px] font-semibold uppercase tracking-[0.16em] text-white transition-all duration-200 hover:bg-[#8A5A6A] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#8A5A6A] focus-visible:ring-offset-2"
-          >
-            View All
-          </a>
-          <a
-            href="/new-arrivals"
-            className="inline-flex items-center gap-2 border border-slate-300 bg-transparent px-7 py-3 text-[10.5px] font-semibold uppercase tracking-[0.16em] text-slate-700 transition-all duration-200 hover:border-slate-900 hover:text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#8A5A6A] focus-visible:ring-offset-2"
-          >
-            New Arrivals
-          </a>
-        </div>
-
-        {/* Collection chips — real collections, exact stored values */}
-        <div className="mt-8 flex flex-wrap items-center justify-center gap-2">
-          {HERO_COLLECTIONS.map((tag) => (
+        {/* Collection chips — derived from the catalogue, exact stored values */}
+        <div className="mt-5 flex flex-wrap items-center justify-center gap-2">
+          {collections.map((tag) => (
             <a
               key={tag}
               href={`/shop?collection=${encodeURIComponent(tag)}`}

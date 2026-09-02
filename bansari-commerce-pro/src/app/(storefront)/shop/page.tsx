@@ -127,10 +127,9 @@ export default async function ShopPage({ searchParams }: ShopPageProps) {
       <ShopEditorialHero />
 
       {/* ── Trust strip ────────────────────────────────────────────────────── */}
+      {/* Stays above the grid: 36px, and it answers "can I trust this shop"   */}
+      {/* before the visitor has invested any scrolling.                       */}
       <ShopTrustStrip />
-
-      {/* ── CRO strip ──────────────────────────────────────────────────────── */}
-      <ShopCROStrip />
 
       {/* ── Main content area ──────────────────────────────────────────────── */}
       <main
@@ -183,6 +182,22 @@ export default async function ShopPage({ searchParams }: ShopPageProps) {
           </div>
         </div>
       </main>
+
+      {/*
+        ── CRO strip ──────────────────────────────────────────────────────────
+        Below the grid, deliberately.
+
+        "Personal styling on WhatsApp" and "Free shipping over ₹2,999" are
+        reassurance for a shopper who is hesitating — they answer questions
+        nobody has yet asked when shown before the first product. Above the grid
+        this band cost 290px and helped push the first product 951px down on
+        desktop (1110px on mobile), so a visitor who clicked SHOP scrolled more
+        than a full screen before seeing a garment.
+
+        Here it reaches everyone who browses the grid without deciding, which is
+        precisely the audience it is written for.
+      */}
+      <ShopCROStrip />
 
       {/* ── Mobile filter / sort bar (fixed bottom, visible < 1024px) ────────── */}
       {/* pb-[72px] on the page body is handled by the bar's own fixed height  */}
