@@ -1,14 +1,25 @@
 "use client";
 
 import { ChevronLeft, ChevronRight } from "lucide-react";
-import { useRouter, useSearchParams } from "next/navigation";
+import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import type { PaginationMeta } from "@/types/filter-params";
 
 // ─── Props ───────────────────────────────────────────────────────────────────
 // Pagination is driven entirely by real data from PaginationMeta (returned by
 // getFilteredProducts). All hardcoded constants have been removed.
-// The component is URL-driven: clicking a page number pushes ?page=N to the
-// URL which triggers a full RSC re-render with the correct data slice.
+//
+// EVERY PAGE CONTROL IS AN ANCHOR.
+//
+// These used to be <button onClick={router.push(...)}>. That works for a person
+// with JavaScript and is invisible to everything else: a crawler following
+// links found no route past page 1, so 12 of the catalogue's products were
+// reachable only through a filter or the sitemap. Anchors also restore
+// middle-click, open-in-new-tab and "copy link address", which buttons silently
+// swallow.
+//
+// next/link still navigates client-side, so the browsing experience is
+// unchanged — the difference is that the href now exists in the HTML.
 
 interface PaginationProps {
   meta: PaginationMeta;
@@ -21,8 +32,18 @@ function getPageRange(current: number, total: number): (number | "...")[] {
   return [1, "...", current - 1, current, current + 1, "...", total];
 }
 
+/** Shared so the active page, the inactive pages and the arrows cannot drift. */
+const PAGE_BASE =
+  "flex h-9 w-9 items-center justify-center border text-[11px] font-semibold transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#8A5A6A]";
+const ARROW_BASE =
+  "flex items-center gap-2 border px-5 py-2.5 text-[11px] font-semibold uppercase tracking-[0.12em] transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#8A5A6A]";
+const ARROW_ENABLED =
+  "border-slate-200 bg-white text-slate-600 hover:border-slate-400 hover:text-slate-900";
+/* Rendered as a <span>, not a disabled link: there is no page to point at. */
+const ARROW_DISABLED =
+  "border-slate-200 bg-white text-slate-600 cursor-not-allowed opacity-30";
+
 export default function Pagination({ meta }: PaginationProps) {
-  const router       = useRouter();
   const searchParams = useSearchParams();
 
   const { page, perPage, total, totalPages } = meta;
@@ -34,11 +55,11 @@ export default function Pagination({ meta }: PaginationProps) {
   // Hide the component entirely when there is only one page
   if (totalPages <= 1 && total > 0) return null;
 
-  function handleSetPage(p: number) {
+  /** Preserves every active filter — only `page` changes. */
+  function hrefForPage(p: number): string {
     const params = new URLSearchParams(searchParams.toString());
-    params.set('page', String(p));
-    router.push(`/shop?${params.toString()}`);
-    window.scrollTo({ top: 0, behavior: 'smooth' });
+    params.set("page", String(p));
+    return `/shop?${params.toString()}`;
   }
 
   return (
@@ -62,23 +83,29 @@ export default function Pagination({ meta }: PaginationProps) {
           />
         </div>
         <p className="text-[10px] uppercase tracking-[0.14em] text-slate-400">
-          {from}–{to} of {total} products
+          {from}&ndash;{to} of {total} products
         </p>
       </div>
 
-      {/* Page buttons */}
+      {/* Page links */}
       <div className="flex flex-col items-center gap-6 sm:flex-row sm:justify-between">
         {/* Prev */}
-        <button
-          type="button"
-          aria-label="Previous page"
-          disabled={!meta.hasPrevPage}
-          onClick={() => handleSetPage(Math.max(1, page - 1))}
-          className="flex items-center gap-2 border border-slate-200 bg-white px-5 py-2.5 text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-600 transition-all duration-200 hover:border-slate-400 hover:text-slate-900 disabled:cursor-not-allowed disabled:opacity-30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#8A5A6A]"
-        >
-          <ChevronLeft size={13} aria-hidden="true" />
-          Previous
-        </button>
+        {meta.hasPrevPage ? (
+          <Link
+            href={hrefForPage(Math.max(1, page - 1))}
+            rel="prev"
+            aria-label="Previous page"
+            className={`${ARROW_BASE} ${ARROW_ENABLED}`}
+          >
+            <ChevronLeft size={13} aria-hidden="true" />
+            Previous
+          </Link>
+        ) : (
+          <span aria-hidden="true" className={`${ARROW_BASE} ${ARROW_DISABLED}`}>
+            <ChevronLeft size={13} aria-hidden="true" />
+            Previous
+          </span>
+        )}
 
         {/* Page numbers */}
         <div className="flex items-center gap-1">
@@ -91,37 +118,46 @@ export default function Pagination({ meta }: PaginationProps) {
               >
                 &hellip;
               </span>
-            ) : (
-              <button
+            ) : p === page ? (
+              /* The current page is not a link to itself. */
+              <span
                 key={p}
-                type="button"
-                aria-label={`Page ${p}`}
-                aria-current={page === p ? "page" : undefined}
-                onClick={() => handleSetPage(p as number)}
-                className={[
-                  "flex h-9 w-9 items-center justify-center border text-[11px] font-semibold transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#8A5A6A]",
-                  page === p
-                    ? "border-[#8A5A6A] bg-[#8A5A6A] text-white"
-                    : "border-slate-200 bg-white text-slate-600 hover:border-slate-400 hover:text-slate-900",
-                ].join(" ")}
+                aria-current="page"
+                aria-label={`Page ${p}, current page`}
+                className={`${PAGE_BASE} border-[#8A5A6A] bg-[#8A5A6A] text-white`}
               >
                 {p}
-              </button>
+              </span>
+            ) : (
+              <Link
+                key={p}
+                href={hrefForPage(p as number)}
+                aria-label={`Page ${p}`}
+                className={`${PAGE_BASE} border-slate-200 bg-white text-slate-600 hover:border-slate-400 hover:text-slate-900`}
+              >
+                {p}
+              </Link>
             )
           )}
         </div>
 
         {/* Next */}
-        <button
-          type="button"
-          aria-label="Next page"
-          disabled={!meta.hasNextPage}
-          onClick={() => handleSetPage(Math.min(totalPages, page + 1))}
-          className="flex items-center gap-2 border border-slate-200 bg-white px-5 py-2.5 text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-600 transition-all duration-200 hover:border-slate-400 hover:text-slate-900 disabled:cursor-not-allowed disabled:opacity-30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#8A5A6A]"
-        >
-          Next
-          <ChevronRight size={13} aria-hidden="true" />
-        </button>
+        {meta.hasNextPage ? (
+          <Link
+            href={hrefForPage(Math.min(totalPages, page + 1))}
+            rel="next"
+            aria-label="Next page"
+            className={`${ARROW_BASE} ${ARROW_ENABLED}`}
+          >
+            Next
+            <ChevronRight size={13} aria-hidden="true" />
+          </Link>
+        ) : (
+          <span aria-hidden="true" className={`${ARROW_BASE} ${ARROW_DISABLED}`}>
+            Next
+            <ChevronRight size={13} aria-hidden="true" />
+          </span>
+        )}
       </div>
     </nav>
   );

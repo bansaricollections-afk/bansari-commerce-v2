@@ -20,6 +20,7 @@ import {
   Wand2,
   X,
   AlertTriangle,
+  Check,
   Ruler,
   Camera,
   Tag,
@@ -1137,6 +1138,33 @@ export default function ProductManagement() {
    */
   const mustDraftFirst = !editProduct && form.isSizeManaged;
 
+  /*
+   * Which steps are actually complete.
+   *
+   * The tabs previously marked a step "done" on `currentStep > step.id` — i.e.
+   * you walked past it — so an untouched step looked finished. With 15 required
+   * fields spread over three steps, the only way to find what was missing was
+   * to press Next and be rejected.
+   *
+   * Media has no required *fields*, but a published product now needs an image,
+   * so it counts as complete once one is attached. Visibility asks for nothing
+   * and is never marked either way — a tick there would be meaningless.
+   */
+  const stepDone = useMemo(() => {
+    const done: Record<number, boolean> = {};
+    for (const step of STEPS) {
+      if (step.id === 0) { done[0] = form.images.length > 0; continue; }
+      if (step.fields.length === 0) { done[step.id] = false; continue; }
+      done[step.id] = step.fields
+        .filter((f) => REQUIRED_FIELDS.includes(f))
+        .every((f) => {
+          const v = form[f];
+          return (typeof v === "string" ? v.trim() : String(v ?? "")).length > 0;
+        });
+    }
+    return done;
+  }, [form]);
+
   function buildPayload(publishNow: boolean): ApiProductPayload {
     const sizesArr = form.sizes.split(",").map((s) => s.trim()).filter(Boolean);
     return {
@@ -1523,21 +1551,37 @@ export default function ProductManagement() {
               {STEPS.map((step) => {
                 const Icon = step.icon;
                 const isActive = currentStep === step.id;
-                const isDone = currentStep > step.id;
+                // Real completeness, not "you scrolled past it".
+                const isDone = stepDone[step.id] === true;
                 return (
                   <button
                     key={step.id}
                     type="button"
                     onClick={() => setCurrentStep(step.id)}
+                    aria-current={isActive ? "step" : undefined}
+                    aria-label={`${step.label}${isDone ? " — complete" : ""}`}
                     className={cn(
-                      "flex-1 flex flex-col items-center gap-1 py-2 rounded-lg text-xs transition-colors",
+                      "relative flex-1 flex flex-col items-center gap-1 py-2 rounded-lg text-xs transition-colors",
                       isActive ? "bg-neutral-900 text-white font-semibold" :
-                      isDone   ? "text-amber-700 hover:bg-amber-50" :
+                      isDone   ? "text-emerald-700 hover:bg-emerald-50" :
                                  "text-neutral-400 hover:bg-neutral-50"
                     )}
                   >
                     <Icon className="h-4 w-4" />
                     <span className="hidden sm:block">{step.short}</span>
+                    {/*
+                      The tick sits on the icon rather than replacing it, so the
+                      step stays identifiable at a glance while it reports state.
+                    */}
+                    {isDone && (
+                      <Check
+                        className={cn(
+                          "absolute right-1.5 top-1.5 h-3 w-3",
+                          isActive ? "text-emerald-300" : "text-emerald-600"
+                        )}
+                        aria-hidden="true"
+                      />
+                    )}
                   </button>
                 );
               })}
