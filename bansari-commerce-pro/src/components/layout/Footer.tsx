@@ -55,12 +55,28 @@ export default async function Footer() {
   // links can never disagree with the nav or with /shop.
   const { collections } = await getShopFacets();
 
+  /*
+   * A catalogue collection can share a name with a static link — "New Arrivals"
+   * is both a fixed destination (/new-arrivals) and a stored collection value.
+   * Merged naively, the footer listed "New Arrivals" twice, pointing at two
+   * different pages, and React logged a duplicate-key warning on every page
+   * because the list is keyed by label.
+   *
+   * The static link wins: it is the curated page, and /shop?collection=… is a
+   * filtered view of the same thing.
+   */
+  const staticLabels = new Set(
+    STATIC_SHOP_LINKS.map((l) => l.label.toLowerCase())
+  );
+
   const SHOP_LINKS = [
     ...STATIC_SHOP_LINKS,
-    ...collections.map((name) => ({
-      label: name,
-      href: `/shop?collection=${encodeURIComponent(name)}`,
-    })),
+    ...collections
+      .filter((name) => !staticLabels.has(name.toLowerCase()))
+      .map((name) => ({
+        label: name,
+        href: `/shop?collection=${encodeURIComponent(name)}`,
+      })),
     ...TRAILING_SHOP_LINKS,
   ];
 
@@ -199,7 +215,7 @@ export default async function Footer() {
           </p>
           <ul style={{ display: "flex", flexDirection: "column", gap: "var(--bc-space-3)" }}>
             {SHOP_LINKS.map((l) => (
-              <li key={l.label}>
+              <li key={l.href}>
                 <Link
                   href={l.href}
                   style={{
@@ -236,7 +252,7 @@ export default async function Footer() {
           </p>
           <ul style={{ display: "flex", flexDirection: "column", gap: "var(--bc-space-3)" }}>
             {POLICY_LINKS.map((l) => (
-              <li key={l.label}>
+              <li key={l.href}>
                 <Link
                   href={l.href}
                   style={{
