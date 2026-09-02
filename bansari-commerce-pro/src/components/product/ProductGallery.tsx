@@ -302,7 +302,17 @@ export default function ProductGallery({ product, selectedVariant }: Props) {
 
   const isNew = product.newArrival;
   const isBestseller = product.bestSeller;
-  const isLowStock = product.stock && product.stock > 0 && product.stock <= 5;
+  /*
+   * NO "Almost Gone" BADGE.
+   *
+   * It rendered on `product.stock <= 5` with no size-managed branch, and this
+   * boutique stocks about one set per style — so it appeared on every product
+   * page. Urgency shown on the whole catalogue is not urgency; it reads as
+   * manufactured scarcity on the page where the customer decides to buy.
+   *
+   * Removed alongside the equivalent "Low Stock" badge on ProductCard. Sold Out
+   * stays: it is specific and true.
+   */
   const isOutOfStock = product.stock === 0;
 
   const TAB_LABELS: Record<Tab, string> = {
@@ -422,11 +432,6 @@ export default function ProductGallery({ product, selectedVariant }: Props) {
               {isBestseller && (
                 <span className="bg-slate-900 text-white text-[10px] font-medium tracking-[0.15em] uppercase px-2.5 py-1">
                   Bestseller
-                </span>
-              )}
-              {isLowStock && (
-                <span className="bg-amber-600 text-white text-[10px] font-medium tracking-[0.15em] uppercase px-2.5 py-1">
-                  Almost Gone
                 </span>
               )}
               {isOutOfStock && (

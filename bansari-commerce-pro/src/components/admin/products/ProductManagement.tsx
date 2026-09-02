@@ -1212,6 +1212,26 @@ export default function ProductManagement() {
     const errors = editProduct ? validateForEdit() : validateAll();
     if (Object.keys(errors).length > 0) { setFieldErrors(errors); toast.error("Please fix validation errors."); return; }
 
+    /*
+     * A published product must have at least one image.
+     *
+     * Nothing enforced this before — not the Media step, not the schema. An
+     * imageless product looks fine in the admin, but product-feed.ts DROPS it
+     * from the Google and Meta catalogues on purpose (image_link is mandatory
+     * on both, and an imageless row is rejected at import and counts against
+     * the account's feed error rate). So it would be live on the storefront and
+     * silently absent from every ad, with nothing to indicate why.
+     *
+     * Drafts are deliberately exempt: photography often arrives after the copy.
+     * Checked at publish only.
+     */
+    const willBePublished = publishNow || (!editProduct && !mustDraftFirst && form.active) || (editProduct && form.active);
+    if (willBePublished && form.images.length === 0) {
+      setCurrentStep(0);
+      toast.error("Add at least one image before publishing — products without an image are dropped from the Google and Meta feeds.");
+      return;
+    }
+
     if (publishNow) setIsPublishing(true); else setIsSaving(true);
 
     try {
@@ -1864,7 +1884,7 @@ export default function ProductManagement() {
                   <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-1.5">
                       <label className="block text-sm font-semibold text-neutral-900">
-                        Available Sizes <span className="text-rose-600">*</span>
+                        Size labels <span className="text-rose-600">*</span>
                       </label>
                       <input
                         type="text"
@@ -1886,7 +1906,20 @@ export default function ProductManagement() {
                       placeholder="Select (optional)"
                     />
                   </div>
-                  <p className="text-xs text-neutral-500">Comma-separated list of sizes</p>
+                  {/*
+                    Named "Size labels", not "Available Sizes", because that is
+                    all this field is: the labels shown on the product page. It
+                    writes a text column on `products` and creates NO size rows
+                    — those live in product_variants and are added on the
+                    Inventory page. Two different things were called "sizes",
+                    which is why a size-managed product could be filled in here
+                    and still be rejected at publish for having no sizes.
+                  */}
+                  <p className="text-xs text-neutral-500">
+                    Comma-separated, e.g. <span className="font-medium">M, L, XL</span>. These are
+                    the labels shown on the product page. Stock per size is set separately on the
+                    product&apos;s Inventory page.
+                  </p>
                 </div>
               </div>
             )}
