@@ -2,6 +2,7 @@ import { MetadataRoute } from 'next';
 import { createServiceRoleClient } from '@/lib/supabase/service';
 import { getShopFacets } from '@/services/shop-facets';
 import { collectionSlug } from '@/lib/collection-slug';
+import { getBrowseLandings } from '@/services/browse-landings';
 
 /**
  * Auto-generates /sitemap.xml via Next.js Metadata API.
@@ -74,5 +75,23 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     // Same contract as above.
   }
 
-  return [...staticPages, ...collectionPages, ...productPages];
+  /*
+   * Browse landing pages (/shop/<slug>) — category, fabric and fabric+category.
+   * Only filters with at least MIN_PRODUCTS behind them are generated, so the
+   * sitemap can never list a near-empty doorway page.
+   */
+  let browsePages: MetadataRoute.Sitemap = [];
+  try {
+    const landings = await getBrowseLandings();
+    browsePages = landings.map((l) => ({
+      url: `${base}/shop/${l.slug}`,
+      lastModified: new Date(),
+      changeFrequency: 'weekly' as const,
+      priority: 0.8,
+    }));
+  } catch {
+    // Same contract as above.
+  }
+
+  return [...staticPages, ...collectionPages, ...browsePages, ...productPages];
 }
