@@ -131,6 +131,7 @@ type CatalogData = {
     fit:      LookupItem[];
     sleeve:   LookupItem[];
     neck:     LookupItem[];
+    bottom:   LookupItem[];
     work:     LookupItem[];
     length:   LookupItem[];
   };
@@ -138,7 +139,7 @@ type CatalogData = {
 
 const emptyCatalog: CatalogData = {
   categories: [], subcategories: [], collections: [], sizeCharts: [],
-  attrs: { fabric: [], color: [], occasion: [], pattern: [], fit: [], sleeve: [], neck: [], work: [], length: [] },
+  attrs: { fabric: [], color: [], occasion: [], pattern: [], fit: [], sleeve: [], neck: [], bottom: [], work: [], length: [] },
 };
 
 // ─── Schemas ──────────────────────────────────────────────────────────────────
@@ -230,6 +231,7 @@ type Product = {
   attr_fit_id?: number | null;
   attr_sleeve_id?: number | null;
   attr_neck_id?: number | null;
+  attr_bottom_id?: number | null;
   attr_work_id?: number | null;
   attr_length_id?: number | null;
   // Phase 1B — model / sizing copy (stored inside specifications JSONB)
@@ -280,6 +282,7 @@ type ProductFormState = {
   attr_fit_id: number | null;
   attr_sleeve_id: number | null;
   attr_neck_id: number | null;
+  attr_bottom_id: number | null;
   attr_work_id: number | null;
   attr_length_id: number | null;
   // Phase 1B — specifications sub-fields (flat in form state, nested in payload)
@@ -325,6 +328,7 @@ type ApiProductPayload = {
   attr_fit_id: number | null;
   attr_sleeve_id: number | null;
   attr_neck_id: number | null;
+  attr_bottom_id: number | null;
   attr_work_id: number | null;
   attr_length_id: number | null;
   // Phase 1B — merged into existing specifications JSONB
@@ -380,6 +384,7 @@ type ApiProductRecord = {
   attrFitId?: number | null;
   attrSleeveId?: number | null;
   attrNeckId?: number | null;
+  attrBottomId?: number | null;
   attrWorkId?: number | null;
   attrLengthId?: number | null;
   cost?: number | null;
@@ -407,6 +412,7 @@ type ApiProductRecord = {
   attr_fit_id?: number | null;
   attr_sleeve_id?: number | null;
   attr_neck_id?: number | null;
+  attr_bottom_id?: number | null;
   attr_work_id?: number | null;
   attr_length_id?: number | null;
   // Phase 1B — specifications JSONB (may be absent on legacy rows)
@@ -468,7 +474,7 @@ const emptyForm: ProductFormState = {
   category_id: null, subcategory_id: null, collection_id: null, size_chart_id: null,
   attr_fabric_id: null, attr_color_id: null, attr_occasion_id: null,
   attr_pattern_id: null, attr_fit_id: null, attr_sleeve_id: null,
-  attr_neck_id: null, attr_work_id: null, attr_length_id: null,
+  attr_neck_id: null, attr_bottom_id: null, attr_work_id: null, attr_length_id: null,
   // Phase 1B
   spec_modelInfo: "",
   spec_sizeWorn: "",
@@ -559,6 +565,7 @@ function mapApiProductToForm(p: ApiProductRecord): ProductFormState {
     attr_fit_id:      p.attrFitId ?? p.attr_fit_id ?? null,
     attr_sleeve_id:   p.attrSleeveId ?? p.attr_sleeve_id ?? null,
     attr_neck_id:     p.attrNeckId ?? p.attr_neck_id ?? null,
+    attr_bottom_id:   p.attrBottomId ?? p.attr_bottom_id ?? null,
     attr_work_id:     p.attrWorkId ?? p.attr_work_id ?? null,
     attr_length_id:   p.attrLengthId ?? p.attr_length_id ?? null,
     // Phase 1B — read from specifications JSONB, fall back to ""
@@ -614,6 +621,7 @@ function mapApiProductToProduct(p: ApiProductRecord): Product {
     attr_fit_id:      p.attrFitId ?? p.attr_fit_id ?? null,
     attr_sleeve_id:   p.attrSleeveId ?? p.attr_sleeve_id ?? null,
     attr_neck_id:     p.attrNeckId ?? p.attr_neck_id ?? null,
+    attr_bottom_id:   p.attrBottomId ?? p.attr_bottom_id ?? null,
     attr_work_id:     p.attrWorkId ?? p.attr_work_id ?? null,
     attr_length_id:   p.attrLengthId ?? p.attr_length_id ?? null,
     specifications:   p.specifications ?? null,
@@ -1242,6 +1250,7 @@ export default function ProductManagement() {
       attr_fit_id:      form.attr_fit_id,
       attr_sleeve_id:   form.attr_sleeve_id,
       attr_neck_id:     form.attr_neck_id,
+      attr_bottom_id:   form.attr_bottom_id,
       attr_work_id:     form.attr_work_id,
       attr_length_id:   form.attr_length_id,
       // Phase 1B — merge new fields into specifications; existing keys are preserved
@@ -1983,6 +1992,20 @@ export default function ProductManagement() {
                       value={form.attr_sleeve_id}
                       options={catalog.attrs.sleeve}
                       onChange={(id) => setField("attr_sleeve_id", id)}
+                      placeholder="Optional"
+                    />
+                    {/*
+                      Bottom type — palazzo, culotte, tulip pant, farsi salwar
+                      and so on. There was previously nowhere to record this, so
+                      it survived only inside product names ("...with White
+                      Tulip Pants") and could not be filtered or displayed.
+                      Optional, because a kurti or top has no bottom.
+                    */}
+                    <LookupSelect
+                      label="Bottom Type"
+                      value={form.attr_bottom_id}
+                      options={catalog.attrs.bottom}
+                      onChange={(id) => setField("attr_bottom_id", id)}
                       placeholder="Optional"
                     />
                     <LookupSelect

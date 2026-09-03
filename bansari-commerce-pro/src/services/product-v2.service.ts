@@ -58,6 +58,7 @@ const PRODUCT_V2_SELECT = `
   category_id, subcategory_id, collection_id, size_chart_id,
   attr_fabric_id, attr_color_id, attr_occasion_id, attr_pattern_id,
   attr_fit_id, attr_sleeve_id, attr_neck_id, attr_work_id, attr_length_id,
+  attr_bottom_id,
   short_description, brand_name, display_order, seo_keywords, canonical_url,
   hsn_code, country_of_origin, manufacturer, care_instructions,
   pattern_text, occasion_text, work_type, fit, sleeve, neck, length_type,
@@ -167,6 +168,9 @@ async function assembleProduct(
       : null;
     const neckRes     = row.attr_neck_id
       ? await sb.from('attr_neck').select('id,name,slug,display_order,active').eq('id', row.attr_neck_id).maybeSingle()
+      : null;
+    const bottomRes   = row.attr_bottom_id
+      ? await sb.from('attr_bottom').select('id,name,slug,display_order,active').eq('id', row.attr_bottom_id).maybeSingle()
       : null;
     const workRes     = row.attr_work_id
       ? await sb.from('attr_work').select('id,name,slug,display_order,active').eq('id', row.attr_work_id).maybeSingle()
@@ -596,6 +600,7 @@ export const ProductV2Service = {
       attr_fit_id:        payload.attr_fit_id          ?? null,
       attr_sleeve_id:     payload.attr_sleeve_id       ?? null,
       attr_neck_id:       payload.attr_neck_id         ?? null,
+      attr_bottom_id:     payload.attr_bottom_id       ?? null,
       attr_work_id:       payload.attr_work_id         ?? null,
       attr_length_id:     payload.attr_length_id       ?? null,
       size_chart_id:      payload.size_chart_id        ?? null,
@@ -696,6 +701,7 @@ export const ProductV2Service = {
       attr_occasion_id: 'attr_occasion_id', attr_pattern_id: 'attr_pattern_id',
       attr_fit_id: 'attr_fit_id', attr_sleeve_id: 'attr_sleeve_id',
       attr_neck_id: 'attr_neck_id', attr_work_id: 'attr_work_id',
+      attr_bottom_id: 'attr_bottom_id',
       attr_length_id: 'attr_length_id', size_chart_id: 'size_chart_id',
       seo_title: 'seo_title', seo_description: 'seo_description',
       seo_keywords: 'seo_keywords', canonical_url: 'canonical_url',

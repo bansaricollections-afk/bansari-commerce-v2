@@ -39,6 +39,7 @@ const log = createLogger({ service: 'admin.catalog' });
  *     fit:      { id, name, slug, displayOrder, active }[],
  *     sleeve:   { id, name, slug, displayOrder, active }[],
  *     neck:     { id, name, slug, displayOrder, active }[],
+ *     bottom:   { id, name, slug, displayOrder, active }[],
  *     work:     { id, name, slug, displayOrder, active }[],
  *     length:   { id, name, slug, displayOrder, active }[],
  *   }
@@ -65,6 +66,7 @@ export async function GET(request: NextRequest) {
       attrFit,
       attrSleeve,
       attrNeck,
+      attrBottom,
       attrWork,
       attrLength,
     ] = await Promise.all([
@@ -81,6 +83,17 @@ export async function GET(request: NextRequest) {
       getAttributeOptions('attr_fit',      false),
       getAttributeOptions('attr_sleeve',   false),
       getAttributeOptions('attr_neck',     false),
+      /*
+       * Tolerant on purpose. getAttributeOptions throws when a table is
+       * missing, and this route feeds the ENTIRE product form — categories,
+       * collections, every attribute. If the code ships before the
+       * attr_bottom migration runs, a throw here would blank the whole form
+       * rather than just one dropdown.
+       *
+       * Falling back to [] means the Bottom Type field is simply empty until
+       * the migration lands, and deploy order stops mattering.
+       */
+      getAttributeOptions('attr_bottom',   false).catch(() => []),
       getAttributeOptions('attr_work',     false),
       getAttributeOptions('attr_length',   false),
     ]);
@@ -140,6 +153,7 @@ export async function GET(request: NextRequest) {
         fit:      attrFit.map((a)      => ({ id: a.id, name: a.name, slug: a.slug, displayOrder: a.displayOrder, active: a.active })),
         sleeve:   attrSleeve.map((a)   => ({ id: a.id, name: a.name, slug: a.slug, displayOrder: a.displayOrder, active: a.active })),
         neck:     attrNeck.map((a)     => ({ id: a.id, name: a.name, slug: a.slug, displayOrder: a.displayOrder, active: a.active })),
+        bottom:   attrBottom.map((a)   => ({ id: a.id, name: a.name, slug: a.slug, displayOrder: a.displayOrder, active: a.active })),
         work:     attrWork.map((a)     => ({ id: a.id, name: a.name, slug: a.slug, displayOrder: a.displayOrder, active: a.active })),
         length:   attrLength.map((a)   => ({ id: a.id, name: a.name, slug: a.slug, displayOrder: a.displayOrder, active: a.active })),
       },
@@ -162,6 +176,7 @@ export async function GET(request: NextRequest) {
           fit:      payload.attrs.fit.length,
           sleeve:   payload.attrs.sleeve.length,
           neck:     payload.attrs.neck.length,
+          bottom:   payload.attrs.bottom.length,
           work:     payload.attrs.work.length,
           length:   payload.attrs.length.length,
         },

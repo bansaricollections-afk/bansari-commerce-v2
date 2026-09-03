@@ -84,6 +84,7 @@ export type DbAttrTable =
   | 'attr_fit'
   | 'attr_sleeve'
   | 'attr_neck'
+  | 'attr_bottom'
   | 'attr_work'
   | 'attr_length';
 
@@ -177,6 +178,7 @@ export interface DbProductV2Row {
   attr_fit_id: number | null;
   attr_sleeve_id: number | null;
   attr_neck_id: number | null;
+  attr_bottom_id: number | null;
   attr_work_id: number | null;
   attr_length_id: number | null;
   short_description: string | null;
@@ -286,6 +288,7 @@ export interface ProductAttributes {
   fit: AttributeOption | null;
   sleeve: AttributeOption | null;
   neck: AttributeOption | null;
+  bottom: AttributeOption | null;
   work: AttributeOption | null;
   length: AttributeOption | null;
 }
@@ -415,6 +418,7 @@ export interface ProductV2 {
   attrFitId: number | null;
   attrSleeveId: number | null;
   attrNeckId: number | null;
+  attrBottomId: number | null;
   attrWorkId: number | null;
   attrLengthId: number | null;
 
@@ -490,6 +494,7 @@ export type CreateProductV2Payload = {
   attr_fit_id?: number;
   attr_sleeve_id?: number;
   attr_neck_id?: number;
+  attr_bottom_id?: number;
   attr_work_id?: number;
   attr_length_id?: number;
   size_chart_id?: number;

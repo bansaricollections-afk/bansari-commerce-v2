@@ -199,6 +199,7 @@ export interface MapProductV2Options {
     fit: DbAttributeOption | null;
     sleeve: DbAttributeOption | null;
     neck: DbAttributeOption | null;
+    bottom: DbAttributeOption | null;
     work: DbAttributeOption | null;
     length: DbAttributeOption | null;
   }>;
@@ -240,6 +241,7 @@ export function mapProductV2(
     fit: am.fit ? mapAttributeOption(am.fit) : null,
     sleeve: am.sleeve ? mapAttributeOption(am.sleeve) : null,
     neck: am.neck ? mapAttributeOption(am.neck) : null,
+    bottom: am.bottom ? mapAttributeOption(am.bottom) : null,
     work: am.work ? mapAttributeOption(am.work) : null,
     length: am.length ? mapAttributeOption(am.length) : null,
   };
@@ -295,6 +297,7 @@ export function mapProductV2(
     attrFitId: row.attr_fit_id,
     attrSleeveId: row.attr_sleeve_id,
     attrNeckId: row.attr_neck_id,
+    attrBottomId: row.attr_bottom_id,
     attrWorkId: row.attr_work_id,
     attrLengthId: row.attr_length_id,
     sizeChartId: row.size_chart_id,
