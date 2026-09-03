@@ -3,6 +3,7 @@ import { createServiceRoleClient } from '@/lib/supabase/service';
 import { getShopFacets } from '@/services/shop-facets';
 import { collectionSlug } from '@/lib/collection-slug';
 import { getBrowseLandings } from '@/services/browse-landings';
+import { guides } from '@/content/guides';
 
 /**
  * Auto-generates /sitemap.xml via Next.js Metadata API.
@@ -93,5 +94,27 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     // Same contract as above.
   }
 
-  return [...staticPages, ...collectionPages, ...browsePages, ...productPages];
+  /* Guides — static content, so no try/catch and no query. */
+  const guidePages: MetadataRoute.Sitemap = [
+    {
+      url: `${base}/guides`,
+      lastModified: new Date(),
+      changeFrequency: 'weekly' as const,
+      priority: 0.7,
+    },
+    ...guides.map((g) => ({
+      url: `${base}/guides/${g.slug}`,
+      lastModified: new Date(g.updatedAt),
+      changeFrequency: 'monthly' as const,
+      priority: 0.6,
+    })),
+  ];
+
+  return [
+    ...staticPages,
+    ...collectionPages,
+    ...browsePages,
+    ...guidePages,
+    ...productPages,
+  ];
 }
