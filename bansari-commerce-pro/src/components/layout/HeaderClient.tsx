@@ -17,9 +17,18 @@ import HeaderSearchInput from "@/components/search/HeaderSearchInput";
 /** A navigation entry built from a real, product-backed catalog value. */
 export type NavEntry = { label: string; href: string };
 
+/*
+ * Shared by the desktop header and MobileMenu.
+ *
+ * Guides sits after Collections and before the About/Contact tail: it is
+ * content people browse, not company information. It was previously only in
+ * the footer's policy column, between Contact Us and Shipping Policy, which
+ * framed it as fine print rather than something worth reading.
+ */
 export const NAV_TOP_LINKS = [
   { label: "New Arrivals", href: "/new-arrivals" },
   { label: "Collections",  href: "/collections" },
+  { label: "Guides",       href: "/guides" },
   { label: "About",        href: "/about" },
   { label: "Contact",      href: "/contact" },
 ] as const;
@@ -412,6 +421,17 @@ export default function HeaderClient({
       />
 
       <style>{`
+        /*
+         * Nav labels never wrap.
+         *
+         * Adding Guides made six items, and at 1024px "New Arrivals" broke onto
+         * a second line — the row grew to 38px while its neighbours stayed at
+         * 21px, so the whole header looked misaligned. A two-word label should
+         * take more width, not more height.
+         */
+        .bc-nav-link {
+          white-space: nowrap;
+        }
         .bc-nav-link:hover {
           color: var(--bc-brand-mauve) !important;
           border-bottom-color: var(--bc-brand-mauve) !important;
