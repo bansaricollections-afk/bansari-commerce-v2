@@ -1328,7 +1328,17 @@ export default function ProductManagement() {
           ? (Object.fromEntries(
               Object.entries(fullPayload).filter(([key, value]) => {
                 if (key === 'id') return true;
-                const before = (buildPayloadFrom(baseline, publishNow) as Record<string, unknown>)[key];
+                /*
+                 * The baseline is built with publishNow = false on purpose: it
+                 * must represent what the SERVER currently holds, not what this
+                 * save intends.
+                 *
+                 * `active` is computed as `publishNow ? true : form.active`, so
+                 * building the baseline with publishNow = true made both sides
+                 * true when publishing a draft. The diff saw no change, `active`
+                 * was omitted, and the product silently stayed unpublished.
+                 */
+                const before = (buildPayloadFrom(baseline, false) as Record<string, unknown>)[key];
                 return JSON.stringify(value) !== JSON.stringify(before);
               })
             ) as typeof fullPayload)
