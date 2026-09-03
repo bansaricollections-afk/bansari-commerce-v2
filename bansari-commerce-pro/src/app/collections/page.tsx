@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 
 import { createServiceRoleClient } from "@/lib/supabase/service";
+import { collectionSlug } from "@/lib/collection-slug";
 
 // Renders live catalog collections — must not be frozen at build time.
 export const revalidate = 60;
@@ -72,7 +73,10 @@ async function getRealCollections(): Promise<Card[]> {
       name: collection,
       count: info.count,
       image: info.image,
-      href: `/shop?collection=${encodeURIComponent(collection)}`,
+      // Points at the collection landing page, not the filtered shop view.
+      // The landing page is the indexable URL: /shop?collection= carries the
+      // shop page's own canonical, so it can never rank on its own.
+      href: `/collections/${collectionSlug(collection)}`,
     });
   }
   cards.sort((a, b) => b.count - a.count);
