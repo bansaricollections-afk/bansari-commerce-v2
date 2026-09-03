@@ -31,10 +31,22 @@ export default function ProductCard({ product, priority = false }: Props) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const displayName =
-    (product as any).shortName ||
-    product.collection ||
-    product.name;
+  /*
+   * The card shows the PRODUCT's name.
+   *
+   * The fallback chain used to be `shortName || collection || name`. There is
+   * no `short_name` column on products, so shortName is always undefined and
+   * every card fell through to the collection — every tile on /shop read
+   * "New Arrivals" or "Festive Edit" instead of the garment's name, with the
+   * collection also shown directly above it as the eyebrow. On a collection
+   * landing page, where every product shares one collection, the whole grid
+   * read as the same item.
+   *
+   * shortName is kept ahead of name so a curated short title still wins if that
+   * column is ever added; collection is gone from the chain entirely — it is
+   * not a name, and it already has its own slot as the eyebrow.
+   */
+  const displayName = (product as any).shortName || product.name;
 
   const craftDetail = [
     (product as any).specifications?.work,

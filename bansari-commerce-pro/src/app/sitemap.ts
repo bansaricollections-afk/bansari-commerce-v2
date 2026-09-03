@@ -1,5 +1,7 @@
 import { MetadataRoute } from 'next';
 import { createServiceRoleClient } from '@/lib/supabase/service';
+import { getShopFacets } from '@/services/shop-facets';
+import { collectionSlug } from '@/lib/collection-slug';
 
 /**
  * Auto-generates /sitemap.xml via Next.js Metadata API.
@@ -51,5 +53,26 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     // Sitemap generation must never fail the build.
   }
 
-  return [...staticPages, ...productPages];
+  /*
+   * Collection landing pages.
+   *
+   * Derived from getShopFacets, which returns only collections holding at least
+   * one live product — so the sitemap can never advertise an empty page. The
+   * `collections` table is deliberately not the source: it lists
+   * bridal-collection and sale, which contain nothing.
+   */
+  let collectionPages: MetadataRoute.Sitemap = [];
+  try {
+    const { collections } = await getShopFacets();
+    collectionPages = collections.map((name) => ({
+      url: `${base}/collections/${collectionSlug(name)}`,
+      lastModified: new Date(),
+      changeFrequency: 'weekly' as const,
+      priority: 0.8,
+    }));
+  } catch {
+    // Same contract as above.
+  }
+
+  return [...staticPages, ...collectionPages, ...productPages];
 }
