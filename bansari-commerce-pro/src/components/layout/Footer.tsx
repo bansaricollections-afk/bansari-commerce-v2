@@ -19,11 +19,13 @@ const STATIC_SHOP_LINKS = [
 
 const TRAILING_SHOP_LINKS = [
   { label: "Wishlist", href: "/wishlist" },
+  // Guides belongs with the browsing links, not with the policies. In the
+  // policy column it read as fine print.
+  { label: "Guides",   href: "/guides" },
 ] as const;
 
 const POLICY_LINKS = [
   { label: "About Us",               href: "/about" },
-  { label: "Guides",                 href: "/guides" },
   { label: "Contact Us",             href: "/contact" },
   { label: "FAQ",                    href: "/faq" },
   { label: "Shipping Policy",        href: "/shipping-policy" },

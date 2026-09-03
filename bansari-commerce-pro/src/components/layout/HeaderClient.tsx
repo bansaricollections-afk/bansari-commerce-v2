@@ -17,9 +17,18 @@ import HeaderSearchInput from "@/components/search/HeaderSearchInput";
 /** A navigation entry built from a real, product-backed catalog value. */
 export type NavEntry = { label: string; href: string };
 
+/*
+ * Shared by the desktop header and MobileMenu.
+ *
+ * Guides sits after Collections and before the About/Contact tail: it is
+ * content people browse, not company information. It was previously only in
+ * the footer's policy column, between Contact Us and Shipping Policy, which
+ * framed it as fine print rather than something worth reading.
+ */
 export const NAV_TOP_LINKS = [
   { label: "New Arrivals", href: "/new-arrivals" },
   { label: "Collections",  href: "/collections" },
+  { label: "Guides",       href: "/guides" },
   { label: "About",        href: "/about" },
   { label: "Contact",      href: "/contact" },
 ] as const;

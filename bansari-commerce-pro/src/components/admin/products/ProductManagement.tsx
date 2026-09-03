@@ -354,6 +354,34 @@ type ApiProductRecord = {
   sizes?: string[] | string;
   price: number;
   compare_price?: number | null;
+  /*
+   * The list API returns mapProductV2 output, which is camelCase. This type
+   * previously declared ONLY snake_case, so every read below resolved to
+   * undefined, the form fell back to "" / null, and the update wrote that blank
+   * over the stored value — silently erasing SEO copy, compare-at price, the
+   * best-seller / new-arrival flags, and all nine attribute ids on every edit.
+   *
+   * Both shapes are declared so the mapper can prefer the key the API actually
+   * sends while remaining tolerant of the other.
+   */
+  comparePrice?: number | null;
+  seoTitle?: string;
+  seoDescription?: string;
+  newArrival?: boolean;
+  bestSeller?: boolean;
+  categoryId?: number | null;
+  subcategoryId?: number | null;
+  collectionId?: number | null;
+  sizeChartId?: number | null;
+  attrFabricId?: number | null;
+  attrColorId?: number | null;
+  attrOccasionId?: number | null;
+  attrPatternId?: number | null;
+  attrFitId?: number | null;
+  attrSleeveId?: number | null;
+  attrNeckId?: number | null;
+  attrWorkId?: number | null;
+  attrLengthId?: number | null;
   cost?: number | null;
   stock: number;
   hsn?: string;
@@ -502,33 +530,37 @@ function mapApiProductToForm(p: ApiProductRecord): ProductFormState {
     color:          p.color ?? "",
     sizes:          sizesStr,
     price:          String(p.price ?? ""),
-    comparePrice:   p.compare_price != null ? String(p.compare_price) : "",
+    // Parenthesised deliberately: `a ?? b != null ? x : y` binds as
+    // `(a ?? (b != null)) ? x : y`, which returns "" for a legitimate 0.
+    comparePrice:   (p.comparePrice ?? p.compare_price) != null
+      ? String(p.comparePrice ?? p.compare_price)
+      : "",
     cost:           p.cost != null ? String(p.cost) : "",
     stock:          String(p.stock ?? ""),
     hsn:            p.hsn ?? "",
     gst:            String(p.gst ?? "5"),
     description:    p.description ?? "",
-    seoTitle:       p.seo_title ?? "",
-    seoDescription: p.seo_description ?? "",
+    seoTitle:       p.seoTitle ?? p.seo_title ?? "",
+    seoDescription: p.seoDescription ?? p.seo_description ?? "",
     featured:       p.featured ?? false,
-    newArrival:     p.new_arrival ?? false,
-    bestSeller:     p.best_seller ?? false,
+    newArrival:     p.newArrival ?? p.new_arrival ?? false,
+    bestSeller:     p.bestSeller ?? p.best_seller ?? false,
     active:         p.active ?? true,
     isSizeManaged:  (p as { is_size_managed?: boolean }).is_size_managed ?? false,
     images:         normalizeImages(p.images),
-    category_id:    p.category_id ?? null,
-    subcategory_id: p.subcategory_id ?? null,
-    collection_id:  p.collection_id ?? null,
-    size_chart_id:  p.size_chart_id ?? null,
-    attr_fabric_id:   p.attr_fabric_id ?? null,
-    attr_color_id:    p.attr_color_id ?? null,
-    attr_occasion_id: p.attr_occasion_id ?? null,
-    attr_pattern_id:  p.attr_pattern_id ?? null,
-    attr_fit_id:      p.attr_fit_id ?? null,
-    attr_sleeve_id:   p.attr_sleeve_id ?? null,
-    attr_neck_id:     p.attr_neck_id ?? null,
-    attr_work_id:     p.attr_work_id ?? null,
-    attr_length_id:   p.attr_length_id ?? null,
+    category_id:    p.categoryId ?? p.category_id ?? null,
+    subcategory_id: p.subcategoryId ?? p.subcategory_id ?? null,
+    collection_id:  p.collectionId ?? p.collection_id ?? null,
+    size_chart_id:  p.sizeChartId ?? p.size_chart_id ?? null,
+    attr_fabric_id:   p.attrFabricId ?? p.attr_fabric_id ?? null,
+    attr_color_id:    p.attrColorId ?? p.attr_color_id ?? null,
+    attr_occasion_id: p.attrOccasionId ?? p.attr_occasion_id ?? null,
+    attr_pattern_id:  p.attrPatternId ?? p.attr_pattern_id ?? null,
+    attr_fit_id:      p.attrFitId ?? p.attr_fit_id ?? null,
+    attr_sleeve_id:   p.attrSleeveId ?? p.attr_sleeve_id ?? null,
+    attr_neck_id:     p.attrNeckId ?? p.attr_neck_id ?? null,
+    attr_work_id:     p.attrWorkId ?? p.attr_work_id ?? null,
+    attr_length_id:   p.attrLengthId ?? p.attr_length_id ?? null,
     // Phase 1B — read from specifications JSONB, fall back to ""
     spec_modelInfo:   typeof specs.modelInfo  === "string" ? specs.modelInfo  : "",
     spec_sizeWorn:    typeof specs.sizeWorn   === "string" ? specs.sizeWorn   : "",
@@ -555,35 +587,35 @@ function mapApiProductToProduct(p: ApiProductRecord): Product {
     color:          p.color ?? "",
     sizes:          sizesArr,
     price:          p.price,
-    comparePrice:   p.compare_price ?? undefined,
+    comparePrice:   p.comparePrice ?? p.compare_price ?? undefined,
     cost:           p.cost ?? undefined,
     stock:          p.stock,
     hsn:            p.hsn ?? "",
     gst:            p.gst ?? 5,
     description:    p.description ?? "",
-    seoTitle:       p.seo_title ?? "",
-    seoDescription: p.seo_description ?? "",
+    seoTitle:       p.seoTitle ?? p.seo_title ?? "",
+    seoDescription: p.seoDescription ?? p.seo_description ?? "",
     featured:       p.featured ?? false,
-    newArrival:     p.new_arrival ?? false,
-    bestSeller:     p.best_seller ?? false,
+    newArrival:     p.newArrival ?? p.new_arrival ?? false,
+    bestSeller:     p.bestSeller ?? p.best_seller ?? false,
     active:         p.active ?? true,
     isSizeManaged:  (p as { is_size_managed?: boolean }).is_size_managed ?? false,
     images:         normalizeImages(p.images),
     createdAt:      p.created_at,
     updatedAt:      p.updated_at,
-    category_id:    p.category_id ?? null,
-    subcategory_id: p.subcategory_id ?? null,
-    collection_id:  p.collection_id ?? null,
-    size_chart_id:  p.size_chart_id ?? null,
-    attr_fabric_id:   p.attr_fabric_id ?? null,
-    attr_color_id:    p.attr_color_id ?? null,
-    attr_occasion_id: p.attr_occasion_id ?? null,
-    attr_pattern_id:  p.attr_pattern_id ?? null,
-    attr_fit_id:      p.attr_fit_id ?? null,
-    attr_sleeve_id:   p.attr_sleeve_id ?? null,
-    attr_neck_id:     p.attr_neck_id ?? null,
-    attr_work_id:     p.attr_work_id ?? null,
-    attr_length_id:   p.attr_length_id ?? null,
+    category_id:    p.categoryId ?? p.category_id ?? null,
+    subcategory_id: p.subcategoryId ?? p.subcategory_id ?? null,
+    collection_id:  p.collectionId ?? p.collection_id ?? null,
+    size_chart_id:  p.sizeChartId ?? p.size_chart_id ?? null,
+    attr_fabric_id:   p.attrFabricId ?? p.attr_fabric_id ?? null,
+    attr_color_id:    p.attrColorId ?? p.attr_color_id ?? null,
+    attr_occasion_id: p.attrOccasionId ?? p.attr_occasion_id ?? null,
+    attr_pattern_id:  p.attrPatternId ?? p.attr_pattern_id ?? null,
+    attr_fit_id:      p.attrFitId ?? p.attr_fit_id ?? null,
+    attr_sleeve_id:   p.attrSleeveId ?? p.attr_sleeve_id ?? null,
+    attr_neck_id:     p.attrNeckId ?? p.attr_neck_id ?? null,
+    attr_work_id:     p.attrWorkId ?? p.attr_work_id ?? null,
+    attr_length_id:   p.attrLengthId ?? p.attr_length_id ?? null,
     specifications:   p.specifications ?? null,
   };
 }
@@ -1165,7 +1197,10 @@ export default function ProductManagement() {
     return done;
   }, [form]);
 
-  function buildPayload(publishNow: boolean): ApiProductPayload {
+  /** Build a payload from an arbitrary form snapshot, so the pre-edit baseline
+   *  can be produced the same way as the current one and the two compared. */
+  function buildPayloadFrom(src: ProductFormState, publishNow: boolean): ApiProductPayload {
+    const form = src;
     const sizesArr = form.sizes.split(",").map((s) => s.trim()).filter(Boolean);
     return {
       name:           form.name,
@@ -1219,6 +1254,10 @@ export default function ProductManagement() {
     };
   }
 
+  function buildPayload(publishNow: boolean): ApiProductPayload {
+    return buildPayloadFrom(form, publishNow);
+  }
+
   // ── Save ───────────────────────────────────────────────────────────────────
 
   const handleSave = useCallback(async (publishNow = false) => {
@@ -1263,7 +1302,38 @@ export default function ProductManagement() {
     if (publishNow) setIsPublishing(true); else setIsSaving(true);
 
     try {
-      const payload = buildPayload(publishNow);
+      const fullPayload = buildPayload(publishNow);
+
+      /*
+       * ON UPDATE, SEND ONLY WHAT CHANGED.
+       *
+       * The server applies `if (key in payload) updateRow[col] = payload[key]`,
+       * so any key present in the request is written — including a blank one.
+       * Sending the whole form on every edit therefore means a single bad field
+       * mapping silently erases stored data, which is exactly what happened:
+       * the form read snake_case keys the API never returns, so SEO copy,
+       * compare-at price, the flags and all nine attribute ids were rewritten
+       * as empty on every save.
+       *
+       * That mapping is fixed, but sending a diff removes the whole class of
+       * bug — an untouched field is now absent from the request, so the server
+       * cannot overwrite it however the form behaved.
+       *
+       * `id` is always included; the route needs it. Create still sends
+       * everything, since there is nothing to diff against.
+       */
+      const baseline = initialFormRef.current;
+      const payload =
+        editProduct && baseline
+          ? (Object.fromEntries(
+              Object.entries(fullPayload).filter(([key, value]) => {
+                if (key === 'id') return true;
+                const before = (buildPayloadFrom(baseline, publishNow) as Record<string, unknown>)[key];
+                return JSON.stringify(value) !== JSON.stringify(before);
+              })
+            ) as typeof fullPayload)
+          : fullPayload;
+
       // FIX: was "edit" — not assignable to 'create' | 'update' union in logAdminSavePayload
       logAdminSavePayload(editProduct ? "update" : "create", payload, editProduct?.id);
 
