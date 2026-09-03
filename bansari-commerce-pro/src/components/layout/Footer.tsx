@@ -23,6 +23,7 @@ const TRAILING_SHOP_LINKS = [
 
 const POLICY_LINKS = [
   { label: "About Us",               href: "/about" },
+  { label: "Guides",                 href: "/guides" },
   { label: "Contact Us",             href: "/contact" },
   { label: "FAQ",                    href: "/faq" },
   { label: "Shipping Policy",        href: "/shipping-policy" },
