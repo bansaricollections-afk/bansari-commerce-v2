@@ -421,6 +421,17 @@ export default function HeaderClient({
       />
 
       <style>{`
+        /*
+         * Nav labels never wrap.
+         *
+         * Adding Guides made six items, and at 1024px "New Arrivals" broke onto
+         * a second line — the row grew to 38px while its neighbours stayed at
+         * 21px, so the whole header looked misaligned. A two-word label should
+         * take more width, not more height.
+         */
+        .bc-nav-link {
+          white-space: nowrap;
+        }
         .bc-nav-link:hover {
           color: var(--bc-brand-mauve) !important;
           border-bottom-color: var(--bc-brand-mauve) !important;
