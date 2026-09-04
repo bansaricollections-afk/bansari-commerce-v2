@@ -10,14 +10,32 @@ export const guide: Guide = {
   category: 'Occasion',
   excerpt:
     'Nine nights, nine outfits, and a dance floor. A practical guide to dressing for Navratri in Gujarat without overheating.',
+
+  /* #43 — Gujarati mirror work, the vocabulary of a garba ground. */
+  hero: {
+    productId: 43,
+    imageIndex: 0,
+    alt: 'A lime yellow cotton kurta set with Gujarati mirror work, palazzo and dupatta, cut with the flare needed for garba',
+  },
+
   body: [
     {
       type: 'p',
-      text: 'Navratri asks more of an outfit than almost any other festival. You are on your feet for hours, often outdoors, frequently dancing, and the same clothes have to carry you from an evening aarti to a garba ground that does not empty until well past midnight. In Gujarat, where the festival is at its most intense, the practical question is rarely "what looks festive" — it is "what will still feel wearable at 1am".',
+      text: 'Navratri asks more of an outfit than almost any other festival. You are on your feet for hours, often outdoors, frequently dancing, and the same clothes have to carry you from an evening aarti to a garba ground that does not empty until well past midnight. In Gujarat, where the festival is at its most intense, the practical question is rarely "what looks festive" — it is ==what will still feel wearable at 1am==.',
     },
     {
       type: 'p',
       text: 'This guide is about the outfits that actually survive that. Not the heaviest lehenga in the shop, but the pieces you will be glad of on night six.',
+    },
+
+    {
+      type: 'keyTakeaway',
+      items: [
+        '**Cotton over synthetics** — polyester traps heat in a crowd; cotton moves it away.',
+        'Anarkali, A-line and palazzo cuts. **Movement is the constraint**, not the embroidery.',
+        'Four or five pieces cover nine nights if the dupatta does the work.',
+        'Buy early — **larger sizes on popular sets sell out first**.',
+      ],
     },
 
     { type: 'h2', text: 'Why cotton earns its place during Navratri' },
@@ -50,6 +68,18 @@ export const guide: Guide = {
     {
       type: 'p',
       text: 'What tends not to work: narrow straight-cut kurtas that restrict the stride, and anything with a hem long enough to catch underfoot in a crowd.',
+    },
+
+    {
+      type: 'figure',
+      productId: 43,
+      imageIndex: 1,
+      secondImageIndex: 3,
+      width: 'wide',
+      alt: 'Lime yellow mirror work kurta set with palazzo, showing the flare through the skirt',
+      secondAlt: 'The same set from the side, showing how the palazzo moves',
+      caption:
+        'Mirror work and a palazzo — festive enough for the ground, light enough for the sixth night.',
     },
 
     { type: 'h2', text: 'Planning nine nights without buying nine outfits' },
@@ -88,7 +118,35 @@ export const guide: Guide = {
         'Armhole and sleeve — raise your arms fully. Garba involves a great deal of that, and a set that pinches in the fitting room will be unbearable by the third song.',
         'Hem length against the shoes you will actually wear, not the ones you tried it on with.',
         'Whether the embroidery sits flat. Raised, beaded work can catch and scratch during close dancing.',
-        'How it washes. You will be washing this more than once during the festival — see our guide on washing cotton kurtas without shrinking them.',
+        'How it washes. You will be washing this more than once during the festival — see our guide on [washing cotton kurtas without shrinking them](/guides/wash-cotton-kurta-without-shrinking).',
+      ],
+    },
+
+    {
+      type: 'productInline',
+      productId: 42,
+      blurb: 'Mustard mirror work with palazzo — the same idea in a warmer shade.',
+    },
+
+    {
+      type: 'faq',
+      items: [
+        {
+          q: 'How many outfits do I actually need for Navratri?',
+          a: 'Four or five pieces that recombine will cover nine nights comfortably. Changing the dupatta changes the outfit far more than most people expect.',
+        },
+        {
+          q: 'Is cotton festive enough for garba?',
+          a: 'Yes — mirror work, gota and embroidery all read as festive on cotton. What reads as "not festive" is usually plain fabric, not the fibre itself.',
+        },
+        {
+          q: 'Do I have to follow the nine-colour tradition?',
+          a: 'Only if the people you dance with observe it. If you want to follow it cheaply, keep the kurta neutral and let the dupatta carry the colour.',
+        },
+        {
+          q: 'When should I buy?',
+          a: 'Well before the fortnight leading up to the festival. Middle sizes empty first, and larger sizes on popular pieces sell out earliest because fewer are made.',
+        },
       ],
     },
 

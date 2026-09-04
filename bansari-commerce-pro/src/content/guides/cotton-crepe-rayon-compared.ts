@@ -10,10 +10,28 @@ export const guide: Guide = {
   category: 'Fabric & Care',
   excerpt:
     'Three fabrics that look similar on a listing and behave nothing alike after ten washes.',
+
+  /* #22 — natural crepe, the least familiar of the three to most buyers. */
+  hero: {
+    productId: 22,
+    imageIndex: 0,
+    alt: 'A royal blue natural crepe printed kurta and palazzo set, showing crepe’s fluid drape and crease resistance',
+  },
+
   body: [
     {
       type: 'p',
-      text: 'Cotton, crepe and rayon appear constantly in ethnic wear listings, often at similar prices, and the description rarely explains how differently they behave. The gap shows up after a season of wear rather than in the shop.',
+      text: 'Cotton, crepe and rayon appear constantly in ethnic wear listings, often at similar prices, and the description rarely explains how differently they behave. ==The gap shows up after a season of wear rather than in the shop.==',
+    },
+
+    {
+      type: 'keyTakeaway',
+      items: [
+        '**Cotton** — breathable and durable. The default for anything worn often.',
+        '**Crepe** — beautiful drape, resists creasing, but usually synthetic and warm.',
+        '**Rayon** — soft and cheap, but **weak when wet** and the first to pill.',
+        'Judge on **cost per wear**, not price. A ₹1,800 cotton set worn fifty times beats a ₹1,200 rayon one worn eight.',
+      ],
     },
 
     { type: 'h2', text: 'Cotton' },
@@ -43,7 +61,19 @@ export const guide: Guide = {
     },
     {
       type: 'p',
-      text: 'Crepe is a good choice for occasion wear where drape matters and the garment is worn for a few hours. It is a poor choice for a full day in the heat.',
+      text: 'Crepe is a good choice for occasion wear where drape matters and the garment is worn for a few hours. **It is a poor choice for a full day in the heat.**',
+    },
+
+    {
+      type: 'figure',
+      productId: 21,
+      imageIndex: 0,
+      secondImageIndex: 3,
+      width: 'wide',
+      alt: 'A black natural crepe printed kurta and pant set, showing how crepe falls in smooth unbroken lines',
+      secondAlt: 'The same crepe set from another angle, where the fabric’s grainy texture is visible',
+      caption:
+        'Crepe hangs in smooth lines and resists creasing — which is exactly why it does not breathe like cotton.',
     },
 
     { type: 'h2', text: 'Rayon (viscose)' },
@@ -60,7 +90,13 @@ export const guide: Guide = {
     },
     {
       type: 'note',
-      text: 'Rayon is the fabric most likely to look excellent in a photograph and disappointing after ten washes. Hand wash it cold and never wring it.',
+      text: 'Rayon looks excellent in a photograph and disappointing after ten washes.',
+    },
+
+    {
+      type: 'productInline',
+      productId: 2,
+      blurb: 'Pure rayon with hand Chikankari — soft handle, and worth hand washing cold.',
     },
 
     { type: 'h2', text: 'Choosing between them' },
@@ -70,7 +106,29 @@ export const guide: Guide = {
     },
     {
       type: 'p',
-      text: 'Cost per wear, rather than price, is the useful measure. A ₹1,800 cotton set worn fifty times is cheaper than a ₹1,200 rayon set worn eight.',
+      text: '==Cost per wear, rather than price, is the useful measure.== A ₹1,800 cotton set worn fifty times is cheaper than a ₹1,200 rayon set worn eight. The same logic applies to [cotton against linen](/guides/cotton-vs-linen-kurtas-gujarat-summers).',
+    },
+
+    {
+      type: 'faq',
+      items: [
+        {
+          q: 'Is crepe a natural fabric?',
+          a: 'Crepe describes a crimped texture, not a fibre. It can be silk, polyester or a blend — most affordable ethnic-wear crepe is synthetic.',
+        },
+        {
+          q: 'Is rayon the same as cotton?',
+          a: 'No. Rayon is semi-synthetic, manufactured from processed cellulose. It shares cotton’s soft handle but not its strength, and it is significantly weaker when wet.',
+        },
+        {
+          q: 'Which of the three is coolest in summer?',
+          a: 'Cotton, clearly. It breathes and absorbs moisture. Crepe is usually synthetic and traps heat; rayon sits between the two.',
+        },
+        {
+          q: 'Which lasts longest?',
+          a: 'Cotton, by a wide margin, provided it is washed cold and line dried. Rayon is typically the first to pill and thin.',
+        },
+      ],
     },
 
     {

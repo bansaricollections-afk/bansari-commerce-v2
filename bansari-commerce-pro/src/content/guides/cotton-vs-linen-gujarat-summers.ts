@@ -10,10 +10,28 @@ export const guide: Guide = {
   category: 'Fabric & Care',
   excerpt:
     'Both breathe. They behave very differently in humidity, in the wash, and after a year of wear.',
+
+  /* #33 — pure linen, so the hero shows the fabric the article argues about. */
+  hero: {
+    productId: 33,
+    imageIndex: 0,
+    alt: 'A mustard pure linen printed kurta set with dupatta, showing linen’s characteristic texture and looser drape',
+  },
+
   body: [
     {
       type: 'p',
-      text: 'Cotton and linen get grouped together as "the breathable ones", which is true and not very useful. In a Gujarat summer — long, dry heat through May, then humidity once the monsoon arrives — they behave differently enough that the choice is worth making deliberately.',
+      text: 'Cotton and linen get grouped together as "the breathable ones", which is true and not very useful. In a Gujarat summer — long, dry heat through May, then humidity once the monsoon arrives — ==they behave differently enough that the choice is worth making deliberately==.',
+    },
+
+    {
+      type: 'keyTakeaway',
+      items: [
+        '**Linen wins in dry heat** — it holds itself off the skin and lets air through.',
+        '**Cotton wins in humidity** — it absorbs moisture instead of letting it sit.',
+        'Linen creases within minutes of sitting down. That never changes.',
+        'Cotton holds print and embroidery more crisply, and costs less to replace.',
+      ],
     },
 
     { type: 'h2', text: 'How each handles heat' },
@@ -29,7 +47,7 @@ export const guide: Guide = {
     { type: 'h2', text: 'The wrinkle question' },
     {
       type: 'p',
-      text: 'Linen creases, and it creases within minutes of sitting down. This is a property of the fibre, not a defect, and no amount of ironing prevents it recurring. If crumpled linen reads as relaxed to you, it is a non-issue. If it reads as untidy, linen will irritate you daily.',
+      text: 'Linen creases, and it creases within minutes of sitting down. ==This is a property of the fibre, not a defect==, and no amount of ironing prevents it recurring. If crumpled linen reads as relaxed to you, it is a non-issue. If it reads as untidy, linen will irritate you daily.',
     },
     {
       type: 'p',
@@ -37,7 +55,20 @@ export const guide: Guide = {
     },
     {
       type: 'note',
-      text: 'A simple test: sit on the fabric in the shop for thirty seconds and stand up. What you see is what you will see at 4pm.',
+      text: 'Sit on the fabric for thirty seconds and stand up. What you see is what you will see at 4pm.',
+    },
+
+    {
+      type: 'figure',
+      productId: 14,
+      imageIndex: 0,
+      secondImageIndex: 2,
+      width: 'wide',
+      alt: 'A beige pure linen patchwork kurta and palazzo set, showing linen’s open weave and relaxed fall',
+      secondAlt:
+        'The same linen set from another angle, where the fabric’s texture and natural creasing are visible',
+      caption:
+        'Linen, photographed honestly — the texture that makes it desirable is the same texture that creases.',
     },
 
     { type: 'h2', text: 'Wear and washing' },
@@ -58,7 +89,35 @@ export const guide: Guide = {
     },
     {
       type: 'p',
-      text: 'Choose linen when you want the drape and the texture, you are mostly in dry heat, and creasing does not bother you. A linen co-ord set is a genuinely different look from a cotton one, not just a different price.',
+      text: 'Choose linen when you want the drape and the texture, you are mostly in dry heat, and creasing does not bother you. **A linen co-ord set is a genuinely different look from a cotton one**, not just a different price.',
+    },
+
+    {
+      type: 'productInline',
+      productId: 11,
+      blurb: 'Coral pink pure linen, cut as a kurta and palazzo set.',
+    },
+
+    {
+      type: 'faq',
+      items: [
+        {
+          q: 'Which is cooler, cotton or linen?',
+          a: 'Linen in still, dry heat, because its looser weave holds the fabric off the skin. Cotton once the air is humid, because it absorbs moisture rather than letting it sit against you.',
+        },
+        {
+          q: 'Does linen stop creasing after a few washes?',
+          a: 'No. It softens, but creasing is how the fibre behaves and it does not go away. Buy linen only if you are comfortable with that look.',
+        },
+        {
+          q: 'Why is linen more expensive?',
+          a: 'Flax is slower and more labour-intensive to process into yarn than cotton, and the price gap widens at higher quality.',
+        },
+        {
+          q: 'Which lasts longer?',
+          a: 'Linen, generally — it is a stronger fibre and improves with age. Cotton is easier and cheaper to replace, which matters for pieces worn very often.',
+        },
+      ],
     },
 
     {

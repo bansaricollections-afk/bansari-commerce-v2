@@ -10,10 +10,27 @@ export const guide: Guide = {
   category: 'Fit & Size',
   excerpt:
     'The letter on the tag means little. Three measurements and one rule decide whether a kurta fits.',
+
+  hero: {
+    productId: 37,
+    imageIndex: 0,
+    alt: 'A sage green pure cotton kurta set with a yoke design, shown full length so the hem and sleeve length are visible',
+  },
+
   body: [
     {
       type: 'p',
-      text: 'There is no national standard for Indian ethnic wear sizing. An L from one label can differ from an L elsewhere by a full size, and the same label may size a kurta and a co-ord set differently. This is why buying by letter alone produces so many returns.',
+      text: 'There is no national standard for Indian ethnic wear sizing. An L from one label can differ from an L elsewhere by a full size, and the same label may size a kurta and a co-ord set differently. ==This is why buying by letter alone produces so many returns.==',
+    },
+
+    {
+      type: 'keyTakeaway',
+      items: [
+        'Take **three measurements**: bust, waist, hip — plus shoulder-to-hem length.',
+        'Check whether the chart describes **your body or the garment**. They differ by inches.',
+        '**Size to your largest measurement**, then have the rest taken in.',
+        'Between sizes? **Always take the larger.** Ethnic wear takes in easily and lets out badly.',
+      ],
     },
 
     { type: 'h2', text: 'The three measurements' },
@@ -45,7 +62,20 @@ export const guide: Guide = {
     },
     {
       type: 'note',
-      text: 'Size to your largest measurement. A kurta that fits the bust but pulls across the hip will read as too small, however well the top half fits.',
+      text: 'Size to your largest measurement. A kurta that fits the bust but pulls across the hip reads as too small.',
+    },
+
+    {
+      type: 'figure',
+      productId: 36,
+      imageIndex: 0,
+      secondImageIndex: 2,
+      width: 'wide',
+      alt: 'A lavender cotton embroidered kurta set shown full length, where hem length and sleeve length can be judged',
+      secondAlt:
+        'The same lavender set from another angle, showing how the kurta falls through the hip',
+      caption:
+        'Judge length from a full-length photograph, not from the size letter — this is the measurement most people skip.',
     },
 
     { type: 'h2', text: 'When to size up' },
@@ -66,12 +96,40 @@ export const guide: Guide = {
     { type: 'h2', text: 'The alteration most worth making' },
     {
       type: 'p',
-      text: 'Buy for the largest measurement and have the waist taken in. A local tailor will do it for a small fraction of the garment price, and the result fits better than any standard size would. Shortening palazzos to your actual height is the second adjustment worth making almost every time.',
+      text: 'Buy for the largest measurement and have the waist taken in. A local tailor will do it for a small fraction of the garment price, and the result fits better than any standard size would. **Shortening palazzos to your actual height** is the second adjustment worth making almost every time.',
     },
 
     {
+      type: 'faq',
+      items: [
+        {
+          q: 'Should I size up or down if I am between sizes?',
+          a: 'Up, almost always. A kurta can be taken in at the waist cheaply; letting one out is limited by the seam allowance, which on most kurtas is minimal.',
+        },
+        {
+          q: 'Does the size chart describe my body or the garment?',
+          a: 'It varies by listing, and the difference is several inches. If it is not stated, assume it is a body measurement and check the return policy before ordering.',
+        },
+        {
+          q: 'Which measurement matters most?',
+          a: 'Whichever is largest on you. Size to that one and alter the rest. A kurta that fits the bust but pulls at the hip reads as too small.',
+        },
+        {
+          q: 'Do cotton kurtas shrink enough to affect sizing?',
+          a: 'A little on the first wash, which matters if you have sized tightly. Washing cold and line drying prevents most of it — see our [washing guide](/guides/wash-cotton-kurta-without-shrinking).',
+        },
+      ],
+    },
+
+    {
+      /*
+       * Size claim is deliberately specific and matches stock: XXL appears on
+       * 30 of 42 active products, 3XL on 14, 4XL on 4. An earlier version said
+       * "selected pieces to 5XL" — exactly one product carries 5XL, so the
+       * plural was not true.
+       */
       type: 'cta',
-      text: 'Our kurta sets are stocked from S through 3XL, with selected pieces to 5XL.',
+      text: 'Most of our kurta sets run to XXL, many to 3XL, and a few to 4XL.',
       href: '/shop/kurta-sets',
       label: 'Shop kurta sets',
     },

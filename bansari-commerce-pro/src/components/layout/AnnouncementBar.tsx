@@ -26,15 +26,29 @@ export default function AnnouncementBar({
   onDismiss,
   className = "",
 }: AnnouncementBarProps) {
-  const [visible, setVisible] = useState(false);
+  /*
+   * Starts VISIBLE, and hides on mount only if the visitor dismissed it.
+   *
+   * This used to start `false` and flip to `true` in the effect below, so the
+   * bar rendered as nothing on the server and on first paint, then appeared
+   * after hydration and pushed the whole page down — a layout shift on every
+   * first visit. PageSpeed measures precisely that case (fresh session, empty
+   * localStorage) and desktop CLS was 0.332 against a 0.1 budget.
+   *
+   * Inverting it means the common path — a visitor who has not dismissed the
+   * bar — has no shift at all. A returning visitor who dismissed it sees the
+   * bar disappear once on load instead, which is the rarer case and shifts
+   * content upward rather than pushing it down under the cursor.
+   */
+  const [visible, setVisible] = useState(true);
   const [msgIndex, setMsgIndex] = useState(0);
   const [fading, setFading] = useState(false);
 
   useEffect(() => {
     try {
-      if (localStorage.getItem(storageKey) !== "dismissed") setVisible(true);
+      if (localStorage.getItem(storageKey) === "dismissed") setVisible(false);
     } catch {
-      setVisible(true);
+      /* localStorage unavailable (private mode) — leave the bar visible. */
     }
   }, [storageKey]);
 

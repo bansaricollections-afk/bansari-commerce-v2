@@ -10,10 +10,28 @@ export const guide: Guide = {
   category: 'Fit & Size',
   excerpt:
     'Most ethnic wear stops at XL. A practical guide to fit, fabric and cut when you need XXL and above.',
+
+  /* #6 — stocked XL through 4XL, so the cover shows a genuinely larger-size piece. */
+  hero: {
+    productId: 6,
+    imageIndex: 0,
+    alt: 'A maroon pure cotton appliqué work kurta set, stocked from XL through 4XL, shown full length',
+  },
+
   body: [
     {
       type: 'p',
-      text: 'Shopping for ethnic wear above XL involves a familiar sequence. You find something you like, you check the size chart, and the chart stops one size before you need it. Where larger sizes do exist, they are often the same pattern scaled up — longer and wider in every direction at once, which is not how bodies actually differ.',
+      text: 'Shopping for ethnic wear above XL involves a familiar sequence. You find something you like, you check the size chart, and the chart stops one size before you need it. Where larger sizes do exist, they are often ==the same pattern scaled up== — longer and wider in every direction at once, which is not how bodies actually differ.',
+    },
+
+    {
+      type: 'keyTakeaway',
+      items: [
+        '**Ignore the letter.** An XXL from one label can be a full size from another.',
+        'Size to your **largest** measurement, then have the rest taken in.',
+        '**Cotton drapes; stiff synthetics stand away from the body** and look boxy above XL.',
+        'Look for A-line and Anarkali cuts — the fit is decided at the shoulder, where sizing is predictable.',
+      ],
     },
     {
       type: 'p',
@@ -43,7 +61,20 @@ export const guide: Guide = {
     },
     {
       type: 'note',
-      text: 'If you are between sizes, size up. Ethnic wear is far easier to take in than to let out, and most cotton has little give.',
+      text: 'Between sizes, size up. Ethnic wear is far easier to take in than to let out.',
+    },
+
+    {
+      type: 'figure',
+      productId: 7,
+      imageIndex: 0,
+      secondImageIndex: 3,
+      width: 'wide',
+      alt: 'A blue pure cotton embroidered mirror work kurta set, stocked from XL through 4XL',
+      secondAlt:
+        'The same blue kurta set from another angle, showing the armhole and sleeve construction',
+      caption:
+        'Cotton follows the body rather than standing away from it — which matters more, not less, as size increases.',
     },
 
     { type: 'h2', text: 'Why cotton behaves well at larger sizes' },
@@ -63,8 +94,14 @@ export const guide: Guide = {
         'A-line and Anarkali — fitted through the shoulder and released from the bust or waist. Flattering across a wide range of shapes because the fit is decided high up, where sizing is most predictable.',
         'Straight kurtas with side slits — the slit is what stops a straight cut pulling across the hip. Check it starts at or above hip level.',
         'Palazzos over narrow pants — a wider leg balances a fuller upper body and is considerably more comfortable to sit in.',
-        'Set-in sleeves with a generous armhole — the single most common failure point in scaled-up patterns.',
+        'Set-in sleeves with a generous armhole — **the single most common failure point** in scaled-up patterns.',
       ],
+    },
+
+    {
+      type: 'productInline',
+      productId: 20,
+      blurb: 'A printed cotton kurta set with pant and dupatta, stocked XL through 4XL.',
     },
     {
       type: 'p',
@@ -82,13 +119,40 @@ export const guide: Guide = {
         'A real measurement chart in inches or centimetres — not just letters.',
         'Whether the measurement is the garment or the body. A "42 inch" kurta might mean the garment measures 42 inches, or that it fits a 42 inch bust. These are very different.',
         'The model\'s height and the size worn, so you can judge length against your own.',
-        'The return window, and whether it applies to all sizes. Some retailers quietly exclude larger sizes from returns.',
+        'The return window, and whether it applies to all sizes. **Some retailers quietly exclude larger sizes from returns.**',
       ],
     },
 
     {
+      type: 'faq',
+      items: [
+        {
+          q: 'Why does an XXL fit differently from one label to the next?',
+          a: 'Because Indian ethnic wear sizing is not standardised. There is no national specification behind the letter, so each label sets its own. The measurement chart is the only reliable guide.',
+        },
+        {
+          q: 'Which cuts work best above XL?',
+          a: 'A-line and Anarkali, because the fit is decided at the shoulder where sizing is most predictable, and the garment is released below. Straight kurtas work if the side slit starts at or above hip level.',
+        },
+        {
+          q: 'Is cotton a good choice at larger sizes?',
+          a: 'Yes, and more so than at smaller ones. Stiff synthetics hold their own shape and read boxy; cotton falls with the body. It also breathes, which matters through a Gujarat summer.',
+        },
+        {
+          q: 'Should I expect to get alterations done?',
+          a: 'Often, and it is standard practice rather than a compromise. Buy for your largest measurement and have the waist taken in — a tailor will do it for a small fraction of the garment price.',
+        },
+      ],
+    },
+
+    {
+      /*
+       * Matches actual stock: XXL on 30 of 42 active products, 3XL on 14,
+       * 4XL on 4. The previous claim of "selected pieces to 5XL" overstated
+       * it — exactly one product carries 5XL.
+       */
       type: 'cta',
-      text: 'Most of our cotton kurta sets are stocked in XXL and 3XL, with selected pieces to 5XL.',
+      text: 'Most of our cotton kurta sets are stocked in XXL, many in 3XL, and a few run to 4XL.',
       href: '/shop/cotton-kurta-sets',
       label: 'Shop cotton kurta sets',
     },

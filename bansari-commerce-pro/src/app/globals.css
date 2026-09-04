@@ -455,6 +455,83 @@ img { display: block; max-width: 100%; }
 
 .bc-rule--wide { width: 5rem; }
 
+/* ── Guide article prose ──────────────────────────────────────────────────
+ * Long-form reading, which the rest of the site does not do anywhere else.
+ *
+ * MEASURE: capped in `ch`, not px. The guides previously used max-w-2xl
+ * (672px) at 15px, giving ~85-95 characters per line — well past the 60-75
+ * that is comfortable to read, and the main reason the articles felt like a
+ * wall of text. `ch` holds the right measure even as the fluid type scale
+ * changes the font size across breakpoints, which a px cap cannot.
+ */
+.bc-guide-prose {
+  max-width: 68ch;
+  /*
+   * Centred, and not only for looks: `.bc-guide-breakout` centres itself on
+   * this column via left:50%/translateX(-50%). With the column left-aligned,
+   * a breakout wider than the column hangs off the left edge of the viewport
+   * and is clipped. Centring the column puts the breakout's centre on the
+   * page's centre, where it belongs.
+   */
+  margin-inline: auto;
+}
+
+/*
+ * BREAKOUT: lets a figure or pull quote escape the measure and run to the full
+ * content width. This is the core magazine device — a body column that never
+ * varies reads as a document; one that opens up for an image and closes again
+ * reads as a spread.
+ *
+ * Centre-and-translate rather than negative-margin arithmetic. An earlier
+ * version computed the offset from the `68ch` measure, which is wrong inside a
+ * pull quote: `ch` resolves against the ELEMENT's own font-size, and the quote
+ * is set at 48px, so `68ch` there is roughly three times the body's. This
+ * approach needs no knowledge of the measure at all.
+ *
+ * `92vw` (not 100vw) leaves a gutter and avoids the scrollbar-width overflow
+ * that full-viewport breakouts classically cause.
+ */
+@media (min-width: 1024px) {
+  .bc-guide-breakout {
+    position: relative;
+    left: 50%;
+    transform: translateX(-50%);
+    width: min(var(--bc-wide), 92vw);
+    max-width: none;
+  }
+}
+
+/* Slightly larger, lighter opening paragraph — an editorial way in. */
+.bc-guide-lead {
+  font-size: var(--bc-lg);
+  line-height: 1.5;
+  color: var(--bc-text-rich);
+}
+
+/*
+ * Drop cap. Large enough to anchor the column (roughly four lines deep), set
+ * in Playfair against the mauve brand colour so it reads as an ornament rather
+ * than an oversized letter.
+ */
+.bc-guide-lead::first-letter {
+  float: left;
+  font-family: var(--font-playfair), 'Playfair Display', Georgia, serif;
+  font-size: 4.1em;
+  line-height: 0.78;
+  padding-right: 0.07em;
+  margin-top: 0.04em;
+  color: var(--bc-brand-mauve);
+}
+
+/* The opening line carries small caps for one line — a print convention. */
+.bc-guide-lead::first-line {
+  font-variant-caps: small-caps;
+  letter-spacing: 0.03em;
+}
+
+/* Remove the default disclosure triangle in Safari/WebKit. */
+.bc-guide-prose summary::-webkit-details-marker { display: none; }
+
 /* ── Luxury animations ── */
 @keyframes bc-fade-up {
   from { opacity: 0; transform: translateY(28px); }

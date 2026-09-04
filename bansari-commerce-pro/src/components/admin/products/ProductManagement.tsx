@@ -989,6 +989,8 @@ export default function ProductManagement() {
       setUploadingImages(true);
       try {
         const uploaded: ProductImage[] = [];
+        /** Storage paths of newly uploaded stills, for WebP variant generation. */
+        const uploadedKeys: string[] = [];
         let savedBytes = 0;
 
         for (const original of valid) {
@@ -1005,6 +1007,8 @@ export default function ProductManagement() {
           const path = buildStoragePath(file);
           const { error } = await supabase.storage.from(PRODUCT_IMAGES_BUCKET).upload(path, file, { upsert: false });
           if (error) { toast.error(`Upload failed: ${error.message}`); continue; }
+          // Collected for variant generation below — videos are excluded there.
+          if (!isVideoFile) uploadedKeys.push(path);
           const { data: { publicUrl } } = supabase.storage.from(PRODUCT_IMAGES_BUCKET).getPublicUrl(path);
           // mediaType is what ProductGallery switches on to render a <video>
           // instead of next/image. Without it the clip would be handed to the
@@ -1017,6 +1021,38 @@ export default function ProductManagement() {
               : {}),
           });
         }
+        /*
+         * Generate the responsive WebP variants the image loader depends on.
+         *
+         * This is REQUIRED, not an optimisation. next.config.ts uses a custom
+         * loader that rewrites every product-image URL to `-w<WIDTH>.webp`.
+         * The loader is a pure URL transform and cannot check whether the file
+         * exists, so an image uploaded without variants renders as a broken
+         * image everywhere it appears.
+         *
+         * Failure is surfaced but does not block the upload: the row is
+         * already saved, and the backfill script can repair coverage. A silent
+         * catch here would leave broken images with no indication why.
+         */
+        if (uploadedKeys.length > 0) {
+          try {
+            const res = await fetch("/api/admin/images/variants", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ keys: uploadedKeys }),
+            });
+            if (!res.ok) {
+              toast.error(
+                "Images uploaded, but resized versions failed to generate — they may not display correctly."
+              );
+            }
+          } catch {
+            toast.error(
+              "Images uploaded, but resized versions failed to generate — they may not display correctly."
+            );
+          }
+        }
+
         if (uploaded.length > 0) {
           setForm((prev) => ({ ...prev, images: [...prev.images, ...uploaded] }));
           setImagePreviews((prev) => [...prev, ...uploaded.map((u) => u.url)]);

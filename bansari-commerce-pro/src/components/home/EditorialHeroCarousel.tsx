@@ -122,6 +122,15 @@ export default function EditorialHeroCarousel({ slides }: { slides: HeroSlide[] 
             alt={s.imageAlt}
             fill
             priority={i === 0}
+            /*
+             * PageSpeed identified this carousel's first slide as the LCP
+             * element and flagged that no `fetchpriority=high` was present —
+             * `priority` alone produced an eager <img> and a preload, but the
+             * browser still had no signal to fetch it ahead of the other ~130
+             * images on the page. Set explicitly rather than relying on
+             * `priority` to imply it.
+             */
+            fetchPriority={i === 0 ? 'high' : 'auto'}
             sizes="100vw"
             style={{
               objectFit: "cover",

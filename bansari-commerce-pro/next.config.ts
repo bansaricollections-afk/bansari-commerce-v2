@@ -116,8 +116,31 @@ const nextConfig: NextConfig = {
      * unoptimized serving is entirely reasonable and this whole problem
      * disappears.
      */
-    unoptimized: true,
-    minimumCacheTTL: 2678400, // 31 days
+    /*
+     * ─────────────────────────────────────────────────────────────────────
+     * RESOLVED — `unoptimized` removed, replaced by a custom loader.
+     * ─────────────────────────────────────────────────────────────────────
+     *
+     * The emergency above is over, but NOT because the quota came back — it
+     * has not. Verified 2026-09-04: /_next/image at w=1080 still returns
+     * 402 OPTIMIZED_IMAGE_REQUEST_PAYMENT_REQUIRED, while w=640 returns 200
+     * only because that variant was cached before the quota ran out.
+     *
+     * Instead, `loader: 'custom'` makes next/image build its srcset from
+     * src/lib/image-loader.ts, which points DIRECTLY at pre-generated WebP
+     * variants in Supabase storage. Nothing is routed through /_next/image,
+     * so no billable transformation is ever requested. This is free on the
+     * Hobby plan and is the same delivery model Shopify gives the comparison
+     * sites: one master image, several widths, WebP, long cache.
+     *
+     * Variants are produced by scripts/generate-webp-variants.js and uploaded
+     * with a one-year cacheControl. Coverage was verified at 933/933 files
+     * (311 referenced images x 3 widths) BEFORE this was switched on — the
+     * loader must never be able to request a file that does not exist.
+     */
+    loader: 'custom',
+    loaderFile: './src/lib/image-loader.ts',
+    minimumCacheTTL: 2678400, // 31 days — inert with a custom loader, kept for reference
     /*
      * REVERTED to the original width lists — do not narrow these again while
      * the transformation quota is exhausted.
@@ -140,8 +163,26 @@ const nextConfig: NextConfig = {
      *   - qualities [75] matches the default the URLs already used.
      *   - formats webp matches the Next default.
      */
-    deviceSizes: [375, 640, 750, 828, 1080, 1200, 1920, 2048, 3840],
-    imageSizes: [16, 32, 48, 64, 96, 128, 256, 384],
+    /*
+     * Narrowed to exactly the widths that exist as generated variants.
+     *
+     * The long comment above warns that narrowing these invalidates the warm
+     * optimiser cache. That warning applied to Vercel's optimiser, where every
+     * cached variant is keyed by width. With `loader: 'custom'` there is no
+     * Vercel cache to invalidate — the loader maps whatever width next/image
+     * asks for onto the nearest generated variant — so narrowing is now both
+     * safe and correct.
+     *
+     * Keeping the old nine widths would emit nine srcset entries per image
+     * that all collapse onto three real files: larger HTML for no benefit.
+     *
+     * `imageSizes` supplies 400 and `deviceSizes` the two larger widths. They
+     * are kept disjoint on purpose: listing 400 in both emitted a duplicate
+     * `400w` candidate in every srcset — harmless to the browser, but ~100
+     * wasted bytes per image across ~130 images on the homepage.
+     */
+    deviceSizes: [800, 1200],
+    imageSizes: [400],
     qualities: [75],
     // One format, not two. Serving both AVIF and WebP doubles the
     // transformations for every image to save a few KB per request.
