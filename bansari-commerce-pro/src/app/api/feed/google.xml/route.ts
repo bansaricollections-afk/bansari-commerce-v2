@@ -53,6 +53,19 @@ export async function GET() {
         `<g:price>${escapeXml(formatPrice(item.price))}</g:price>`,
         `<g:brand>${escapeXml(item.brand)}</g:brand>`,
         `<g:google_product_category>${escapeXml(item.googleProductCategory)}</g:google_product_category>`,
+        /*
+         * REQUIRED for apparel. Merchant Center disapproves every clothing
+         * item that omits gender or age_group — the whole feed was being
+         * rejected on this alone.
+         *
+         * Hardcoded because the catalogue is exclusively womenswear; there is
+         * no menswear or childrenswear column to read, so inventing a lookup
+         * would be more fragile than the constant. If the range ever widens,
+         * these must become per-product fields rather than staying silently
+         * wrong.
+         */
+        `<g:gender>female</g:gender>`,
+        `<g:age_group>adult</g:age_group>`,
       ];
 
       for (const url of item.additionalImageLinks) {
@@ -86,13 +99,40 @@ export async function GET() {
         parts.push(`<g:identifier_exists>no</g:identifier_exists>`);
       }
 
-      // One entry per product, so sizes are declared together rather than
-      // split into variants keyed on ids the pixel never reports.
-      for (const size of item.sizes) {
-        parts.push(`<g:size>${escapeXml(size)}</g:size>`);
+      /*
+       * ONE ITEM PER SIZE, linked by item_group_id.
+       *
+       * This previously emitted several <g:size> elements inside a single
+       * item, on the reasoning that one entry per product keeps ids matching
+       * what the Meta pixel reports. Google does not accept that shape: an
+       * apparel item carries exactly ONE size, and variants of the same
+       * garment are separate items joined by `item_group_id`. Sending repeated
+       * sizes meant every item was malformed.
+       *
+       * The pixel concern still holds, but it belongs to the Meta feed, which
+       * is generated separately (api/feed/meta.xml) and still emits one entry
+       * per product under the bare product id. So Google gets the structure it
+       * requires without changing what the pixel matches on.
+       *
+       * A product with no size list still produces a single item, unchanged.
+       */
+      if (item.sizes.length === 0) {
+        return `    <item>\n      ${parts.join('\n      ')}\n    </item>`;
       }
 
-      return `    <item>\n      ${parts.join('\n      ')}\n    </item>`;
+      return item.sizes
+        .map((size) => {
+          const variant = [
+            // Variant id must be unique and stable; the group id ties them back
+            // to one product so Shopping shows a single listing with sizes.
+            `<g:id>${escapeXml(`${item.id}-${size}`)}</g:id>`,
+            `<g:item_group_id>${escapeXml(item.id)}</g:item_group_id>`,
+            ...parts.slice(1),
+            `<g:size>${escapeXml(size)}</g:size>`,
+          ];
+          return `    <item>\n      ${variant.join('\n      ')}\n    </item>`;
+        })
+        .join('\n');
     })
     .join('\n');
 
