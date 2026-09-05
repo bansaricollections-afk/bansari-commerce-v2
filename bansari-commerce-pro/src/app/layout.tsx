@@ -5,6 +5,7 @@ import MetaPixel from '@/analytics/meta-pixel';
 import AttributionCapture from '@/analytics/attribution-capture';
 import GoogleTag from '@/analytics/google-tag';
 import ConsentNotice from '@/components/consent/ConsentNotice';
+import { jsonLd } from '@/lib/json-ld';
 import './globals.css';
 
 /**
@@ -203,19 +204,19 @@ export default function RootLayout({
         <script
           type="application/ld+json"
           dangerouslySetInnerHTML={{
-            __html: JSON.stringify(organizationSchema),
+            __html: jsonLd(organizationSchema),
           }}
         />
         <script
           type="application/ld+json"
           dangerouslySetInnerHTML={{
-            __html: JSON.stringify(localBusinessSchema),
+            __html: jsonLd(localBusinessSchema),
           }}
         />
         <script
           type="application/ld+json"
           dangerouslySetInnerHTML={{
-            __html: JSON.stringify(websiteSchema),
+            __html: jsonLd(websiteSchema),
           }}
         />
       </head>

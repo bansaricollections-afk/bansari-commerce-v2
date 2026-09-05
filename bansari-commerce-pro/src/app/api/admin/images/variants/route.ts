@@ -3,6 +3,7 @@ import sharp from 'sharp';
 
 import { requireAdminSession } from '@/lib/auth/requireAdmin';
 import { createServiceRoleClient } from '@/lib/supabase/service';
+import { detectImageType } from '@/lib/image-signature';
 
 /**
  * Generate responsive WebP variants for a freshly uploaded product image.
@@ -83,6 +84,19 @@ export async function POST(request: NextRequest) {
     if (dErr || !blob) { failed.push(rawKey); continue; }
 
     const src = Buffer.from(await blob.arrayBuffer());
+
+    /*
+     * Confirm the stored object really is an image before handing it to sharp.
+     * Product images are uploaded straight from the browser to Supabase, so the
+     * only type check on that path is the client's own — this is the first
+     * server-side look at the actual bytes. sharp is a native library; feeding
+     * it arbitrary attacker-supplied data is exactly the shape of the libvips
+     * CVEs patched in this same batch.
+     */
+    if (!detectImageType(new Uint8Array(src.subarray(0, 32)))) {
+      failed.push(rawKey);
+      continue;
+    }
 
     for (const w of WIDTHS) {
       try {

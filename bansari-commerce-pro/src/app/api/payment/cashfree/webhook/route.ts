@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 
-import { verifyCashfreeWebhookSignature } from '@/lib/cashfree';
+import {
+  isCashfreeWebhookTimestampFresh,
+  verifyCashfreeWebhookSignature,
+} from '@/lib/cashfree';
 import { verifyAndPersistCashfreeOrder } from '@/lib/cashfree-order';
 import { createLogger } from '@/lib/logger';
 import { generateRequestId } from '@/lib/request-id';
@@ -33,6 +36,19 @@ export async function POST(request: NextRequest) {
   if (!verifyCashfreeWebhookSignature(rawBody, timestamp, signature)) {
     log.warn('cashfree.webhook.signature_invalid');
     return apiError(requestId, 'INVALID_SIGNATURE', 'Invalid webhook signature.', 401);
+  }
+
+  /*
+   * Replay guard. A valid signature proves the payload came from Cashfree but
+   * not WHEN — without this, a captured webhook could be replayed forever.
+   *
+   * Returns 200, not an error: to Cashfree this is a webhook already handled,
+   * and a 4xx would make it retry a delivery we are deliberately discarding.
+   * The 200 also gives a replaying attacker no signal.
+   */
+  if (!isCashfreeWebhookTimestampFresh(timestamp)) {
+    log.warn('cashfree.webhook.stale_timestamp', { timestamp });
+    return NextResponse.json({ success: true, requestId, handled: false }, { status: 200 });
   }
 
   // 2. Now it is safe to parse.

@@ -252,6 +252,50 @@ export async function getCashfreePayments(
  * Compared in constant time. Length-guarded first so timingSafeEqual never
  * throws on a mismatched buffer size.
  */
+/**
+ * How old a webhook may be before it is treated as a replay.
+ *
+ * Deliberately generous. The signature covers the timestamp, so an attacker
+ * cannot forge a fresh one — this only needs to bound how long a CAPTURED
+ * webhook stays useful. 15 minutes absorbs clock skew and provider retry
+ * delays while shrinking the replay window from "forever" to a quarter hour.
+ */
+const WEBHOOK_MAX_AGE_MS = 15 * 60 * 1000;
+
+/**
+ * Is a Cashfree webhook timestamp recent enough to act on?
+ *
+ * WHY THIS IS SEPARATE FROM SIGNATURE VERIFICATION
+ * A valid signature proves the payload came from Cashfree; it says nothing
+ * about WHEN. Without a freshness bound, anyone who captures one valid webhook
+ * can replay it indefinitely. It cannot fabricate a payment — the handler is
+ * idempotent and re-fetches true status from Cashfree — but each replay forces
+ * an outbound API call, which is a cheap denial-of-service against our own
+ * rate budget.
+ *
+ * FAILS OPEN, ON PURPOSE
+ * An unparseable or absent timestamp returns `true` (allow). This is safe
+ * because the timestamp is INSIDE the signed payload: an attacker cannot alter
+ * it without invalidating the signature, so any request reaching this check has
+ * Cashfree's original value. Failing open therefore costs no security, and
+ * avoids taking payments offline if the provider ever changes the format.
+ * Money paths should not break on a defence-in-depth control.
+ *
+ * Accepts seconds or milliseconds — Cashfree documents epoch seconds, but the
+ * magnitude test costs nothing and removes a whole class of unit bug.
+ */
+export function isCashfreeWebhookTimestampFresh(
+  timestamp: string,
+  now: number = Date.now()
+): boolean {
+  const raw = Number(timestamp);
+  if (!Number.isFinite(raw) || raw <= 0) return true; // see FAILS OPEN above
+
+  const ms = raw > 1e12 ? raw : raw * 1000;
+  // Absolute difference, so a clock ahead of ours is bounded too.
+  return Math.abs(now - ms) <= WEBHOOK_MAX_AGE_MS;
+}
+
 export function verifyCashfreeWebhookSignature(
   rawBody: string,
   timestamp: string,

@@ -9,6 +9,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { requireAdminSession } from '@/lib/auth/requireAdmin';
 import { createServiceRoleClient } from '@/lib/supabase/service';
 import { CampaignError } from '@/lib/campaign-errors';
+import { detectImageTypeFromFile } from '@/lib/image-signature';
 
 export const dynamic = 'force-dynamic';
 
@@ -37,9 +38,27 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'File exceeds 50 MB limit' }, { status: 400 });
     }
 
-    const ext = file.name.split('.').pop() ?? 'jpg';
+    /*
+     * Verify the bytes match the claim. `file.type` above is whatever the
+     * client chose to send, so on its own it proves nothing — this is the check
+     * that actually establishes the upload is an image.
+     */
+    const detected = await detectImageTypeFromFile(file);
+    if (!detected || !ALLOWED_TYPES.includes(detected.mime)) {
+      return NextResponse.json(
+        { error: 'File contents are not a supported image (JPEG, PNG, WebP, AVIF).' },
+        { status: 400 }
+      );
+    }
+
+    /*
+     * Extension comes from the DETECTED type, never from `file.name`. The
+     * previous `file.name.split('.').pop()` built the storage key out of an
+     * attacker-influenced string, which is how uploads end up with surprising
+     * extensions and nested paths.
+     */
     const timestamp = Date.now();
-    const path = `campaigns/${variant}/${timestamp}.${ext}`;
+    const path = `campaigns/${variant}/${timestamp}.${detected.ext}`;
 
     const sb = createServiceRoleClient();
     const arrayBuffer = await file.arrayBuffer();
@@ -47,7 +66,9 @@ export async function POST(req: NextRequest) {
 
     const { error: uploadError } = await sb.storage
       .from(BUCKET)
-      .upload(path, buffer, { contentType: file.type, upsert: false });
+      // Detected type, not the declared one — the stored Content-Type is what
+      // browsers act on, so it must reflect the actual bytes.
+      .upload(path, buffer, { contentType: detected.mime, upsert: false });
 
     if (uploadError) throw new CampaignError(uploadError.message, 'INTERNAL');
 

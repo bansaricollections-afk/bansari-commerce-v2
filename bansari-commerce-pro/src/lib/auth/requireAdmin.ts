@@ -132,6 +132,56 @@ export async function requireAdminSession(
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   }
 
-  diagLog('5_result', { outcome: 'PASS', userId: user.id, email: user.email });
+  /*
+   * ── 5. Multi-factor assurance ────────────────────────────────────────────
+   *
+   * THIS IS THE ENFORCEMENT POINT. The login screen asks for a TOTP code, but
+   * a login screen is just a client — anyone can skip it and call the API with
+   * a password-only (AAL1) session. MFA is only real if the server refuses to
+   * act on an AAL1 session, which is what this does.
+   *
+   * Supabase reports two levels:
+   *   currentLevel — what this session has actually achieved
+   *   nextLevel    — the highest the user COULD reach, i.e. 'aal2' once they
+   *                  have at least one verified factor enrolled
+   *
+   * So `nextLevel === 'aal2' && currentLevel !== 'aal2'` means precisely:
+   * "this account has MFA set up and this session has not satisfied it."
+   *
+   * FAILS OPEN BEFORE ENROLMENT, ON PURPOSE. When no factor is enrolled,
+   * nextLevel is 'aal1' and this check passes. That is deliberate — requiring
+   * a factor that does not exist yet would lock the only admin out of the
+   * panel they need in order to enrol. Security arrives when the factor is
+   * added, and from that moment it cannot be skipped.
+   *
+   * A failure to READ the assurance level is treated as a pass rather than a
+   * denial: this runs on every admin request, and a transient Auth outage
+   * should not take the whole admin panel offline. The password and role
+   * checks above have already run, so the floor is never lower than it was
+   * before MFA existed.
+   */
+  try {
+    const { data: aal, error: aalError } =
+      await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
+
+    diagLog('6_mfa', {
+      currentLevel: aal?.currentLevel ?? null,
+      nextLevel: aal?.nextLevel ?? null,
+      error: aalError?.message ?? null,
+    });
+
+    if (!aalError && aal?.nextLevel === 'aal2' && aal.currentLevel !== 'aal2') {
+      diagLog('6_result', { outcome: '403_MFA_REQUIRED', userId: user.id });
+      return NextResponse.json(
+        { error: 'MFA required', code: 'MFA_REQUIRED' },
+        { status: 403 }
+      );
+    }
+  } catch (err) {
+    // See "fails open" above — log loudly, do not deny.
+    diagLog('6_mfa_threw', { message: err instanceof Error ? err.message : String(err) });
+  }
+
+  diagLog('7_result', { outcome: 'PASS', userId: user.id, email: user.email });
   return { userId: user.id, email: user.email ?? '' };
 }

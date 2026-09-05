@@ -8,6 +8,7 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 
 import { guides } from '@/content/guides';
+import { jsonLd } from '@/lib/json-ld';
 
 export const revalidate = 3600;
 
@@ -58,11 +59,11 @@ export default function GuidesIndexPage() {
     <>
       <script
         type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbSchema) }}
+        dangerouslySetInnerHTML={{ __html: jsonLd(breadcrumbSchema) }}
       />
       <script
         type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(listSchema) }}
+        dangerouslySetInnerHTML={{ __html: jsonLd(listSchema) }}
       />
 
       <main className="mx-auto max-w-[1440px] px-5 pb-24 pt-8 md:px-10 lg:px-16">

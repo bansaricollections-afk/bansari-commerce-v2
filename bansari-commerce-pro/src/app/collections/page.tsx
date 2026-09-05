@@ -1,3 +1,4 @@
+import { jsonLd } from '@/lib/json-ld';
 import type { Metadata } from "next";
 import Link from "next/link";
 
@@ -94,7 +95,7 @@ export default async function CollectionsPage() {
         type="application/ld+json"
         suppressHydrationWarning
         dangerouslySetInnerHTML={{
-          __html: JSON.stringify({
+          __html: jsonLd({
             "@context": "https://schema.org",
             "@type": "BreadcrumbList",
             itemListElement: [
@@ -108,7 +109,7 @@ export default async function CollectionsPage() {
         type="application/ld+json"
         suppressHydrationWarning
         dangerouslySetInnerHTML={{
-          __html: JSON.stringify({
+          __html: jsonLd({
             "@context": "https://schema.org",
             "@type": "CollectionPage",
             name: "Collections — Bansari Collections",

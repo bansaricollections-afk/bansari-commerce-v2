@@ -18,6 +18,7 @@ import { Suspense } from 'react';
 import ProductGrid from '@/components/shop/ProductGrid';
 import ProductGridSkeleton from '@/components/shop/ProductGridSkeleton';
 import { getBrowseLandings, findBrowseLanding, type BrowseLanding } from '@/services/browse-landings';
+import { jsonLd } from '@/lib/json-ld';
 
 export const revalidate = 60;
 
@@ -102,11 +103,11 @@ export default async function BrowseLandingPage({ params }: Props) {
     <>
       <script
         type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(collectionSchema) }}
+        dangerouslySetInnerHTML={{ __html: jsonLd(collectionSchema) }}
       />
       <script
         type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbSchema) }}
+        dangerouslySetInnerHTML={{ __html: jsonLd(breadcrumbSchema) }}
       />
 
       <main className="mx-auto max-w-[1440px] px-5 pb-24 pt-8 md:px-10 lg:px-16">

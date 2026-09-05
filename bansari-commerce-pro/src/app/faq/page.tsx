@@ -1,3 +1,4 @@
+import { jsonLd } from '@/lib/json-ld';
 export const metadata = {
   title: 'Frequently Asked Questions',
   description:
@@ -73,7 +74,7 @@ export default function FAQPage() {
     <main className="mx-auto max-w-5xl px-6 py-16">
       <script
         type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(faqSchema) }}
+        dangerouslySetInnerHTML={{ __html: jsonLd(faqSchema) }}
       />
 
       <h1 className="mb-8 text-4xl font-bold">Frequently Asked Questions</h1>

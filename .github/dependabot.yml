@@ -1,0 +1,60 @@
+# Automated dependency scanning.
+#
+# WHY
+# This project reached 13 known vulnerabilities (10 high) before anyone looked,
+# including a Next.js middleware-bypass advisory affecting the exact mechanism
+# that gates /admin. Nothing surfaced it — `npm audit` only runs when someone
+# remembers to type it. Dependabot turns that into a scheduled check that opens
+# a PR instead of relying on memory.
+#
+# GROUPING
+# Patch and minor updates are grouped into one PR per week so routine bumps do
+# not create noise. Major updates are deliberately left ungrouped and separate:
+# this is a modified Next.js (see AGENTS.md) and a major bump needs to be
+# reviewed and tested on its own, never merged alongside anything else.
+version: 2
+
+updates:
+  - package-ecosystem: npm
+    directory: /bansari-commerce-pro
+    schedule:
+      interval: weekly
+      day: monday
+      time: "04:00"
+      timezone: Asia/Kolkata
+    open-pull-requests-limit: 5
+    groups:
+      # Routine, low-risk bumps — one PR to review and merge.
+      safe-updates:
+        patterns:
+          - "*"
+        update-types:
+          - patch
+          - minor
+    ignore:
+      # Majors are opt-in only. An unattended major on next/react/tailwind is
+      # far more likely to break a live storefront than to fix anything urgent.
+      - dependency-name: "next"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "react"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "react-dom"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "tailwindcss"
+        update-types: ["version-update:semver-major"]
+    labels:
+      - dependencies
+      - security
+    commit-message:
+      prefix: "chore(deps)"
+
+  # Keep CI actions current too — a compromised or abandoned action is a
+  # supply-chain path into the build, not just a maintenance nuisance.
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: monthly
+    labels:
+      - dependencies
+    commit-message:
+      prefix: "chore(ci)"

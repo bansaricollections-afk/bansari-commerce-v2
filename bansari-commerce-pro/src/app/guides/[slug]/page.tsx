@@ -15,6 +15,7 @@ import ArticleProgress from '@/components/guides/ArticleProgress';
 import GuideBody from '@/components/guides/GuideBody';
 import { guides, getGuide, type Guide } from '@/content/guides';
 import { getGuideMedia, imageAt } from '@/lib/guide-media';
+import { jsonLd } from '@/lib/json-ld';
 
 export const revalidate = 3600;
 
@@ -163,16 +164,16 @@ export default async function GuidePage({ params }: Props) {
     <>
       <script
         type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(articleSchema) }}
+        dangerouslySetInnerHTML={{ __html: jsonLd(articleSchema) }}
       />
       <script
         type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbSchema) }}
+        dangerouslySetInnerHTML={{ __html: jsonLd(breadcrumbSchema) }}
       />
       {faqSchema && (
         <script
           type="application/ld+json"
-          dangerouslySetInnerHTML={{ __html: JSON.stringify(faqSchema) }}
+          dangerouslySetInnerHTML={{ __html: jsonLd(faqSchema) }}
         />
       )}
 

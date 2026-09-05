@@ -14,6 +14,7 @@
  */
 import { type NextRequest, NextResponse } from 'next/server';
 import { requireAdminSession } from '@/lib/auth/requireAdmin';
+import { recordAdminAction } from '@/lib/audit';
 import { apiSuccess, apiError } from '@/lib/api-response';
 import { generateRequestId } from '@/lib/request-id';
 import { OrderV2Service } from '@/services/order-v2.service';
@@ -32,6 +33,17 @@ export async function POST(request: NextRequest, { params }: Params) {
       actorId:   auth.userId,
       actorName: auth.email,
     });
+
+    // Money-path action — recorded before responding so the trail exists even
+    // if the client never receives the response.
+    await recordAdminAction({
+      action: 'order_out_for_delivery',
+      entityType: 'order',
+      entityId: id,
+      userId: auth.userId,
+      metadata: { actorEmail: auth.email, requestId },
+    });
+
     return apiSuccess({ order });
   } catch (err) {
     if (err instanceof OrderError) {

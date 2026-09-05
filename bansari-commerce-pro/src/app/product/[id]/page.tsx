@@ -11,6 +11,7 @@ import ProductGallery from '@/components/product/ProductGallery';
 import ProductInfo from '@/components/product/ProductInfo';
 import RecentlyViewed from '@/components/product/RecentlyViewed';
 import TrustBadges from '@/components/product/TrustBadges';
+import { jsonLd } from '@/lib/json-ld';
 
 export const dynamic = 'force-dynamic';
 
@@ -290,9 +291,9 @@ export default async function ProductPage({ params }: Props) {
       <div className="pb-[76px] lg:pb-0">
         <main className="min-h-screen bg-[#FFFDF9]">
           {/* JSON-LD blocks — unchanged */}
-          <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(faqSchema) }} />
-          <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(productSchema) }} />
-          <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbSchema) }} />
+          <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: jsonLd(faqSchema) }} />
+          <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: jsonLd(productSchema) }} />
+          <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: jsonLd(breadcrumbSchema) }} />
 
           {/* HERO: GALLERY + PURCHASE PANEL */}
           <section className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 pt-8 pb-16">
