@@ -343,6 +343,21 @@ export default function ProductInfo({ product, canonicalUrl }: Props) {
             </a>
             , subject to policy
           </p>
+
+          {/*
+            Marketplace presence, placed here rather than higher up because
+            this is where hesitation actually happens — beside the price and
+            the buy button, at the moment an unfamiliar brand is being asked
+            for card details.
+
+            TEXT ONLY, NEVER A LINK. A visitor who is already on this page and
+            leaves to buy on a marketplace completes the sale at a fraction of
+            the margin. The point is to borrow the credibility, not to hand
+            over the order. See MARKETPLACES in components/layout/Footer.tsx.
+          */}
+          <p className="text-slate-400">
+            Also available on Myntra, Amazon &amp; Flipkart
+          </p>
         </div>
 
         {/*

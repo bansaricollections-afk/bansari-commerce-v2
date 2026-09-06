@@ -43,6 +43,30 @@ const TRUST_ITEMS = [
   "Quality Checked",
 ] as const;
 
+/**
+ * Marketplaces the brand also sells on.
+ *
+ * WHY THIS IS HERE
+ * A visitor who has never heard of this brand is being asked to enter card
+ * details on an unknown site with no reviews behind it. Marketplaces vet their
+ * sellers, so naming them answers the only question that actually blocks a
+ * first order: is this a real business. Unlike most trust signals it is
+ * verifiably true, which is the bar everything on this storefront has to meet.
+ *
+ * WHY IT IS NOT A LINK
+ * Deliberate, and the most important thing to preserve if this is ever edited.
+ * A customer already on this site who leaves to buy on a marketplace is the
+ * worst outcome available — the sale completes at a fraction of the margin,
+ * having cost nothing to acquire. Naming the platforms borrows the credibility
+ * without handing over the order. Do not turn these into links, buttons, or
+ * "Buy on…" calls to action.
+ *
+ * WHY TEXT AND NOT LOGOS
+ * Amazon, Myntra and Flipkart all restrict use of their brand assets. Plain
+ * text sidesteps the permission question entirely and reads more confidently.
+ */
+const MARKETPLACES = ["Myntra", "Amazon", "Flipkart"] as const;
+
 const PAYMENT_METHODS = [
   "Visa",
   "Mastercard",
@@ -344,6 +368,21 @@ export default async function Footer() {
                 ✓ {t}
               </span>
             ))}
+
+            {/*
+              MARKETPLACE PRESENCE — deliberately TEXT, with NO LINKS.
+              See MARKETPLACES in this file for why.
+            */}
+            <span
+              style={{
+                fontSize: "var(--bc-text-xs)",
+                color: "var(--bc-text-inverse)",
+                opacity: 0.45,
+                marginTop: "var(--bc-space-2)",
+              }}
+            >
+              Also available on {MARKETPLACES.join(", ")}
+            </span>
           </div>
         </div>
       </div>
