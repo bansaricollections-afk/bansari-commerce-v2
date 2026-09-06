@@ -47,7 +47,24 @@ type Props = { params: Promise<{ id: string }> };
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { id } = await params;
   const product = await getProductById(Number(id));
-  if (!product) return { title: 'Product Not Found | Bansari Collections' };
+  /*
+   * A missing product must be explicitly noindex.
+   *
+   * Returning only a title meant this branch inherited the root layout's
+   * `robots: { index: true, follow: true }`, so the page emitted BOTH
+   * `index, follow` (from the layout) and `noindex` (from not-found.tsx) —
+   * contradictory directives on a page that should never be indexed at all.
+   *
+   * The title also carried the brand suffix while the layout template appends
+   * it again, producing "Product Not Found | Bansari Collections | Bansari
+   * Collections". `absolute` opts out of the template.
+   */
+  if (!product) {
+    return {
+      title: { absolute: 'Product Not Found | Bansari Collections' },
+      robots: { index: false, follow: false },
+    };
+  }
 
   const canonicalUrl = `${SITE_URL}/product/${id}`;
   const ogTitle = product.seo_title || product.name;

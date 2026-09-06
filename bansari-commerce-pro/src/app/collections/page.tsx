@@ -4,6 +4,7 @@ import Link from "next/link";
 
 import { createServiceRoleClient } from "@/lib/supabase/service";
 import { collectionSlug } from "@/lib/collection-slug";
+import BrowseLandingLinks from '@/components/shop/BrowseLandingLinks';
 
 // Renders live catalog collections — must not be frozen at build time.
 export const revalidate = 60;
@@ -248,6 +249,14 @@ export default async function CollectionsPage() {
               </svg>
             </Link>
           </div>
+
+          {/*
+            Second internal link path to the /shop/<slug> landings. They were
+            reachable only from a couple of guide articles, which Search
+            Console read as "not worth crawling" — a sitemap entry says a URL
+            exists, an internal link says it matters.
+          */}
+          <BrowseLandingLinks className="mt-20" heading="Browse by category and fabric" />
         </div>
       </main>
     </>

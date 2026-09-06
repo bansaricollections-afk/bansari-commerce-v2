@@ -11,6 +11,7 @@ import MobileFilterBar from "@/components/shop/MobileFilterBar";
 import ProductGrid from "@/components/shop/ProductGrid";
 import ProductGridSkeleton from "@/components/shop/ProductGridSkeleton";
 import Pagination from "@/components/shop/Pagination";
+import BrowseLandingLinks from '@/components/shop/BrowseLandingLinks';
 
 import { getFilteredProducts } from "@/services/product.service";
 import { getShopFacets } from "@/services/shop-facets";
@@ -179,6 +180,15 @@ export default async function ShopPage({ searchParams }: ShopPageProps) {
             {meta.totalPages > 1 && (
               <Pagination meta={meta} />
             )}
+
+            {/*
+              Crawlable links to the /shop/<slug> landing pages. Placed after
+              the grid so it serves browsing without competing with it, but
+              still inside the indexable body — these pages were sitting in the
+              sitemap with no inbound links and Search Console had them under
+              "Discovered – currently not indexed".
+            */}
+            <BrowseLandingLinks className="mt-16" />
           </div>
         </div>
       </main>

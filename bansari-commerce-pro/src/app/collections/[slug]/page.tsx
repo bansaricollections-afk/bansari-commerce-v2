@@ -73,7 +73,17 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { slug } = await params;
   const { collections } = await getShopFacets();
   const name = resolveCollectionSlug(slug, collections);
-  if (!name) return { title: "Collection Not Found" };
+  /*
+   * Explicitly noindex — see the same guard in product/[id] and guides/[slug].
+   * Returning only a title lets the root layout's `index, follow` through,
+   * contradicting the noindex that not-found.tsx emits on the same response.
+   */
+  if (!name) {
+    return {
+      title: { absolute: "Collection Not Found | Bansari Collections" },
+      robots: { index: false, follow: false },
+    };
+  }
 
   const [{ meta }, copy] = await Promise.all([
     getFilteredProducts({ collection: name, perPage: 1 }),

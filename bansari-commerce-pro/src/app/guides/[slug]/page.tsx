@@ -31,7 +31,18 @@ export function generateStaticParams() {
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { slug } = await params;
   const guide = getGuide(slug);
-  if (!guide) return { title: 'Guide Not Found' };
+  /*
+   * Explicitly noindex. Without it this branch inherits the root layout's
+   * `robots: { index: true, follow: true }`, so a missing guide emitted both
+   * `index, follow` and the noindex from not-found.tsx — contradictory
+   * directives on a page that should never be indexed at all.
+   */
+  if (!guide) {
+    return {
+      title: { absolute: 'Guide Not Found | Bansari Collections' },
+      robots: { index: false, follow: false },
+    };
+  }
 
   return {
     title: guide.title,

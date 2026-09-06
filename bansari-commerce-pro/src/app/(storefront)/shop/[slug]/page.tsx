@@ -56,7 +56,17 @@ export async function generateStaticParams() {
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { slug } = await params;
   const landing = await findBrowseLanding(slug);
-  if (!landing) return { title: 'Not Found' };
+  /*
+   * Explicitly noindex — see the same guard in product/[id] and guides/[slug].
+   * Returning only a title lets the root layout's `index, follow` through,
+   * contradicting the noindex that not-found.tsx emits on the same response.
+   */
+  if (!landing) {
+    return {
+      title: { absolute: 'Not Found | Bansari Collections' },
+      robots: { index: false, follow: false },
+    };
+  }
 
   const description = introFor(landing);
 
