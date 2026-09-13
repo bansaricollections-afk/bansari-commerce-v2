@@ -235,14 +235,64 @@ function orderShippedHtml(data: OrderShippedData): string {
 </html>`;
 }
 
+/**
+ * Record the outcome of a send in `email_log`.
+ *
+ * WHY IT EXISTS
+ * A paying customer got no confirmation and there was no way to find out what
+ * had happened — server logs expire and are not queryable per order. This
+ * table answers "did this customer actually receive their receipt".
+ *
+ * NEVER THROWS, AND IS NEVER AWAITED BY THE CALLER'S RESULT. Logging is
+ * strictly observational: a logging outage must not change whether an email is
+ * reported as sent, and must certainly not surface as an error on a paid
+ * order. Every failure here is swallowed after a console warning — the one
+ * place in this file where silence is the correct behaviour, because the thing
+ * being silenced is the recorder, not the event.
+ */
+async function recordEmailAttempt(entry: {
+  recipient: string;
+  subject: string;
+  template?: string | null;
+  sent: boolean;
+  error?: string | null;
+  orderNumber?: string | null;
+}): Promise<void> {
+  try {
+    const { createServiceRoleClient } = await import("@/lib/supabase/service");
+    const sb = createServiceRoleClient();
+    const { error } = await sb.from("email_log").insert({
+      recipient: entry.recipient,
+      subject: entry.subject,
+      template: entry.template ?? null,
+      sent: entry.sent,
+      error: entry.error ?? null,
+      order_number: entry.orderNumber ?? null,
+    });
+    if (error) {
+      console.warn(`[email.service] email_log insert failed: ${error.message}`);
+    }
+  } catch (err) {
+    console.warn(
+      `[email.service] email_log unavailable: ${err instanceof Error ? err.message : "unknown"}`
+    );
+  }
+}
+
 async function sendEmail({
   to,
   subject,
   html,
+  template,
+  orderNumber,
 }: {
   to: string;
   subject: string;
   html: string;
+  /** Logical email type, for grouping failures by kind in email_log. */
+  template?: string;
+  /** Links the log row back to an order where one exists. */
+  orderNumber?: string | null;
 }): Promise<EmailResult> {
   const apiKey = process.env.RESEND_API_KEY;
   const from =
@@ -252,7 +302,9 @@ async function sendEmail({
     console.warn(
       "[email.service] RESEND_API_KEY is not set — email not sent."
     );
-    return { sent: false, error: "RESEND_API_KEY not configured" };
+    const message = "RESEND_API_KEY not configured";
+    await recordEmailAttempt({ recipient: to, subject, template, sent: false, error: message, orderNumber });
+    return { sent: false, error: message };
   }
 
   try {
@@ -269,14 +321,17 @@ async function sendEmail({
       const text = await response.text();
       const message = `Resend API error ${response.status}: ${text}`;
       console.warn(`[email.service] ${message}`);
+      await recordEmailAttempt({ recipient: to, subject, template, sent: false, error: message, orderNumber });
       return { sent: false, error: message };
     }
 
+    await recordEmailAttempt({ recipient: to, subject, template, sent: true, orderNumber });
     return { sent: true };
   } catch (err) {
     const message =
       err instanceof Error ? err.message : "Unknown fetch error";
     console.warn(`[email.service] Failed to send email: ${message}`);
+    await recordEmailAttempt({ recipient: to, subject, template, sent: false, error: message, orderNumber });
     return { sent: false, error: message };
   }
 }
@@ -292,6 +347,8 @@ export async function sendOrderConfirmationEmail(
     to: data.customerEmail,
     subject: `Order Confirmed \u2014 ${data.orderNumber} | Bansari Collections`,
     html: orderConfirmationHtml(deepEscape(data)),
+    template: "order_confirmation",
+    orderNumber: data.orderNumber,
   });
 }
 
@@ -357,6 +414,8 @@ export async function sendOwnerNewOrderEmail(
     to,
     subject: `New order ${data.orderNumber} \u2014 ${formatRupees(data.grandTotal)}`,
     html: ownerNewOrderHtml(deepEscape(data)),
+    template: "owner_new_order",
+    orderNumber: data.orderNumber,
   });
 }
 
@@ -372,6 +431,8 @@ export async function sendOrderShippedEmail(
     to: data.customerEmail,
     subject: `Your Order Has Shipped \u2014 ${data.orderNumber} | Bansari Collections`,
     html: orderShippedHtml(deepEscape(data)),
+    template: "order_shipped",
+    orderNumber: data.orderNumber,
   });
 }
 
@@ -422,6 +483,7 @@ export async function sendWelcomeEmail(
     to: data.customerEmail,
     subject: "Welcome to Bansari Collections",
     html,
+    template: "welcome",
   });
 }
 
@@ -487,6 +549,8 @@ export async function sendOutForDeliveryEmail(
   return sendEmail({
     to: data.customerEmail,
     subject: `Out for Delivery \u2014 ${data.orderNumber} | Bansari Collections`,
+    template: "out_for_delivery",
+    orderNumber: data.orderNumber,
     html: orderStageHtml(
       {
         banner: "Arriving today",
@@ -504,6 +568,8 @@ export async function sendOrderDeliveredEmail(
   return sendEmail({
     to: data.customerEmail,
     subject: `Delivered \u2014 ${data.orderNumber} | Bansari Collections`,
+    template: "order_delivered",
+    orderNumber: data.orderNumber,
     html: orderStageHtml(
       {
         banner: "Your order has arrived",

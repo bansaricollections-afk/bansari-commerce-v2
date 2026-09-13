@@ -64,7 +64,15 @@ import { logAdminSavePayload } from "@/lib/debug/product-debug";
 // ─── Constants ────────────────────────────────────────────────────────────────
 
 const PRODUCT_IMAGES_BUCKET = "product-images";
-const PAGE_SIZE = 12;
+/**
+ * Rows per page in the product list.
+ *
+ * Was a fixed 12, which made bulk editing a 43-product catalogue tedious —
+ * four pages of paging to reach anything. The API accepts up to 100
+ * (src/app/api/admin/products/route.ts clamps there), so these are all safe.
+ */
+const PAGE_SIZE_OPTIONS = [12, 30, 50] as const;
+const DEFAULT_PAGE_SIZE = 30;
 const MAX_FILE_SIZE_BYTES = 8 * 1024 * 1024;
 
 /*
@@ -795,7 +803,10 @@ export default function ProductManagement() {
   const searchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const supabase = useMemo(() => createClient(), []);
-  const totalPages = Math.ceil(total / PAGE_SIZE);
+
+  /** Rows per page — user-selectable, see PAGE_SIZE_OPTIONS. */
+  const [pageSize, setPageSize] = useState<number>(DEFAULT_PAGE_SIZE);
+  const totalPages = Math.ceil(total / pageSize);
 
   // ── Load catalog lookups ───────────────────────────────────────────────────
 
@@ -875,7 +886,7 @@ export default function ProductManagement() {
     try {
       const params = new URLSearchParams({
         page: String(currentPage),
-        limit: String(PAGE_SIZE),
+        limit: String(pageSize),
         orderBy: "created_at",
         ascending: "false",
       });
@@ -889,7 +900,8 @@ export default function ProductManagement() {
     } finally {
       setIsLoading(false);
     }
-  }, [currentPage, debouncedQuery]);
+    // pageSize included so changing rows-per-page refetches immediately.
+  }, [currentPage, debouncedQuery, pageSize]);
 
   useEffect(() => { void loadProducts(); }, [loadProducts]);
 
@@ -1455,10 +1467,11 @@ export default function ProductManagement() {
 
   /*
    * Counts come from the API, which computes them across the whole filtered
-   * catalogue. They were previously derived from `products` — one page of
-   * PAGE_SIZE (12) rows — so a 40-product catalogue rendered "Total 12"
-   * directly beneath a header reading "40 products total", and "Low Stock 12"
-   * only ever meant "all 12 rows on this page are low".
+   * catalogue. They were previously derived from `products` — a single page of
+   * rows — so a 40-product catalogue rendered "Total 12" directly beneath a
+   * header reading "40 products total", and "Low Stock 12" only ever meant
+   * "all 12 rows on this page are low". Page size is now user-selectable,
+   * which would have made that bug vary with the chosen size.
    *
    * The page-derived values remain as a fallback for the first paint, before
    * the response lands.
@@ -1634,9 +1647,41 @@ export default function ProductManagement() {
           </div>
         )}
 
+        {/*
+          Rows-per-page. Rendered whenever there are more rows than the
+          smallest option, NOT only when totalPages > 1 — otherwise choosing 50
+          collapses the list to one page and the control that got you there
+          disappears, stranding you with no way back to 12.
+        */}
+        {total > PAGE_SIZE_OPTIONS[0] && (
+          <div className="flex items-center justify-center gap-2 mt-8 text-sm text-neutral-600">
+            <span>Rows per page</span>
+            {PAGE_SIZE_OPTIONS.map((n) => (
+              <button
+                key={n}
+                type="button"
+                onClick={() => {
+                  setPageSize(n);
+                  // Page 3 of 12-per-page does not exist at 50 per page.
+                  setCurrentPage(0);
+                }}
+                aria-pressed={pageSize === n}
+                className={`rounded-md border px-2.5 py-1 transition-colors ${
+                  pageSize === n
+                    ? 'border-neutral-900 bg-neutral-900 text-white'
+                    : 'border-neutral-300 hover:bg-neutral-100'
+                }`}
+              >
+                {n}
+              </button>
+            ))}
+            <span className="ml-2 text-neutral-400">{total} total</span>
+          </div>
+        )}
+
         {/* Pagination */}
         {totalPages > 1 && (
-          <div className="flex items-center justify-center gap-3 mt-8">
+          <div className="flex items-center justify-center gap-3 mt-4">
             <Button
               variant="outline"
               size="sm"
