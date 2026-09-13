@@ -41,8 +41,11 @@ export default function ShippingPolicyPage() {
         </p>
 
         <p>
-          Customers will receive shipment tracking details by SMS and/or
-          email once the order has been dispatched.
+          {/* SMS removed: no SMS provider is integrated, so this document was
+              committing to a channel that does not exist. A published policy
+              is the last place to overstate what the system does. */}
+          Customers will receive shipment tracking details by email once the
+          order has been dispatched.
         </p>
 
         <p>

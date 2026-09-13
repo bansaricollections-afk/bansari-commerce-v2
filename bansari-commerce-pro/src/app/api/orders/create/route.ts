@@ -470,8 +470,14 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    /*
+     * sendEmail() returns { sent: false, error } rather than throwing, so the
+     * try/catch below cannot see a Resend failure and the success log fires
+     * regardless of outcome. Capture the results and check them explicitly —
+     * a log line that says "sent" when nothing was sent is worse than no log.
+     */
     try {
-      await sendOrderConfirmationEmail({
+      const customerResult = await sendOrderConfirmationEmail({
         orderNumber: order.order_number,
         customerName: order.customer_name,
         customerEmail: order.customer_email,
@@ -495,7 +501,7 @@ export async function POST(request: NextRequest) {
 
       // Owner notification — the shop had no "you have an order" alert on any
       // provider. Same non-blocking contract as the customer email above.
-      await sendOwnerNewOrderEmail({
+      const ownerResult = await sendOwnerNewOrderEmail({
         orderNumber: order.order_number,
         customerName: order.customer_name,
         customerEmail: order.customer_email,
@@ -520,7 +526,19 @@ export async function POST(request: NextRequest) {
         paymentReference: razorpay_payment_id,
       });
 
-      rLog.info('orders.create.email.sent', { orderId: order.id });
+      if (customerResult?.sent && ownerResult?.sent) {
+        rLog.info('orders.create.email.sent', { orderId: order.id });
+      } else {
+        // error level: a customer who paid and heard nothing is an incident.
+        rLog.error('orders.create.email.failed', {
+          orderId: order.id,
+          orderNumber: order.order_number,
+          customerSent: customerResult?.sent ?? false,
+          ownerSent: ownerResult?.sent ?? false,
+          customerError: customerResult?.error ?? null,
+          ownerError: ownerResult?.error ?? null,
+        });
+      }
     } catch (emailErr) {
       rLog.warn('orders.create.email.failed', {
         orderId: order.id,

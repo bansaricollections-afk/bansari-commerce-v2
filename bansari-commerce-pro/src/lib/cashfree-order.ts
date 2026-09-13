@@ -428,11 +428,38 @@ export async function verifyAndPersistCashfreeOrder(
     }),
   ]);
 
-  if (customerEmail.status === 'rejected' || ownerEmail.status === 'rejected') {
-    log.warn('cashfree.persist.email_failed', {
+  /*
+   * Detect a FAILED send, not merely a thrown one.
+   *
+   * sendEmail() does not throw — it returns { sent: false, error } for a dead
+   * API key, an unverified domain, or any Resend error. So under
+   * Promise.allSettled every send is `fulfilled` regardless of outcome, and
+   * the previous check (`status === 'rejected'`) could never fire. A real
+   * customer's order confirmation failed and nothing anywhere recorded it:
+   * the send returned a falsy result, this warning stayed silent, and
+   * /api/health/email reported "ok" because a key was present.
+   *
+   * Swallowing the failure is still correct — a bounced receipt must never
+   * fail a paid order — but swallowing it INVISIBLY is not.
+   */
+  const settledSent = (r: PromiseSettledResult<{ sent: boolean; error?: string }>) =>
+    r.status === 'fulfilled' ? r.value?.sent === true : false;
+  const settledError = (r: PromiseSettledResult<{ sent: boolean; error?: string }>) =>
+    r.status === 'fulfilled' ? (r.value?.error ?? null) : String(r.reason);
+
+  const customerSent = settledSent(customerEmail);
+  const ownerSent = settledSent(ownerEmail);
+
+  if (!customerSent || !ownerSent) {
+    // error level, not warn: a customer who paid and heard nothing is an
+    // incident, and this is the only trace it leaves.
+    log.error('cashfree.persist.email_failed', {
       orderId: order.id,
-      customer: customerEmail.status,
-      owner: ownerEmail.status,
+      orderNumber: order.order_number,
+      customerSent,
+      ownerSent,
+      customerError: settledError(customerEmail),
+      ownerError: settledError(ownerEmail),
     });
   }
 

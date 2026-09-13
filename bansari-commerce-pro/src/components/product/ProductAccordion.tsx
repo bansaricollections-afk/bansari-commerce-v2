@@ -152,7 +152,7 @@ export default function ProductAccordion({ product }: Props) {
             'Ships across India through our courier partners',
             'Metro cities: 3–5 business days',
             'Rest of India: 5–7 business days',
-            'Tracking link sent via SMS and email',
+            'Tracking link sent by email',
             'Prepaid orders only — online payment at checkout',
           ].map(line => (
             <li key={line} className="flex items-start gap-2">

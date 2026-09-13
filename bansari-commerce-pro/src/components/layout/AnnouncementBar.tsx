@@ -17,7 +17,18 @@ export interface AnnouncementBarProps {
 const MESSAGES = [
   "Shipping across India · Dispatched in 1–2 business days",
   "Secure online payments · UPI, cards & net banking accepted",
-  "Tracking details sent by SMS and email once your order ships",
+  /*
+   * Was "Tracking details sent by SMS and email once your order ships".
+   *
+   * There is no SMS integration in this codebase — no provider, no client, no
+   * credentials — so that line promised something that could not happen. A
+   * real customer chased a missing SMS that was never going to arrive.
+   *
+   * Reworded to email only, which IS implemented (email.service.ts sends on
+   * ship, out-for-delivery and delivered). Restore the SMS wording only if an
+   * SMS provider is actually wired up.
+   */
+  "Tracking details sent by email once your order ships",
   "Easy 7-day returns as per our Return & Refund Policy",
 ];
 

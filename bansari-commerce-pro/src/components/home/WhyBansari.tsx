@@ -22,7 +22,7 @@ const PILLARS = [
   {
     number: "04",
     title: "Delivered to Your Door",
-    body: "We ship across India through our courier partners. Orders are dispatched within 1–2 business days, and tracking details reach you by SMS or email.",
+    body: "We ship across India through our courier partners. Orders are dispatched within 1–2 business days, and tracking details reach you by email.",
     href: "/shipping-policy",
   },
   {
