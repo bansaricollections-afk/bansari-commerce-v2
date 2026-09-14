@@ -53,23 +53,45 @@ function fmt(n: number | string | null | undefined) {
   return `₹${Number(n ?? 0).toLocaleString('en-IN')}`;
 }
 
-async function apiPost<T>(url: string, body: unknown): Promise<T> {
+/*
+ * WHY THESE THROW
+ *
+ * These used to `return res.json()` without ever looking at res.ok, and every
+ * caller ignored the result. A 403 (session expired / MFA), a 422 (invalid
+ * status transition) or a 500 all looked identical to success: the modal
+ * closed, the page reloaded, and nothing had changed. That is how a real
+ * shipment silently failed to save — and the same silence covered Issue
+ * Refund, which moves money.
+ *
+ * Failing loudly is the whole point. Callers surface the message.
+ */
+async function apiSend<T>(method: 'POST' | 'PATCH', url: string, body: unknown): Promise<T> {
   const res = await fetch(url, {
-    method:  'POST',
+    method,
     headers: { 'Content-Type': 'application/json' },
     body:    JSON.stringify(body),
   });
-  return res.json() as Promise<T>;
+
+  let json: unknown = null;
+  try {
+    json = await res.json();
+  } catch {
+    // A non-JSON body (proxy error page, empty 204) is still a real outcome.
+  }
+
+  const payload = json as { success?: boolean; message?: string; error?: string; code?: string } | null;
+
+  if (!res.ok || payload?.success === false) {
+    const detail = payload?.message || payload?.error || `${res.status} ${res.statusText}`;
+    const code = payload?.code ? ` (${payload.code})` : '';
+    throw new Error(`${detail}${code}`);
+  }
+
+  return payload as T;
 }
 
-async function apiPatch<T>(url: string, body: unknown): Promise<T> {
-  const res = await fetch(url, {
-    method:  'PATCH',
-    headers: { 'Content-Type': 'application/json' },
-    body:    JSON.stringify(body),
-  });
-  return res.json() as Promise<T>;
-}
+const apiPost  = <T,>(url: string, body: unknown) => apiSend<T>('POST',  url, body);
+const apiPatch = <T,>(url: string, body: unknown) => apiSend<T>('PATCH', url, body);
 
 // ─── Modal ──────────────────────────────────────────────────────────────────
 
@@ -121,6 +143,8 @@ export default function OrderDetailPage() {
   const [loading,  setLoading]  = useState(true);
   const [error,    setError]    = useState<string | null>(null);
   const [busy,     setBusy]     = useState(false);
+  /* Failure of an action (ship, refund, cancel …), shown until the next attempt. */
+  const [actionError, setActionError] = useState<string | null>(null);
 
   // modal state
   const [modal, setModal] = useState<
@@ -183,12 +207,48 @@ export default function OrderDetailPage() {
 
   // ── Actions ───────────────────────────────────────────────────────────────
 
+  /**
+   * Runs an action, and makes failure visible.
+   *
+   * On success the modal closes and the order reloads. On failure the modal
+   * STAYS OPEN with the error shown, so the typed-in courier and AWB are not
+   * lost and the merchant can see why it did not go through.
+   */
+  async function run(fn: () => Promise<unknown>, closeModal = true) {
+    setBusy(true);
+    setActionError(null);
+    try {
+      await fn();
+      if (closeModal) setModal(null);
+      void load();
+    } catch (e) {
+      setActionError(e instanceof Error ? e.message : 'Action failed.');
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function doDeliver() {
     if (!confirm('Mark this order as delivered?')) return;
-    setBusy(true);
-    await fetch(`/api/admin/orders/${id}/deliver`, { method: 'POST' });
-    setBusy(false);
-    void load();
+    await run(() =>
+      fetch(`/api/admin/orders/${id}/deliver`, { method: 'POST' }).then((r) => {
+        if (!r.ok) throw new Error(`Mark delivered failed: ${r.status} ${r.statusText}`);
+      })
+    );
+  }
+
+  /**
+   * Moves a paid order out of `pending` and into the fulfilment pipeline.
+   *
+   * Without this the order screen is a dead end: "Ship Order" is only offered
+   * from confirmed/processing/packed, so a paid order stuck at `pending` could
+   * never have a courier and AWB recorded. Sends no customer email — the
+   * customer already has their order confirmation.
+   */
+  async function doConfirm() {
+    await run(() =>
+      apiPost(`/api/admin/orders/${id}/confirm`, {})
+    );
   }
 
   /**
@@ -197,87 +257,70 @@ export default function OrderDetailPage() {
    */
   async function doOutForDelivery() {
     if (!confirm('Mark as out for delivery? This emails the customer.')) return;
-    setBusy(true);
-    try {
-      await apiPost(`/api/admin/orders/${id}/out-for-delivery`, {});
-    } finally {
-      setBusy(false);
-    }
-    void load();
+    await run(() =>
+      apiPost(`/api/admin/orders/${id}/out-for-delivery`, {})
+    );
   }
 
   async function doShip() {
     if (!courier || !awb) return;
-    setBusy(true);
-    await apiPost(`/api/admin/orders/${id}/ship`, {
-      courierName: courier, awbNumber: awb,
-      trackingUrl: trackingUrl || undefined,
-      expectedDeliveryDate: expected || undefined,
-    });
-    setBusy(false);
-    setModal(null);
-    void load();
+    await run(() =>
+      apiPost(`/api/admin/orders/${id}/ship`, {
+        courierName: courier,
+        awbNumber: awb,
+        trackingUrl: trackingUrl || undefined,
+        expectedDeliveryDate: expected || undefined,
+      })
+    );
   }
 
   async function doCancel() {
     if (!reason) return;
-    setBusy(true);
-    await apiPost(`/api/admin/orders/${id}/cancel`, { reason });
-    setBusy(false);
-    setModal(null);
-    void load();
+    await run(() =>
+      apiPost(`/api/admin/orders/${id}/cancel`, { reason })
+    );
   }
 
   async function doRefund() {
     if (!refundAmt) return;
-    setBusy(true);
-    await apiPost(`/api/admin/orders/${id}/refund`, {
-      amount: Number(refundAmt),
-      reference: refundRef || undefined,
-      reason: reason || undefined,
-    });
-    setBusy(false);
-    setModal(null);
-    void load();
+    await run(() =>
+      apiPost(`/api/admin/orders/${id}/refund`, {
+        amount: Number(refundAmt),
+        reference: refundRef || undefined,
+        reason: reason || undefined,
+      })
+    );
   }
 
   async function doReturn() {
     if (!reason) return;
-    setBusy(true);
-    await apiPost(`/api/admin/orders/${id}/return`, { reason });
-    setBusy(false);
-    setModal(null);
-    void load();
+    await run(() =>
+      apiPost(`/api/admin/orders/${id}/return`, { reason })
+    );
   }
 
   async function doExchange() {
     if (!reason) return;
-    setBusy(true);
-    await apiPost(`/api/admin/orders/${id}/exchange`, { reason });
-    setBusy(false);
-    setModal(null);
-    void load();
+    await run(() =>
+      apiPost(`/api/admin/orders/${id}/exchange`, { reason })
+    );
   }
 
   async function doNote() {
     if (!reason) return;
-    setBusy(true);
-    await apiPost(`/api/admin/orders/${id}/timeline`, { note: reason });
-    setBusy(false);
-    setModal(null);
-    void load();
+    await run(() =>
+      apiPost(`/api/admin/orders/${id}/timeline`, { note: reason })
+    );
   }
 
   async function doSaveNotes() {
-    setBusy(true);
-    await apiPatch(`/api/admin/orders/${id}/notes`, {
-      internalNotes: internalNote || null,
-      customerNotes: customerNote || null,
-      packingNotes:  packingNote  || null,
-    });
-    setBusy(false);
-    setModal(null);
-    void load();
+    await run(() =>
+      apiPatch(`/api/admin/orders/${id}/notes`, {
+        internalNotes: internalNote || null,
+        customerNotes: customerNote || null,
+        packingNotes:  packingNote  || null,
+      })
+    );
   }
 
   function openNotes() {
@@ -302,6 +345,12 @@ export default function OrderDetailPage() {
   }
 
   const status = order.orderV2Status;
+  /*
+   * Confirm is the first forward step of the lifecycle and the gate in front of
+   * shipping. Offered only once the money is in — confirming an unpaid order
+   * would move it into fulfilment on a payment that may never land.
+   */
+  const canConfirm  = status === 'pending' && order.paymentV2Status === 'paid';
   const canShip     = ['confirmed','processing','packed'].includes(status);
   const canDeliver  = status === 'shipped' || status === 'out_for_delivery';
   /*
@@ -318,8 +367,8 @@ export default function OrderDetailPage() {
   // First applicable forward-moving action gets primary (solid) emphasis; the rest stay
   // as quiet outline buttons so the action bar reads as one dominant next-step, not a
   // row of equally-weighted colored pills.
-  const primaryAction: 'ship' | 'deliver' | 'return' | 'exchange' | 'refund' | null =
-    canShip ? 'ship' : canDeliver ? 'deliver' : canReturn ? 'return' : canExchange ? 'exchange' : canRefund ? 'refund' : null;
+  const primaryAction: 'confirm' | 'ship' | 'deliver' | 'return' | 'exchange' | 'refund' | null =
+    canConfirm ? 'confirm' : canShip ? 'ship' : canDeliver ? 'deliver' : canReturn ? 'return' : canExchange ? 'exchange' : canRefund ? 'refund' : null;
 
   return (
     <div>
@@ -346,8 +395,19 @@ export default function OrderDetailPage() {
           </Link>
         </div>
 
+        {/* ── Action failure ──
+           Sits above the action bar so it is impossible to miss. Previously an
+           action that failed left no trace on screen at all. */}
+        {actionError && (
+          <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3" role="alert">
+            <p className="text-sm font-semibold text-red-800">That action did not go through</p>
+            <p className="mt-1 text-sm text-red-700">{actionError}</p>
+          </div>
+        )}
+
         {/* ── Action Bar ── */}
         <div className="flex flex-wrap gap-2.5">
+          {canConfirm  && <ActionBtn primary={primaryAction === 'confirm'}  onClick={() => { void doConfirm(); }} disabled={busy}>Confirm Order</ActionBtn>}
           {canShip     && <ActionBtn primary={primaryAction === 'ship'}     onClick={() => { setCourier(''); setAwb(''); setTracking(''); setExpected(''); setModal('ship'); }}>Ship Order</ActionBtn>}
           {canOutForDelivery && <ActionBtn onClick={() => { void doOutForDelivery(); }} disabled={busy}>Out for Delivery</ActionBtn>}
           {canDeliver  && <ActionBtn primary={primaryAction === 'deliver'}  onClick={() => { void doDeliver(); }} disabled={busy}>Mark Delivered</ActionBtn>}

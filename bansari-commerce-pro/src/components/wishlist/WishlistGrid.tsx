@@ -12,12 +12,10 @@ type Props = {
   products: Product[];
 };
 
-export default function WishlistGrid({ products }: Props) {
-  const {
-    items,
-    removeItem,
-  } = useWishlist();
+type SizeAvailability = { label: string; status: string; available: number };
 
+export default function WishlistGrid({ products }: Props) {
+  const { items, removeItem } = useWishlist();
   const { addItem } = useCart();
 
   const wishlistProducts = products.filter((product) =>
@@ -26,109 +24,187 @@ export default function WishlistGrid({ products }: Props) {
 
   if (wishlistProducts.length === 0) {
     return (
-      <main className="min-h-screen bg-[#FFFDF9]">
-
+      <main className="min-h-screen" style={{ backgroundColor: "var(--bc-surface-cream)" }}>
         <div className="mx-auto flex max-w-3xl flex-col items-center px-6 py-24 text-center">
+          <Heart size={64} strokeWidth={1} className="mb-8" style={{ color: "var(--bc-brand-mauve)" }} />
 
-          <Heart
-            size={80}
-            className="mb-8 text-[#8A5A6A]"
-          />
-
-          <h1 className="font-[family:var(--font-playfair)] text-5xl font-bold">
+          <h1
+            className="font-[family:var(--font-playfair)] text-4xl sm:text-5xl"
+            style={{ fontWeight: 400, color: "var(--bc-text-primary)" }}
+          >
             My Closet
           </h1>
 
-          <p className="mt-6 max-w-xl text-lg text-gray-600">
+          <p className="mt-6 max-w-xl text-[15px] leading-relaxed" style={{ color: "var(--bc-text-secondary)" }}>
             Save your favourite outfits here and revisit them whenever inspiration strikes.
           </p>
 
-          <Link
-            href="/shop"
-            className="mt-10 rounded-full bg-[#8A5A6A] px-10 py-4 text-white transition hover:bg-[#734757]"
-          >
+          <Link href="/shop" className="bc-cta-primary mt-10">
             Discover Collection
           </Link>
-
         </div>
-
       </main>
     );
   }
 
   return (
-    <main className="min-h-screen bg-[#FFFDF9]">
-
+    <main className="min-h-screen" style={{ backgroundColor: "var(--bc-surface-cream)" }}>
       <div className="mx-auto max-w-7xl px-6 py-16">
-
-        <h1 className="mb-12 font-[family:var(--font-playfair)] text-5xl font-bold">
+        <h1
+          className="mb-12 font-[family:var(--font-playfair)] text-4xl sm:text-5xl"
+          style={{ fontWeight: 400, color: "var(--bc-text-primary)" }}
+        >
           My Closet
         </h1>
 
         <div className="grid gap-8 md:grid-cols-2 lg:grid-cols-3">
+          {wishlistProducts.map((product) => {
+            /* ── Availability, read from real per-size inventory ──
+               Mirrors ProductCard exactly. A product-level total is never
+               allowed to imply that a particular size is available. */
+            const sizeAvailability = (product as unknown as {
+              sizeAvailability?: SizeAvailability[];
+            }).sizeAvailability;
 
-          {wishlistProducts.map((product) => (
+            const isSizeManaged =
+              Array.isArray(sizeAvailability) && sizeAvailability.length > 0;
+            const sellableSizes = isSizeManaged
+              ? sizeAvailability!.filter((s) => s.status !== "SOLD_OUT")
+              : [];
+            const isSoldOut = isSizeManaged && sellableSizes.length === 0;
 
-            <div
-              key={product.id}
-              className="overflow-hidden rounded-3xl bg-white shadow-sm transition hover:shadow-xl"
-            >
+            const imageUrl = product.images?.[0]?.url || "/placeholder.png";
 
-              <Image
-                src={product.images?.[0]?.url || '/placeholder.png'}
-                alt={product.name}
-                width={500}
-                height={650}
-                className="h-[380px] w-full object-cover"
-              />
+            return (
+              <div
+                key={product.id}
+                className="overflow-hidden transition-colors"
+                style={{
+                  backgroundColor: "#FFFFFF",
+                  border: "1px solid var(--bc-border-soft)",
+                }}
+              >
+                <Link href={`/product/${product.id}`} className="block">
+                  <div className="relative aspect-[2/3] w-full overflow-hidden bg-[#F7F3EE]">
+                    <Image
+                      src={imageUrl}
+                      alt={product.name}
+                      fill
+                      className="object-cover"
+                      sizes="(max-width:768px) 100vw, (max-width:1024px) 50vw, 33vw"
+                    />
+                  </div>
+                </Link>
 
-              <div className="space-y-4 p-6">
+                <div className="flex flex-col gap-3 p-6">
+                  <Link href={`/product/${product.id}`}>
+                    <h2
+                      className="font-[family:var(--font-playfair)] text-xl leading-snug"
+                      style={{ fontWeight: 400, color: "var(--bc-text-primary)" }}
+                    >
+                      {product.name}
+                    </h2>
+                  </Link>
 
-                <h2 className="text-2xl font-semibold">
-                  {product.name}
-                </h2>
-
-                <p className="font-bold text-[#8A5A6A]">
-                  ₹{product.price}
-                </p>
-
-                <div className="flex gap-3">
-
-                  <button
-                    onClick={() =>
-                      addItem({
-                        id: product.id,
-                        name: product.name,
-                        image: product.images?.[0]?.url || '/placeholder.png',
-                        price: product.price,
-                        quantity: 1,
-                      })
-                    }
-                    className="flex flex-1 items-center justify-center gap-2 rounded-full bg-[#8A5A6A] py-3 text-white transition hover:bg-[#734757]"
+                  <p
+                    className="text-[15px] font-medium tabular-nums"
+                    style={{ color: "var(--bc-text-primary)" }}
                   >
-                    <ShoppingBag size={18} />
-                    Add to Bag
-                  </button>
+                    &#x20B9;{product.price.toLocaleString("en-IN")}
+                  </p>
 
-                  <button
-                    onClick={() => removeItem(product.id)}
-                    className="rounded-full border p-3 transition hover:bg-red-50"
-                  >
-                    <Trash2 size={18} />
-                  </button>
+                  {isSizeManaged && (
+                    <p className="text-[11px] tracking-[0.02em]" style={{ color: "var(--bc-text-muted)" }}>
+                      {isSoldOut
+                        ? "Sold out in all sizes"
+                        : `${sellableSizes.map((s) => s.label).join(" · ")} available`}
+                    </p>
+                  )}
 
+                  <div className="mt-1 flex gap-3">
+                    {/*
+                     * WHY THIS IS A LINK, NOT AN ADD-TO-CART BUTTON
+                     *
+                     * A size-managed line cannot be added from here. The cart
+                     * item would carry no variantId, and validateCartItems
+                     * rejects the whole order at payment with "Please select a
+                     * size" — with no way back, because the cart page shows the
+                     * chosen size but offers no way to choose one. The customer
+                     * would only discover it after entering their address.
+                     *
+                     * CartCrossSell already refuses one-tap adds for exactly
+                     * this reason. Size selection belongs on the PDP.
+                     *
+                     * Sold out is rendered as inert text rather than a disabled
+                     * button: there is no action to offer, and a greyed button
+                     * invites a click that will never work.
+                     */}
+                    {isSoldOut ? (
+                      <span
+                        className="flex flex-1 items-center justify-center gap-2 py-3 text-[10px] font-semibold uppercase tracking-[0.14em]"
+                        style={{
+                          backgroundColor: "var(--bc-border-soft)",
+                          color: "var(--bc-text-muted)",
+                        }}
+                      >
+                        Sold Out
+                      </span>
+                    ) : isSizeManaged ? (
+                      <Link
+                        href={`/product/${product.id}`}
+                        aria-label={`Choose a size for ${product.name}`}
+                        className="flex flex-1 items-center justify-center gap-2 py-3 text-[10px] font-semibold uppercase tracking-[0.14em] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset"
+                        style={{
+                          backgroundColor: "var(--bc-text-primary)",
+                          color: "var(--bc-surface-cream)",
+                        }}
+                      >
+                        <ShoppingBag size={13} aria-hidden="true" />
+                        Choose Size
+                      </Link>
+                    ) : (
+                      <button
+                        type="button"
+                        aria-label={`Add ${product.name} to bag`}
+                        onClick={() =>
+                          addItem({
+                            id: product.id,
+                            name: product.name,
+                            image: imageUrl,
+                            price: product.price,
+                            quantity: 1,
+                          })
+                        }
+                        className="flex flex-1 items-center justify-center gap-2 py-3 text-[10px] font-semibold uppercase tracking-[0.14em] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset"
+                        style={{
+                          backgroundColor: "var(--bc-text-primary)",
+                          color: "var(--bc-surface-cream)",
+                        }}
+                      >
+                        <ShoppingBag size={13} aria-hidden="true" />
+                        Add to Bag
+                      </button>
+                    )}
+
+                    <button
+                      type="button"
+                      aria-label={`Remove ${product.name} from closet`}
+                      onClick={() => removeItem(product.id)}
+                      className="p-3 transition-colors"
+                      style={{
+                        border: "1px solid var(--bc-border-soft)",
+                        color: "var(--bc-text-muted)",
+                      }}
+                    >
+                      <Trash2 size={16} aria-hidden="true" />
+                    </button>
+                  </div>
                 </div>
-
               </div>
-
-            </div>
-
-          ))}
-
+            );
+          })}
         </div>
-
       </div>
-
     </main>
   );
 }

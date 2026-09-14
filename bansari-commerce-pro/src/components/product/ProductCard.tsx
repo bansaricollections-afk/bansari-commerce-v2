@@ -108,7 +108,13 @@ export default function ProductCard({ product, priority = false }: Props) {
       router.push(`/product/${product.id}`);
       return;
     }
-    addItem({ productId: product.id, quantity: 1 });
+    addItem({
+      productId: product.id,
+      quantity: 1,
+      name: product.name,
+      price: product.price,
+      image: product.images?.[0]?.url,
+    });
     setQuickAdded(true);
     setTimeout(() => setQuickAdded(false), 1800);
   }

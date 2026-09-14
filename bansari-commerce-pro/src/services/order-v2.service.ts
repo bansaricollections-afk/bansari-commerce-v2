@@ -431,7 +431,38 @@ export const OrderV2Service = {
     if (!payload.awbNumber)   throw new OrderError('AWB / tracking number is required.', 'AWB_REQUIRED');
 
     const row = await getOrderRowOrThrow(orderId);
-    assertValidTransition(row.order_v2_status, 'shipped');
+
+    /*
+     * WALK THE ORDER FORWARD TO `packed` FIRST.
+     *
+     * The transition table only allows packed → shipped, but the admin offers
+     * "Ship Order" from confirmed, processing AND packed. From the first two,
+     * ship() threw INVALID_STATUS_TRANSITION — and because the client swallowed
+     * failed responses, a real shipment silently did nothing: no shipment row,
+     * no AWB, no customer email, no trace anywhere.
+     *
+     * `processing` and `packed` are bookkeeping steps a one-person boutique has
+     * no separate moment for: the parcel is packed and handed to the courier in
+     * one action. So rather than demand three extra clicks, walk the status
+     * through each legal step. Nothing is bypassed — every hop is a transition
+     * the table already permits, and each is written to the timeline, so the
+     * history still reads confirmed → processing → packed → shipped.
+     */
+    const WALK_TO_PACKED: Record<string, OrderV2Status[]> = {
+      confirmed:  ['processing', 'packed'],
+      processing: ['packed'],
+    };
+    for (const step of WALK_TO_PACKED[row.order_v2_status] ?? []) {
+      await this.updateStatus(orderId, step, {
+        actorId:   payload.actorId,
+        actorName: payload.actorName,
+        reason:    'Auto-advanced while shipping',
+      });
+    }
+
+    // Re-read: the walk above changed the row we validate against.
+    const current = await getOrderRowOrThrow(orderId);
+    assertValidTransition(current.order_v2_status, 'shipped');
 
     const sb  = createServiceRoleClient();
     const now = new Date().toISOString();
@@ -472,7 +503,8 @@ export const OrderV2Service = {
     if (error) throw new OrderError(error.message, 'INTERNAL');
 
     await appendTimeline(orderId, 'shipped', {
-      previousStatus: row.order_v2_status,
+      // `current`, not `row` — the walk above may have advanced the status.
+      previousStatus: current.order_v2_status,
       newStatus:      'shipped',
       actorId:        payload.actorId,
       actorName:      payload.actorName,

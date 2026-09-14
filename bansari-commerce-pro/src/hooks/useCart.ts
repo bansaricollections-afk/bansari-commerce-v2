@@ -53,18 +53,37 @@ export function useCart() {
   }
 
   /**
-   * addItem — accepts the shape used by ProductCard:
-   *   { productId: number, quantity: number }
-   * We cannot look up name/price here (no DB access on client), so we
-   * pass minimal data. The cart drawer should enrich from its own state.
-   * For a full add-to-cart, prefer navigating to the product page.
+   * addItem — the card-level adapter, for products that are NOT size-managed.
+   *
+   * This used to accept only { productId, quantity } and write name: '',
+   * price: 0, image: '' into the store, on the assumption that "the cart
+   * drawer should enrich from its own state". It does not — nothing enriches
+   * it — so any caller silently produced a blank ₹0 cart line. The display
+   * fields are now required, because the caller always has them.
+   *
+   * A size-managed product must NOT come through here: the line would carry no
+   * variantId and validateCartItems rejects the order at payment with "Please
+   * select a size". Send those to the PDP instead (see ProductCard and
+   * WishlistGrid), or use addToCart with a resolved size.
    */
-  function addItem({ productId, quantity }: { productId: number; quantity: number }) {
+  function addItem({
+    productId,
+    quantity,
+    name,
+    price,
+    image,
+  }: {
+    productId: number;
+    quantity: number;
+    name: string;
+    price: number;
+    image?: string;
+  }) {
     store.addItem({
       id: productId,
-      name: '',
-      image: '',
-      price: 0,
+      name,
+      image: image ?? '',
+      price,
       quantity,
     });
   }
