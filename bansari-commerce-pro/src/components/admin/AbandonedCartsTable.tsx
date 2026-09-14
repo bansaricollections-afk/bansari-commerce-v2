@@ -20,7 +20,8 @@ type AbandonedCart = {
   customerEmail: string | null;
   customerPhone: string | null;
   isGuest: boolean;
-  state: "ABANDONED" | "EXPIRED";
+  /* NO_PAYMENT_ATTEMPT — details entered at checkout, Pay never clicked. */
+  state: "ABANDONED" | "EXPIRED" | "NO_PAYMENT_ATTEMPT";
 };
 
 function formatAge(minutes: number | null): string {
@@ -235,8 +236,13 @@ export default function AbandonedCartsTable() {
                         <td className="px-4 py-3">
                           <Badge
                             variant={cart.state === "EXPIRED" ? "outline" : "secondary"}
+                            title={
+                              cart.state === "NO_PAYMENT_ATTEMPT"
+                                ? "Entered their details at checkout but never reached the payment screen."
+                                : undefined
+                            }
                           >
-                            {cart.state}
+                            {cart.state === "NO_PAYMENT_ATTEMPT" ? "NO PAYMENT ATTEMPT" : cart.state}
                           </Badge>
                           {cart.isGuest && (
                             <span className="ml-2 text-xs text-gray-400">guest</span>
@@ -284,6 +290,13 @@ export default function AbandonedCartsTable() {
         </div>
 
         <p className="mt-3 text-xs text-gray-400">
+          NO PAYMENT ATTEMPT means the shopper typed their contact details at
+          checkout and left before reaching the payment screen — earlier and
+          colder than a pending checkout, but contactable, which is the whole
+          point. Anyone who has since placed an order is excluded.
+        </p>
+
+        <p className="mt-2 text-xs text-gray-400">
           EXPIRED is a derived state, shown once a checkout has passed its expiry
           timestamp. Removal is handled by a separate database cleanup process, so
           expired records stay visible until that process removes them — treat no

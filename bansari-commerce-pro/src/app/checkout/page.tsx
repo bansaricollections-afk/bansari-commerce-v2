@@ -215,6 +215,86 @@ export default function CheckoutPage() {
 
   const errors      = validate(fields);
   const isValid     = Object.keys(errors).length === 0;
+
+  /* ── Abandoned-cart capture ──────────────────────────────────────────────
+   *
+   * A pending_orders row is only written when a payment order is created —
+   * the instant Pay is clicked. Anyone who fills this form and then leaves
+   * left no trace at all, and analytics reports a product name, never a
+   * person. So the contact details are captured here, as soon as they are
+   * valid: the earliest moment there is anything contactable to store.
+   *
+   * Deliberately narrow: name, phone, email and a cart snapshot. The delivery
+   * address is NOT sent — it is far more sensitive, and useless for the one
+   * thing this exists to enable, which is getting back in touch.
+   *
+   * Debounced so typing an email character by character is one write, not
+   * twenty. Keyed on a per-tab session id so the row is upserted. Every
+   * failure is swallowed: a shopper's checkout must never break because a
+   * merchant convenience did.
+   */
+  /*
+   * Read lazily inside the effect below, never during render: sessionStorage
+   * does not exist on the server, and touching it while rendering would make
+   * the SSR pass and hydration disagree. A ref rather than state because
+   * nothing renders from it.
+   */
+  const leadSessionId = useRef<string | null>(null);
+  function ensureLeadSessionId(): string {
+    if (leadSessionId.current) return leadSessionId.current;
+    const KEY = "bansari-checkout-session";
+    let existing = sessionStorage.getItem(KEY);
+    if (!existing) {
+      existing = crypto.randomUUID();
+      sessionStorage.setItem(KEY, existing);
+    }
+    leadSessionId.current = existing;
+    return existing;
+  }
+
+  const contactReady =
+    !errors.fullName && !errors.phone && !errors.email && items.length > 0;
+
+  /* Primitives only, so the effect does not re-fire on every render. */
+  const leadName  = fields.fullName.trim();
+  const leadPhone = fields.phone.trim();
+  const leadEmail = fields.email.trim();
+  const leadCartKey = items
+    .map((i) => `${i.id}:${i.variantId ?? ""}:${i.quantity}`)
+    .join("|");
+
+  useEffect(() => {
+    if (!contactReady) return;
+
+    const timer = setTimeout(() => {
+      void fetch("/api/checkout/lead", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        // keepalive: the write must still land if they close the tab moments
+        // after the debounce fires — which is exactly the case we care about.
+        keepalive: true,
+        body: JSON.stringify({
+          sessionId: ensureLeadSessionId(),
+          name:  leadName,
+          phone: leadPhone,
+          email: leadEmail,
+          items: items.map((i) => ({
+            id:        i.id,
+            name:      i.name,
+            size:      i.size ?? null,
+            variantId: i.variantId ?? null,
+            quantity:  i.quantity,
+            price:     i.price,
+          })),
+        }),
+      }).catch(() => {
+        // Never surfaced. See the note above.
+      });
+    }, 1200);
+
+    return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [contactReady, leadName, leadPhone, leadEmail, leadCartKey]);
   const firstErrorRef = useRef<HTMLInputElement | null>(null);
 
   function setField(key: keyof Fields) {

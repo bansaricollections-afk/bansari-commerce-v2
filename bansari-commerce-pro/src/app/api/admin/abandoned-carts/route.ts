@@ -209,9 +209,108 @@ export async function GET(request: NextRequest) {
         };
       });
 
+    /*
+     * Step 4 — checkout leads.
+     *
+     * `pending_orders` only ever sees people who reached the Pay click. The
+     * larger group — filled in their details, then left — lives in
+     * checkout_leads. Those are the genuinely recoverable ones: an email and
+     * the exact cart they wanted.
+     *
+     * A lead is dropped when an order exists for the same email placed at or
+     * after it, which is the same "do not chase someone who already bought"
+     * rule applied above, matched on the only key a lead carries.
+     */
+    const { data: leadRows, error: leadError } = await sb
+      .from('checkout_leads')
+      .select('id, created_at, customer_name, customer_email, customer_phone, item_count, subtotal, currency, converted_order_id, user_id')
+      .is('converted_order_id', null)
+      .lte('created_at', cutoffIso)
+      .order('created_at', { ascending: false })
+      .limit(limit);
+
+    /*
+     * Fails SOFT, unlike the paid cross-check below.
+     *
+     * The two failures are not equivalent. A broken buyer cross-check risks
+     * showing a paying customer as abandoned, so that one withholds the list.
+     * A broken leads query only means fewer rows — and if this deploys before
+     * the checkout_leads migration runs, it is simply a table that does not
+     * exist yet. Taking the whole abandoned-carts screen down for that would
+     * be a worse outcome than the screen it replaces.
+     */
+    if (leadError) {
+      log.error('admin.abandoned_carts.leads_query_failed', leadError);
+    }
+
+    const leads = (leadError ? [] : leadRows ?? []) as {
+      id: string; created_at: string; customer_name: string | null;
+      customer_email: string; customer_phone: string | null;
+      item_count: number | null; subtotal: number | string | null;
+      currency: string | null; user_id: string | null;
+    }[];
+
+    const purchasedEmails = new Map<string, number>();
+    if (leads.length > 0) {
+      const emails = [...new Set(leads.map((l) => l.customer_email.toLowerCase()))];
+      const { data: buyerRows, error: buyerError } = await sb
+        .from('orders')
+        .select('customer_email, created_at')
+        .in('customer_email', emails);
+      if (buyerError) {
+        log.error('admin.abandoned_carts.lead_buyer_crosscheck_failed', buyerError);
+        return apiError(requestId, 'DB_ERROR', 'Unable to verify paid orders; abandoned list withheld.', 500);
+      }
+      for (const o of buyerRows ?? []) {
+        const row = o as { customer_email: string | null; created_at: string };
+        if (!row.customer_email) continue;
+        const key = row.customer_email.toLowerCase();
+        const at = new Date(row.created_at).getTime();
+        const best = purchasedEmails.get(key);
+        if (best === undefined || at > best) purchasedEmails.set(key, at);
+      }
+    }
+
+    const leadCarts = leads
+      .filter((lead) => {
+        const boughtAt = purchasedEmails.get(lead.customer_email.toLowerCase());
+        return boughtAt === undefined || boughtAt < new Date(lead.created_at).getTime();
+      })
+      .map((lead) => {
+        const createdMs = new Date(lead.created_at).getTime();
+        return {
+          id: lead.id,
+          reference: null,
+          createdAt: lead.created_at,
+          expiresAt: null,
+          ageMinutes: Number.isFinite(createdMs)
+            ? Math.max(0, Math.round((now - createdMs) / 60_000))
+            : null,
+          value: Number(lead.subtotal ?? 0),
+          currency: lead.currency ?? 'INR',
+          itemCount: lead.item_count ?? 0,
+          customerName: lead.customer_name,
+          customerEmail: lead.customer_email,
+          customerPhone: lead.customer_phone,
+          isGuest: lead.user_id === null,
+          /*
+           * Distinct from 'ABANDONED' on purpose. These people never reached
+           * the payment screen, so they are earlier and colder than a pending
+           * order — worth knowing before picking up the phone.
+           */
+          state: 'NO_PAYMENT_ATTEMPT',
+        };
+      });
+
+    // Newest first across both sources.
+    const allCarts = [...carts, ...leadCarts].sort(
+      (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+    );
+
     log.info('admin.abandoned_carts.listed', {
       requestId,
       windowMinutes: minutes,
+      leads: leadCarts.length,
       candidates: rows.length,
       excludedAsPaid: rows.length - carts.length,
       returned: carts.length,
@@ -227,7 +326,7 @@ export async function GET(request: NextRequest) {
       // query, so `carts.length` can legitimately be smaller than `limit`.
       candidateCount: count ?? rows.length,
       excludedAsPaid: rows.length - carts.length,
-      data: carts,
+      data: allCarts,
     });
   } catch (err) {
     log.error('admin.abandoned_carts.unhandled', err);
