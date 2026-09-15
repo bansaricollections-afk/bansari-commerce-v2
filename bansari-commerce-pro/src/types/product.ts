@@ -120,6 +120,26 @@ export interface Product {
    */
   sizeAvailability?: SizeAvailability[];
   specifications?: ProductSpecification;
+
+  /*
+   * Structured attribute references, as stored by the admin. Resolved to
+   * display labels through src/services/product-attributes.ts — the ids are
+   * carried rather than the names so a renamed attribute option updates
+   * everywhere at once.
+   */
+  attrFabricId?: number;
+  attrColorId?: number;
+  attrOccasionId?: number;
+  attrPatternId?: number;
+  attrFitId?: number;
+  attrSleeveId?: number;
+  attrNeckId?: number;
+  attrBottomId?: number;
+  attrWorkId?: number;
+  attrLengthId?: number;
+  careInstructions?: string;
+  packageContents?: string;
+  countryOfOrigin?: string;
   description?: string;
   seo?: ProductSEO;
   reviews?: ProductReview[];

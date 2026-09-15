@@ -4,8 +4,6 @@
 // No route, layout, filter, or sort logic changes.
 import { Suspense } from 'react';
 import type { Metadata } from 'next';
-import Header from '@/components/layout/Header';
-import Footer from '@/components/layout/Footer';
 import FilterSidebar from '@/components/shop/FilterSidebar';
 import MobileFilterBar from '@/components/shop/MobileFilterBar';
 import ShopToolbar from '@/components/shop/ShopToolbar';
@@ -117,7 +115,6 @@ export default async function SearchPage({
 
   return (
     <>
-      <Header />
       <main id="main-content" className="min-h-screen bg-white">
         {/* ─ Search bar hero ─ */}
         <section className="border-b border-slate-100 bg-[#faf9f7] px-4 py-10 sm:px-6">
@@ -184,7 +181,6 @@ export default async function SearchPage({
         )}
       </main>
       <ShopTrustStrip />
-      <Footer />
     </>
   );
 }

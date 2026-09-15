@@ -57,6 +57,26 @@ export type Product = {
    */
   sizeAvailability?: SizeAvailability[];
   specifications?: any;
+
+  /*
+   * Structured attributes as stored by the admin — the attr_*_id foreign keys
+   * into the ten lookup tables. Carried as ids, not names, so a renamed
+   * attribute option updates every product at once. Resolved for display by
+   * buildSpecRows() in src/services/product-attributes.ts.
+   */
+  attrFabricId?: number;
+  attrColorId?: number;
+  attrOccasionId?: number;
+  attrPatternId?: number;
+  attrFitId?: number;
+  attrSleeveId?: number;
+  attrNeckId?: number;
+  attrBottomId?: number;
+  attrWorkId?: number;
+  attrLengthId?: number;
+  careInstructions?: string;
+  packageContents?: string;
+  countryOfOrigin?: string;
   seo?: any;
   reviews?: any[];
   color?: string;
@@ -93,8 +113,15 @@ export type CartValidationResult =
 // Shared select clause — every field consumed by any storefront component
 // ---------------------------------------------------------------------------
 
+/*
+ * The attr_*_id columns were missing here, which is why no product page ever
+ * showed a specification. The admin has been writing them since August — 43 of
+ * 56 active products carry a fabric, fit, sleeve and occasion — but the
+ * storefront never asked Postgres for them, so the data could not render.
+ * Resolved to labels by src/services/product-attributes.ts.
+ */
 const PRODUCT_SELECT =
-  'id, name, slug, price, stock, active, images, category, featured, new_arrival, best_seller, description, sizes, compare_price, seo_title, seo_description, sku, collection, fabric, color, rating, review_count, specifications' as const;
+  'id, name, slug, price, stock, active, images, category, featured, new_arrival, best_seller, description, sizes, compare_price, seo_title, seo_description, sku, collection, fabric, color, rating, review_count, specifications, care_instructions, package_contents, country_of_origin, attr_fabric_id, attr_color_id, attr_occasion_id, attr_pattern_id, attr_fit_id, attr_sleeve_id, attr_neck_id, attr_bottom_id, attr_work_id, attr_length_id' as const;
 
 // ---------------------------------------------------------------------------
 // mapRow — normalises a raw Supabase row into the Product shape
@@ -177,6 +204,26 @@ function mapRow(row: Record<string, any>): Product {
     rating: undefined,
     reviewCount: undefined,
     specifications: row['specifications'] ?? undefined,
+
+    /*
+     * Structured attributes, straight from the lookup FKs the admin writes.
+     * Resolved to labels at render time by buildSpecRows() rather than here,
+     * so mapRow stays synchronous and the ten lookup tables are read once per
+     * request instead of once per product.
+     */
+    attrFabricId:    row['attr_fabric_id']   ?? undefined,
+    attrColorId:     row['attr_color_id']    ?? undefined,
+    attrOccasionId:  row['attr_occasion_id'] ?? undefined,
+    attrPatternId:   row['attr_pattern_id']  ?? undefined,
+    attrFitId:       row['attr_fit_id']      ?? undefined,
+    attrSleeveId:    row['attr_sleeve_id']   ?? undefined,
+    attrNeckId:      row['attr_neck_id']     ?? undefined,
+    attrBottomId:    row['attr_bottom_id']   ?? undefined,
+    attrWorkId:      row['attr_work_id']     ?? undefined,
+    attrLengthId:    row['attr_length_id']   ?? undefined,
+    careInstructions: row['care_instructions'] ?? undefined,
+    packageContents:  row['package_contents']  ?? undefined,
+    countryOfOrigin:  row['country_of_origin'] ?? undefined,
     seo_title: row['seo_title'] ?? undefined,
     seo_description: row['seo_description'] ?? undefined,
     // compare_price DB column → oldPrice camelCase used by ProductCard / ProductInfo

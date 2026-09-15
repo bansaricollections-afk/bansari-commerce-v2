@@ -6,6 +6,7 @@ import { FaInstagram, FaFacebookF, FaPinterestP } from "react-icons/fa6";
 import CookiePreferencesLink from "@/components/consent/CookiePreferencesLink";
 
 import { getShopFacets } from "@/services/shop-facets";
+import FooterShopBy from "@/components/layout/FooterShopBy";
 
 // Fixed destinations that are not catalog-derived. The collection links used
 // to be hardcoded here too ("SUMMER 2026", "Celebration Edit") and would have
@@ -386,6 +387,12 @@ export default async function Footer() {
           </div>
         </div>
       </div>
+
+      {/* ── Shop By — sitewide links to every browse landing ──
+         Sits between the main grid and the legal bar: it is browsing, not
+         fine print, and it is the only place the landing pages are linked
+         from every page rather than just /shop and /collections. */}
+      <FooterShopBy />
 
       {/* ── Bottom bar ── */}
       <div

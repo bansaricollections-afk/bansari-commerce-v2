@@ -45,31 +45,24 @@ function Row({ item, open, toggle }: { item: Item; open: boolean; toggle: () => 
 }
 
 export default function ProductAccordion({ product }: Props) {
-  const [openId, setOpenId] = useState<string | null>('specs');
+  const [openId, setOpenId] = useState<string | null>('care');
   const specs = product.specifications;
   const toggle = (id: string) => setOpenId(prev => prev === id ? null : id);
 
   const items: Item[] = [
-    // ── Specifications ──────────────────────────────────────────
-    {
-      id: 'specs',
-      label: 'Product Specifications',
-      content: specs ? (
-        <dl className="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-3">
-          {specs.fabric && (<><dt className="text-[10px] tracking-widest uppercase text-slate-400">Fabric</dt><dd className="text-sm text-slate-700">{specs.fabric}</dd></>)}
-          {specs.work && (<><dt className="text-[10px] tracking-widest uppercase text-slate-400">Work</dt><dd className="text-sm text-slate-700">{specs.work}</dd></>)}
-          {specs.neckline && (<><dt className="text-[10px] tracking-widest uppercase text-slate-400">Neckline</dt><dd className="text-sm text-slate-700">{specs.neckline}</dd></>)}
-          {specs.sleeve && (<><dt className="text-[10px] tracking-widest uppercase text-slate-400">Sleeve</dt><dd className="text-sm text-slate-700">{specs.sleeve}</dd></>)}
-          {specs.fit && (<><dt className="text-[10px] tracking-widest uppercase text-slate-400">Fit</dt><dd className="text-sm text-slate-700">{specs.fit}</dd></>)}
-          {specs.occasion && (
-            <><dt className="text-[10px] tracking-widest uppercase text-slate-400">Occasion</dt>
-            <dd className="text-sm text-slate-700">{Array.isArray(specs.occasion) ? specs.occasion.join(', ') : specs.occasion}</dd></>
-          )}
-          {product.sku && (<><dt className="text-[10px] tracking-widest uppercase text-slate-400">Style Code</dt><dd className="text-sm font-mono text-slate-500">{product.sku}</dd></>)}
-          {product.category && (<><dt className="text-[10px] tracking-widest uppercase text-slate-400">Category</dt><dd className="text-sm text-slate-700">{product.category}</dd></>)}
-        </dl>
-      ) : <p className="text-slate-400 italic text-sm">Specifications not available.</p>,
-    },
+    /*
+     * The 'Product Specifications' panel that used to live here has been
+     * replaced by <ProductSpecifications>, a full section above this
+     * accordion.
+     *
+     * It read product.specifications — a JSONB column populated on ONE of
+     * fifty-six active products — so on every other product it rendered
+     * "Specifications not available." while the real attributes sat unread in
+     * the attr_*_id columns. Leaving it in place alongside the new section
+     * put that denial directly beneath a table listing ten specifications.
+     *
+     * Its one unique field, Style Code, moved into buildSpecRows().
+     */
 
     // ── Fabric & Care ────────────────────────────────────────────
     (specs?.fabric || specs?.care) ? {

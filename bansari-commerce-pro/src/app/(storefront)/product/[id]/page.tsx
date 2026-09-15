@@ -2,13 +2,13 @@ import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 
 import { getProductById, incrementProductView } from '@/services/product.service';
-import Header from '@/components/layout/Header';
-import Footer from '@/components/layout/Footer';
+import { getAttributeIndex, buildSpecRows } from '@/services/product-attributes';
 
 import CompleteLook from '@/components/product/CompleteLook';
 import ProductAccordion from '@/components/product/ProductAccordion';
 import ProductGallery from '@/components/product/ProductGallery';
 import ProductInfo from '@/components/product/ProductInfo';
+import ProductSpecifications from '@/components/product/ProductSpecifications';
 import RecentlyViewed from '@/components/product/RecentlyViewed';
 import TrustBadges from '@/components/product/TrustBadges';
 import { jsonLd } from '@/lib/json-ld';
@@ -141,6 +141,35 @@ export default async function ProductPage({ params }: Props) {
 
   // ── Derived schema inputs ───────────────────────────────────────────────
   const spec = product.specifications;
+
+  /*
+   * Specification rows, resolved from the attr_*_id lookups the admin writes.
+   * One cached read of the ten small attribute tables serves this, the
+   * metadata and the JSON-LD.
+   */
+  const attributeIndex = await getAttributeIndex();
+  const specRows = buildSpecRows(
+    {
+      attrFabricId:   product.attrFabricId,
+      attrColorId:    product.attrColorId,
+      attrOccasionId: product.attrOccasionId,
+      attrPatternId:  product.attrPatternId,
+      attrFitId:      product.attrFitId,
+      attrSleeveId:   product.attrSleeveId,
+      attrNeckId:     product.attrNeckId,
+      attrBottomId:   product.attrBottomId,
+      attrWorkId:     product.attrWorkId,
+      attrLengthId:   product.attrLengthId,
+      sku:            product.sku,
+      fabric:         product.fabric,
+      color:          product.color,
+      category:       product.category,
+      careInstructions: product.careInstructions,
+      packageContents:  product.packageContents,
+      countryOfOrigin:  product.countryOfOrigin,
+    },
+    attributeIndex
+  );
 
   // Size-managed products carry live variant rows; legacy ones do not.
   const sizeLabels = (product.sizeAvailability ?? [])
@@ -303,7 +332,6 @@ export default async function ProductPage({ params }: Props) {
 
   return (
     <>
-      <Header />
       {/* mobile sticky bottom bar offset */}
       <div className="pb-[76px] lg:pb-0">
         <main className="min-h-screen bg-[#FFFDF9]">
@@ -337,6 +365,9 @@ export default async function ProductPage({ params }: Props) {
             </section>
           )}
 
+          {/* PRODUCT SPECIFICATIONS — structured attributes, real values only */}
+          <ProductSpecifications rows={specRows} />
+
           {/* ACCORDION: Details / Care / Shipping / Returns / Reviews */}
           <section className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 pb-14">
             <ProductAccordion product={product} />
@@ -363,7 +394,6 @@ export default async function ProductPage({ params }: Props) {
           </section>
         </main>
       </div>
-      <Footer />
     </>
   );
 }
