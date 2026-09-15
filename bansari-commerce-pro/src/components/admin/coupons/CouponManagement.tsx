@@ -78,9 +78,22 @@ type ApiSingleResponse = {
   data: Coupon;
 };
 
+/*
+ * The canonical error shape every route returns via apiError():
+ *   { success: false, requestId, code, message }
+ *
+ * This was typed as { error: { code, message } } — a shape nothing on the
+ * server produces. `errBody?.error?.message` was therefore always undefined,
+ * so every failure fell back to a bare "HTTP 500" / "HTTP 409" and the real
+ * reason the server had gone to the trouble of sending was thrown away.
+ * `error` is kept optional for any older endpoint still using the nested form.
+ */
 type ApiErrorResponse = {
   success: false;
-  error: { code: string; message: string };
+  requestId?: string;
+  code?: string;
+  message?: string;
+  error?: { code: string; message: string };
 };
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -109,7 +122,8 @@ async function apiFetch<T>(url: string, options?: RequestInit): Promise<T> {
     let errMsg = `HTTP ${res.status}`;
     try {
       const errBody = (await res.json()) as ApiErrorResponse;
-      if (errBody?.error?.message) errMsg = errBody.error.message;
+      const detail = errBody?.message ?? errBody?.error?.message;
+      if (detail) errMsg = detail;
     } catch { /* ignore */ }
     throw new Error(errMsg);
   }

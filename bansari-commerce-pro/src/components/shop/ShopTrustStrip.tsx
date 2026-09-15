@@ -3,7 +3,7 @@ import { SHIPPING_THRESHOLD } from "@/lib/shipping";
 // Shipping copy is derived from the same constant the checkout and the
 // order-creation API bill against, so the two can never contradict each other.
 // This previously read "Orders above ₹1,999" while the server charged ₹99 on
-// anything under ₹2,999.
+// anything under ₹2,999. The threshold is now ₹2,099.
 const TRUST_ITEMS = [
   {
     label: "Free Shipping",

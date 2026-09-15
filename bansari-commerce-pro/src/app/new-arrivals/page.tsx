@@ -1,3 +1,5 @@
+import { SHIPPING_THRESHOLD_LABEL } from "@/lib/shipping";
+
 import Image from "next/image";
 import Link from "next/link";
 
@@ -9,7 +11,7 @@ export const revalidate = 60;
 export const metadata = {
   title: "New Arrivals — Latest Ethnic Wear",
   description:
-    "Shop the newest arrivals at Bansari Collections — freshly added cotton kurta sets, linen co-ords and embroidered ethnic wear for women. Free shipping over Rs 2,999.",
+    `Shop the newest arrivals at Bansari Collections — freshly added cotton kurta sets, linen co-ords and embroidered ethnic wear for women. Free shipping over Rs ${SHIPPING_THRESHOLD_LABEL}.`,
   alternates: {
     canonical: "https://www.bansaricollection.in/new-arrivals",
   },

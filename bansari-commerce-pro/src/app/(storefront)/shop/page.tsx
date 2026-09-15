@@ -1,3 +1,5 @@
+import { SHIPPING_THRESHOLD_LABEL } from "@/lib/shipping";
+
 import { Suspense } from "react";
 import type { Metadata } from "next";
 
@@ -28,7 +30,7 @@ export const metadata: Metadata = {
   // so the template appended it a second time.
   title: "Shop Indian Ethnic Wear for Women",
   description:
-    "Browse cotton kurta sets, linen co-ords, chikankari suits and printed kurtis. Filter by fabric, colour, size and price. Free shipping over ₹2,999.",
+    `Browse cotton kurta sets, linen co-ords, chikankari suits and printed kurtis. Filter by fabric, colour, size and price. Free shipping over ₹${SHIPPING_THRESHOLD_LABEL}.`,
   openGraph: {
     title: "Shop Indian Ethnic Wear — Bansari Collections",
     description: "Cotton kurta sets, linen co-ords, chikankari suits and printed kurtis.",
@@ -197,7 +199,7 @@ export default async function ShopPage({ searchParams }: ShopPageProps) {
         ── CRO strip ──────────────────────────────────────────────────────────
         Below the grid, deliberately.
 
-        "Personal styling on WhatsApp" and "Free shipping over ₹2,999" are
+        "Personal styling on WhatsApp" and "Free shipping over ₹2,099" are
         reassurance for a shopper who is hesitating — they answer questions
         nobody has yet asked when shown before the first product. Above the grid
         this band cost 290px and helped push the first product 951px down on

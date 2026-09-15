@@ -1,3 +1,5 @@
+import { SHIPPING_THRESHOLD_LABEL } from "@/lib/shipping";
+
 import AnnouncementBar from "@/components/home/AnnouncementBar";
 import EditorialHero from "@/components/home/EditorialHero";
 import CategoryShowcase from "@/components/home/CategoryShowcase";
@@ -24,7 +26,7 @@ export const metadata = {
     absolute: "Bansari Collections — Indian Ethnic Wear for Women",
   },
   description:
-    "Shop handcrafted Indian ethnic wear for women — cotton kurta sets, linen co-ords, chikankari and printed suits. Free shipping over ₹2,999.",
+    `Shop handcrafted Indian ethnic wear for women — cotton kurta sets, linen co-ords, chikankari and printed suits. Free shipping over ₹${SHIPPING_THRESHOLD_LABEL}.`,
   alternates: { canonical: "/" },
 };
 

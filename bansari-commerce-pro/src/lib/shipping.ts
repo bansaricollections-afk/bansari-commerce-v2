@@ -8,7 +8,16 @@
  */
 
 /** Minimum cart subtotal (₹) required to qualify for free shipping. */
-export const SHIPPING_THRESHOLD = 2999;
+export const SHIPPING_THRESHOLD = 2099;
+
+/**
+ * The threshold formatted for display — "2,099".
+ *
+ * Marketing copy used to hardcode the number in ten places, so lowering the
+ * threshold meant the site advertised one figure while the server billed
+ * against another. Every piece of shipping copy now reads from here.
+ */
+export const SHIPPING_THRESHOLD_LABEL = SHIPPING_THRESHOLD.toLocaleString('en-IN');
 
 /** Flat-rate shipping cost (₹) applied when subtotal < SHIPPING_THRESHOLD. */
 export const STANDARD_SHIPPING = 99;

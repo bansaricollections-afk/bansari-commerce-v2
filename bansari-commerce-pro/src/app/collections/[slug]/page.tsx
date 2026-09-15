@@ -1,3 +1,5 @@
+import { SHIPPING_THRESHOLD_LABEL } from "@/lib/shipping";
+
 import { jsonLd } from '@/lib/json-ld';
 /**
  * Collection landing page — /collections/[slug]
@@ -101,7 +103,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
    */
   const factual = `Shop the ${name} collection at Bansari Collections — ${meta.total} ${
     meta.total === 1 ? "piece" : "pieces"
-  } of handcrafted Indian ethnic wear for women. Free shipping over ₹2,999.`;
+  } of handcrafted Indian ethnic wear for women. Free shipping over ₹${SHIPPING_THRESHOLD_LABEL}.`;
   const description = trimToLength(copy ? `${copy}. ${factual}` : factual, 158);
 
   return {

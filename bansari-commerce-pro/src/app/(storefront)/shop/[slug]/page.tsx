@@ -1,3 +1,5 @@
+import { SHIPPING_THRESHOLD_LABEL } from "@/lib/shipping";
+
 /**
  * Browse landing page — /shop/<slug>
  *
@@ -40,11 +42,11 @@ function introFor(landing: BrowseLanding): string {
   const pieces = `${n} ${n === 1 ? 'piece' : 'pieces'}`;
   switch (landing.kind) {
     case 'category':
-      return `${pieces} of ${landing.heading.toLowerCase()} from Bansari Collections, a boutique in Vadodara. Free shipping on orders over ₹2,999 and 7-day returns.`;
+      return `${pieces} of ${landing.heading.toLowerCase()} from Bansari Collections, a boutique in Vadodara. Free shipping on orders over ₹${SHIPPING_THRESHOLD_LABEL} and 7-day returns.`;
     case 'fabric':
-      return `${pieces} in ${landing.filter.fabric?.toLowerCase()} from Bansari Collections, a boutique in Vadodara. Free shipping on orders over ₹2,999 and 7-day returns.`;
+      return `${pieces} in ${landing.filter.fabric?.toLowerCase()} from Bansari Collections, a boutique in Vadodara. Free shipping on orders over ₹${SHIPPING_THRESHOLD_LABEL} and 7-day returns.`;
     default:
-      return `${pieces} of ${landing.filter.fabric?.toLowerCase()} ${landing.filter.category?.toLowerCase()} from Bansari Collections, a boutique in Vadodara. Free shipping on orders over ₹2,999 and 7-day returns.`;
+      return `${pieces} of ${landing.filter.fabric?.toLowerCase()} ${landing.filter.category?.toLowerCase()} from Bansari Collections, a boutique in Vadodara. Free shipping on orders over ₹${SHIPPING_THRESHOLD_LABEL} and 7-day returns.`;
   }
 }
 

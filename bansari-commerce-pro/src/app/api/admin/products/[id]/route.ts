@@ -6,6 +6,7 @@ import { generateRequestId } from '@/lib/request-id';
 import { apiError } from '@/lib/api-response';
 import { ProductV2Service } from '@/services/product-v2.service';
 import type { UpdateProductV2Payload } from '@/types/product-v2';
+import { productErrorStatus } from '@/lib/product-errors';
 
 const log = createLogger({ service: 'admin.products' });
 
@@ -82,10 +83,7 @@ export async function PUT(request: NextRequest, context: RouteContext) {
     const message = err instanceof Error ? err.message : 'Unknown error';
     const code = (err as { code?: string }).code ?? 'INTERNAL';
     log.error('admin.products.update.failed', err, { requestId });
-    const statusMap: Record<string, number> = {
-      VALIDATION: 422, SIZE_INVENTORY_REQUIRED: 422, DUPLICATE_SKU: 409, DUPLICATE_SLUG: 409, NOT_FOUND: 404, INTERNAL: 500,
-    };
-    return apiError(requestId, code, message, statusMap[code] ?? 500);
+    return apiError(requestId, code, message, productErrorStatus(code));
   }
 }
 

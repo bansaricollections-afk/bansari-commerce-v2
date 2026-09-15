@@ -3,6 +3,7 @@
  * Benchmark: Net-a-Porter · Aza Fashions · Sabyasachi.
  * Premium icon set, refined typography, hairline gold dividers.
  */
+import { SHIPPING_THRESHOLD_LABEL } from "@/lib/shipping";
 
 const TRUST_ITEMS = [
   {
@@ -18,7 +19,7 @@ const TRUST_ITEMS = [
       </svg>
     ),
     label: "Complimentary Shipping",
-    sub: "On orders above ₹2,999",
+    sub: `On orders above ₹${SHIPPING_THRESHOLD_LABEL}`,
   },
   {
     icon: (

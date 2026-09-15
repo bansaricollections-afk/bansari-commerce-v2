@@ -1,3 +1,5 @@
+import { SHIPPING_THRESHOLD_LABEL } from "@/lib/shipping";
+
 export const metadata = {
   title: "Shipping Policy",
   description:
@@ -34,8 +36,9 @@ export default function ShippingPolicyPage() {
         </h2>
 
         <p>
-          Orders with a subtotal of ₹2,999 or more are shipped free of charge.
-          Orders below ₹2,999 are charged a flat standard shipping fee of ₹99.
+          Orders with a subtotal of ₹{SHIPPING_THRESHOLD_LABEL} or more are shipped
+          free of charge. Orders below ₹{SHIPPING_THRESHOLD_LABEL} are charged a flat
+          standard shipping fee of ₹99.
           The applicable shipping charge is shown at checkout before payment is
           completed.
         </p>
