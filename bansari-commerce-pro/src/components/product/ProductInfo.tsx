@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useEffect, useRef, useState } from 'react';
 
 import type { Product } from '@/types/product';
+import type { ProductSpecRow } from '@/services/product-attributes';
 import type { ProductVariant, SizeAvailability } from '@/types/product';
 import { trackRecentlyViewed } from '@/lib/recentlyViewed';
 import { SHIPPING_THRESHOLD } from '@/lib/shipping';
@@ -17,6 +18,12 @@ import PincodeChecker from './PincodeChecker';
 // TrustBadges rendered ONCE in page.tsx — never here.
 
 interface Props {
+  /**
+   * Specification rows, resolved server-side from the attr_*_id lookups.
+   * Passed in rather than fetched here: this is a client component, and the
+   * ten attribute lookup tables are read once per request on the server.
+   */
+  specRows?: ProductSpecRow[];
   product: Product;
   canonicalUrl: string;
 }
@@ -164,7 +171,7 @@ function SizeGuideModal({ onClose }: { onClose: () => void }) {
   );
 }
 
-export default function ProductInfo({ product, canonicalUrl }: Props) {
+export default function ProductInfo({ product, canonicalUrl, specRows = [] }: Props) {
   const [quantity, setQuantity] = useState(1);
   const [selectedVariant, setSelectedVariant] = useState<ProductVariant | null>(null);
   const [selectedSize, setSelectedSize] = useState<SizeAvailability | null>(null);
@@ -480,47 +487,51 @@ export default function ProductInfo({ product, canonicalUrl }: Props) {
           <PincodeChecker />
         </div>
 
-        {/* ── Quick spec pills ── */}
-        {specs && (
-          <div className="mt-8 grid grid-cols-2 gap-x-6 gap-y-3.5 pt-6 border-t border-slate-100">
-            {specs.fabric && (
-              <div>
-                <p className="text-[10px] tracking-[0.18em] uppercase text-slate-500 mb-1">Fabric</p>
-                <p className="text-sm text-slate-800 font-normal">{specs.fabric}</p>
-              </div>
-            )}
-            {specs.occasion && (
-              <div>
-                <p className="text-[10px] tracking-[0.18em] uppercase text-slate-500 mb-1">Occasion</p>
-                <p className="text-sm text-slate-800 font-normal">
-                  {Array.isArray(specs.occasion) ? specs.occasion.join(', ') : specs.occasion}
-                </p>
-              </div>
-            )}
-            {specs.fit && (
-              <div>
-                <p className="text-[10px] tracking-[0.18em] uppercase text-slate-500 mb-1">Fit</p>
-                <p className="text-sm text-slate-800 font-normal">{specs.fit}</p>
-              </div>
-            )}
-            {specs.neckline && (
-              <div>
-                <p className="text-[10px] tracking-[0.18em] uppercase text-slate-500 mb-1">Neckline</p>
-                <p className="text-sm text-slate-800 font-normal">{specs.neckline}</p>
-              </div>
-            )}
-            {specs.sleeve && (
-              <div>
-                <p className="text-[10px] tracking-[0.18em] uppercase text-slate-500 mb-1">Sleeve</p>
-                <p className="text-sm text-slate-800 font-normal">{specs.sleeve}</p>
-              </div>
-            )}
-            {specs.work && (
-              <div>
-                <p className="text-[10px] tracking-[0.18em] uppercase text-slate-500 mb-1">Work</p>
-                <p className="text-sm text-slate-800 font-normal">{specs.work}</p>
-              </div>
-            )}
+        {/* ── The Details — specification block, inside the purchase panel ──
+           Position is the point. This started life as a full-width section far
+           below the fold, which meant the two things that actually decide an
+           ethnic-wear purchase — what it is made of and how it is cut — sat
+           three screens away from the Add to Cart button. A shopper should not
+           have to scroll to learn the fabric.
+
+           It replaces a "Quick spec pills" block that stood in exactly this
+           spot reading product.specifications, a JSONB column populated on one
+           product out of fifty-six. Right position, dead data. Same position
+           now, with the attributes the admin has actually been saving.
+
+           Two columns of label-over-value rather than the label/value rows used
+           in a wide table: this column is ~45% of the page, and a
+           right-aligned value opposite its label would leave a gulf between
+           them. */}
+        {specRows.length > 0 && (
+          <div className="mt-8 border-t pt-6" style={{ borderColor: 'var(--bc-border-soft)' }}>
+            <p
+              className="mb-4 text-[10px] font-semibold uppercase tracking-[0.2em]"
+              style={{ color: 'var(--bc-text-primary)' }}
+            >
+              The Details
+            </p>
+
+            <dl className="grid grid-cols-2 gap-x-6 gap-y-3.5">
+              {specRows.map((row) => (
+                <div key={row.label}>
+                  <dt
+                    className="mb-1 text-[10px] uppercase tracking-[0.18em]"
+                    style={{ color: 'var(--bc-text-muted)' }}
+                  >
+                    {row.label}
+                  </dt>
+                  <dd
+                    /* break-words: a long unbroken SKU has no wrap opportunity
+                       and would otherwise spill out of a ~150px column. */
+                    className="text-sm leading-snug break-words"
+                    style={{ color: 'var(--bc-text-primary)' }}
+                  >
+                    {row.value}
+                  </dd>
+                </div>
+              ))}
+            </dl>
           </div>
         )}
       </div>

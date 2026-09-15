@@ -8,7 +8,6 @@ import CompleteLook from '@/components/product/CompleteLook';
 import ProductAccordion from '@/components/product/ProductAccordion';
 import ProductGallery from '@/components/product/ProductGallery';
 import ProductInfo from '@/components/product/ProductInfo';
-import ProductSpecifications from '@/components/product/ProductSpecifications';
 import RecentlyViewed from '@/components/product/RecentlyViewed';
 import TrustBadges from '@/components/product/TrustBadges';
 import { jsonLd } from '@/lib/json-ld';
@@ -344,7 +343,7 @@ export default async function ProductPage({ params }: Props) {
           <section className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 pt-8 pb-16">
             <div className="grid gap-8 lg:gap-16 lg:grid-cols-[55%_45%]">
               <ProductGallery product={product} />
-              <ProductInfo product={product} canonicalUrl={canonicalUrl} />
+              <ProductInfo product={product} canonicalUrl={canonicalUrl} specRows={specRows} />
             </div>
           </section>
 
@@ -364,9 +363,6 @@ export default async function ProductPage({ params }: Props) {
               </div>
             </section>
           )}
-
-          {/* PRODUCT SPECIFICATIONS — structured attributes, real values only */}
-          <ProductSpecifications rows={specRows} />
 
           {/* ACCORDION: Details / Care / Shipping / Returns / Reviews */}
           <section className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 pb-14">
