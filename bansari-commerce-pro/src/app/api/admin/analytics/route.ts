@@ -32,24 +32,59 @@ export async function GET(request: NextRequest) {
   }
 
   const orders = ordersResult.data ?? [];
-  const totalRevenue = orders
-    .filter((o) => o.order_status !== 'cancelled')
-    .reduce((sum, o) => sum + Number(o.grand_total ?? 0), 0);
 
-  const completedOrders = orders.filter(
-    (o) => o.order_status === 'delivered'
-  ).length;
+  /*
+   * FIELD NAMES ARE SNAKE_CASE ON PURPOSE.
+   *
+   * This route used to return totalRevenue / totalOrders / aov /
+   * completedOrders while AdminAnalytics read total_revenue, total_orders,
+   * average_order_value, delivered_orders, cancelled_orders and
+   * pending_orders. Every KPI card therefore read `undefined` and the page
+   * looked broken while both halves were individually "working".
+   *
+   * The component's shape is the fuller one — it wants the cancelled and
+   * pending counts too — so the API is brought to it rather than the reverse.
+   */
+  const isCancelled = (status: string | null) =>
+    (status ?? '').toLowerCase() === 'cancelled';
 
-  const aov = completedOrders > 0 ? totalRevenue / completedOrders : 0;
+  const billable = orders.filter((o) => !isCancelled(o.order_status));
+
+  const totalRevenue = billable.reduce(
+    (sum, o) => sum + Number(o.grand_total ?? 0),
+    0
+  );
+
+  const deliveredOrders = orders.filter((o) => o.order_status === 'delivered').length;
+  const cancelledOrders = orders.filter((o) => isCancelled(o.order_status)).length;
+
+  /*
+   * Anything not yet delivered and not cancelled is still in flight. Derived
+   * rather than matched against a list of status names, so a status added to
+   * the lifecycle later cannot silently vanish from this figure.
+   */
+  const pendingOrders = orders.length - deliveredOrders - cancelledOrders;
+
+  /*
+   * AOV over the orders the revenue actually came from.
+   *
+   * It used to divide total revenue by the DELIVERED count — a different
+   * population from the numerator. With five real orders and none yet marked
+   * delivered, that reported an average order value of zero against ₹2,480 of
+   * revenue.
+   */
+  const averageOrderValue = billable.length > 0 ? totalRevenue / billable.length : 0;
 
   return NextResponse.json({
     success: true,
     requestId,
-    totalRevenue,
-    totalOrders: orders.length,
-    completedOrders,
-    aov: Math.round(aov),
-    totalProducts: productsResult.count ?? 0,
-    periodDays: 30,
+    total_revenue: totalRevenue,
+    total_orders: orders.length,
+    average_order_value: Math.round(averageOrderValue),
+    delivered_orders: deliveredOrders,
+    cancelled_orders: cancelledOrders,
+    pending_orders: pendingOrders,
+    total_products: productsResult.count ?? 0,
+    period_days: 30,
   });
 }

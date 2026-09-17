@@ -72,17 +72,38 @@ export function AdminAnalytics() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    /*
+     * Checks res.ok. These used to call .json() on whatever came back, so a
+     * 401 from an expired admin session or a 500 from a bad column was parsed
+     * as data and rendered as empty cards — the page looked broken with no
+     * indication of why. An expired session is by far the most likely cause
+     * and is worth saying out loud.
+     */
+    const read = async (url: string) => {
+      const res = await fetch(url, { cache: "no-store" });
+      if (!res.ok) {
+        const detail =
+          res.status === 401 || res.status === 403
+            ? "Your admin session has expired — sign in again."
+            : `${url} returned ${res.status}`;
+        throw new Error(detail);
+      }
+      return res.json();
+    };
+
     Promise.all([
-      fetch("/api/admin/analytics").then((r) => r.json()),
-      fetch("/api/admin/analytics/top-products").then((r) => r.json()),
-      fetch("/api/admin/analytics/daily").then((r) => r.json()),
+      read("/api/admin/analytics"),
+      read("/api/admin/analytics/top-products"),
+      read("/api/admin/analytics/daily"),
     ])
       .then(([s, tp, d]) => {
         setSummary(s);
-        setTopProducts(tp);
-        setDaily(d);
+        // Defensive: an error body is an object, and .map on it would throw
+        // during render, replacing the page with a blank screen.
+        setTopProducts(Array.isArray(tp) ? tp : []);
+        setDaily(Array.isArray(d) ? d : []);
       })
-      .catch((e) => setError(String(e)))
+      .catch((e) => setError(e instanceof Error ? e.message : String(e)))
       .finally(() => setLoading(false));
   }, []);
 
