@@ -14,6 +14,7 @@ export type PublicReview = {
   title: string | null;
   body: string | null;
   verifiedPurchase: boolean;
+  photos: string[];
   createdAt: string;
 };
 
@@ -147,6 +148,8 @@ export async function submitReview(input: {
   authorName: string;
   title?: string | null;
   body?: string | null;
+  /** Public URLs returned by /api/reviews/photo. */
+  photos?: string[];
 }): Promise<SubmitResult> {
   const rating = Math.round(Number(input.rating));
   if (!Number.isFinite(rating) || rating < 1 || rating > 5) {
@@ -176,6 +179,15 @@ export async function submitReview(input: {
       rating,
       title: (input.title ?? '').trim().slice(0, 120) || null,
       body:  (input.body ?? '').trim().slice(0, 4000) || null,
+      /*
+       * Only URLs this site issued. The upload route is the sole writer to the
+       * review-photos bucket, so anything else in this array came from a
+       * tampered client — dropping it stops a review embedding an image
+       * hotlinked from somewhere we do not control.
+       */
+      photos: (input.photos ?? [])
+        .filter((u) => typeof u === 'string' && u.includes('/review-photos/'))
+        .slice(0, 5),
       verified_purchase: true,
       status: 'pending',
     })
@@ -209,7 +221,7 @@ export const getProductReviews = cache(async function getProductReviews(
     const sb = createServiceRoleClient();
     const { data, error } = await sb
       .from('reviews')
-      .select('id, author_name, rating, title, body, verified_purchase, created_at')
+      .select('id, author_name, rating, title, body, verified_purchase, photos, created_at')
       .eq('product_id', productId)
       .eq('status', 'approved')
       .order('created_at', { ascending: false })
@@ -224,6 +236,7 @@ export const getProductReviews = cache(async function getProductReviews(
       title: (r.title as string) ?? null,
       body: (r.body as string) ?? null,
       verifiedPurchase: Boolean(r.verified_purchase),
+      photos: Array.isArray(r.photos) ? (r.photos as string[]) : [],
       createdAt: r.created_at as string,
     }));
   } catch {

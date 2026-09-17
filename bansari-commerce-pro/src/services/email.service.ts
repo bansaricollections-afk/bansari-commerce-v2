@@ -15,6 +15,8 @@
  *   • return { sent: boolean; error?: string }
  *   • are safe to call without awaiting in non-critical paths
  */
+import { REVIEW_REWARD } from "@/lib/review-reward";
+
 
 const RESEND_API = "https://api.resend.com/emails";
 
@@ -611,13 +613,78 @@ export async function sendReviewInvitationEmail(data: {
       {
         banner: "How was it?",
         lead:
-          "Your order {order} arrived a few days ago. If you have a moment, tell other shoppers what it is really like — the fit, the fabric, the colour in daylight.",
+          "We hope your order {order} arrived safely and that you have had a chance to wear it. If you can spare two minutes, we would be very grateful for your honest thoughts — the fit, the fabric, the colour in daylight.",
         closing:
-          "Only customers who have received a piece can review it, so your words carry real weight. We publish honest reviews, including critical ones.",
-        extra: `<table role="presentation" width="100%" style="margin-top:8px;margin-bottom:24px;">${lines}</table>`,
+          "Only customers who have actually received a piece can review it here, so your words carry real weight with the next person deciding. We publish every honest review, including the critical ones — that is the only way this is worth anything. Thank you for choosing a small boutique. It genuinely matters to us.",
+        extra:
+          `<table role="presentation" width="100%" style="margin-top:8px;margin-bottom:8px;">${lines}</table>` +
+          `<table width="100%" cellpadding="0" cellspacing="0" style="background:#F9F3E8;border:1px solid #E2C98E;margin:8px 0 24px;">
+             <tr><td style="padding:18px 20px;">
+               <p style="margin:0 0 6px;font-size:12px;font-weight:600;letter-spacing:0.8px;text-transform:uppercase;color:#9E7B47;">A small thank-you</p>
+               <p style="margin:0;font-size:14px;line-height:1.6;color:#2d1f1f;">
+                 If you add a photo of the piece with your review, we will send you a
+                 <strong>${REVIEW_REWARD.percentOff}% discount code for your next order</strong> as our way of saying thank you.
+                 A real photo helps the next customer far more than anything we could write ourselves.
+               </p>
+               <p style="margin:10px 0 0;font-size:12px;line-height:1.6;color:#6b5b5b;">
+                 The code is yours whatever you write — we ask for your honest opinion, not a kind one.
+                 Valid for ${REVIEW_REWARD.validDays} days on any order, no minimum.
+               </p>
+             </td></tr>
+           </table>`,
       },
       {
         orderNumber: safe.orderNumber,
+        customerName: safe.customerName,
+        customerEmail: safe.customerEmail,
+      } as OrderStageData
+    ),
+  });
+}
+
+/**
+ * The thank-you: sent when a photo review is approved, carrying the coupon.
+ *
+ * Sent on APPROVAL rather than on submission, so it is never a promise made
+ * before the review has been read. The wording deliberately repeats that the
+ * code was not conditional on the review being kind — a customer who left
+ * three stars should not wonder whether the discount is a bribe.
+ */
+export async function sendReviewRewardEmail(data: {
+  customerName: string;
+  customerEmail: string;
+  productName: string;
+  couponCode: string;
+  percentOff: number;
+  validDays: number;
+}): Promise<EmailResult> {
+  const safe = deepEscape(data);
+
+  return sendEmail({
+    to: data.customerEmail,
+    subject: `Thank you — here is ${safe.percentOff}% off your next order | Bansari Collections`,
+    template: "review_reward",
+    html: orderStageHtml(
+      {
+        banner: "Thank you",
+        lead:
+          `Your review of the ${safe.productName} is now live on our website, photo and all. Thank you for taking the trouble — a real photo of a real person wearing the piece tells the next customer more than anything we could write ourselves.`,
+        closing:
+          "If there is ever anything we can put right, simply reply to this email. A small boutique lives or dies by what its customers say, and we would rather hear it from you first.",
+        extra:
+          `<table width="100%" cellpadding="0" cellspacing="0" style="background:#F9F3E8;border:1px solid #E2C98E;margin:8px 0 24px;">
+             <tr><td style="padding:22px 20px;text-align:center;">
+               <p style="margin:0 0 8px;font-size:12px;font-weight:600;letter-spacing:0.8px;text-transform:uppercase;color:#9E7B47;">With our compliments</p>
+               <p style="margin:0 0 4px;font-size:15px;color:#2d1f1f;">${safe.percentOff}% off your next order</p>
+               <p style="margin:12px 0 0;font-size:22px;font-weight:700;letter-spacing:2px;color:#1A0F16;">${safe.couponCode}</p>
+               <p style="margin:12px 0 0;font-size:12px;color:#6b5b5b;">
+                 Enter it at checkout. Valid for ${safe.validDays} days, on any order, with no minimum spend.
+               </p>
+             </td></tr>
+           </table>`,
+      },
+      {
+        orderNumber: "",
         customerName: safe.customerName,
         customerEmail: safe.customerEmail,
       } as OrderStageData

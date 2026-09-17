@@ -162,6 +162,31 @@ export default function ProductReviews({
                 </p>
               )}
 
+              {r.photos.length > 0 && (
+                <ul className="mt-4 flex flex-wrap gap-2">
+                  {r.photos.map((url) => (
+                    <li key={url}>
+                      {/*
+                        Plain <img>, not next/image: these are customer uploads
+                        with no generated WebP variants, and the custom loader
+                        would rewrite the URL to a -w800.webp that does not
+                        exist. Sized and lazy so they cost nothing above the
+                        fold.
+                      */}
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img
+                        src={url}
+                        alt={`Photo from ${r.authorName}'s review`}
+                        loading="lazy"
+                        decoding="async"
+                        className="h-24 w-24 object-cover sm:h-28 sm:w-28"
+                        style={{ border: '1px solid var(--bc-border-soft)' }}
+                      />
+                    </li>
+                  ))}
+                </ul>
+              )}
+
               <p className="mt-3 text-[11px] tracking-[0.04em]" style={{ color: 'var(--bc-text-muted)' }}>
                 {r.authorName} ·{' '}
                 {new Date(r.createdAt).toLocaleDateString('en-IN', {

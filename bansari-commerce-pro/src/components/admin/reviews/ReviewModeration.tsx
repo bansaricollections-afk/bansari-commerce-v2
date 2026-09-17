@@ -16,6 +16,8 @@ type Review = {
   body: string | null;
   status: 'pending' | 'approved' | 'rejected';
   verified_purchase: boolean;
+  photos?: string[];
+  reward_coupon_code?: string | null;
 };
 
 type Counts = { pending: number; approved: number; rejected: number };
@@ -158,6 +160,33 @@ export default function ReviewModeration() {
                   {r.title && <p className="mt-2 font-semibold text-slate-900">{r.title}</p>}
                   {r.body && (
                     <p className="mt-1 whitespace-pre-line text-sm text-slate-700">{r.body}</p>
+                  )}
+
+                  {Array.isArray(r.photos) && r.photos.length > 0 && (
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      {r.photos.map((url) => (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img
+                          key={url}
+                          src={url}
+                          alt="Customer review photo"
+                          loading="lazy"
+                          className="h-24 w-24 rounded-lg border border-slate-200 object-cover"
+                        />
+                      ))}
+                    </div>
+                  )}
+
+                  {/* Says out loud that approving this one also sends a coupon. */}
+                  {Array.isArray(r.photos) && r.photos.length > 0 && r.status === 'pending' && (
+                    <p className="mt-2 text-xs font-medium text-amber-700">
+                      Approving this will email a 10% thank-you code.
+                    </p>
+                  )}
+                  {r.reward_coupon_code && (
+                    <p className="mt-2 text-xs text-slate-500">
+                      Thank-you code issued: <span className="font-mono">{r.reward_coupon_code}</span>
+                    </p>
                   )}
 
                   <p className="mt-3 text-xs text-slate-500">

@@ -27,7 +27,7 @@ export async function GET(request: NextRequest) {
   const sb = createServiceRoleClient();
   let query = sb
     .from('reviews')
-    .select('id, created_at, product_id, product_name, order_id, customer_email, author_name, rating, title, body, status, verified_purchase, moderated_at, moderation_note')
+    .select('id, created_at, product_id, product_name, order_id, customer_email, author_name, rating, title, body, status, verified_purchase, photos, reward_coupon_code, moderated_at, moderation_note')
     .order('created_at', { ascending: false })
     .limit(200);
 

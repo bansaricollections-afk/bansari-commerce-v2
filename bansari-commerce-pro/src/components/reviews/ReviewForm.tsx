@@ -1,9 +1,10 @@
 'use client';
 
 import { useState } from 'react';
-import { Star } from 'lucide-react';
+import { Star, ImagePlus, X } from 'lucide-react';
 
 import type { ReviewInvitation } from '@/services/review.service';
+import { REVIEW_REWARD } from '@/lib/review-reward';
 
 /**
  * The review form itself.
@@ -27,9 +28,32 @@ export default function ReviewForm({
   const [authorName, setAuthorName] = useState(invitation.suggestedName);
   const [title, setTitle] = useState('');
   const [body, setBody] = useState('');
+  const [photos, setPhotos] = useState<string[]>([]);
+  const [uploading, setUploading] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [done, setDone] = useState(false);
+
+  async function addPhoto(file: File) {
+    if (photos.length >= 5) return;
+    setUploading(true);
+    setError(null);
+    try {
+      const fd = new FormData();
+      fd.append('token', token);
+      fd.append('file', file);
+      const res = await fetch('/api/reviews/photo', { method: 'POST', body: fd });
+      const json = (await res.json()) as { success?: boolean; url?: string; message?: string };
+      if (!res.ok || json?.success === false || !json.url) {
+        throw new Error(json?.message ?? 'That photo could not be uploaded.');
+      }
+      setPhotos((prev) => [...prev, json.url as string]);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'That photo could not be uploaded.');
+    } finally {
+      setUploading(false);
+    }
+  }
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -46,7 +70,7 @@ export default function ReviewForm({
       const res = await fetch('/api/reviews/submit', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ token, rating, authorName, title, body }),
+        body: JSON.stringify({ token, rating, authorName, title, body, photos }),
       });
       const json = (await res.json()) as { success?: boolean; message?: string };
       if (!res.ok || json?.success === false) {
@@ -79,6 +103,9 @@ export default function ReviewForm({
         <p className="mt-3 text-[14px] leading-relaxed" style={{ color: 'var(--bc-text-secondary)' }}>
           Your review has been sent to us and will appear on the product page once we have
           read it. We publish honest reviews, including critical ones.
+          {photos.length > 0
+            ? ` Because you added a photo, we will email you a ${REVIEW_REWARD.percentOff}% discount code for your next order as soon as it is approved.`
+            : ''}
         </p>
       </div>
     );
@@ -184,6 +211,85 @@ export default function ReviewForm({
           style={inputStyle}
         />
       </label>
+
+      {/* ── Photos ──
+         Optional, and the reward is stated plainly rather than dangled. The
+         code is issued for a photo review of ANY rating — saying so here
+         matters, because an incentive that looks conditional on praise makes
+         every review on the site less believable. */}
+      <div className="flex flex-col gap-3">
+        <span
+          className="text-[10px] font-semibold uppercase tracking-[0.2em]"
+          style={{ color: 'var(--bc-text-primary)' }}
+        >
+          Add a photo <span style={{ color: 'var(--bc-text-muted)' }}>(optional)</span>
+        </span>
+
+        <div
+          className="flex flex-col gap-3 p-4"
+          style={{ border: '1px solid var(--bc-border-gold)', backgroundColor: 'var(--bc-gold-faint)' }}
+        >
+          <p className="text-[13px] leading-relaxed" style={{ color: 'var(--bc-text-secondary)' }}>
+            Add a photo of the piece and we will send you{' '}
+            <strong style={{ color: 'var(--bc-text-primary)' }}>
+              {REVIEW_REWARD.percentOff}% off your next order
+            </strong>{' '}
+            as a thank-you. The code is yours whatever you write — we are asking for your
+            honest opinion, not a kind one.
+          </p>
+
+          {photos.length > 0 && (
+            <ul className="flex flex-wrap gap-2">
+              {photos.map((url) => (
+                <li key={url} className="relative">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={url}
+                    alt="Your review photo"
+                    className="h-20 w-20 object-cover"
+                    style={{ border: '1px solid var(--bc-border)' }}
+                  />
+                  <button
+                    type="button"
+                    aria-label="Remove this photo"
+                    onClick={() => setPhotos((p) => p.filter((u) => u !== url))}
+                    className="absolute -right-2 -top-2 flex h-6 w-6 items-center justify-center rounded-full"
+                    style={{ backgroundColor: 'var(--bc-text-primary)', color: 'var(--bc-surface-cream)' }}
+                  >
+                    <X size={12} aria-hidden="true" />
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+
+          {photos.length < 5 && (
+            <label
+              className="inline-flex cursor-pointer items-center gap-2 self-start px-4 py-2.5 text-[11px] font-semibold uppercase tracking-[0.14em]"
+              style={{ border: '1px solid var(--bc-text-primary)', color: 'var(--bc-text-primary)' }}
+            >
+              <ImagePlus size={14} aria-hidden="true" />
+              {uploading ? 'Uploading…' : photos.length ? 'Add another' : 'Choose a photo'}
+              <input
+                type="file"
+                accept="image/jpeg,image/png,image/webp"
+                className="sr-only"
+                disabled={uploading}
+                onChange={(e) => {
+                  const f = e.target.files?.[0];
+                  // Reset so choosing the same file twice still fires onChange.
+                  e.target.value = '';
+                  if (f) void addPhoto(f);
+                }}
+              />
+            </label>
+          )}
+
+          <p className="text-[11px]" style={{ color: 'var(--bc-text-muted)' }}>
+            JPEG, PNG or WebP, up to 5 MB. Up to five photos.
+          </p>
+        </div>
+      </div>
 
       {error && (
         <p role="alert" className="text-[14px]" style={{ color: '#B91C1C' }}>

@@ -53,6 +53,7 @@ export async function POST(request: NextRequest) {
     authorName:  String(payload.authorName ?? ''),
     title:       typeof payload.title === 'string' ? payload.title : null,
     body:        typeof payload.body === 'string' ? payload.body : null,
+    photos:      Array.isArray(payload.photos) ? (payload.photos as string[]) : [],
   });
 
   if (!result.ok) {
