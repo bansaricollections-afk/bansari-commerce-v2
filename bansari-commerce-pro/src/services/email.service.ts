@@ -500,7 +500,13 @@ export type OrderStageData = {
  * whole sequence reads as one voice.
  */
 function orderStageHtml(
-  stage: { banner: string; lead: string; closing: string },
+  /*
+   * `extra` is optional pre-built HTML dropped in above the closing line — used
+   * by the review invitation for its per-item links. Callers are responsible
+   * for escaping anything they interpolate into it; every current caller
+   * builds it from deepEscape()d values.
+   */
+  stage: { banner: string; lead: string; closing: string; extra?: string },
   data: OrderStageData
 ): string {
   const tracking = data.trackingNumber
@@ -531,6 +537,7 @@ function orderStageHtml(
           <p style="margin:0 0 8px;font-size:18px;font-weight:600;">Hi ${data.customerName},</p>
           <p style="margin:0 0 24px;font-size:15px;color:#6b5b5b;">${stage.lead.replace("{order}", `<strong>${data.orderNumber}</strong>`)}</p>
           ${tracking}
+          ${stage.extra ?? ""}
           <p style="margin:0;font-size:14px;color:#6b5b5b;">${stage.closing}</p>
         </td></tr>
         <tr><td style="background:#fdf6f8;padding:20px 40px;text-align:center;">
@@ -558,6 +565,62 @@ export async function sendOutForDeliveryEmail(
         closing: "Please keep your phone reachable so our courier partner can find you.",
       },
       deepEscape(data)
+    ),
+  });
+}
+
+/**
+ * The review invitation, sent after delivery.
+ *
+ * Separate from the delivered email on purpose: that one arrives the moment
+ * the courier marks it delivered, when the customer has not yet opened the
+ * parcel. Asking "how was it?" in the same breath as "it has arrived" gets a
+ * rating of the delivery, not the garment.
+ *
+ * Each link carries its own signed token for one order line, so a customer who
+ * bought three pieces can review each separately, and each link proves that
+ * specific purchase without needing an account.
+ */
+export async function sendReviewInvitationEmail(data: {
+  customerName: string;
+  customerEmail: string;
+  orderNumber: string;
+  items: { productName: string; reviewUrl: string }[];
+}): Promise<EmailResult> {
+  if (data.items.length === 0) {
+    return { sent: false, error: "No reviewable items on this order." };
+  }
+
+  const safe = deepEscape(data);
+  const lines = safe.items
+    .map(
+      (i) =>
+        `<tr><td style="padding:10px 0;border-bottom:1px solid #F4EDE3;">
+           <span style="font-size:15px;color:#1A0F16;">${i.productName}</span><br/>
+           <a href="${i.reviewUrl}" style="font-size:13px;color:#9E7B47;text-decoration:underline;">Write a review</a>
+         </td></tr>`
+    )
+    .join("");
+
+  return sendEmail({
+    to: data.customerEmail,
+    subject: `How was your order? — ${data.orderNumber} | Bansari Collections`,
+    template: "review_invitation",
+    orderNumber: data.orderNumber,
+    html: orderStageHtml(
+      {
+        banner: "How was it?",
+        lead:
+          "Your order {order} arrived a few days ago. If you have a moment, tell other shoppers what it is really like — the fit, the fabric, the colour in daylight.",
+        closing:
+          "Only customers who have received a piece can review it, so your words carry real weight. We publish honest reviews, including critical ones.",
+        extra: `<table role="presentation" width="100%" style="margin-top:8px;margin-bottom:24px;">${lines}</table>`,
+      },
+      {
+        orderNumber: safe.orderNumber,
+        customerName: safe.customerName,
+        customerEmail: safe.customerEmail,
+      } as OrderStageData
     ),
   });
 }

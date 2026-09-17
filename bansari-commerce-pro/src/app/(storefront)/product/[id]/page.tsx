@@ -3,11 +3,13 @@ import { notFound } from 'next/navigation';
 
 import { getProductById, incrementProductView } from '@/services/product.service';
 import { getAttributeIndex, buildSpecRows } from '@/services/product-attributes';
+import { getProductReviews, getProductRatingSummary } from '@/services/review.service';
 
 import CompleteLook from '@/components/product/CompleteLook';
 import ProductAccordion from '@/components/product/ProductAccordion';
 import ProductGallery from '@/components/product/ProductGallery';
 import ProductInfo from '@/components/product/ProductInfo';
+import ProductReviews from '@/components/reviews/ProductReviews';
 import RecentlyViewed from '@/components/product/RecentlyViewed';
 import TrustBadges from '@/components/product/TrustBadges';
 import { jsonLd } from '@/lib/json-ld';
@@ -146,6 +148,16 @@ export default async function ProductPage({ params }: Props) {
    * One cached read of the ten small attribute tables serves this, the
    * metadata and the JSON-LD.
    */
+  /*
+   * Approved reviews only. Both return empty/zero when there are none, and
+   * every consumer below guards on that, so a product with no reviews renders
+   * exactly as it does today.
+   */
+  const [reviews, ratingSummary] = await Promise.all([
+    getProductReviews(product.id),
+    getProductRatingSummary(product.id),
+  ]);
+
   const attributeIndex = await getAttributeIndex();
   const specRows = buildSpecRows(
     {
@@ -252,8 +264,25 @@ export default async function ProductPage({ params }: Props) {
         merchantReturnDays: 7,
       },
     },
-    ...(product.reviewCount && product.reviewCount > 0 && {
-      aggregateRating: { '@type': 'AggregateRating', ratingValue: product.rating, reviewCount: product.reviewCount },
+    /*
+     * aggregateRating from APPROVED REVIEWS ONLY, and omitted entirely when
+     * there are none.
+     *
+     * This used to read product.rating / product.reviewCount — seeded
+     * placeholder values (every row carried 5, one carried 4.8 / 126) that the
+     * product mapper deliberately withholds precisely so they could never
+     * reach structured data. Publishing an invented rating breaks Google's
+     * structured-data policy and risks a manual action. These numbers are now
+     * computed from reviews tied to delivered order lines.
+     */
+    ...(ratingSummary.count > 0 && {
+      aggregateRating: {
+        '@type': 'AggregateRating',
+        ratingValue: ratingSummary.average,
+        reviewCount: ratingSummary.count,
+        bestRating: 5,
+        worstRating: 1,
+      },
     }),
   };
 
@@ -363,6 +392,9 @@ export default async function ProductPage({ params }: Props) {
               </div>
             </section>
           )}
+
+          {/* CUSTOMER REVIEWS — renders nothing until one is approved */}
+          <ProductReviews reviews={reviews} summary={ratingSummary} />
 
           {/* ACCORDION: Details / Care / Shipping / Returns / Reviews */}
           <section className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 pb-14">

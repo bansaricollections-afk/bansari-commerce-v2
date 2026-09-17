@@ -19,7 +19,10 @@ import {
   sendOrderShippedEmail,
   sendOutForDeliveryEmail,
   sendOrderDeliveredEmail,
+  sendReviewInvitationEmail,
 } from '@/services/email.service';
+import { createReviewToken } from '@/lib/review-token';
+import { siteConfig } from '@/lib/site';
 import type {
   OrderV2,
   OrderItemV2,
@@ -584,6 +587,47 @@ export const OrderV2Service = {
         trackingUrl:    delivered.courierUrl ?? undefined,
       })
     );
+
+    /*
+     * Review invitation — one signed link per purchased line.
+     *
+     * Wrapped so it can never affect the delivery itself: the order is already
+     * delivered and the stock already finalised by this point, and failing to
+     * ask for a review is not a reason to fail the transition. Sent alongside
+     * the delivered email rather than days later because there is no scheduler
+     * here; a cron-driven delay would be the better version of this.
+     */
+    try {
+      const { data: lines } = await sb
+        .from('order_items')
+        .select('id, product_id, product_name')
+        .eq('order_id', orderId);
+
+      const items = (lines ?? [])
+        .filter((l) => l.product_id != null)
+        .map((l) => ({
+          productName: (l.product_name as string) ?? 'your purchase',
+          reviewUrl: `${siteConfig.url}/review?t=${createReviewToken({
+            orderItemId: l.id as string,
+            orderId: Number(orderId),
+            productId: Number(l.product_id),
+          })}`,
+        }));
+
+      if (items.length > 0) {
+        await sendReviewInvitationEmail({
+          customerName:  delivered.customerName,
+          customerEmail: delivered.customerEmail,
+          orderNumber:   delivered.orderNumber,
+          items,
+        });
+      }
+    } catch (err) {
+      log.error('order.deliver.review_invite_failed', {
+        orderId,
+        message: err instanceof Error ? err.message : String(err),
+      });
+    }
 
     return delivered;
   },

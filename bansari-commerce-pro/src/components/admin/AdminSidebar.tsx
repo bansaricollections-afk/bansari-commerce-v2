@@ -13,8 +13,7 @@ import {
   ShoppingCart,
   Tags,
   TicketPercent,
-  Users,
-} from "lucide-react";
+  Users, Star } from "lucide-react";
 
 import { cn } from "@/lib/utils";
 
@@ -41,6 +40,7 @@ const navGroups: {
     items: [
       { title: "Orders", href: "/admin/orders", icon: ShoppingBag },
       { title: "Abandoned Carts", href: "/admin/abandoned-carts", icon: ShoppingCart },
+      { title: "Reviews", href: "/admin/reviews", icon: Star },
     ],
   },
   {
