@@ -40,13 +40,49 @@ type Props = { params: Promise<{ slug: string }> };
 function introFor(landing: BrowseLanding): string {
   const n = landing.count;
   const pieces = `${n} ${n === 1 ? 'piece' : 'pieces'}`;
+  const tail = `from Bansari Collections, a boutique in Vadodara. Free shipping on orders over ₹${SHIPPING_THRESHOLD_LABEL} and 7-day returns.`;
+  const { category, fabric, occasion, work } = landing.filter;
+
+  /*
+   * Every branch is written out rather than falling through to a default.
+   *
+   * The previous `default` assumed fabric AND category were both set, because
+   * at the time the only combination was fabric × category. An occasion or
+   * work page hitting it would have rendered "N pieces of undefined undefined"
+   * — visible nonsense on a page built to be indexed.
+   */
   switch (landing.kind) {
     case 'category':
-      return `${pieces} of ${landing.heading.toLowerCase()} from Bansari Collections, a boutique in Vadodara. Free shipping on orders over ₹${SHIPPING_THRESHOLD_LABEL} and 7-day returns.`;
+      return `${pieces} of ${landing.heading.toLowerCase()} ${tail}`;
     case 'fabric':
-      return `${pieces} in ${landing.filter.fabric?.toLowerCase()} from Bansari Collections, a boutique in Vadodara. Free shipping on orders over ₹${SHIPPING_THRESHOLD_LABEL} and 7-day returns.`;
+      return `${pieces} in ${fabric?.toLowerCase()} ${tail}`;
+    case 'fabric-category':
+      return `${pieces} of ${fabric?.toLowerCase()} ${category?.toLowerCase()} ${tail}`;
+    case 'occasion':
+      return `${pieces} chosen for ${occasion?.toLowerCase()} occasions ${tail}`;
+    case 'occasion-category':
+      return `${pieces} of ${category?.toLowerCase()} for ${occasion?.toLowerCase()} occasions ${tail}`;
+    case 'work':
+      return `${pieces} featuring ${work?.toLowerCase()} ${tail}`;
+    case 'work-category':
+      return `${pieces} of ${category?.toLowerCase()} with ${work?.toLowerCase()} ${tail}`;
+  }
+}
+
+/** The small uppercase label above the H1. */
+function eyebrowFor(landing: BrowseLanding): string {
+  switch (landing.kind) {
+    case 'fabric':
+    case 'fabric-category':
+      return 'Fabric';
+    case 'occasion':
+    case 'occasion-category':
+      return 'Occasion';
+    case 'work':
+    case 'work-category':
+      return 'Craft';
     default:
-      return `${pieces} of ${landing.filter.fabric?.toLowerCase()} ${landing.filter.category?.toLowerCase()} from Bansari Collections, a boutique in Vadodara. Free shipping on orders over ₹${SHIPPING_THRESHOLD_LABEL} and 7-day returns.`;
+      return 'Shop';
   }
 }
 
@@ -133,7 +169,7 @@ export default async function BrowseLandingPage({ params }: Props) {
 
         <header className="mb-10 max-w-2xl">
           <p className="mb-2 text-[9px] font-semibold uppercase tracking-[0.2em] text-[#8A5A6A]">
-            {landing.kind === 'fabric' ? 'Fabric' : 'Shop'}
+            {eyebrowFor(landing)}
           </p>
           <h1 className="font-[family:var(--font-playfair)] text-4xl font-normal leading-tight text-slate-900">
             {landing.heading}

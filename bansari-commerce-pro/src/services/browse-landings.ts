@@ -20,6 +20,7 @@
  */
 import { createServiceRoleClient } from '@/lib/supabase/service';
 import { cache } from 'react';
+import { getAttributeIndex } from '@/services/product-attributes';
 
 /**
  * Minimum products for a landing page to be worth generating.
@@ -30,15 +31,35 @@ import { cache } from 'react';
  */
 export const MIN_PRODUCTS = 4;
 
+/**
+ * Attribute values that clear MIN_PRODUCTS but must never become a page.
+ *
+ * 'Plain' is the largest single Work bucket — 21 products — and the worst
+ * possible landing page. It describes the ABSENCE of embellishment, nobody
+ * searches "plain kurti", and "Plain Dresses" as a heading reads as a
+ * criticism of the dresses. The threshold guards against thin pages; this
+ * guards against pages that are well-stocked and still worthless.
+ */
+const EXCLUDED_VALUES = new Set(['plain']);
+
+const isExcluded = (value: string) => EXCLUDED_VALUES.has(value.trim().toLowerCase());
+
 export type BrowseLanding = {
   slug: string;
   /** H1 and title, e.g. "Cotton Kurta Sets". */
   heading: string;
   /** Filters handed to getFilteredProducts — must match /shop's own semantics. */
-  filter: { category?: string; fabric?: string };
+  filter: { category?: string; fabric?: string; occasion?: string; work?: string };
   count: number;
   /** Drives the intro sentence; no editorial copy is invented per page. */
-  kind: 'category' | 'fabric' | 'fabric-category';
+  kind:
+    | 'category'
+    | 'fabric'
+    | 'fabric-category'
+    | 'occasion'
+    | 'occasion-category'
+    | 'work'
+    | 'work-category';
 };
 
 function slugify(value: string): string {
@@ -62,24 +83,62 @@ export const getBrowseLandings = cache(async function getBrowseLandings(): Promi
     const sb = createServiceRoleClient();
     const { data, error } = await sb
       .from('products')
-      .select('category, fabric')
+      .select('category, fabric, attr_occasion_id, attr_work_id')
       .eq('active', true);
 
     if (error || !data) return [];
 
+    /*
+     * Occasion and work live in lookup tables, so their labels are resolved
+     * once here rather than joined per row.
+     */
+    const attributes = await getAttributeIndex();
+
     const categories = new Map<string, number>();
     const fabrics = new Map<string, number>();
+    const occasions = new Map<string, number>();
+    const works = new Map<string, number>();
     const combos = new Map<string, { category: string; fabric: string; count: number }>();
+    const occasionCombos = new Map<string, { category: string; occasion: string; count: number }>();
+    const workCombos = new Map<string, { category: string; work: string; count: number }>();
 
-    for (const row of data as { category: string | null; fabric: string | null }[]) {
+    const bump = <T>(map: Map<string, T & { count: number }>, key: string, make: () => T) => {
+      const existing = map.get(key);
+      if (existing) existing.count += 1;
+      else map.set(key, { ...make(), count: 1 } as T & { count: number });
+    };
+
+    type Row = {
+      category: string | null;
+      fabric: string | null;
+      attr_occasion_id: number | null;
+      attr_work_id: number | null;
+    };
+
+    for (const row of data as Row[]) {
       const { category, fabric } = row;
+      const occasion =
+        typeof row.attr_occasion_id === 'number'
+          ? attributes.attr_occasion.get(row.attr_occasion_id) ?? null
+          : null;
+      const work =
+        typeof row.attr_work_id === 'number'
+          ? attributes.attr_work.get(row.attr_work_id) ?? null
+          : null;
+
       if (category) categories.set(category, (categories.get(category) ?? 0) + 1);
       if (fabric) fabrics.set(fabric, (fabrics.get(fabric) ?? 0) + 1);
+      if (occasion && !isExcluded(occasion)) occasions.set(occasion, (occasions.get(occasion) ?? 0) + 1);
+      if (work && !isExcluded(work)) works.set(work, (works.get(work) ?? 0) + 1);
+
       if (category && fabric) {
-        const key = `${fabric}|${category}`;
-        const existing = combos.get(key);
-        if (existing) existing.count += 1;
-        else combos.set(key, { category, fabric, count: 1 });
+        bump(combos, `${fabric}|${category}`, () => ({ category, fabric }));
+      }
+      if (category && occasion && !isExcluded(occasion)) {
+        bump(occasionCombos, `${occasion}|${category}`, () => ({ category, occasion }));
+      }
+      if (category && work && !isExcluded(work)) {
+        bump(workCombos, `${work}|${category}`, () => ({ category, work }));
       }
     }
 
@@ -114,6 +173,43 @@ export const getBrowseLandings = cache(async function getBrowseLandings(): Promi
       // A combo whose slug collides with a category or fabric page adds nothing.
       if (landings.some((l) => l.slug === slug)) continue;
       landings.push({ slug, heading, filter: { category, fabric }, count, kind: 'fabric-category' });
+    }
+
+    /*
+     * Occasion pages. "festive kurta set" is a phrase people genuinely type in
+     * this market, in a way "v-neck kurta" is not — which is why occasion and
+     * work are the two attribute dimensions promoted to pages and the other
+     * six (neckline, sleeve, length, fit, pattern, colour) are not.
+     */
+    for (const [occasion, count] of occasions) {
+      if (count < MIN_PRODUCTS) continue;
+      const heading = `${occasion} Wear`;
+      const slug = slugify(heading);
+      if (landings.some((l) => l.slug === slug)) continue;
+      landings.push({ slug, heading, filter: { occasion }, count, kind: 'occasion' });
+    }
+
+    for (const [work, count] of works) {
+      if (count < MIN_PRODUCTS) continue;
+      const slug = slugify(work);
+      if (landings.some((l) => l.slug === slug)) continue;
+      landings.push({ slug, heading: work, filter: { work }, count, kind: 'work' });
+    }
+
+    for (const { category, occasion, count } of occasionCombos.values()) {
+      if (count < MIN_PRODUCTS) continue;
+      const heading = `${occasion} ${category}`;
+      const slug = slugify(heading);
+      if (landings.some((l) => l.slug === slug)) continue;
+      landings.push({ slug, heading, filter: { category, occasion }, count, kind: 'occasion-category' });
+    }
+
+    for (const { category, work, count } of workCombos.values()) {
+      if (count < MIN_PRODUCTS) continue;
+      const heading = `${work} ${category}`;
+      const slug = slugify(heading);
+      if (landings.some((l) => l.slug === slug)) continue;
+      landings.push({ slug, heading, filter: { category, work }, count, kind: 'work-category' });
     }
 
     // Biggest first, so generateStaticParams prerenders the most valuable first.

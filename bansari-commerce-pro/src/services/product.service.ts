@@ -11,6 +11,7 @@ import {
 } from '@/lib/debug/product-debug';
 import type { FilterParams, PaginationMeta, SortOption } from '@/types/filter-params';
 import type { SizeAvailability } from '@/types/product';
+import { resolveAttributeId } from '@/services/product-attributes';
 
 // ---------------------------------------------------------------------------
 // Types — fields must exactly match public.products column names
@@ -311,6 +312,7 @@ export async function getFilteredProducts(
     priceMin,
     priceMax,
     occasion,
+    work,
     size,
     inStock,
   } = params;
@@ -407,6 +409,34 @@ export async function getFilteredProducts(
     };
   }
 
+  /*
+   * Occasion and work are stored as FOREIGN KEYS (attr_occasion_id,
+   * attr_work_id), not as text. The occasion filter used to match
+   * `specifications->>occasion` — a JSONB column populated on one product out
+   * of sixty-one — so the shop's Occasion facet filtered almost everything out
+   * no matter what you picked. Same admin-writes-one-column,
+   * storefront-reads-another split that hid the specification table.
+   *
+   * Resolved by name so URLs stay readable: /shop?occasion=Festive, not
+   * ?attr_occasion_id=2.
+   *
+   * A name that resolves to nothing yields an EMPTY result, never an
+   * unfiltered one — a filter that silently matches everything is worse than
+   * one that matches nothing.
+   */
+  const occasionId = occasion ? await resolveAttributeId('attr_occasion', occasion) : null;
+  const workId     = work     ? await resolveAttributeId('attr_work', work)         : null;
+
+  if ((occasion && occasionId === null) || (work && workId === null)) {
+    return {
+      products: [],
+      meta: {
+        page: safePage, perPage: safePerPage, total: 0, totalPages: 0,
+        hasNextPage: false, hasPrevPage: safePage > 1,
+      },
+    };
+  }
+
   // ── Build the base query (always filter active products) ──────────────────
   // We use a helper to apply identical filters to both the data query and the
   // count query, so the total count always matches the returned page.
@@ -428,11 +458,8 @@ export async function getFilteredProducts(
     // deliberately NOT filtered on here for size-managed products.
     if (idAllowList !== null) query = query.in('id', idAllowList);
 
-    // occasion is stored inside the specifications JSONB column
-    // Use Postgres ->> cast and ilike for case-insensitive match
-    if (occasion) {
-      query = query.ilike('specifications->>occasion', `%${occasion}%`);
-    }
+    if (occasionId !== null) query = query.eq('attr_occasion_id', occasionId);
+    if (workId !== null)     query = query.eq('attr_work_id', workId);
 
     return query as T;
   }

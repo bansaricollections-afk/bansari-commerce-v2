@@ -35,10 +35,11 @@ import { getBrowseLandings, type BrowseLanding } from '@/services/browse-landing
  */
 
 /** Groups in reading order. `kind` comes straight from getBrowseLandings(). */
-const GROUPS: { kind: BrowseLanding['kind']; heading: string }[] = [
-  { kind: 'category', heading: 'Shop by Category' },
-  { kind: 'fabric', heading: 'Shop by Fabric' },
-  { kind: 'fabric-category', heading: 'Shop by Fabric & Style' },
+const GROUPS: { kinds: BrowseLanding['kind'][]; heading: string }[] = [
+  { kinds: ['category'], heading: 'Shop by Category' },
+  { kinds: ['fabric', 'fabric-category'], heading: 'Shop by Fabric' },
+  { kinds: ['occasion', 'occasion-category'], heading: 'Shop by Occasion' },
+  { kinds: ['work', 'work-category'], heading: 'Shop by Craft' },
 ];
 
 export default async function FooterShopBy() {
@@ -50,7 +51,7 @@ export default async function FooterShopBy() {
 
   const groups = GROUPS.map((g) => ({
     ...g,
-    items: landings.filter((l) => l.kind === g.kind),
+    items: landings.filter((l) => g.kinds.includes(l.kind)),
   })).filter((g) => g.items.length > 0);
 
   if (groups.length === 0) return null;
@@ -88,9 +89,9 @@ export default async function FooterShopBy() {
           </h2>
         </div>
 
-        <div className="grid gap-x-10 gap-y-8 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="grid gap-x-10 gap-y-8 sm:grid-cols-2 lg:grid-cols-4">
           {groups.map((group) => (
-            <section key={group.kind}>
+            <section key={group.heading}>
               <p
                 style={{
                   fontSize: 'var(--bc-text-xs)',

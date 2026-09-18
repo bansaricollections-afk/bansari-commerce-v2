@@ -47,10 +47,17 @@ export interface FilterParams {
 
   // ── Occasion (stored in specifications JSONB) ───────────────────────────────
   /**
-   * Matches specifications->>'occasion' (case-insensitive contains).
+   * Matched by NAME against attr_occasion (the controlled list the admin
+   * writes), not against the specifications JSONB it used to read.
    * Stored as free-text in the JSONB specifications column.
    */
   occasion?: string;
+
+  /**
+   * Surface work — Mirror Work, Embroidered, Chikankari and so on. Matched by
+   * name against attr_work, the same controlled list the admin writes.
+   */
+  work?: string;
 
   // ── Size ─────────────────────────────────────────────────────────────────
   /**

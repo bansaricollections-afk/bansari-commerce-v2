@@ -159,3 +159,56 @@ export function buildSpecRows(
     .filter((entry): entry is [string, string] => entry[1] !== null)
     .map(([label, value]) => ({ label, value }));
 }
+
+/**
+ * Resolve an attribute NAME to its id, case-insensitively.
+ *
+ * Filters travel through URLs as readable words — /shop?occasion=Festive reads
+ * like the rest of the shop's filters and like the browse landings, where
+ * /shop?attr_occasion_id=2 would not. The name is resolved here, once, against
+ * the same cached index everything else uses.
+ *
+ * Returns null for an unknown name so the caller can decide: a filter that
+ * matches nothing should return no products, not silently return everything.
+ */
+export async function resolveAttributeId(
+  table: AttributeTable,
+  name: string
+): Promise<number | null> {
+  const wanted = name.trim().toLowerCase();
+  if (!wanted) return null;
+
+  const index = await getAttributeIndex();
+  for (const [id, label] of index[table]) {
+    if (label.trim().toLowerCase() === wanted) return id;
+  }
+  return null;
+}
+
+/** Every attribute label in use by at least one active product, with counts. */
+export async function getAttributeUsage(
+  table: AttributeTable,
+  column: string
+): Promise<Map<string, number>> {
+  const usage = new Map<string, number>();
+  try {
+    const index = await getAttributeIndex();
+    const sb = createServiceRoleClient();
+    const { data, error } = await sb.from('products').select(`id, ${column}`).eq('active', true);
+    if (error || !data) return usage;
+
+    // Supabase infers a ParserError for a template-literal select string, so
+    // the cast goes through `unknown` — the sanctioned pattern in this codebase
+    // when the compiler sees no structural overlap.
+    for (const row of data as unknown as Record<string, unknown>[]) {
+      const id = row[column];
+      if (typeof id !== 'number') continue;
+      const label = index[table].get(id);
+      if (!label) continue;
+      usage.set(label, (usage.get(label) ?? 0) + 1);
+    }
+  } catch {
+    // An empty facet is a survivable outcome; a thrown one is not.
+  }
+  return usage;
+}

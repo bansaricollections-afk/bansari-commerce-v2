@@ -21,6 +21,7 @@ import { cache } from 'react';
 import { createServiceRoleClient } from '@/lib/supabase/service';
 import { getVariantAvailabilityIndex } from '@/services/size-inventory.service';
 import type { ShopFacets } from '@/components/shop/FilterSidebar';
+import { getAttributeUsage } from "@/services/product-attributes";
 
 export type { ShopFacets };
 
@@ -58,7 +59,15 @@ export const getShopFacets = cache(async function getShopFacets(): Promise<ShopF
     const sizes = new Set<string>();
     for (const label of index.sellableSizeLabels) sizes.add(label);
 
-    const occasions = new Set<string>();
+    /*
+     * Occasions come from attr_occasion via attr_occasion_id — the column the
+     * admin actually writes. This used to read specifications.occasion, a
+     * JSONB field set on one product out of sixty-one, so the Occasion filter
+     * offered two stale values and matched almost nothing.
+     */
+    const occasionUsage = await getAttributeUsage('attr_occasion', 'attr_occasion_id');
+    const occasions = new Set<string>(occasionUsage.keys());
+
     for (const row of data) {
       const isSizeManaged = index.sizeManagedIds.has(row.id as number);
       const rowSizes: unknown = row.sizes;
@@ -66,14 +75,6 @@ export const getShopFacets = cache(async function getShopFacets(): Promise<ShopF
         for (const s of rowSizes) {
           if (typeof s === "string" && s.trim()) sizes.add(s.trim());
         }
-      }
-      // specifications.occasion is stored either as a string or a string[]
-      // depending on the product. getFilteredProducts matches it with
-      // `ilike specifications->>occasion`, which works for both shapes.
-      const occasion = (row.specifications as Record<string, unknown> | null)?.occasion;
-      const occasionValues = Array.isArray(occasion) ? occasion : [occasion];
-      for (const o of occasionValues) {
-        if (typeof o === "string" && o.trim()) occasions.add(o.trim());
       }
     }
 

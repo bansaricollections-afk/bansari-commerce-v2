@@ -92,6 +92,9 @@ function parseSearchParams(raw: Record<string, string | string[] | undefined>): 
     priceMin:   num("priceMin"),
     priceMax:   num("priceMax"),
     occasion:   str("occasion"),
+    // Read even though no UI emits it yet: the service supports it, and a
+    // ?work= that silently returned everything would be a filter that lies.
+    work:       str("work"),
     size:       str("size"),
     inStock,
   };
