@@ -1,2 +1,20 @@
 .vercel
 .env*
+
+# ── One-off operational artefacts ─────────────────────────────────────────
+# Rollback snapshots and backups written by the maintenance scripts. They are
+# point-in-time dumps of production rows, not source.
+#
+# pending-orders-backup-*.json in particular contains customer emails, phone
+# numbers and shipping addresses. Committing it would put customer PII into
+# git history permanently, where it cannot be removed without rewriting every
+# clone. Ignored so that cannot happen by accident.
+*-rollback-*.json
+*-rollback.json
+pending-orders-backup-*.json
+attribute-backfill-rollback-*.json
+work-attribute-rollback-*.json
+work-correction-rollback-*.json
+image-audit.csv
+image-*-manifest.json
+.vscode/
