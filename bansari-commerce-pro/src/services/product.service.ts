@@ -78,6 +78,7 @@ export type Product = {
   careInstructions?: string;
   packageContents?: string;
   countryOfOrigin?: string;
+  createdAt?: string;
   seo?: any;
   reviews?: any[];
   color?: string;
@@ -122,7 +123,7 @@ export type CartValidationResult =
  * Resolved to labels by src/services/product-attributes.ts.
  */
 const PRODUCT_SELECT =
-  'id, name, slug, price, stock, active, images, category, featured, new_arrival, best_seller, description, sizes, compare_price, seo_title, seo_description, sku, collection, fabric, color, rating, review_count, specifications, care_instructions, package_contents, country_of_origin, attr_fabric_id, attr_color_id, attr_occasion_id, attr_pattern_id, attr_fit_id, attr_sleeve_id, attr_neck_id, attr_bottom_id, attr_work_id, attr_length_id' as const;
+  'id, name, slug, price, stock, active, images, category, featured, new_arrival, best_seller, description, sizes, compare_price, seo_title, seo_description, sku, collection, fabric, color, rating, review_count, specifications, care_instructions, package_contents, country_of_origin, attr_fabric_id, attr_color_id, attr_occasion_id, attr_pattern_id, attr_fit_id, attr_sleeve_id, attr_neck_id, attr_bottom_id, attr_work_id, attr_length_id, created_at' as const;
 
 // ---------------------------------------------------------------------------
 // mapRow — normalises a raw Supabase row into the Product shape
@@ -225,6 +226,10 @@ function mapRow(row: Record<string, any>): Product {
     careInstructions: row['care_instructions'] ?? undefined,
     packageContents:  row['package_contents']  ?? undefined,
     countryOfOrigin:  row['country_of_origin'] ?? undefined,
+    // Drives the Offer's validFrom in the product JSON-LD: the date this
+    // product was listed is the date its offer began, and it is the only
+    // honest answer available.
+    createdAt:        row['created_at'] ?? undefined,
     seo_title: row['seo_title'] ?? undefined,
     seo_description: row['seo_description'] ?? undefined,
     // compare_price DB column → oldPrice camelCase used by ProductCard / ProductInfo

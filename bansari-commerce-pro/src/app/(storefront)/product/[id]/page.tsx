@@ -13,6 +13,7 @@ import ProductReviews from '@/components/reviews/ProductReviews';
 import RecentlyViewed from '@/components/product/RecentlyViewed';
 import TrustBadges from '@/components/product/TrustBadges';
 import { jsonLd } from '@/lib/json-ld';
+import { SHIPPING_THRESHOLD, STANDARD_SHIPPING } from '@/lib/shipping';
 
 export const dynamic = 'force-dynamic';
 
@@ -254,14 +255,70 @@ export default async function ProductPage({ params }: Props) {
       // a date in the past makes the offer look stale and suppresses the rich
       // result entirely.
       priceValidUntil: PRICE_VALID_UNTIL,
-      // Matches /return-refund-policy: "returned within 7 days of delivery".
-      // returnFees and returnMethod are omitted rather than guessed — the
-      // policy does not state who bears the cost.
+
+      /*
+       * validFrom — the date this product was listed. The offer has been
+       * valid since the product existed, and created_at is the only honest
+       * answer available; anything else would be a number chosen to satisfy a
+       * validator.
+       */
+      ...(product.createdAt && { validFrom: product.createdAt.slice(0, 10) }),
+
+      /*
+       * Shipping, stated per product because the rate genuinely depends on
+       * this product's price: free at or above the threshold, ₹99 below it.
+       * A single blanket rate would be wrong for half the catalogue.
+       *
+       * Both times are what the site already promises a shopper: the shipping
+       * policy says dispatch in 1–2 business days, and DeliveryEstimate on
+       * this very page tells them metro 3 / rest of India 5. Structured data
+       * that contradicted the page it sits on would be the worst of both.
+       */
+      shippingDetails: {
+        '@type': 'OfferShippingDetails',
+        shippingRate: {
+          '@type': 'MonetaryAmount',
+          value: product.price >= SHIPPING_THRESHOLD ? 0 : STANDARD_SHIPPING,
+          currency: 'INR',
+        },
+        shippingDestination: {
+          '@type': 'DefinedRegion',
+          addressCountry: 'IN',
+        },
+        deliveryTime: {
+          '@type': 'ShippingDeliveryTime',
+          handlingTime: {
+            '@type': 'QuantitativeValue',
+            minValue: 1,
+            maxValue: 2,
+            unitCode: 'DAY',
+          },
+          transitTime: {
+            '@type': 'QuantitativeValue',
+            minValue: 3,
+            maxValue: 5,
+            unitCode: 'DAY',
+          },
+        },
+      },
+
+      /*
+       * Return policy. merchantReturnDays matches /return-refund-policy:
+       * "returned within 7 days of delivery".
+       *
+       * returnFees and returnMethod were previously omitted rather than
+       * guessed, because the policy only said who pays when the fault is
+       * ours. The owner has since confirmed returns are free in every case,
+       * and the policy page has been updated to say so — these two statements
+       * must never disagree, because both are public promises.
+       */
       hasMerchantReturnPolicy: {
         '@type': 'MerchantReturnPolicy',
         applicableCountry: 'IN',
         returnPolicyCategory: 'https://schema.org/MerchantReturnFiniteReturnWindow',
         merchantReturnDays: 7,
+        returnMethod: 'https://schema.org/ReturnByMail',
+        returnFees: 'https://schema.org/FreeReturn',
       },
     },
     /*

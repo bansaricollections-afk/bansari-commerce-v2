@@ -105,13 +105,30 @@ export default function ReturnRefundPolicyPage() {
           depending on the payment provider or bank.
         </p>
 
+        {/*
+          Return shipping is stated here explicitly because the product pages
+          publish it as structured data (hasMerchantReturnPolicy.returnFees =
+          FreeReturn). These two must always agree: both are public promises,
+          and a policy page that contradicted the markup would mislead
+          customers and Google alike. Change one, change the other.
+        */}
+        <h2 className="pt-2 text-xl font-semibold text-slate-900">
+          Who pays for return shipping
+        </h2>
+        <p>
+          <strong>We do.</strong> Return shipping is free on every eligible
+          return, whether the piece arrived faulty or simply was not right for
+          you. You will never be charged to send something back, and no return
+          cost is deducted from your refund.
+        </p>
+
         <h2 className="pt-2 text-xl font-semibold text-slate-900">
           How to initiate a return
         </h2>
         <p>
           Contact our customer support team with your order number before
           sending any product back, so we can guide you through the return
-          process.
+          process and arrange the return shipment.
         </p>
 
         <p>
