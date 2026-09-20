@@ -25,7 +25,13 @@ const TRAILING_SHOP_LINKS = [
   { label: "Guides",   href: "/guides" },
 ] as const;
 
+/*
+ * Linked from the footer so the local page is reachable from every page on the
+ * site rather than only the sitemap. An orphaned page is what "Discovered –
+ * currently not indexed" looks like.
+ */
 const POLICY_LINKS = [
+  { label: "Visit Us in Vadodara", href: "/ethnic-wear-vadodara" },
   { label: "About Us",               href: "/about" },
   { label: "Contact Us",             href: "/contact" },
   { label: "FAQ",                    href: "/faq" },

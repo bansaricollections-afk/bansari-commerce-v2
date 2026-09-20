@@ -23,6 +23,9 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     { url: `${base}/shop`, lastModified: new Date(), changeFrequency: 'daily', priority: 0.9 },
     { url: `${base}/collections`, lastModified: new Date(), changeFrequency: 'weekly', priority: 0.8 },
     { url: `${base}/new-arrivals`, lastModified: new Date(), changeFrequency: 'daily', priority: 0.8 },
+    // Local landing page. Higher priority than the other static pages because
+    // local search is the one channel a young domain can rank in now.
+    { url: `${base}/ethnic-wear-vadodara`, lastModified: new Date(), changeFrequency: 'weekly', priority: 0.8 },
     { url: `${base}/about`, lastModified: new Date(), changeFrequency: 'monthly', priority: 0.5 },
     { url: `${base}/contact`, lastModified: new Date(), changeFrequency: 'monthly', priority: 0.5 },
     { url: `${base}/faq`, lastModified: new Date(), changeFrequency: 'monthly', priority: 0.5 },

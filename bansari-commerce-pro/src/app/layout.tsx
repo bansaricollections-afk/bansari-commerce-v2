@@ -142,11 +142,52 @@ const organizationSchema = {
     'https://www.facebook.com/BansariCollections',
     'https://www.pinterest.com/BansariCollections',
   ],
+
+  /*
+   * priceRange is the field Google most often reports as missing on a
+   * LocalBusiness. These are the real lowest and highest prices in the live
+   * catalogue at the time of writing (₹749–₹3,599), rounded outward so an
+   * ordinary price change does not make the statement false.
+   */
+  priceRange: '₹700–₹4,000',
+  currenciesAccepted: 'INR',
+  paymentAccepted: 'Credit Card, Debit Card, UPI, Net Banking',
+
+  /*
+   * Where we actually sell. Vadodara is the shop; India is the delivery
+   * footprint, which /shipping-policy states. Nothing beyond that is claimed.
+   */
+  areaServed: [
+    { '@type': 'City', name: 'Vadodara' },
+    { '@type': 'Country', name: 'India' },
+  ],
+
+  department: {
+    '@type': 'ClothingStore',
+    name: 'Women’s Indian Ethnic Wear',
+  },
 };
 
+/**
+ * The physical shop.
+ *
+ * ClothingStore is a subtype of LocalBusiness, so this already qualifies for
+ * local results — the type is deliberately the specific one rather than a bare
+ * LocalBusiness or Store.
+ *
+ * WHY LOCAL MATTERS DISPROPORTIONATELY HERE
+ * The domain is a few months old with no backlinks, so it cannot compete for
+ * "cotton kurta set" against Myntra or Nykaa on authority. Local results are
+ * judged mostly on proximity and relevance instead, which is the one arena
+ * where a new boutique with a real address can rank immediately.
+ *
+ * @id gives the business a stable identifier that /ethnic-wear-vadodara points
+ * back to, so both pages describe ONE entity rather than two similar ones.
+ */
 const localBusinessSchema = {
   '@context': 'https://schema.org',
   '@type': 'ClothingStore',
+  '@id': 'https://www.bansaricollection.in/#store',
   name: 'Bansari Collections',
   image: 'https://www.bansaricollection.in/opengraph-image',
   url: 'https://www.bansaricollection.in',
