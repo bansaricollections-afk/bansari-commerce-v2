@@ -129,10 +129,22 @@ export async function getFeaturedCoupon(): Promise<FeaturedCoupon | null> {
   const supabase = createServiceRoleClient();
   const nowIso = new Date().toISOString();
 
+  /*
+   * is_public is the whole guard. Without it this returned the newest active
+   * coupon of ANY kind, so a single-use personal code — a review thank-you
+   * emailed to one customer, or a one-off gesture — was advertised across the
+   * storefront the moment it was created, and the first stranger to see it
+   * spent it.
+   *
+   * Private by default, opted in per campaign. The cost of the default being
+   * wrong is "my campaign is not showing", which someone notices. The cost of
+   * the old behaviour was margin leaking silently.
+   */
   const { data, error } = await supabase
     .from('coupons')
     .select('*')
     .eq('active', true)
+    .eq('is_public', true)
     .or(`expires_at.is.null,expires_at.gt.${nowIso}`)
     .order('created_at', { ascending: false })
     .limit(5);

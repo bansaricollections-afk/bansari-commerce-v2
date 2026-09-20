@@ -16,6 +16,7 @@ import type { Product, ProductVariant, SizeAvailability } from '@/types/product'
 import CartDrawer from './CartDrawer';
 import NotifyMe from './NotifyMe';
 import CouponBanner from '@/components/coupon/CouponBanner';
+import WhatsAppShareButton from '@/components/product/WhatsAppShare';
 
 interface Props {
   product: Product;
@@ -255,6 +256,22 @@ export default function ProductActions({
                 </svg>
                 {inWishlist ? 'Wishlisted' : 'Wishlist'}
               </button>
+
+              {/*
+                Share to WhatsApp — the customer sending this to a friend.
+                Distinct from "Enquire on WhatsApp" below, which messages the
+                shop. In this market the first is how a piece actually travels:
+                a woman sends it to her sister before she buys it.
+
+                WhatsAppShare.tsx had been written, finished and imported
+                nowhere — the same dead-code pattern as the specification table
+                and the occasion filter.
+              */}
+              <WhatsAppShareButton
+                productName={product.name}
+                productUrl={typeof window !== 'undefined' ? window.location.href : ''}
+                price={product.price}
+              />
 
               <button onClick={handleShare} className="flex items-center gap-1.5 hover:text-slate-900 transition-colors duration-200">
                 <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24">
