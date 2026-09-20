@@ -13,7 +13,7 @@ import {
   ShoppingCart,
   Tags,
   TicketPercent,
-  Users, Star , Printer } from "lucide-react";
+  Users, Star , Printer, Camera } from "lucide-react";
 
 import { cn } from "@/lib/utils";
 
@@ -54,6 +54,7 @@ const navGroups: {
       { title: "Homepage", href: "/admin/homepage", icon: LayoutTemplate },
       { title: "Banners", href: "/admin/banners", icon: ImageIcon },
       { title: "Coupons", href: "/admin/coupons", icon: TicketPercent },
+      { title: "Instagram", href: "/admin/instagram", icon: Camera },
       { title: "Assets", href: "/admin/dam", icon: FolderOpen },
     ],
   },
