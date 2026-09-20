@@ -465,8 +465,12 @@ export async function sendWelcomeEmail(
             addresses will now be saved for a faster checkout next time.
           </p>
           <p style="margin:0 0 28px;font-size:15px;color:#6b5b5b;">
-            Every piece we make is chosen with care — handcrafted fabrics, considered detail, and quality
-            we stand behind.
+            <!-- "Every piece we make" — Bansari does not make anything. It
+                 sources from artisans in Jaipur and from manufacturers. This
+                 goes out to every new customer, so it was the widest-reaching
+                 version of the claim on the site. -->
+            Every piece we carry is chosen by hand — sourced from artisans in Jaipur and makers we buy
+            from directly, and quality we stand behind.
           </p>
           <table cellpadding="0" cellspacing="0"><tr><td style="background:#8A5A6A;border-radius:999px;">
             <a href="https://www.bansaricollection.in/shop" style="display:inline-block;padding:14px 32px;font-size:15px;font-weight:600;color:#ffffff;text-decoration:none;">Start Shopping</a>

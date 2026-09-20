@@ -3,8 +3,20 @@ import Link from "next/link";
 const PILLARS = [
   {
     number: "01",
-    title: "Handcrafted with Intention",
-    body: "Every piece is made by artisan hands, not on a mass-production line. We keep the catalogue small so each design gets the attention it deserves.",
+    /*
+     * NOT "made by artisan hands, not on a mass-production line".
+     *
+     * Bansari does not manufacture. Pieces are SOURCED — from artisan
+     * clusters in Jaipur and from established manufacturers. Claiming every
+     * piece is handmade is false for the manufacturer-sourced part of the
+     * catalogue, and it is the kind of claim a marketplace compliance check
+     * or a single customer question can disprove.
+     *
+     * What IS true and worth saying: the selection is deliberate and the
+     * catalogue is small. That is a real difference from a drop-shipper.
+     */
+    title: "Chosen, Not Churned Out",
+    body: "We source from artisan clusters in Jaipur and from manufacturers we have worked with directly. We keep the catalogue small so each design earns its place.",
     href: "/about",
   },
   {
@@ -33,8 +45,14 @@ const PILLARS = [
   },
   {
     number: "06",
-    title: "Conscious Luxury",
-    body: "We work with artisan families rather than factories. Every purchase sustains a living craft, a livelihood, and an unbroken chain of tradition.",
+    /*
+     * NOT "artisan families rather than factories" — the shop works with
+     * both, and says so. The honest version is still a good reason to buy
+     * here: the craft traditions being bought from are real, and naming
+     * Jaipur is a verifiable, specific claim rather than a warm vague one.
+     */
+    title: "Craft We Pay For",
+    body: "Much of what we carry comes from artisans in Jaipur whose block-printing and embroidery traditions run through families. We buy their work because it is better, and we say where it comes from.",
     href: "/about",
   },
 ];

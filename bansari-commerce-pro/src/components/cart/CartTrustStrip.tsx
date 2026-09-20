@@ -1,7 +1,11 @@
+// "Handcrafted Guarantee" guaranteed nothing and was not true of the whole
+// catalogue. Replaced with the free-shipping threshold, which is a published
+// policy and — at the cart, where the customer is deciding — more useful than
+// a craft adjective.
 const SIGNALS = [
   "Secure Encrypted Checkout",
   "7-Day Easy Returns",
-  "Handcrafted Guarantee",
+  "Free Shipping over ₹2,099",
 ];
 
 /**

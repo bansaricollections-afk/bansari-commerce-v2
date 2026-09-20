@@ -209,7 +209,14 @@ export default async function CraftsmanshipStory() {
                 margin: 0,
               }}
             >
-              Every thread is chosen with intention. Every embroidery is the work of artisan hands that have practiced their craft across generations. We do not manufacture garments — we preserve living traditions.
+              {/* "We do not manufacture garments" was already true and is kept.
+                  What could not stand was "every embroidery is the work of
+                  artisan hands" — the catalogue is sourced from artisan
+                  clusters in Jaipur AND from established manufacturers, so
+                  "every" is false. The sentence now says where the clothes
+                  come from, which is both accurate and more specific than the
+                  claim it replaces. */}
+              We do not manufacture garments. We source them — from artisans in Jaipur whose block-printing and embroidery have passed down through families, and from manufacturers whose finishing we trust. Both are chosen by hand, in Vadodara, one piece at a time.
             </p>
           </div>
 

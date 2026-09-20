@@ -8,7 +8,9 @@ import { useEffect, useRef, useState } from "react";
 // the weekly-arrivals cadence (no such schedule is committed anywhere).
 const MESSAGES = [
   { text: "Shipping across India — dispatched in 1–2 business days", highlight: "Shipping across India" },
-  { text: "Handcrafted in India", highlight: "Handcrafted in India" },
+  // "Handcrafted in India" → "Sourced in India". The clothes are Indian-made;
+  // they are not all handcrafted, and Bansari is not the maker either way.
+  { text: "Sourced in India — Jaipur artisans & trusted makers", highlight: "Sourced in India" },
   { text: "Secure payments — UPI, cards & net banking", highlight: "Secure payments" },
   { text: "Easy 7-day returns · WhatsApp support", highlight: "Easy 7-day returns" },
 ];

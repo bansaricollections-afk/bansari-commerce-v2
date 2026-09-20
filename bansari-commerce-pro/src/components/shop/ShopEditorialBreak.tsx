@@ -1,21 +1,39 @@
+/*
+ * TRUTH PASS — all three pillars previously described a business this is not.
+ *
+ * Bansari SOURCES. It does not design in-house, it does not weave, and it does
+ * not manufacture. Stock comes from artisan clusters in Jaipur and from
+ * established manufacturers, and is selected in Vadodara. The three claims
+ * replaced here were:
+ *
+ *   "Every silhouette is conceived by our in-house studio in Vadodara"
+ *      — there is no design studio.
+ *   "We source only the finest ... from master weavers across India"
+ *      — "only the finest" and "master weavers" are unverifiable, and the
+ *        hard-coded fabric list does not track the catalogue.
+ *   "every embroidery is stitched by artisan hands — never by machine"
+ *      — the strongest of the three, and disprovable by looking at a garment.
+ *
+ * What replaces them is narrower, duller and checkable. That is the point: a
+ * claim a customer can verify is worth more than one they must take on faith,
+ * and this shop's actual advantage — a small catalogue chosen by a person who
+ * has handled every piece — is real and was being buried under invented craft
+ * language.
+ */
 const PILLARS = [
   {
-    label: "Designed in India",
-    // Vadodara, not Surat — the same founding-location correction made in
-    // home/CraftsmanshipStory.tsx. Kept in step deliberately: the brand's
-    // stated home must not differ between the homepage, the shop page and the
-    // JSON-LD address in app/layout.tsx.
-    body: "Every silhouette is conceived by our in-house studio in Vadodara, drawing from centuries of craft tradition.",
+    label: "Chosen in Vadodara",
+    body: "Every piece is selected by hand at our boutique in Vadodara. We buy in small numbers, most in a single unit per size.",
     symbol: "✦",
   },
   {
-    label: "Premium Fabrics",
-    body: "We source only the finest Chanderi silks, Georgette, and handloom Cotton from master weavers across India.",
+    label: "Sourced from Jaipur",
+    body: "Much of the block-printing and embroidery we carry comes from artisan clusters in Jaipur, alongside manufacturers we buy from directly.",
     symbol: "◈",
   },
   {
-    label: "Handcrafted Details",
-    body: "From mirror-work to chikankari, every embroidery is stitched by artisan hands — never by machine.",
+    label: "Stated Openly",
+    body: "Fabric, work and fit are published on every product page, taken from the same record we buy against.",
     symbol: "◉",
   },
 ];

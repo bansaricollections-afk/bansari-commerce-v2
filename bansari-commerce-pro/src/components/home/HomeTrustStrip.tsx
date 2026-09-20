@@ -62,8 +62,10 @@ const TRUST_ITEMS = [
         <line x1="17.5" y1="15" x2="9" y2="15" />
       </svg>
     ),
-    label: "Artisan Craftsmanship",
-    sub: "Ethically sourced, handmade",
+    // "handmade" is false for the manufacturer-sourced part of the catalogue.
+    // Naming Jaipur is narrower and actually true.
+    label: "Artisan Sourced",
+    sub: "Jaipur craft, chosen in Vadodara",
   },
 ];
 

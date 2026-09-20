@@ -136,8 +136,10 @@ export default function CategoryGrid() {
             <p className="bc-cat__kicker">{closing.occasion}</p>
             <h3 className="bc-cat__closing-title">{closing.title}</h3>
             <p className="bc-cat__closing-body">
-              Craftsmanship rooted in tradition. Each piece honours the artisans
-              behind every stitch.
+              {/* "honours the artisans behind every stitch" implied every
+                  stitch is an artisan's. Narrowed to what is true. */}
+              Sourced from artisans in Jaipur and makers we buy from directly,
+              then chosen one piece at a time.
             </p>
             <Link href={closing.link} className="bc-cat__closing-cta">
               Discover the Collection

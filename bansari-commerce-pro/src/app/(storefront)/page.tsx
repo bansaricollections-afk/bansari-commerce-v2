@@ -25,8 +25,12 @@ export const metadata = {
   title: {
     absolute: "Bansari Collections — Indian Ethnic Wear for Women",
   },
+  // "handcrafted" dropped: the catalogue is sourced from Jaipur artisans AND
+  // from manufacturers, so it was not true of everything sold. This string is
+  // what Google prints under the result, which makes it the single most widely
+  // read sentence on the site.
   description:
-    `Shop handcrafted Indian ethnic wear for women — cotton kurta sets, linen co-ords, chikankari and printed suits. Free shipping over ₹${SHIPPING_THRESHOLD_LABEL}.`,
+    `Shop Indian ethnic wear for women — cotton kurta sets, linen co-ords, chikankari and printed suits. Sourced from Jaipur artisans, chosen in Vadodara. Free shipping over ₹${SHIPPING_THRESHOLD_LABEL}.`,
   alternates: { canonical: "/" },
 };
 
