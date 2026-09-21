@@ -37,6 +37,9 @@ export const dynamic = 'force-dynamic';
 const SITE = 'https://www.bansaricollection.in';
 const CODE = 'FIRSTVISIT10';
 
+/** Kept in step with src/config/brand.ts — printed paper cannot be corrected. */
+const INSTAGRAM_HANDLE = '@bansari_collections';
+
 /** utm tags so the visits these cards produce are distinguishable in analytics. */
 const CARD_URL = `${SITE}/?utm_source=parcel_insert&utm_medium=print&utm_campaign=marketplace_to_site`;
 
@@ -86,7 +89,21 @@ export default async function ParcelInsertPage() {
             </div>
           )}
 
-          <p className="url">bansaricollection.in</p>
+          {/*
+            The handle is on the card because the binding constraint on
+            Instagram right now is audience, not content. Under 200 followers
+            means a post reaches almost nobody regardless of how good it is.
+            The people opening these parcels have already paid and are holding
+            the product — they are the most likely followers this business will
+            ever get, and nothing has ever asked them.
+
+            One line, not a second QR: the card already has one, and two codes
+            on a business card means neither gets scanned.
+          */}
+          <p className="url">
+            bansaricollection.in
+            <span className="handle">{INSTAGRAM_HANDLE}</span>
+          </p>
         </div>
 
         <div className="card-qr">
@@ -202,9 +219,18 @@ export default async function ParcelInsertPage() {
         }
         .url {
           margin: 0;
+          display: flex;
+          align-items: baseline;
+          justify-content: space-between;
+          gap: 2mm;
           font: 600 8.5pt/1.2 Inter, Arial, sans-serif;
           letter-spacing: 0.04em;
           color: #1A0F16;
+        }
+        .handle {
+          font: 500 7pt/1.2 Inter, Arial, sans-serif;
+          letter-spacing: 0.04em;
+          color: #9E7B47;
         }
         .card-qr {
           display: flex;
