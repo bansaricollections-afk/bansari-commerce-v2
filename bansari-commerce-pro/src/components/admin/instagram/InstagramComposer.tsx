@@ -48,6 +48,14 @@ type RecentRow = {
   createdAt: string;
 };
 
+type GuideRow = {
+  slug: string;
+  title: string;
+  category: string;
+  excerpt: string;
+  slides: number;
+};
+
 type PreparedImage = {
   url: string;
   action: 'padded' | 'resized' | 'unchanged';
@@ -76,6 +84,15 @@ export default function InstagramComposer({
   products: ProductRow[];
   recent: RecentRow[];
 }) {
+  /*
+   * Guides are posted through the same preview → publish flow as products.
+   * The guide endpoint returns the identical shape, so everything below the
+   * queue works unchanged whichever tab is active.
+   */
+  const [tab, setTab] = useState<'products' | 'guides'>('products');
+  const [guides, setGuides] = useState<GuideRow[] | null>(null);
+  const [selectedGuide, setSelectedGuide] = useState<GuideRow | null>(null);
+
   const [selected, setSelected] = useState<ProductRow | null>(null);
   const [preview, setPreview] = useState<Preview | null>(null);
   const [caption, setCaption] = useState('');
@@ -89,7 +106,9 @@ export default function InstagramComposer({
 
   async function runPreview(product: ProductRow) {
     setSelected(product);
+    setSelectedGuide(null);
     setPreview(null);
+    setReel(null);
     setDone(null);
     setError(null);
     setBusy('preview');
@@ -106,6 +125,45 @@ export default function InstagramComposer({
       setChosen((json.images as PreparedImage[]).map((i) => i.url));
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Preview failed');
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function loadGuides() {
+    setTab('guides');
+    if (guides) return;
+    try {
+      const res = await fetch('/api/admin/instagram/guide');
+      const json = await res.json();
+      if (!res.ok || !json.success) throw new Error(json.message ?? `HTTP ${res.status}`);
+      setGuides(json.guides as GuideRow[]);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not load guides');
+    }
+  }
+
+  async function previewGuide(guide: GuideRow) {
+    setSelectedGuide(guide);
+    setSelected(null);
+    setPreview(null);
+    setReel(null);
+    setDone(null);
+    setError(null);
+    setBusy('preview');
+    try {
+      const res = await fetch('/api/admin/instagram/guide', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ slug: guide.slug }),
+      });
+      const json = await res.json();
+      if (!res.ok || !json.success) throw new Error(json.message ?? `HTTP ${res.status}`);
+      setPreview(json as Preview);
+      setCaption(json.caption);
+      setChosen((json.images as PreparedImage[]).map((i) => i.url));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not build the carousel');
     } finally {
       setBusy(null);
     }
@@ -133,7 +191,7 @@ export default function InstagramComposer({
   }
 
   async function publish() {
-    if (!preview || !selected) return;
+    if (!preview || (!selected && !selectedGuide)) return;
     setError(null);
     setBusy('publish');
     try {
@@ -141,11 +199,12 @@ export default function InstagramComposer({
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          productId: selected.id,
+          // 0 means "not a product post" — a guide carousel.
+          productId: selected?.id ?? 0,
           caption,
           hashtags: preview.hashtags,
           imageUrls: chosen,
-          altText: selected.name,
+          altText: selected?.name ?? selectedGuide?.title,
         }),
       });
       const json = await res.json();
@@ -216,6 +275,59 @@ export default function InstagramComposer({
       <div className="grid gap-8 lg:grid-cols-[320px_minmax(0,1fr)]">
         {/* ── Queue ── */}
         <section>
+          <div className="mb-3 flex gap-1 border-b border-slate-200">
+            {(['products', 'guides'] as const).map((t) => (
+              <button
+                key={t}
+                type="button"
+                onClick={() => (t === 'guides' ? loadGuides() : setTab('products'))}
+                className={`-mb-px border-b-2 px-3 py-2 text-sm capitalize transition-colors ${
+                  tab === t
+                    ? 'border-slate-900 font-semibold text-slate-900'
+                    : 'border-transparent text-slate-500 hover:text-slate-800'
+                }`}
+              >
+                {t}
+              </button>
+            ))}
+          </div>
+
+          {tab === 'guides' ? (
+            <>
+              <p className="mb-4 text-xs leading-relaxed text-slate-500">
+                Each guide becomes a carousel built from its key takeaways. These earn{' '}
+                <strong>saves</strong> — the strongest ranking signal on Instagram — because
+                advice stays useful after the scroll. A product photo does not.
+              </p>
+              <ul className="max-h-[640px] space-y-1 overflow-y-auto pr-1">
+                {(guides ?? []).map((g) => (
+                  <li key={g.slug}>
+                    <button
+                      type="button"
+                      onClick={() => previewGuide(g)}
+                      disabled={busy !== null || g.slides === 0}
+                      className={`w-full border px-3 py-2.5 text-left transition-colors disabled:opacity-40 ${
+                        selectedGuide?.slug === g.slug
+                          ? 'border-slate-900 bg-slate-50'
+                          : 'border-slate-200 hover:border-slate-400'
+                      }`}
+                    >
+                      <span className="block text-[11px] uppercase tracking-wider text-slate-400">
+                        {g.category} · {g.slides} slides
+                      </span>
+                      <span className="mt-0.5 block text-sm leading-snug text-slate-900">
+                        {g.title}
+                      </span>
+                    </button>
+                  </li>
+                ))}
+                {guides === null && (
+                  <li className="px-3 py-6 text-center text-sm text-slate-500">Loading…</li>
+                )}
+              </ul>
+            </>
+          ) : (
+            <>
           <h2 className="mb-1 text-sm font-semibold uppercase tracking-wider text-slate-500">
             Never posted
           </h2>
@@ -265,6 +377,8 @@ export default function InstagramComposer({
               </li>
             )}
           </ul>
+            </>
+          )}
         </section>
 
         {/* ── Composer ── */}
@@ -414,8 +528,8 @@ export default function InstagramComposer({
                 </p>
               </div>
 
-              {/* ── Reel ── */}
-              <div className="border-t border-slate-200 pt-5">
+              {/* ── Reel — products only; a guide carousel is already text slides ── */}
+              <div className={`border-t border-slate-200 pt-5 ${selected ? '' : 'hidden'}`}>
                 <h3 className="text-sm font-semibold text-slate-900">Reel</h3>
                 <p className="mt-1 max-w-xl text-xs leading-relaxed text-slate-500">
                   Builds a 9:16 video from these photos for you to download and post from

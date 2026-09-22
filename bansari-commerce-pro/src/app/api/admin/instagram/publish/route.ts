@@ -41,8 +41,15 @@ export async function POST(request: NextRequest) {
     : [];
   const altText = typeof body.altText === 'string' ? body.altText : undefined;
 
-  if (!Number.isInteger(productId) || productId <= 0) {
-    return apiError(requestId, 'VALIDATION', 'productId must be a positive integer', 422);
+  /*
+   * A post does not have to be about a product. Guide carousels are published
+   * through this same endpoint — a carousel of ten images is a carousel of ten
+   * images — and carry no product. 0 or absent means "not a product post" and
+   * is stored as NULL, which is what instagram_posts.product_id already allows.
+   */
+  const isProductPost = Number.isInteger(productId) && productId > 0;
+  if (body.productId !== undefined && body.productId !== null && !isProductPost && productId !== 0) {
+    return apiError(requestId, 'VALIDATION', 'productId must be a positive integer or 0', 422);
   }
   if (!caption.trim()) {
     return apiError(requestId, 'VALIDATION', 'caption is required', 422);
@@ -83,7 +90,13 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    const result = await publishToInstagram({ productId, caption, hashtags, imageUrls, altText });
+    const result = await publishToInstagram({
+      productId: isProductPost ? productId : null,
+      caption,
+      hashtags,
+      imageUrls,
+      altText,
+    });
 
     log.info('admin.instagram.publish.ok', {
       productId,

@@ -96,7 +96,8 @@ export type PublishResult = {
  * post the merchant already read.
  */
 export async function publishToInstagram(opts: {
-  productId: number;
+  /** null for posts that are not about a product — e.g. guide carousels. */
+  productId: number | null;
   caption: string;
   hashtags: string[];
   imageUrls: string[];
