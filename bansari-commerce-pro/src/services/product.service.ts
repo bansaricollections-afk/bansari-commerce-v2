@@ -125,6 +125,43 @@ export type CartValidationResult =
 const PRODUCT_SELECT =
   'id, name, slug, price, stock, active, images, category, featured, new_arrival, best_seller, description, sizes, compare_price, seo_title, seo_description, sku, collection, fabric, color, rating, review_count, specifications, care_instructions, package_contents, country_of_origin, attr_fabric_id, attr_color_id, attr_occasion_id, attr_pattern_id, attr_fit_id, attr_sleeve_id, attr_neck_id, attr_bottom_id, attr_work_id, attr_length_id, created_at' as const;
 
+/**
+ * The columns a GRID needs. Everything above is for a product PAGE.
+ *
+ * WHY THE DISTINCTION IS WORTH MAKING
+ * /shop was shipping 551KB of HTML built from 86KB of product data, and a
+ * third of that data is never rendered on a card. Measured over one page of
+ * 24 products:
+ *
+ *   description        29KB   a card shows the name and price, not the copy
+ *   images[]           32KB   seven URLs per product; a card shows two
+ *
+ * Because the page is server-rendered, every unused byte is paid for twice —
+ * once in the HTML and again in the RSC payload that hydrates it.
+ *
+ * WHAT IS DROPPED, AND WHY IT IS SAFE
+ *   description, seo_title, seo_description, care_instructions,
+ *   package_contents, country_of_origin
+ *       none are read by ProductCard or any grid; all are product-page copy.
+ *
+ *   attr_*_id (all ten)
+ *       resolved to labels only by buildSpecRows(), which is called from
+ *       exactly two places — the product page and the Instagram caption —
+ *       and both go through getProductById(), which keeps PRODUCT_SELECT.
+ *
+ * WHAT IS DELIBERATELY KEPT
+ *   specifications   ProductCard reads specifications.work and .fabric for
+ *                    its craft line.
+ *   compare_price    drives the discount badge.
+ *   sizes            feeds variants[] and the size availability strip.
+ *
+ * mapRow() reads every field as `row['x'] ?? default`, so a column absent from
+ * this select becomes undefined rather than throwing. That is what makes one
+ * mapper safe for both selects.
+ */
+const LIST_SELECT =
+  'id, name, slug, price, stock, active, images, category, featured, new_arrival, best_seller, sizes, compare_price, sku, collection, fabric, color, specifications, created_at' as const;
+
 // ---------------------------------------------------------------------------
 // mapRow — normalises a raw Supabase row into the Product shape
 // ---------------------------------------------------------------------------
@@ -276,7 +313,7 @@ export async function getProducts(): Promise<Product[]> {
 
   const { data, error } = await supabase
     .from('products')
-    .select(PRODUCT_SELECT)
+    .select(LIST_SELECT)
     .eq('active', true)
     .order('created_at', { ascending: false });
 
@@ -511,7 +548,7 @@ export async function getFilteredProducts(
 
   const dataQuery = applySort(
     applyFilters(
-      supabase.from('products').select(PRODUCT_SELECT)
+      supabase.from('products').select(LIST_SELECT)
     ),
     sort
   ).range(from, to);
@@ -555,7 +592,7 @@ export async function getNewArrivals(): Promise<Product[]> {
 
   const { data, error } = await supabase
     .from('products')
-    .select(PRODUCT_SELECT)
+    .select(LIST_SELECT)
     .eq('active', true)
     .eq('new_arrival', true)
     .order('created_at', { ascending: false });
@@ -589,7 +626,7 @@ export async function getMostViewed(limit = 8): Promise<Product[]> {
 
   const { data, error } = await supabase
     .from('products')
-    .select(PRODUCT_SELECT)
+    .select(LIST_SELECT)
     .eq('active', true)
     .gt('view_count', 0)
     .order('view_count', { ascending: false })
@@ -623,7 +660,7 @@ export async function getBestSellers(limit = 8): Promise<Product[]> {
 
   const { data, error } = await supabase
     .from('products')
-    .select(PRODUCT_SELECT)
+    .select(LIST_SELECT)
     .eq('active', true)
     .eq('best_seller', true)
     .order('created_at', { ascending: false })
@@ -672,7 +709,7 @@ export async function getFeaturedProducts(): Promise<Product[]> {
 
   const { data, error } = await supabase
     .from('products')
-    .select(PRODUCT_SELECT)
+    .select(LIST_SELECT)
     .eq('active', true)
     .eq('featured', true)
     .order('created_at', { ascending: false });
@@ -708,7 +745,7 @@ export async function getRelatedProducts(
 
   const { data, error } = await supabase
     .from('products')
-    .select(PRODUCT_SELECT)
+    .select(LIST_SELECT)
     .eq('active', true)
     .eq('category', category)
     .neq('id', productId)
