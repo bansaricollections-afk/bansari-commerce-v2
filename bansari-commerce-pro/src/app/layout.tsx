@@ -4,6 +4,7 @@ import { Analytics } from '@vercel/analytics/next';
 import MetaPixel from '@/analytics/meta-pixel';
 import AttributionCapture from '@/analytics/attribution-capture';
 import GoogleTag from '@/analytics/google-tag';
+import { SpeedInsights } from '@vercel/speed-insights/next';
 import ConsentNotice from '@/components/consent/ConsentNotice';
 import { jsonLd } from '@/lib/json-ld';
 import './globals.css';
@@ -309,6 +310,27 @@ export default function RootLayout({
          * See src/analytics/consent.ts.
          */}
         <ConsentNotice />
+        {/*
+         * Real-user performance measurement.
+         *
+         * WHY THIS IS HERE
+         * Every performance number for this site so far has been measured from
+         * a test machine on another continent, over a link that manages about
+         * 120KB/s to Mumbai. That is useful for comparing before and after —
+         * the same yardstick both times — and useless as an estimate of what a
+         * customer in Vadodara actually experiences. It over-states load times
+         * on a good connection and under-states them on a phone.
+         *
+         * This reports Core Web Vitals from the browsers of actual visitors:
+         * LCP, CLS, INP, TTFB, split by page and by device. It answers "is the
+         * site slow for the people using it" with their data instead of an
+         * inference from mine.
+         *
+         * It collects no personal data and no cookies — timings and a page
+         * path only — so it sits outside the consent gate above, which exists
+         * for the advertising tags.
+         */}
+        <SpeedInsights />
       </body>
     </html>
   );
