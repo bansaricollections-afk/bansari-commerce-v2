@@ -14,7 +14,16 @@ export const guide: Guide = {
   /* #17 — hand block printed cotton, the kind most vulnerable to a bad wash. */
   hero: {
     productId: 17,
-    imageIndex: 0,
+    /*
+     * imageIndex 1, not 0.
+     *
+     * Image 0 of this product has a shop sign reading "TARINI JAIPUR" rendered
+     * into it — the image is AI-generated and invented another brand's
+     * signage. It cannot be used as editorial imagery, and it was about to
+     * become the cover slide of this guide's Instagram carousel, where that
+     * sign would have been the most legible text in the frame.
+     */
+    imageIndex: 1,
     alt: 'A mustard yellow hand block printed pure cotton kurta set, the kind of print that fades if washed in hot water',
   },
 

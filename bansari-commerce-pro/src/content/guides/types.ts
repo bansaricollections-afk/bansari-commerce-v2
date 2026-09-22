@@ -91,7 +91,57 @@ export type GuideBlock =
    */
   | { type: 'productInline'; productId: number; blurb: string }
   /** Q&A. Also emitted as FAQPage structured data by the route. */
-  | { type: 'faq'; items: { q: string; a: string }[] };
+  | { type: 'faq'; items: { q: string; a: string }[] }
+  /**
+   * A LIVE, SELF-UPDATING set of products, chosen by filter rather than by id.
+   *
+   * WHY THIS EXISTS
+   * `figure` and `productInline` name a specific product. That is right when
+   * the prose is about that garment, and wrong for "here are the cotton kurta
+   * sets we have for Navratri" — because the moment a new cotton kurta set is
+   * added, the guide is out of date and nobody remembers to edit it. An
+   * article that silently goes stale is worse than one that was never written,
+   * because the reader cannot tell.
+   *
+   * This block stores a QUESTION, not an answer: "active cotton kurta sets
+   * under ₹2,500, newest first". It is answered from the catalogue on every
+   * render, so adding a product to a matching category makes it appear here
+   * with no edit to the guide.
+   *
+   * SPARSENESS IS AN ACCEPTABLE OUTCOME
+   * If the filter matches fewer than `minProducts` the block renders NOTHING.
+   * A grid padded with near-misses, or a heading with one lonely product under
+   * it, reads worse than the section not existing — and the same rule already
+   * governs the browse landings.
+   */
+  | {
+      type: 'productFeed';
+      /** Section heading. Omitted if the block renders nothing. */
+      heading: string;
+      /** One line of context under the heading. */
+      intro?: string;
+      /**
+       * Filters, passed straight to getFilteredProducts. Names are resolved
+       * against the attribute tables, so an occasion or work that does not
+       * exist matches nothing rather than everything.
+       */
+      filter: {
+        category?: string;
+        collection?: string;
+        fabric?: string;
+        color?: string;
+        occasion?: string;
+        work?: string;
+        priceMin?: number;
+        priceMax?: number;
+      };
+      /** How many to show. Defaults to 4. */
+      limit?: number;
+      /** Render nothing below this many matches. Defaults to 3. */
+      minProducts?: number;
+      /** Link to the matching shop page, so the reader can see the rest. */
+      seeAllHref?: string;
+    };
 
 export type Guide = {
   slug: string;

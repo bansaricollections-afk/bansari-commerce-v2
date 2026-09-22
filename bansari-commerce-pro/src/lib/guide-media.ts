@@ -1,7 +1,7 @@
 import { cache } from 'react';
 
 import { getProductById } from '@/services/product.service';
-import type { Guide } from '@/content/guides';
+import type { Guide, GuideBlock } from '@/content/guides';
 
 /**
  * Resolves the real products a guide references, so `figure` and
@@ -76,3 +76,68 @@ export const getGuideMedia = cache(
 export function imageAt(media: GuideMedia, index = 0): string {
   return media.images[index] ?? media.images[0];
 }
+
+/**
+ * Answers every `productFeed` block in a guide against the live catalogue.
+ *
+ * Keyed by the block's index rather than by product id, because a feed is a
+ * list and two feeds in one article can legitimately overlap.
+ *
+ * WHY FEEDS ARE RESOLVED HERE AND NOT IN THE RENDERER
+ * GuideBody maps over blocks synchronously and is shared by the page and its
+ * metadata. Fetching inside it would either force it async or fire a query per
+ * block. Resolving up front keeps the renderer a pure function of its props
+ * and keeps the number of queries equal to the number of feed blocks — which
+ * is one or two.
+ *
+ * A failing filter yields an empty list, never an exception. A guide must
+ * still render if the catalogue is briefly unreachable; losing a product grid
+ * is survivable, a 500 on an indexed article is not.
+ */
+export const getGuideFeeds = cache(
+  async (guide: Guide): Promise<Map<number, GuideMedia[]>> => {
+    const feeds = new Map<number, GuideMedia[]>();
+
+    const blocks = guide.body
+      .map((block, index) => ({ block, index }))
+      .filter(
+        (entry): entry is { block: Extract<GuideBlock, { type: 'productFeed' }>; index: number } =>
+          entry.block.type === 'productFeed'
+      );
+
+    if (blocks.length === 0) return feeds;
+
+    const { getFilteredProducts } = await import('@/services/product.service');
+
+    await Promise.all(
+      blocks.map(async ({ block, index }) => {
+        try {
+          const { products } = await getFilteredProducts({
+            ...block.filter,
+            perPage: block.limit ?? 4,
+            sort: 'newest',
+            inStock: true,
+          });
+
+          const mapped = products
+            .map((p) => {
+              const images = (p.images ?? [])
+                .map((img) => (typeof img === 'string' ? img : img?.url))
+                .filter((url): url is string => typeof url === 'string' && url.length > 0);
+              if (images.length === 0) return null;
+              return { id: p.id, name: p.name, price: p.price, href: `/product/${p.id}`, images };
+            })
+            .filter((m): m is GuideMedia => m !== null);
+
+          // Below the threshold the block renders nothing at all, so an empty
+          // list is stored rather than a short one.
+          feeds.set(index, mapped.length >= (block.minProducts ?? 3) ? mapped : []);
+        } catch {
+          feeds.set(index, []);
+        }
+      })
+    );
+
+    return feeds;
+  }
+);

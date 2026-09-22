@@ -14,7 +14,7 @@ import { notFound } from 'next/navigation';
 import ArticleProgress from '@/components/guides/ArticleProgress';
 import GuideBody from '@/components/guides/GuideBody';
 import { guides, getGuide, type Guide } from '@/content/guides';
-import { getGuideMedia, imageAt } from '@/lib/guide-media';
+import { getGuideFeeds, getGuideMedia, imageAt } from '@/lib/guide-media';
 import { jsonLd } from '@/lib/json-ld';
 
 export const revalidate = 3600;
@@ -105,7 +105,9 @@ export default async function GuidePage({ params }: Props) {
   if (!guide) notFound();
 
   const url = `${SITE_URL}/guides/${guide.slug}`;
-  const media = await getGuideMedia(guide);
+  // Feeds are the self-updating product grids; resolved alongside the
+  // fixed media so the page still makes one pass over the catalogue.
+  const [media, feeds] = await Promise.all([getGuideMedia(guide), getGuideFeeds(guide)]);
   const hero = guide.hero ? media.get(guide.hero.productId) : undefined;
   const minutes = readingMinutes(guide);
 
@@ -399,7 +401,7 @@ export default async function GuidePage({ params }: Props) {
                 </Link>
               </nav>
 
-              <GuideBody blocks={guide.body} media={media} />
+              <GuideBody blocks={guide.body} media={media} feeds={feeds} />
             </div>
           </div>
         </article>

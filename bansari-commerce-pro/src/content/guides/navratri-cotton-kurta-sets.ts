@@ -111,6 +111,27 @@ export const guide: Guide = {
       text: 'If you do want to follow it without buying nine outfits, the trick is to hold the colour in the dupatta and keep the base neutral. A cream or beige kurta set takes a different dupatta each night and reads as a new outfit in photographs.',
     },
 
+    /*
+     * Self-updating. This block stores the QUESTION — active cotton kurta sets
+     * — and is answered from the catalogue on every render, so a cotton kurta
+     * set added next week appears here without anyone editing this file.
+     *
+     * The alternative was a hand-picked list of product ids, which is accurate
+     * on the day it is written and quietly wrong a month later. A reader
+     * cannot tell a stale article from a current one, which is what makes
+     * staleness expensive.
+     */
+    {
+      type: 'productFeed',
+      heading: 'Cotton kurta sets in stock now',
+      intro:
+        'Everything below is live from our catalogue — in stock, in the sizes shown on each page.',
+      filter: { category: 'Kurta Sets', fabric: 'Cotton' },
+      limit: 4,
+      minProducts: 3,
+      seeAllHref: '/shop/cotton',
+    },
+
     { type: 'h2', text: 'What to check before you buy' },
     {
       type: 'ul',

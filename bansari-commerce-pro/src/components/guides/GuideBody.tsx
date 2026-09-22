@@ -22,9 +22,12 @@ import { imageAt, type GuideMedia } from '@/lib/guide-media';
 export default function GuideBody({
   blocks,
   media,
+  feeds,
 }: {
   blocks: GuideBlock[];
   media: Map<number, GuideMedia>;
+  /** Live results for `productFeed` blocks, keyed by block index. */
+  feeds?: Map<number, GuideMedia[]>;
 }) {
   /*
    * The first paragraph gets a drop cap and a larger size — a standing
@@ -279,6 +282,107 @@ export default function GuideBody({
                   </figcaption>
                 )}
               </figure>
+            );
+          }
+
+          case 'productFeed': {
+            /*
+             * Answered from the live catalogue, so adding a product to a
+             * matching category makes it appear here with no edit to the
+             * guide. getGuideFeeds stores an EMPTY list when the filter
+             * matched fewer than minProducts, so the whole section —
+             * heading included — disappears rather than showing a thin grid.
+             * A sparse catalogue is an acceptable outcome; padding is not.
+             */
+            const items = feeds?.get(i) ?? [];
+            if (items.length === 0) return null;
+            return (
+              <section key={i} className="my-14">
+                <div className="mb-6 flex items-end justify-between gap-4">
+                  <div>
+                    <div className="flex items-center gap-3">
+                      <span
+                        aria-hidden
+                        className="block h-px w-8"
+                        style={{ backgroundColor: 'var(--bc-gold)' }}
+                      />
+                      <p
+                        className="font-semibold uppercase"
+                        style={{
+                          fontSize: 'var(--bc-xs)',
+                          letterSpacing: '0.16em',
+                          color: 'var(--bc-text-gold)',
+                        }}
+                      >
+                        In stock now
+                      </p>
+                    </div>
+                    <h2
+                      className="mt-3 leading-tight"
+                      style={{
+                        fontFamily: "var(--font-playfair), 'Playfair Display', Georgia, serif",
+                        fontSize: 'var(--bc-xl)',
+                        color: 'var(--bc-text-rich)',
+                      }}
+                    >
+                      {block.heading}
+                    </h2>
+                    {block.intro && (
+                      <p
+                        className="mt-2 max-w-prose"
+                        style={{ fontSize: 'var(--bc-sm)', color: 'var(--bc-text-mid)' }}
+                      >
+                        {block.intro}
+                      </p>
+                    )}
+                  </div>
+                  {block.seeAllHref && (
+                    <Link
+                      href={block.seeAllHref}
+                      className="shrink-0 underline underline-offset-4"
+                      style={{ fontSize: 'var(--bc-sm)', color: 'var(--bc-text-gold)' }}
+                    >
+                      See all
+                    </Link>
+                  )}
+                </div>
+
+                <div className="grid grid-cols-2 gap-x-4 gap-y-8 lg:grid-cols-4">
+                  {items.map((m) => (
+                    <Link key={m.id} href={m.href} className="group block">
+                      <div
+                        className="relative mb-3 aspect-[4/5] overflow-hidden"
+                        style={{ background: 'var(--bc-stone)' }}
+                      >
+                        <Image
+                          src={imageAt(m, 0)}
+                          alt={m.name}
+                          fill
+                          sizes="(max-width: 1024px) 50vw, 25vw"
+                          className="object-cover transition-transform duration-500 group-hover:scale-[1.03]"
+                        />
+                      </div>
+                      <p
+                        className="leading-snug"
+                        style={{
+                          fontFamily: "var(--font-playfair), 'Playfair Display', Georgia, serif",
+                          fontSize: 'var(--bc-sm)',
+                          color: 'var(--bc-text-rich)',
+                        }}
+                      >
+                        {m.name}
+                      </p>
+                      {/* Price read live, never written into guide copy. */}
+                      <p
+                        className="mt-1 font-medium tabular-nums"
+                        style={{ fontSize: 'var(--bc-sm)', color: 'var(--bc-text-ink)' }}
+                      >
+                        ₹{m.price.toLocaleString('en-IN')}
+                      </p>
+                    </Link>
+                  ))}
+                </div>
+              </section>
             );
           }
 
