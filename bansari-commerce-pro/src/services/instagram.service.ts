@@ -10,6 +10,7 @@
 import {
   createCarouselContainer,
   createImageContainer,
+  findRecentMediaByCaption,
   getInstagramCredentials,
   getPermalink,
   getPublishingLimit,
@@ -113,6 +114,28 @@ export async function publishToInstagram(opts: {
     throw new Error(`Instagram allows at most ${MAX_CAROUSEL} images per post`);
   }
 
+  /*
+   * Refuse to post the same caption twice in quick succession.
+   *
+   * This is the other half of the lost-response problem. Even with recovery in
+   * the failure path, a merchant who sees an error and presses Publish again —
+   * or double-clicks, or reloads and retries — must not be able to duplicate a
+   * post. Checking the account itself is authoritative in a way that checking
+   * our own table is not, because the case that hurts is precisely the one
+   * where our table is wrong.
+   *
+   * Scoped to ten minutes: posting the same product again next month is a
+   * legitimate thing to want, and this must not block it.
+   */
+  const alreadyLive = await findRecentMediaByCaption(creds, opts.caption);
+  if (alreadyLive) {
+    throw new Error(
+      'This exact post is already live on Instagram — published within the last ' +
+        'few minutes. Not posting it again. ' +
+        (alreadyLive.permalink ?? '')
+    );
+  }
+
   const sb = createServiceRoleClient();
 
   /*
@@ -141,8 +164,48 @@ export async function publishToInstagram(opts: {
 
   const postId = row.id as number;
 
-  const fail = async (err: unknown): Promise<never> => {
+  /** Record a post we have confirmed is live on the account. */
+  const succeed = async (mediaId: string, permalink: string | null): Promise<PublishResult> => {
+    await sb
+      .from('instagram_posts')
+      .update({
+        status: 'published',
+        ig_media_id: mediaId,
+        permalink,
+        published_at: new Date().toISOString(),
+        error: null,
+      })
+      .eq('id', postId);
+    return { postId, mediaId, permalink };
+  };
+
+  /*
+   * An error from Meta does NOT mean nothing was published.
+   *
+   * On the first real post this system made, media_publish returned "An
+   * unexpected error has occurred. Please retry your request later." while the
+   * carousel was already live. Marking that attempt `failed` invited a retry,
+   * and the retry posted a second identical carousel that had to be deleted by
+   * hand.
+   *
+   * There is no idempotency key in this API, so before accepting a failure we
+   * look at the account. If a post carrying this exact caption appeared in the
+   * last few minutes, the publish succeeded and only the response was lost.
+   */
+  const fail = async (err: unknown): Promise<PublishResult> => {
     const message = err instanceof Error ? err.message : String(err);
+
+    const live = await findRecentMediaByCaption(creds, opts.caption);
+    if (live) {
+      await sb
+        .from('instagram_posts')
+        .update({
+          error: `Recovered: Instagram reported an error but the post was live. Original error: ${message}`,
+        })
+        .eq('id', postId);
+      return succeed(live.id, live.permalink);
+    }
+
     await sb.from('instagram_posts').update({ status: 'failed', error: message }).eq('id', postId);
     throw err;
   };
@@ -175,20 +238,7 @@ export async function publishToInstagram(opts: {
     // ── The irreversible step ──
     const mediaId = await publishContainer(creds, containerId);
 
-    const permalink = await getPermalink(creds, mediaId);
-
-    await sb
-      .from('instagram_posts')
-      .update({
-        status: 'published',
-        ig_media_id: mediaId,
-        permalink,
-        published_at: new Date().toISOString(),
-        error: null,
-      })
-      .eq('id', postId);
-
-    return { postId, mediaId, permalink };
+    return succeed(mediaId, await getPermalink(creds, mediaId));
   } catch (err) {
     return fail(err);
   }

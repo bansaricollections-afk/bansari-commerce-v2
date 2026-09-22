@@ -165,6 +165,58 @@ export async function publishContainer(
   return r.id;
 }
 
+/**
+ * Find a post that was published in the last few minutes carrying this exact
+ * caption.
+ *
+ * WHY THIS IS NEEDED
+ * media_publish is not safe to assume failed just because it returned an
+ * error. Observed in production on the very first real post: Meta answered
+ *
+ *     "An unexpected error has occurred. Please retry your request later."
+ *
+ * and the post was already live. The retry then published a second identical
+ * carousel, which had to be deleted by hand.
+ *
+ * The API gives no idempotency key, so the only way to tell a genuine failure
+ * from a lost response is to look at what is actually on the account. The
+ * caption is the strongest available fingerprint: it is long, generated, and
+ * carries a product-specific URL.
+ */
+export async function findRecentMediaByCaption(
+  creds: InstagramCredentials,
+  caption: string,
+  withinMs = 10 * 60 * 1000
+): Promise<{ id: string; permalink: string | null } | null> {
+  try {
+    const r = await call<{
+      data?: { id: string; caption?: string; timestamp?: string; permalink?: string }[];
+    }>(
+      `${creds.igUserId}/media`,
+      creds,
+      { fields: 'id,caption,timestamp,permalink', limit: '10' },
+      'GET'
+    );
+
+    const cutoff = Date.now() - withinMs;
+    const wanted = caption.trim();
+
+    for (const media of r.data ?? []) {
+      if (!media.caption || media.caption.trim() !== wanted) continue;
+      // A caption match alone is not enough — the same product could have been
+      // posted legitimately last month. It must also be recent.
+      const posted = media.timestamp ? Date.parse(media.timestamp) : NaN;
+      if (Number.isNaN(posted) || posted < cutoff) continue;
+      return { id: media.id, permalink: media.permalink ?? null };
+    }
+    return null;
+  } catch {
+    // This runs inside error handling. It must never replace the original,
+    // more informative failure with one of its own.
+    return null;
+  }
+}
+
 /** The public permalink, fetched after publishing so the record links out. */
 export async function getPermalink(
   creds: InstagramCredentials,
