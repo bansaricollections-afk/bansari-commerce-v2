@@ -2,7 +2,7 @@
 
 import Image from 'next/image';
 import { useState } from 'react';
-import { AlertTriangle, CheckCircle2, ExternalLink, Image as ImageIcon, Loader2, Send } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, Download, ExternalLink, Film, Image as ImageIcon, Loader2, Send } from 'lucide-react';
 
 /**
  * The Instagram composer.
@@ -80,9 +80,12 @@ export default function InstagramComposer({
   const [preview, setPreview] = useState<Preview | null>(null);
   const [caption, setCaption] = useState('');
   const [chosen, setChosen] = useState<string[]>([]);
-  const [busy, setBusy] = useState<'preview' | 'publish' | null>(null);
+  const [busy, setBusy] = useState<'preview' | 'publish' | 'reel' | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [done, setDone] = useState<{ permalink: string | null } | null>(null);
+  const [reel, setReel] = useState<{ url: string; durationSeconds: number; frames: number } | null>(
+    null
+  );
 
   async function runPreview(product: ProductRow) {
     setSelected(product);
@@ -103,6 +106,27 @@ export default function InstagramComposer({
       setChosen((json.images as PreparedImage[]).map((i) => i.url));
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Preview failed');
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function makeReel() {
+    if (!selected) return;
+    setError(null);
+    setReel(null);
+    setBusy('reel');
+    try {
+      const res = await fetch('/api/admin/instagram/reel', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ productId: selected.id }),
+      });
+      const json = await res.json();
+      if (!res.ok || !json.success) throw new Error(json.message ?? `HTTP ${res.status}`);
+      setReel({ url: json.url, durationSeconds: json.durationSeconds, frames: json.frames });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Reel generation failed');
     } finally {
       setBusy(null);
     }
@@ -388,6 +412,57 @@ export default function InstagramComposer({
                       ? 'Meta is fetching and processing each image — this can take a minute. Do not close the tab.'
                       : 'This posts immediately and cannot be undone from here.'}
                 </p>
+              </div>
+
+              {/* ── Reel ── */}
+              <div className="border-t border-slate-200 pt-5">
+                <h3 className="text-sm font-semibold text-slate-900">Reel</h3>
+                <p className="mt-1 max-w-xl text-xs leading-relaxed text-slate-500">
+                  Builds a 9:16 video from these photos for you to download and post from
+                  your phone. It is <strong>not</strong> posted automatically, and that is
+                  deliberate: Instagram&rsquo;s API cannot attach music-library audio, and
+                  trending audio is the main reason a reel reaches people who don&rsquo;t
+                  follow you. Add the audio in the app.
+                </p>
+
+                <div className="mt-3 flex flex-wrap items-center gap-3">
+                  <button
+                    type="button"
+                    onClick={makeReel}
+                    disabled={busy !== null}
+                    className="inline-flex items-center gap-2 border border-slate-300 px-4 py-2 text-sm font-medium text-slate-800 transition-colors hover:border-slate-900 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    {busy === 'reel' ? (
+                      <>
+                        <Loader2 size={15} className="animate-spin" /> Rendering…
+                      </>
+                    ) : (
+                      <>
+                        <Film size={15} /> Generate Reel
+                      </>
+                    )}
+                  </button>
+
+                  {reel && (
+                    <a
+                      href={reel.url}
+                      download={`${preview.product.name.replace(/[^a-z0-9]+/gi, '-').toLowerCase()}-reel.mp4`}
+                      className="inline-flex items-center gap-2 bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-700"
+                    >
+                      <Download size={15} /> Download ({reel.durationSeconds}s,{' '}
+                      {reel.frames} photos)
+                    </a>
+                  )}
+                </div>
+
+                {reel && (
+                  <video
+                    src={reel.url}
+                    controls
+                    playsInline
+                    className="mt-4 block w-[200px] border border-slate-200"
+                  />
+                )}
               </div>
             </div>
           )}

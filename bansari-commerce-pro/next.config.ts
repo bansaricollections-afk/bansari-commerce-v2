@@ -7,6 +7,20 @@ const nextConfig: NextConfig = {
   compress: true,
   poweredByHeader: false,
 
+  /*
+   * ffmpeg ships as a per-platform package and picks its binary with a
+   * runtime require (`@ffmpeg-installer/win32-x64` here, `linux-x64` on
+   * Vercel). The bundler cannot resolve that statically and fails the build
+   * trying — and if it did bundle it, it would bake in THIS machine's
+   * platform, so the deployed function would carry a Windows .exe it cannot
+   * run. Leaving it external means the binary is resolved from node_modules
+   * at runtime, on whatever platform is actually running.
+   *
+   * sharp is listed for the same reason: it is a native module with
+   * platform-specific binaries.
+   */
+  serverExternalPackages: ['@ffmpeg-installer/ffmpeg', 'sharp'],
+
   // Force a unique build ID on every deploy so Turbopack never reuses
   // stale cached chunks from a previous build (e.g. old column references).
   generateBuildId: async () => {
