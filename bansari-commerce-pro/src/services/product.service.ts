@@ -285,10 +285,38 @@ function mapRow(row: Record<string, any>): Product {
 export async function getProductById(id: number): Promise<Product | null> {
   const supabase = createServiceRoleClient();
 
+  /*
+   * `active` is filtered here, and it was not before.
+   *
+   * THE BUG THIS FIXES
+   * Deleting a product in the admin performs a SOFT delete — it sets
+   * active = false and keeps the row, so that orders which reference the
+   * product keep working. Every list query already respected that: /shop, the
+   * sitemap, and both merchant feeds all dropped the product immediately.
+   *
+   * This function did not. So /product/47 kept returning HTTP 200 for a
+   * product the merchant had deleted, reachable by anyone holding the link —
+   * a Google result, a shared URL, an Instagram post, a browser tab left open.
+   * The customer could read the page and add it to the basket, and only at
+   * checkout would validateCartItems reject it for being inactive. The money
+   * was never at risk; the merchant's intent and the customer's time were.
+   *
+   * It also silently broke a documented guarantee elsewhere: guide-media.ts
+   * states that "a referenced product that has been deleted or deactivated
+   * resolves to undefined, and the renderer omits that block". That could not
+   * happen while this query returned inactive rows, so guides could still
+   * show a deleted garment.
+   *
+   * Every caller wants this behaviour: the product page 404s, guides omit the
+   * block, and the Instagram composer refuses to post a product that is no
+   * longer for sale. The admin edits products through its own API and is
+   * unaffected.
+   */
   const { data, error } = await supabase
     .from('products')
     .select(PRODUCT_SELECT)
     .eq('id', id)
+    .eq('active', true)
     .maybeSingle();
 
   if (error) throw new Error(error.message);
