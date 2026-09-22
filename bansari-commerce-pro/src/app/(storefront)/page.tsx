@@ -22,15 +22,44 @@ export const metadata = {
    * template. Without it the brand appeared twice in one title, wasting the
    * ~60 characters Google actually renders.
    */
+  /*
+   * "Vadodara" is in the title because of a measured failure, not a hunch.
+   *
+   * Search Console, 3 months: "bansari shop" earns 62 impressions at average
+   * position 4.9 and ZERO clicks. "bansari" earns 92 impressions, also zero.
+   * People looking for a shop called Bansari are seeing this site near the top
+   * of page one and choosing something else.
+   *
+   * That is not a ranking problem — position 4.9 is already good. It is the
+   * snippet failing to answer the only question those searchers have: "is this
+   * the Bansari I mean?" The old title said what the shop SELLS, which every
+   * competing result also says. It did not say WHICH shop this is.
+   *
+   * Bansari is also a common given name, so a share of those impressions were
+   * never going to convert. Naming the city is what separates the two.
+   */
   title: {
-    absolute: "Bansari Collections — Indian Ethnic Wear for Women",
+    absolute: "Bansari Collections — Ethnic Wear Boutique in Vadodara",
   },
   // "handcrafted" dropped: the catalogue is sourced from Jaipur artisans AND
   // from manufacturers, so it was not true of everything sold. This string is
   // what Google prints under the result, which makes it the single most widely
   // read sentence on the site.
+  /*
+   * Rewritten to lead with WHO and WHERE, then what.
+   *
+   * Google renders roughly 155 characters, so the first clause is the one that
+   * is always read. The previous text opened with "Shop Indian ethnic wear for
+   * women" — indistinguishable from every other result on the page. Opening
+   * with the shop and the city answers the searcher's actual question in the
+   * first six words.
+   *
+   * Every claim is still checkable: the boutique address is in the footer and
+   * the schema, the sourcing line matches /faq, and the shipping threshold is
+   * read from the same constant checkout uses rather than typed here.
+   */
   description:
-    `Shop Indian ethnic wear for women — cotton kurta sets, linen co-ords, chikankari and printed suits. Sourced from Jaipur artisans, chosen in Vadodara. Free shipping over ₹${SHIPPING_THRESHOLD_LABEL}.`,
+    `A women's ethnic wear boutique in Vadodara, Gujarat. Cotton kurta sets, co-ord sets, kurtis and dresses. Free shipping over ₹${SHIPPING_THRESHOLD_LABEL}, free 7-day returns.`,
   alternates: { canonical: "/" },
 };
 
