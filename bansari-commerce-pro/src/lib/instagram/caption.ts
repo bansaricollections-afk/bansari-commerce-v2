@@ -196,7 +196,16 @@ export function buildCaption(product: Product, index: AttributeIndex): Generated
   lines.push('Free shipping over ₹2,099 · Free 7-day returns');
   // Sourcing, stated the same way the site now states it.
   lines.push('Sourced from artisans in Jaipur, chosen in Vadodara.', '');
-  lines.push(`Shop → ${productUrl}`);
+  /*
+   * Instagram never makes caption links tappable. The long UTM URL that used
+   * to sit here could only be used by typing it, which nobody did. So the
+   * caption now points at the one tappable link a profile has — the bio,
+   * which opens /instagram with every posted piece — and offers a short link
+   * short enough to type from memory. /p/[id] adds the UTM tags on the way
+   * through, so the visit is still attributed to Instagram.
+   */
+  lines.push('🛍 Tap the link in our bio to shop this piece');
+  lines.push(`or visit bansaricollection.in/p/${product.id}`);
 
   const hashtags = buildHashtags({ fabric, work, occasion, pattern, category, id: product.id });
 

@@ -260,7 +260,8 @@ export async function buildGuideCarousel(
     '',
     ...items.map((t) => `• ${stripMarkup(t)}`),
     '',
-    `Full guide → ${guideUrl}`,
+    // Caption links are never tappable on Instagram; the bio link is.
+    'Read the full guide — link in our bio.',
   ];
 
   const hashtags = [
