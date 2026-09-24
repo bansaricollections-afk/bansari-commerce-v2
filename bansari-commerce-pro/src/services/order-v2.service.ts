@@ -967,4 +967,93 @@ export const OrderV2Service = {
   },
 };
 
+/**
+ * Send ONE gentle review reminder for a delivered order.
+ *
+ * WHY THIS EXISTS
+ * The invitation goes out automatically at delivery, and that was the only
+ * send. The first real customer received it, did not act on it, and there was
+ * no way in the admin to follow up — only by hand, outside the system, without
+ * the signed links that make a review verifiable.
+ *
+ * THE GUARDS, AND WHY EACH ONE
+ *   delivered only       a review of something not yet received is not a
+ *                        verified-purchase review.
+ *   items not reviewed   a line that already has a review is left out, so a
+ *                        customer is never asked twice about the same piece.
+ *   once per order       checked against email_log. A reminder is a courtesy;
+ *                        a second one is pestering, and the email itself
+ *                        promises "the only reminder we will send". That
+ *                        promise has to be enforced here or it is a lie.
+ *
+ * The thank-you coupon is unchanged: it is issued only when a review WITH A
+ * PHOTO is approved, by review-reward.service — never by this function.
+ */
+export async function sendReviewReminder(
+  orderId: number
+): Promise<{ sent: boolean; reason?: string; items?: number }> {
+  const sb = createServiceRoleClient();
+
+  const { data: order } = await sb
+    .from('orders')
+    .select('id, order_number, customer_name, customer_email, order_v2_status')
+    .eq('id', orderId)
+    .maybeSingle();
+
+  if (!order) return { sent: false, reason: 'Order not found.' };
+  if (order.order_v2_status !== 'delivered') {
+    return { sent: false, reason: 'Only delivered orders can be asked for a review.' };
+  }
+  if (!order.customer_email) return { sent: false, reason: 'No email address on this order.' };
+
+  const { data: prior } = await sb
+    .from('email_log')
+    .select('id')
+    .eq('order_number', order.order_number)
+    .eq('template', 'review_reminder')
+    .eq('sent', true)
+    .limit(1);
+
+  if (prior && prior.length > 0) {
+    return { sent: false, reason: 'A reminder has already been sent for this order.' };
+  }
+
+  const { data: lines } = await sb
+    .from('order_items')
+    .select('id, product_id, product_name')
+    .eq('order_id', orderId);
+
+  const lineIds = (lines ?? []).map((l) => l.id as string);
+  const { data: reviewed } = lineIds.length
+    ? await sb.from('reviews').select('order_item_id').in('order_item_id', lineIds)
+    : { data: [] as { order_item_id: string }[] };
+  const done = new Set((reviewed ?? []).map((r) => r.order_item_id));
+
+  const items = (lines ?? [])
+    .filter((l) => l.product_id != null && !done.has(l.id as string))
+    .map((l) => ({
+      productName: (l.product_name as string) ?? 'your purchase',
+      reviewUrl: `${siteConfig.url}/review?t=${createReviewToken({
+        orderItemId: l.id as string,
+        orderId: Number(orderId),
+        productId: Number(l.product_id),
+      })}`,
+    }));
+
+  if (items.length === 0) {
+    return { sent: false, reason: 'Every item on this order has already been reviewed.' };
+  }
+
+  const result = await sendReviewInvitationEmail({
+    customerName: (order.customer_name as string) ?? 'there',
+    customerEmail: order.customer_email as string,
+    orderNumber: order.order_number as string,
+    items,
+    reminder: true,
+  });
+
+  if (!result.sent) return { sent: false, reason: result.error ?? 'The email could not be sent.' };
+  return { sent: true, items: items.length };
+}
+
 export type { OrderV2, OrderItemV2, OrderTimelineEntry, OrderShipment, OrderV2SearchResult };

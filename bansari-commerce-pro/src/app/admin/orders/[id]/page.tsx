@@ -228,6 +228,30 @@ export default function OrderDetailPage() {
     }
   }
 
+  /**
+   * One gentle follow-up asking for a review. The server enforces the rules
+   * (delivered only, unreviewed items only, once per order) and its refusal
+   * message is shown as-is — "a reminder has already been sent" is an answer
+   * the merchant should read, not a generic failure.
+   */
+  async function doReviewReminder() {
+    if (
+      !confirm(
+        'Send the customer one gentle reminder to review this order?\n\n' +
+          'They will get their review link again, plus the 10% thank-you offer for a photo review. ' +
+          'Only one reminder can ever be sent per order.'
+      )
+    ) {
+      return;
+    }
+    await run(async () => {
+      const r = await fetch(`/api/admin/orders/${id}/review-reminder`, { method: 'POST' });
+      const json = (await r.json().catch(() => null)) as { message?: string } | null;
+      if (!r.ok) throw new Error(json?.message ?? `Reminder failed: ${r.status}`);
+      alert('Review reminder sent.');
+    }, false);
+  }
+
   async function doDeliver() {
     if (!confirm('Mark this order as delivered?')) return;
     await run(() =>
@@ -413,6 +437,7 @@ export default function OrderDetailPage() {
           {canDeliver  && <ActionBtn primary={primaryAction === 'deliver'}  onClick={() => { void doDeliver(); }} disabled={busy}>Mark Delivered</ActionBtn>}
           {canReturn   && <ActionBtn primary={primaryAction === 'return'}   onClick={() => { setReason(''); setModal('return'); }}>Request Return</ActionBtn>}
           {canExchange && <ActionBtn primary={primaryAction === 'exchange'} onClick={() => { setReason(''); setModal('exchange'); }}>Request Exchange</ActionBtn>}
+          {status === 'delivered' && <ActionBtn onClick={() => { void doReviewReminder(); }} disabled={busy}>Send Review Reminder</ActionBtn>}
           {canRefund   && <ActionBtn primary={primaryAction === 'refund'}   onClick={() => { setReason(''); setRefundAmt(''); setRefundRef(''); setModal('refund'); }}>Issue Refund</ActionBtn>}
           {canCancel   && <ActionBtn destructive onClick={() => { setReason(''); setModal('cancel'); }}>Cancel Order</ActionBtn>}
           <ActionBtn onClick={() => { setReason(''); setModal('note'); }}>Add Note</ActionBtn>

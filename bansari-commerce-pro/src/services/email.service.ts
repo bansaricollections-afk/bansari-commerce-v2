@@ -592,6 +592,16 @@ export async function sendReviewInvitationEmail(data: {
   customerEmail: string;
   orderNumber: string;
   items: { productName: string; reviewUrl: string }[];
+  /**
+   * A gentle follow-up rather than the first invitation.
+   *
+   * Same links, same thank-you offer — only the subject and opening change.
+   * The subject must differ: a second identical "How was your order?" reads
+   * as a system glitch, and a customer who ignored the first is more likely to
+   * ignore an exact repeat. The wording acknowledges the earlier email rather
+   * than pretending it is the first contact.
+   */
+  reminder?: boolean;
 }): Promise<EmailResult> {
   if (data.items.length === 0) {
     return { sent: false, error: "No reviewable items on this order." };
@@ -610,14 +620,17 @@ export async function sendReviewInvitationEmail(data: {
 
   return sendEmail({
     to: data.customerEmail,
-    subject: `How was your order? — ${data.orderNumber} | Bansari Collections`,
-    template: "review_invitation",
+    subject: data.reminder
+      ? `A quick favour, if you have a moment — ${data.orderNumber} | Bansari Collections`
+      : `How was your order? — ${data.orderNumber} | Bansari Collections`,
+    template: data.reminder ? "review_reminder" : "review_invitation",
     orderNumber: data.orderNumber,
     html: orderStageHtml(
       {
-        banner: "How was it?",
-        lead:
-          "We hope your order {order} arrived safely and that you have had a chance to wear it. If you can spare two minutes, we would be very grateful for your honest thoughts — the fit, the fabric, the colour in daylight.",
+        banner: data.reminder ? "Still thinking of you" : "How was it?",
+        lead: data.reminder
+          ? "We wrote a few days ago after your order {order} arrived, and we know how easily these emails slip past. By now you have hopefully had a chance to wear it a few times. If you can spare two minutes, your honest thoughts on the fit, the fabric and the colour would mean a great deal to us — and to the next person deciding. This is the only reminder we will send."
+          : "We hope your order {order} arrived safely and that you have had a chance to wear it. If you can spare two minutes, we would be very grateful for your honest thoughts — the fit, the fabric, the colour in daylight.",
         closing:
           "Only customers who have actually received a piece can review it here, so your words carry real weight with the next person deciding. We publish every honest review, including the critical ones — that is the only way this is worth anything. Thank you for choosing a small boutique. It genuinely matters to us.",
         extra:
