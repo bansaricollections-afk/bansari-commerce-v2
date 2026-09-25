@@ -8,6 +8,8 @@ import type { ProductSpecRow } from '@/services/product-attributes';
 import type { ProductVariant, SizeAvailability } from '@/types/product';
 import { trackRecentlyViewed } from '@/lib/recentlyViewed';
 import { SHIPPING_THRESHOLD } from '@/lib/shipping';
+import { buildHighlights, type HighlightKind } from '@/lib/product-highlights';
+import { Sparkles, Leaf, Layers, Check } from 'lucide-react';
 
 import DeliveryEstimate from './DeliveryEstimate';
 import ProductActions from './ProductActions';
@@ -171,7 +173,21 @@ function SizeGuideModal({ onClose }: { onClose: () => void }) {
   );
 }
 
+const HIGHLIGHT_ICONS: Record<HighlightKind, typeof Sparkles> = {
+  craft: Sparkles,
+  fabric: Leaf,
+  set: Layers,
+  feature: Check,
+};
+
 export default function ProductInfo({ product, canonicalUrl, specRows = [] }: Props) {
+  const specValue = (label: string) => specRows.find((r) => r.label === label)?.value ?? null;
+  const highlights = buildHighlights({
+    name: product.name,
+    category: product.category,
+    fabric: specValue('Fabric') ?? (product as { fabric?: string | null }).fabric,
+    work: specValue('Work'),
+  });
   const [quantity, setQuantity] = useState(1);
   const [selectedVariant, setSelectedVariant] = useState<ProductVariant | null>(null);
   const [selectedSize, setSelectedSize] = useState<SizeAvailability | null>(null);
@@ -328,6 +344,31 @@ export default function ProductInfo({ product, canonicalUrl, specRows = [] }: Pr
           <p className="mt-2 text-[12px] text-slate-500">
             You save ₹{savedAmount.toLocaleString('en-IN')}
           </p>
+        )}
+
+        {/* ── Highlights — the concrete reasons to buy, where the decision is
+             made. Derived from the Work/Fabric attributes and the title only;
+             a product with nothing specific shows nothing. ── */}
+        {highlights.length > 0 && (
+          <ul aria-label="Highlights" className="mt-4 flex flex-wrap gap-2">
+            {highlights.map((h) => {
+              const Icon = HIGHLIGHT_ICONS[h.kind];
+              return (
+                <li
+                  key={h.label}
+                  className="inline-flex items-center gap-1.5 border px-2.5 py-1.5 text-[11px] font-medium tracking-[0.04em]"
+                  style={{
+                    borderColor: 'var(--bc-gold)',
+                    background: 'rgba(201,169,110,0.08)',
+                    color: 'var(--bc-text-ink, #1A0F16)',
+                  }}
+                >
+                  <Icon size={13} strokeWidth={1.75} aria-hidden="true" style={{ color: 'var(--bc-gold-dark)' }} />
+                  {h.label}
+                </li>
+              );
+            })}
+          </ul>
         )}
 
         {/* ── Shipping / returns ── */}

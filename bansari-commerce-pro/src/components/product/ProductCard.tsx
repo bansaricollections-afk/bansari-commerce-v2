@@ -9,6 +9,7 @@ import { useCart } from "@/hooks/useCart";
 
 import { Product } from "@/types";
 import { logCardRender } from "@/lib/debug/product-debug";
+import { topHighlight } from "@/lib/product-highlights";
 
 type Props = {
   product: Product;
@@ -55,6 +56,11 @@ export default function ProductCard({ product, priority = false }: Props) {
   ]
     .filter(Boolean)
     .join(" · ");
+
+  const cardHighlight = topHighlight({
+    name: product.name,
+    category: product.category,
+  });
 
   /* ── Badge logic ── */
   const isNew = (product as any).isNew ?? false;
@@ -227,6 +233,19 @@ export default function ProductCard({ product, priority = false }: Props) {
             </span>
           )}
         </div>
+
+        {/* ── Highlight — the one concrete reason to open this card (Mirror
+             Work, 3-Piece Set…). Bottom-left so it never competes with the
+             status badges; the desktop hover bar covers it while in use. ── */}
+        {cardHighlight && !isSoldOut && (
+          <span
+            className="pointer-events-none absolute bottom-3 left-3 inline-flex items-center gap-1 border border-[#C9A96E] bg-[#FFFDF9]/92 px-2 py-[5px] text-[9px] font-semibold uppercase leading-none tracking-[0.14em] text-[#1A0F16] backdrop-blur-sm"
+            aria-hidden="true"
+          >
+            <span className="text-[#A8864A]">✦</span>
+            {cardHighlight.label}
+          </span>
+        )}
 
         {/* ── Wishlist — top right, always visible, 44×44 touch target ── */}
         <button
