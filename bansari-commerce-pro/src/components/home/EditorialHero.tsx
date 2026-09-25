@@ -1,7 +1,17 @@
-import { getFeaturedProducts } from "@/services/product.service";
+import { getFeaturedProducts, getProducts } from "@/services/product.service";
+import { collectionSlug } from "@/lib/collection-slug";
 import EditorialHeroCarousel, { type HeroSlide } from "./EditorialHeroCarousel";
 
 const POSITIONS: HeroSlide["position"][] = ["left", "center", "right"];
+
+/*
+ * Festive campaign slide — leads the carousel through Karwa Chauth and
+ * Diwali, then disappears on its own after FESTIVE_UNTIL, so nobody has to
+ * remember to take it down. Built from the live "Festive Edit" collection:
+ * if that collection is empty or renamed, the slide simply does not render.
+ */
+const FESTIVE_COLLECTION = "Festive Edit";
+const FESTIVE_UNTIL = new Date("2026-11-10T00:00:00+05:30");
 
 // ── Real, catalog-driven hero ───────────────────────────────────────────────
 // Slides are built from active products flagged `featured` in Admin Product
@@ -34,6 +44,31 @@ export default async function EditorialHero() {
       accent: [p.category, p.collection].filter(Boolean).join(" · "),
       position: POSITIONS[i % POSITIONS.length],
     }));
+
+  if (Date.now() < FESTIVE_UNTIL.getTime()) {
+    try {
+      const festive = (await getProducts()).find(
+        (p) => p.collection === FESTIVE_COLLECTION && p.images?.[0]?.url
+      );
+      if (festive) {
+        slides.unshift({
+          id: -1,
+          campaign: "Karwa Chauth & Diwali",
+          headline: "The Festive Edit",
+          subheadline: "Mirror work, bandhani and sequin sets for the season.",
+          cta: "Shop the Festive Edit",
+          ctaHref: `/collections/${collectionSlug(FESTIVE_COLLECTION)}`,
+          image: festive.images![0]!.url!,
+          imageAlt: festive.name,
+          accent: FESTIVE_COLLECTION,
+          position: "left",
+        });
+        slides.splice(3);
+      }
+    } catch {
+      /* The campaign slide is optional; the carousel works without it. */
+    }
+  }
 
   if (slides.length === 0) return null;
 

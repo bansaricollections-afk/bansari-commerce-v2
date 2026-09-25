@@ -350,6 +350,19 @@ export default function ProductInfo({ product, canonicalUrl, specRows = [] }: Pr
             </a>
             , subject to policy
           </p>
+          {/* Doubt happens here, beside the price — so the way to ask sits here
+              too, not only in the floating button. */}
+          <p>
+            Unsure about size or fabric?{' '}
+            <a
+              href={`https://wa.me/918460192745?text=${encodeURIComponent(`Hi, I have a question about this piece: https://www.bansaricollection.in/product/${product.id}`)}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="font-medium text-[#1f7a3e] underline underline-offset-2"
+            >
+              Chat with us on WhatsApp
+            </a>
+          </p>
 
           {/* The "Also available on Myntra, Amazon & Flipkart" line was
               removed on the owner's call (26 Sep 2026): beside the buy button
