@@ -31,7 +31,7 @@ export default function ShopToolbar({ total }: ShopToolbarProps) {
   const pathname     = usePathname();
   const searchParams = useSearchParams();
 
-  const currentSort = (searchParams.get('sort') ?? 'newest') as SortOption;
+  const currentSort = (searchParams.get('sort') ?? 'bestseller') as SortOption;
 
   const [grid, setGrid] = useState<"2" | "3" | "4">("3");
   const [open, setOpen] = useState(false);

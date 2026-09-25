@@ -62,7 +62,7 @@ function MobileFilterBarInner({ facets }: { facets: ShopFacets }) {
     availability: "",
     priceMin:     "",
     priceMax:     "",
-    sort:         "newest",
+    sort:         "bestseller",
   });
 
   // Sync draft from URL whenever drawer opens
@@ -78,7 +78,7 @@ function MobileFilterBarInner({ facets }: { facets: ShopFacets }) {
       availability: params.get("availability") ?? "",
       priceMin:     params.get("priceMin")     ?? "",
       priceMax:     params.get("priceMax")     ?? "",
-      sort:         (params.get("sort") ?? "newest") as SortOption,
+      sort:         (params.get("sort") ?? "bestseller") as SortOption,
     });
   }, [open, params]);
 
@@ -176,7 +176,7 @@ function MobileFilterBarInner({ facets }: { facets: ShopFacets }) {
   }, [draft, pathname, router]);
 
   const clearDraft = useCallback(() => {
-    setDraft({ category: "", collection: "", occasion: "", fabric: "", size: "", color: "", availability: "", priceMin: "", priceMax: "", sort: "newest" });
+    setDraft({ category: "", collection: "", occasion: "", fabric: "", size: "", color: "", availability: "", priceMin: "", priceMax: "", sort: "bestseller" });
   }, []);
 
   const activeCount = [draft.category, draft.collection, draft.occasion, draft.fabric, draft.size, draft.color, draft.availability, draft.priceMin, draft.priceMax].filter(Boolean).length;
@@ -213,7 +213,7 @@ function MobileFilterBarInner({ facets }: { facets: ShopFacets }) {
           {/* Inline sort — visible at all times on mobile */}
           <div className="relative shrink-0">
             <select
-              value={params.get("sort") ?? "newest"}
+              value={params.get("sort") ?? "bestseller"}
               onChange={(e) => {
                 const next = new URLSearchParams(params.toString());
                 next.set("sort", e.target.value);

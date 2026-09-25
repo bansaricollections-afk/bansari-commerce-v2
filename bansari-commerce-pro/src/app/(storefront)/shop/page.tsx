@@ -70,7 +70,7 @@ function parseSearchParams(raw: Record<string, string | string[] | undefined>): 
   const validSorts: SortOption[] = [
     "newest", "price_asc", "price_desc", "bestseller", "discount", "relevance",
   ];
-  const sort: SortOption = sortRaw && validSorts.includes(sortRaw) ? sortRaw : "newest";
+  const sort: SortOption = sortRaw && validSorts.includes(sortRaw) ? sortRaw : "bestseller"; // strongest pieces first for a first-time visitor
 
   // availability → inStock boolean mapping
   const availability = str("availability");

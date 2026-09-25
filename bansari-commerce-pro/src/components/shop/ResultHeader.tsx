@@ -23,7 +23,7 @@ function ResultHeaderInner({ total, page, perPage }: ResultHeaderProps) {
   const pathname = usePathname();
   const params   = useSearchParams();
 
-  const currentSort = (params.get("sort") ?? "newest") as SortOption;
+  const currentSort = (params.get("sort") ?? "bestseller") as SortOption;
 
   const from = Math.min((page - 1) * perPage + 1, total);
   const to   = Math.min(page * perPage, total);

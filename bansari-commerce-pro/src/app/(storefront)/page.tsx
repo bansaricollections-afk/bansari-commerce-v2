@@ -2,6 +2,7 @@ import { SHIPPING_THRESHOLD_LABEL } from "@/lib/shipping";
 
 import EditorialHero from "@/components/home/EditorialHero";
 import CategoryShowcase from "@/components/home/CategoryShowcase";
+import OccasionTiles from "@/components/shop/OccasionTiles";
 import TrendingCollections from "@/components/home/TrendingCollections";
 import NewArrivals from "@/components/home/NewArrivals";
 import BestSellers from "@/components/home/BestSellers";
@@ -79,6 +80,12 @@ export default function HomePage() {
       <main id="main-content" tabIndex={-1}>
         {/* ── 3. Editorial Hero ── */}
         <EditorialHero />
+
+        {/* ── 3b. Shop by Occasion — how ethnic wear is actually bought ── */}
+        <OccasionTiles
+          withHeading
+          className="mx-auto block max-w-6xl px-5 pt-12 md:px-10 md:pt-16"
+        />
 
         {/* ── 4. Shop by Category ── */}
         <CategoryShowcase />

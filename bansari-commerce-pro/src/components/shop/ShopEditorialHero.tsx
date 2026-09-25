@@ -19,6 +19,7 @@
  * taxonomy to come from the catalog so chips cannot rot into dead links.
  */
 import { getShopFacets } from "@/services/shop-facets";
+import OccasionTiles from "./OccasionTiles";
 
 /** Chips are a glance, not a directory — cap so the hero cannot grow tall again. */
 const MAX_CHIPS = 4;
@@ -46,20 +47,24 @@ export default async function ShopEditorialHero() {
         ))}
       </div>
 
-      <div className="mx-auto flex max-w-[1440px] flex-col items-center justify-center px-5 py-7 text-center md:px-10 lg:px-16 lg:py-9">
+      <div className="mx-auto flex max-w-[1440px] flex-col items-center justify-center px-5 py-5 text-center md:px-10 lg:px-16 lg:py-9">
 
         {/* Kicker */}
-        <p className="mb-2.5 text-[9px] font-bold uppercase tracking-[0.32em] text-[#8A5A6A]">
+        <p className="mb-2.5 hidden text-[9px] sm:block font-bold uppercase tracking-[0.32em] text-[#8A5A6A]">
           ✦ The Bansari Catalogue ✦
         </p>
 
         {/* Editorial headline */}
-        <h2 className="font-[family:var(--font-playfair)] text-[clamp(1.4rem,3.6vw,2.4rem)] font-normal leading-[1.1] text-slate-900">
+        <h2 className="font-[family:var(--font-playfair)] text-[1.25rem] sm:text-[clamp(1.4rem,3.6vw,2.4rem)] font-normal leading-[1.1] text-slate-900">
           Dressed for Every Story
         </h2>
 
-        {/* Collection chips — derived from the catalogue, exact stored values */}
-        <div className="mt-5 flex flex-wrap items-center justify-center gap-2">
+        {/* Occasion first — how this category is actually shopped. */}
+        <OccasionTiles className="mt-4 w-full max-w-4xl text-left" />
+
+        {/* Collection chips — desktop only now; the header menu lists them on
+            phones, and here they pushed the first product down. */}
+        <div className="mt-5 hidden flex-wrap items-center justify-center gap-2 sm:flex">
           {collections.map((tag) => (
             <a
               key={tag}
