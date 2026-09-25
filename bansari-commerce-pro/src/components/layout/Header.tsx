@@ -33,10 +33,12 @@ export default async function Header() {
     getFeaturedCoupon().catch(() => null),
   ]);
   const inr = (n: number) => `₹${n.toLocaleString("en-IN")}`;
+  // Kept short: the bar is one line, and on a 375px phone a longer version
+  // truncated right before the code — the one part a shopper needs.
   const offer = coupon
     ? `${coupon.discountType === "flat" ? `${inr(coupon.discountValue)} off` : `${coupon.discountValue}% off`}${
-        coupon.minOrder > 0 ? ` above ${inr(coupon.minOrder)}` : ""
-      } · Code ${coupon.code}`
+        coupon.minOrder > 0 ? ` on ${inr(coupon.minOrder)}+` : ""
+      } · ${coupon.code}`
     : null;
 
   // Exact stored strings, URL-encoded. Never slugified: /shop matches the

@@ -102,7 +102,7 @@ export default function AnnouncementBar({
       <span className="invisible w-7 shrink-0" aria-hidden="true" />
 
       <p
-        className="truncate whitespace-nowrap text-center tracking-[0.1em] uppercase"
+        className="truncate whitespace-nowrap text-center tracking-[0.06em] uppercase sm:tracking-[0.1em]"
         style={{
           fontSize: "var(--bc-text-xs)",
           opacity: fading ? 0 : 1,
