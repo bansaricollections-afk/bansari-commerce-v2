@@ -148,6 +148,18 @@ export default function EditorialHeroCarousel({ slides }: { slides: HeroSlide[] 
               background: `${copyScrim(s.position)}, ${FOOT_SCRIM}`,
             }}
           />
+          {/* Phones only: the side scrim covers a quarter of the width, but on a
+              phone the copy spans the full width, so the headline washed into
+              the photo. A bottom wash sits under the copy instead. */}
+          <div
+            className="md:hidden"
+            style={{
+              position: "absolute",
+              inset: 0,
+              background:
+                "linear-gradient(to top, rgba(26,15,22,0.88) 0%, rgba(26,15,22,0.62) 40%, rgba(26,15,22,0.12) 70%, transparent 82%)",
+            }}
+          />
         </div>
       ))}
 

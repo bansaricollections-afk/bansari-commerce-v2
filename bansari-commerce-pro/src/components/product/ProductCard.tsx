@@ -20,7 +20,8 @@ export default function ProductCard({ product, priority = false }: Props) {
   const [wishlisted, setWishlisted] = useState(false);
   const [hovered, setHovered] = useState(false);
   const [quickAdded, setQuickAdded] = useState(false);
-  const { addItem } = useCart();
+  const { addItem, addToCart } = useCart();
+  const [addedSize, setAddedSize] = useState<string | null>(null);
   const router = useRouter();
 
   const primaryImage = product.images?.[0]?.url || "/placeholder.png";
@@ -64,7 +65,7 @@ export default function ProductCard({ product, priority = false }: Props) {
      "Only 1 left" is shown only when a single size is sellable with exactly
      one unit left. Products without variants keep the legacy <= 5 rule. */
   const sizeAvailability = (product as any).sizeAvailability as
-    | { label: string; status: string; available: number }[]
+    | { variantId: number; label: string; sku?: string; status: string; available: number }[]
     | undefined;
   const isSizeManaged = Array.isArray(sizeAvailability) && sizeAvailability.length > 0;
   const sellableSizes = isSizeManaged
@@ -117,6 +118,23 @@ export default function ProductCard({ product, priority = false }: Props) {
     });
     setQuickAdded(true);
     setTimeout(() => setQuickAdded(false), 1800);
+  }
+
+  /* One tap adds that size. The hover bar never appears on a phone, so a
+     mobile shopper had to open every product just to add it. */
+  function handleSizeAdd(
+    e: React.MouseEvent,
+    s: { variantId: number; label: string; sku?: string }
+  ) {
+    e.preventDefault();
+    e.stopPropagation();
+    addToCart({
+      product,
+      quantity: 1,
+      size: { variantId: s.variantId, label: s.label, sku: s.sku },
+    });
+    setAddedSize(s.label);
+    setTimeout(() => setAddedSize(null), 1800);
   }
 
   /* Shared badge base classes — restrained brand palette, no marketplace
@@ -373,12 +391,36 @@ export default function ProductCard({ product, priority = false }: Props) {
         </div>
 
         {/* Size availability — real per-size inventory, never a product total */}
-        {isSizeManaged && (
+        {isSizeManaged && isSoldOut && (
           <p className="mt-2 text-[11px] tracking-[0.02em] text-slate-500">
-            {isSoldOut
-              ? "Sold out in all sizes"
-              : `${sellableSizes.map((s) => s.label).join(" · ")} available`}
+            Sold out in all sizes
           </p>
+        )}
+        {isSizeManaged && !isSoldOut && (
+          <div className="mt-2.5">
+            <p className="mb-1.5 text-[10px] uppercase tracking-[0.12em] text-slate-500">
+              {addedSize ? `Size ${addedSize} added to bag ✓` : "Tap a size to add"}
+            </p>
+            <div className="flex flex-wrap gap-1.5">
+              {sellableSizes.map((s) => (
+                <button
+                  key={s.variantId}
+                  type="button"
+                  onClick={(e) => handleSizeAdd(e, s)}
+                  aria-label={`Add ${displayName}, size ${s.label}, to bag`}
+                  className={[
+                    "min-h-8 min-w-8 border px-2 text-[11px] font-medium transition-colors",
+                    "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#8A5A6A]",
+                    addedSize === s.label
+                      ? "border-[#1A0F16] bg-[#1A0F16] text-[#FFFDF9]"
+                      : "border-[#1A0F16]/25 text-[#1A0F16] hover:border-[#1A0F16]",
+                  ].join(" ")}
+                >
+                  {s.label}
+                </button>
+              ))}
+            </div>
+          </div>
         )}
       </div>
     </article>

@@ -1,6 +1,5 @@
 import { SHIPPING_THRESHOLD_LABEL } from "@/lib/shipping";
 
-import AnnouncementBar from "@/components/home/AnnouncementBar";
 import EditorialHero from "@/components/home/EditorialHero";
 import CategoryShowcase from "@/components/home/CategoryShowcase";
 import TrendingCollections from "@/components/home/TrendingCollections";
@@ -71,8 +70,8 @@ export default function HomePage() {
         Skip to main content
       </a>
 
-      {/* ── 1. Announcement Bar (outside <main> — correct landmark) ── */}
-      <AnnouncementBar />
+      {/* The announcement bar lives in the site header. A second copy here
+          stacked two bars on the homepage and pushed the hero off a phone. */}
 
       {/* ── 2. Header is in layout ── */}
 

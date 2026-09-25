@@ -34,17 +34,20 @@ export const NAV_TOP_LINKS = [
 ] as const;
 
 const ANNOUNCEMENT: AnnouncementBarProps = {
-  storageKey: "announcement:v3",
+  storageKey: "announcement:v4",
 };
 
 export default function HeaderClient({
   categories,
   collections,
+  offer = null,
 }: {
   /** Live catalog categories — derived server-side, never hardcoded. */
   categories: NavEntry[];
   /** Live catalog collections — derived server-side, never hardcoded. */
   collections: NavEntry[];
+  /** Live public coupon line, or null when no campaign is running. */
+  offer?: string | null;
 }) {
   const { items }           = useCart();
   const { items: wishlist } = useWishlist();
@@ -117,7 +120,7 @@ export default function HeaderClient({
 
   return (
     <>
-      <AnnouncementBar {...ANNOUNCEMENT} />
+      <AnnouncementBar {...ANNOUNCEMENT} offer={offer} />
 
       <header
         className="sticky top-0 z-[var(--bc-z-sticky)] backdrop-blur-lg"

@@ -18,24 +18,15 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const base =
     process.env.NEXT_PUBLIC_SITE_URL ?? 'https://www.bansaricollection.in';
 
-  const staticPages: MetadataRoute.Sitemap = [
-    { url: base, lastModified: new Date(), changeFrequency: 'weekly', priority: 1.0 },
-    { url: `${base}/shop`, lastModified: new Date(), changeFrequency: 'daily', priority: 0.9 },
-    { url: `${base}/collections`, lastModified: new Date(), changeFrequency: 'weekly', priority: 0.8 },
-    { url: `${base}/new-arrivals`, lastModified: new Date(), changeFrequency: 'daily', priority: 0.8 },
-    // Local landing page. Higher priority than the other static pages because
-    // local search is the one channel a young domain can rank in now.
-    { url: `${base}/ethnic-wear-vadodara`, lastModified: new Date(), changeFrequency: 'weekly', priority: 0.8 },
-    { url: `${base}/about`, lastModified: new Date(), changeFrequency: 'monthly', priority: 0.5 },
-    { url: `${base}/contact`, lastModified: new Date(), changeFrequency: 'monthly', priority: 0.5 },
-    { url: `${base}/faq`, lastModified: new Date(), changeFrequency: 'monthly', priority: 0.5 },
-    { url: `${base}/shipping-policy`, lastModified: new Date(), changeFrequency: 'monthly', priority: 0.4 },
-    { url: `${base}/return-refund-policy`, lastModified: new Date(), changeFrequency: 'monthly', priority: 0.4 },
-    { url: `${base}/exchange-policy`, lastModified: new Date(), changeFrequency: 'monthly', priority: 0.4 },
-    { url: `${base}/cancellation-policy`, lastModified: new Date(), changeFrequency: 'monthly', priority: 0.4 },
-    { url: `${base}/privacy-policy`, lastModified: new Date(), changeFrequency: 'monthly', priority: 0.4 },
-    { url: `${base}/terms-and-conditions`, lastModified: new Date(), changeFrequency: 'monthly', priority: 0.4 },
-  ];
+  /*
+   * lastmod must be a real change date. It was `new Date()` on 43 URLs, so
+   * every fetch claimed they had just changed; Google learns to ignore a
+   * sitemap's lastmod when it is always "now", which slows recrawling of the
+   * pages that really did change. Catalog-driven pages use the newest product
+   * change; policy pages omit lastmod rather than invent one.
+   */
+  let newestProduct: Date | null = null;
+  const catalogUpdated = () => newestProduct ?? undefined;
 
   let productPages: MetadataRoute.Sitemap = [];
   try {
@@ -47,6 +38,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       .order('updated_at', { ascending: false });
 
     if (products) {
+      if (products[0]) newestProduct = new Date(products[0].updated_at);
       productPages = products.map((p) => ({
         url: `${base}/product/${p.id}`,
         lastModified: new Date(p.updated_at),
@@ -57,6 +49,26 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   } catch {
     // Sitemap generation must never fail the build.
   }
+
+  const staticPages: MetadataRoute.Sitemap = [
+    { url: base, lastModified: catalogUpdated(), changeFrequency: 'weekly', priority: 1.0 },
+    { url: `${base}/shop`, lastModified: catalogUpdated(), changeFrequency: 'daily', priority: 0.9 },
+    { url: `${base}/collections`, lastModified: catalogUpdated(), changeFrequency: 'weekly', priority: 0.8 },
+    { url: `${base}/new-arrivals`, lastModified: catalogUpdated(), changeFrequency: 'daily', priority: 0.8 },
+    // Local landing page. Higher priority than the other static pages because
+    // local search is the one channel a young domain can rank in now.
+    { url: `${base}/ethnic-wear-vadodara`, lastModified: catalogUpdated(), changeFrequency: 'weekly', priority: 0.8 },
+    { url: `${base}/about`, changeFrequency: 'monthly', priority: 0.5 },
+    { url: `${base}/contact`, changeFrequency: 'monthly', priority: 0.5 },
+    { url: `${base}/faq`, changeFrequency: 'monthly', priority: 0.5 },
+    { url: `${base}/shipping-policy`, changeFrequency: 'monthly', priority: 0.4 },
+    { url: `${base}/return-refund-policy`, changeFrequency: 'monthly', priority: 0.4 },
+    { url: `${base}/exchange-policy`, changeFrequency: 'monthly', priority: 0.4 },
+    { url: `${base}/cancellation-policy`, changeFrequency: 'monthly', priority: 0.4 },
+    { url: `${base}/privacy-policy`, changeFrequency: 'monthly', priority: 0.4 },
+    { url: `${base}/terms-and-conditions`, changeFrequency: 'monthly', priority: 0.4 },
+  ];
+
 
   /*
    * Collection landing pages.
@@ -71,7 +83,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     const { collections } = await getShopFacets();
     collectionPages = collections.map((name) => ({
       url: `${base}/collections/${collectionSlug(name)}`,
-      lastModified: new Date(),
+      lastModified: catalogUpdated(),
       changeFrequency: 'weekly' as const,
       priority: 0.8,
     }));
@@ -89,7 +101,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     const landings = await getBrowseLandings();
     browsePages = landings.map((l) => ({
       url: `${base}/shop/${l.slug}`,
-      lastModified: new Date(),
+      lastModified: catalogUpdated(),
       changeFrequency: 'weekly' as const,
       priority: 0.8,
     }));
@@ -101,7 +113,9 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const guidePages: MetadataRoute.Sitemap = [
     {
       url: `${base}/guides`,
-      lastModified: new Date(),
+      lastModified: new Date(
+        Math.max(...guides.map((g) => new Date(g.updatedAt).getTime()))
+      ),
       changeFrequency: 'weekly' as const,
       priority: 0.7,
     },

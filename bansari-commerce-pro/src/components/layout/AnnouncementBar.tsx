@@ -6,6 +6,8 @@ import { useEffect, useState } from "react";
 export interface AnnouncementBarProps {
   /** Versioned localStorage key — increment to re-surface after content changes */
   storageKey: string;
+  /** Live coupon line; shown first and longest when present. */
+  offer?: string | null;
   onDismiss?: () => void;
   className?: string;
 }
@@ -15,8 +17,8 @@ export interface AnnouncementBarProps {
 // shipping policy), "Trusted by 10,000+ customers" (no sales data supports it),
 // and "The Festive Edit is now live" (no such collection exists).
 const MESSAGES = [
-  "Shipping across India · Dispatched in 1–2 business days",
-  "Secure online payments · UPI, cards & net banking accepted",
+  "Dispatched in 1–2 business days",
+  "Secure payments · UPI & cards",
   /*
    * Was "Tracking details sent by SMS and email once your order ships".
    *
@@ -28,12 +30,13 @@ const MESSAGES = [
    * ship, out-for-delivery and delivered). Restore the SMS wording only if an
    * SMS provider is actually wired up.
    */
-  "Tracking details sent by email once your order ships",
-  "Easy 7-day returns as per our Return & Refund Policy",
+  "Tracking sent by email",
+  "Easy 7-day returns",
 ];
 
 export default function AnnouncementBar({
   storageKey,
+  offer = null,
   onDismiss,
   className = "",
 }: AnnouncementBarProps) {
@@ -51,6 +54,7 @@ export default function AnnouncementBar({
    * bar disappear once on load instead, which is the rarer case and shifts
    * content upward rather than pushing it down under the cursor.
    */
+  const messages = offer ? [offer, ...MESSAGES] : MESSAGES;
   const [visible, setVisible] = useState(true);
   const [msgIndex, setMsgIndex] = useState(0);
   const [fading, setFading] = useState(false);
@@ -68,12 +72,12 @@ export default function AnnouncementBar({
     const id = setInterval(() => {
       setFading(true);
       setTimeout(() => {
-        setMsgIndex((i) => (i + 1) % MESSAGES.length);
+        setMsgIndex((i) => (i + 1) % messages.length);
         setFading(false);
       }, 350);
     }, 4500);
     return () => clearInterval(id);
-  }, [visible]);
+  }, [visible, messages.length]);
 
   function handleDismiss() {
     setVisible(false);
@@ -98,7 +102,7 @@ export default function AnnouncementBar({
       <span className="invisible w-7 shrink-0" aria-hidden="true" />
 
       <p
-        className="text-center tracking-[0.12em] uppercase"
+        className="truncate whitespace-nowrap text-center tracking-[0.1em] uppercase"
         style={{
           fontSize: "var(--bc-text-xs)",
           opacity: fading ? 0 : 1,
@@ -106,7 +110,7 @@ export default function AnnouncementBar({
           transition: "opacity 350ms ease, transform 350ms ease",
         }}
       >
-        {MESSAGES[msgIndex]}
+        {messages[msgIndex % messages.length]}
       </p>
 
       <button

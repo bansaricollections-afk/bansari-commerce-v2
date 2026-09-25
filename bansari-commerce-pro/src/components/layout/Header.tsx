@@ -18,6 +18,7 @@
  */
 
 import { getShopFacets } from "@/services/shop-facets";
+import { getFeaturedCoupon } from "@/services/coupon.service";
 
 import HeaderClient, { type NavEntry } from "./HeaderClient";
 
@@ -25,7 +26,18 @@ export default async function Header() {
   // Only values with at least one active product come back, so a nav entry
   // can never point at an empty result. getShopFacets is React-cached, so the
   // Header, the Footer and the page share one query per request.
-  const { categories, collections } = await getShopFacets();
+  // The live public coupon, so the bar can never advertise an expired code.
+  // A failed lookup only hides the offer; it must never break the header.
+  const [{ categories, collections }, coupon] = await Promise.all([
+    getShopFacets(),
+    getFeaturedCoupon().catch(() => null),
+  ]);
+  const inr = (n: number) => `₹${n.toLocaleString("en-IN")}`;
+  const offer = coupon
+    ? `${coupon.discountType === "flat" ? `${inr(coupon.discountValue)} off` : `${coupon.discountValue}% off`}${
+        coupon.minOrder > 0 ? ` above ${inr(coupon.minOrder)}` : ""
+      } · Code ${coupon.code}`
+    : null;
 
   // Exact stored strings, URL-encoded. Never slugified: /shop matches the
   // stored value verbatim.
@@ -42,6 +54,7 @@ export default async function Header() {
     <HeaderClient
       categories={categories.map(toCategory)}
       collections={collections.map(toCollection)}
+      offer={offer}
     />
   );
 }

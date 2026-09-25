@@ -132,15 +132,18 @@ export default function ConsentNotice() {
       }}
     >
       <div
-        className="mx-auto flex flex-col gap-5 md:flex-row md:items-center md:justify-between"
+        className="mx-auto flex flex-row items-center justify-between gap-3 md:gap-5"
         style={{
           maxWidth: 'var(--bc-wide)',
           paddingInline: 'var(--bc-gutter)',
-          paddingBlock: 'clamp(1.25rem, 2.5vw, 1.75rem)',
+          paddingBlock: 'clamp(0.625rem, 2vw, 1.75rem)',
         }}
       >
         <div style={{ maxWidth: '62ch' }}>
+          {/* Heading hidden on phones: the notice used to cover a quarter of
+              the first screen, so it is one compact row there. */}
           <p
+            className="hidden md:block"
             style={{
               fontFamily: "var(--font-playfair), 'Playfair Display', Georgia, serif",
               fontSize: 'var(--bc-md)',
@@ -155,15 +158,18 @@ export default function ConsentNotice() {
             style={{
               fontFamily: "var(--font-inter), 'Inter', sans-serif",
               fontSize: 'var(--bc-sm)',
-              lineHeight: 1.65,
+              lineHeight: 1.5,
               color: 'rgba(255,253,249,0.68)',
-              margin: '0.5rem 0 0',
+              margin: 0,
               fontWeight: 300,
             }}
           >
+            {!strict && <span className="md:hidden">We use cookies to measure visits.</span>}
+            <span className={strict ? undefined : 'hidden md:inline'}>
             {strict
               ? 'We would like to use cookies to measure how our collections are discovered and to understand which of our advertisements bring you here. Nothing is measured until you choose.'
-              : 'We use cookies to measure how our collections are discovered and to understand which of our advertisements bring you here. You can decline at any time.'}{' '}
+              : 'We use cookies to measure how our collections are discovered and to understand which of our advertisements bring you here. You can decline at any time.'}
+            </span>{' '}
             <Link
               href="/privacy-policy"
               style={{
@@ -172,13 +178,13 @@ export default function ConsentNotice() {
                 textUnderlineOffset: '3px',
               }}
             >
-              Read our privacy policy
+              Privacy policy
             </Link>
             .
           </p>
         </div>
 
-        <div className="flex shrink-0 items-center gap-3">
+        <div className="flex shrink-0 items-center gap-2 md:gap-3">
           {/*
             Decline is a ghost control and Accept is the gold primary, matching
             the CTA hierarchy used across the site. Both are real, equally
@@ -194,7 +200,7 @@ export default function ConsentNotice() {
               fontWeight: 500,
               letterSpacing: '0.14em',
               textTransform: 'uppercase',
-              padding: '0.9375rem 1.75rem',
+              padding: 'clamp(0.625rem, 1.5vw, 0.9375rem) clamp(0.875rem, 2vw, 1.75rem)',
               background: 'transparent',
               color: 'var(--bc-text-inverse)',
               border: '1px solid rgba(255,253,249,0.28)',
@@ -208,6 +214,7 @@ export default function ConsentNotice() {
             type="button"
             onClick={() => choose('granted')}
             className="bc-cta-primary"
+            style={{ padding: 'clamp(0.625rem, 1.5vw, 0.9375rem) clamp(0.875rem, 2vw, 1.75rem)' }}
           >
             Accept
           </button>
