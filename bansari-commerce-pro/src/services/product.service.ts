@@ -75,6 +75,7 @@ export type Product = {
   attrBottomId?: number;
   attrWorkId?: number;
   attrLengthId?: number;
+  sizeChartId?: number;
   careInstructions?: string;
   packageContents?: string;
   countryOfOrigin?: string;
@@ -123,7 +124,7 @@ export type CartValidationResult =
  * Resolved to labels by src/services/product-attributes.ts.
  */
 const PRODUCT_SELECT =
-  'id, name, slug, price, stock, active, images, category, featured, new_arrival, best_seller, description, sizes, compare_price, seo_title, seo_description, sku, collection, fabric, color, rating, review_count, specifications, care_instructions, package_contents, country_of_origin, attr_fabric_id, attr_color_id, attr_occasion_id, attr_pattern_id, attr_fit_id, attr_sleeve_id, attr_neck_id, attr_bottom_id, attr_work_id, attr_length_id, created_at' as const;
+  'id, name, slug, price, stock, active, images, category, featured, new_arrival, best_seller, description, sizes, compare_price, seo_title, seo_description, sku, collection, fabric, color, rating, review_count, specifications, care_instructions, package_contents, country_of_origin, attr_fabric_id, attr_color_id, attr_occasion_id, attr_pattern_id, attr_fit_id, attr_sleeve_id, attr_neck_id, attr_bottom_id, attr_work_id, attr_length_id, size_chart_id, created_at' as const;
 
 /**
  * The columns a GRID needs. Everything above is for a product PAGE.
@@ -260,6 +261,7 @@ function mapRow(row: Record<string, any>): Product {
     attrBottomId:    row['attr_bottom_id']   ?? undefined,
     attrWorkId:      row['attr_work_id']     ?? undefined,
     attrLengthId:    row['attr_length_id']   ?? undefined,
+    sizeChartId:     row['size_chart_id']    ?? undefined,
     careInstructions: row['care_instructions'] ?? undefined,
     packageContents:  row['package_contents']  ?? undefined,
     countryOfOrigin:  row['country_of_origin'] ?? undefined,
@@ -892,4 +894,36 @@ export async function validateCartItems(
   }
 
   return { valid: true, lineItems };
+}
+
+/**
+ * The size chart assigned to a product in Admin, shaped for the storefront
+ * size guide. Null when none is assigned or the lookup fails — the guide then
+ * falls back to standard sizing, so a missing chart never breaks the page.
+ */
+export async function getSizeChartForProduct(
+  sizeChartId: number | null | undefined
+): Promise<{ name: string; description: string | null; rows: { size: string; bust?: number; waist?: number; hip?: number }[] } | null> {
+  if (typeof sizeChartId !== 'number') return null;
+  try {
+    const { data } = await createServiceRoleClient()
+      .from('size_charts')
+      .select('name, description, chart_data')
+      .eq('id', sizeChartId)
+      .maybeSingle();
+    if (!data) return null;
+    const rows = Array.isArray(data.chart_data)
+      ? (data.chart_data as Record<string, unknown>[])
+          .filter((r) => typeof r.size === 'string')
+          .map((r) => ({
+            size: r.size as string,
+            bust: typeof r.bust === 'number' ? r.bust : undefined,
+            waist: typeof r.waist === 'number' ? r.waist : undefined,
+            hip: typeof r.hip === 'number' ? r.hip : undefined,
+          }))
+      : [];
+    return { name: data.name as string, description: (data.description as string | null) ?? null, rows };
+  } catch {
+    return null;
+  }
 }

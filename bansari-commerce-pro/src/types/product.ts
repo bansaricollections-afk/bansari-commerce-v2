@@ -137,6 +137,7 @@ export interface Product {
   attrBottomId?: number;
   attrWorkId?: number;
   attrLengthId?: number;
+  sizeChartId?: number;
   careInstructions?: string;
   packageContents?: string;
   countryOfOrigin?: string;

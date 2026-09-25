@@ -1,7 +1,8 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import type { ProductVariant, SizeAvailability } from '@/types/product';
+import { SizeGuideModal, type SizeChartData } from './SizeGuide';
 
 interface Props {
   variants: ProductVariant[];
@@ -15,85 +16,11 @@ interface Props {
   sizeAvailability?: SizeAvailability[];
   selectedSize?: SizeAvailability | null;
   onSelectSize?: (size: SizeAvailability) => void;
+  sizeChart?: SizeChartData | null;
 }
 
 const SIZE_ORDER = ['XXS','XS','S','M','L','XL','XXL','3XL','4XL','Free Size'];
 
-function SizeGuideModal({ onClose }: { onClose: () => void }) {
-  // Escape closes the guide, matching ProductInfo's SizeGuideModal. The
-  // listener lives and dies with this modal's mount, so there is no always-on
-  // global handler. It only calls onClose — no size, variant, stock,
-  // availability or cart state is read or written here.
-  useEffect(() => {
-    const onKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose();
-    };
-    document.addEventListener('keydown', onKeyDown);
-    return () => document.removeEventListener('keydown', onKeyDown);
-  }, [onClose]);
-
-  return (
-    <div
-      role="dialog"
-      aria-modal="true"
-      aria-label="Size Guide"
-      className="fixed inset-0 z-50 flex items-end sm:items-center justify-center"
-    >
-      {/* Backdrop */}
-      <button
-        className="absolute inset-0 bg-black/40 backdrop-blur-sm"
-        onClick={onClose}
-        aria-label="Close size guide"
-      />
-      {/* Sheet */}
-      <div className="relative z-10 bg-white w-full sm:max-w-lg rounded-t-2xl sm:rounded-2xl overflow-hidden shadow-2xl">
-        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100">
-          <h2 className="text-sm font-medium text-slate-900 tracking-wide">Size Guide</h2>
-          <button
-            onClick={onClose}
-            aria-label="Close"
-            className="w-8 h-8 flex items-center justify-center text-slate-400 hover:text-slate-700 rounded-full hover:bg-slate-100 transition-colors"
-          >
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-            </svg>
-          </button>
-        </div>
-        <div className="px-6 py-5 overflow-x-auto">
-          <p className="text-xs text-slate-500 mb-4 leading-relaxed">
-            Our pieces are crafted with generous sizing. We recommend checking measurements before ordering. All measurements in inches.
-          </p>
-          <table className="w-full text-xs border-collapse">
-            <thead>
-              <tr className="border-b border-slate-200">
-                {['Size','Bust','Waist','Hip','Length'].map(h => (
-                  <th key={h} className="py-2 pr-4 text-left text-[10px] tracking-[0.15em] uppercase text-slate-400 font-medium whitespace-nowrap">{h}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100">
-              {[
-                ['XS','32"','26"','36"','52"'],
-                ['S','34"','28"','38"','52"'],
-                ['M','36"','30"','40"','53"'],
-                ['L','38"','32"','42"','53"'],
-                ['XL','40"','34"','44"','54"'],
-                ['XXL','42"','36"','46"','54"'],
-                ['3XL','44"','38"','48"','55"'],
-              ].map(([sz, ...rest]) => (
-                <tr key={sz}>
-                  <td className="py-2 pr-4 font-semibold text-slate-800">{sz}</td>
-                  {rest.map((v, i) => <td key={i} className="py-2 pr-4 text-slate-500">{v}</td>)}
-                </tr>
-              ))}
-            </tbody>
-          </table>
-          <p className="text-[11px] text-slate-400 mt-3">Model wears size S. When in doubt, size up.</p>
-        </div>
-      </div>
-    </div>
-  );
-}
 
 export default function ProductVariantSelector({
   variants,
@@ -102,6 +29,7 @@ export default function ProductVariantSelector({
   sizeAvailability,
   selectedSize,
   onSelectSize,
+  sizeChart = null,
 }: Props) {
   const [guideOpen, setGuideOpen] = useState(false);
 
@@ -198,7 +126,13 @@ export default function ProductVariantSelector({
 
   return (
     <>
-      {guideOpen && <SizeGuideModal onClose={() => setGuideOpen(false)} />}
+      {guideOpen && (
+        <SizeGuideModal
+          onClose={() => setGuideOpen(false)}
+          chart={sizeChart}
+          sizes={(sizeAvailability ?? []).map((s) => s.label)}
+        />
+      )}
 
       <div className="flex flex-col gap-5">
         {/* ── Size selector ── */}

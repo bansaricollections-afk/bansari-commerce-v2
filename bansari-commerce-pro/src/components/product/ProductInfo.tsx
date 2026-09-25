@@ -14,6 +14,7 @@ import { Sparkles, Leaf, Layers, Check } from 'lucide-react';
 import DeliveryEstimate from './DeliveryEstimate';
 import ProductActions from './ProductActions';
 import NotifyMe from './NotifyMe';
+import { SizeGuideModal, type SizeChartData } from './SizeGuide';
 import ProductVariantSelector from './ProductVariantSelector';
 import QuantitySelector from './QuantitySelector';
 import PincodeChecker from './PincodeChecker';
@@ -27,6 +28,8 @@ interface Props {
    * ten attribute lookup tables are read once per request on the server.
    */
   specRows?: ProductSpecRow[];
+  /** The chart assigned in Admin; null falls back to standard sizing. */
+  sizeChart?: SizeChartData | null;
   product: Product;
   canonicalUrl: string;
 }
@@ -52,128 +55,6 @@ function StarRow({ rating, count }: { rating: number; count: number }) {
   );
 }
 
-// ─── Size Guide Modal ──────────────────────────────────────────────────────
-function SizeGuideModal({ onClose }: { onClose: () => void }) {
-  const dialogRef      = useRef<HTMLDivElement | null>(null);
-  const closeButtonRef = useRef<HTMLButtonElement | null>(null);
-
-  // Escape closes the guide. The listener is scoped to the modal's own
-  // lifetime — it mounts with the modal and is removed on unmount, so there is
-  // no always-on global handler. It only calls onClose; no selection, size,
-  // quantity or cart state is touched.
-  useEffect(() => {
-    const onKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose();
-    };
-    document.addEventListener('keydown', onKeyDown);
-    return () => document.removeEventListener('keydown', onKeyDown);
-  }, [onClose]);
-
-  /**
-   * Focus management, matching the MobileFilterBar pattern. This modal is
-   * conditionally rendered, so it unmounts on close and needs no
-   * inert/aria-hidden handling. On mount, focus moves to the Close button;
-   * Tab and Shift+Tab cycle within the dialog; on unmount, focus returns to
-   * the Size Guide button that opened it. DOM focus only — no size, variant,
-   * availability or cart state is read or written.
-   */
-  useEffect(() => {
-    const dialog = dialogRef.current;
-    const opener = document.activeElement as HTMLElement | null;
-    const raf = requestAnimationFrame(() => closeButtonRef.current?.focus());
-
-    const onKeyDown = (e: KeyboardEvent) => {
-      if (e.key !== 'Tab' || !dialog) return;
-      const focusables = dialog.querySelectorAll<HTMLElement>(
-        'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
-      );
-      if (focusables.length === 0) return;
-      const first = focusables[0]!;
-      const last = focusables[focusables.length - 1]!;
-      const active = document.activeElement;
-
-      if (!e.shiftKey && active === last) {
-        e.preventDefault();
-        first.focus();
-      } else if (e.shiftKey && active === first) {
-        e.preventDefault();
-        last.focus();
-      } else if (!dialog.contains(active)) {
-        e.preventDefault();
-        first.focus();
-      }
-    };
-
-    document.addEventListener('keydown', onKeyDown);
-    return () => {
-      cancelAnimationFrame(raf);
-      document.removeEventListener('keydown', onKeyDown);
-      opener?.focus?.();
-    };
-  }, []);
-
-  return (
-    <div
-      ref={dialogRef}
-      className="fixed inset-0 z-50 bg-black/60 flex items-end sm:items-center justify-center p-4"
-      role="dialog"
-      aria-label="Size guide"
-      aria-modal="true"
-      onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
-    >
-      <div className="bg-white w-full max-w-md rounded-sm shadow-2xl overflow-auto max-h-[85vh]">
-        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100">
-          <h2 className="text-sm font-medium tracking-[0.12em] uppercase text-slate-900">Size Guide</h2>
-          <button
-            ref={closeButtonRef}
-            onClick={onClose}
-            aria-label="Close size guide"
-            className="text-slate-400 hover:text-slate-700 transition-colors p-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#8A5A6A]"
-          >
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-            </svg>
-          </button>
-        </div>
-        <div className="px-6 py-5">
-          <p className="text-[11px] tracking-[0.18em] uppercase text-[#8A5A6A] font-medium mb-4">Indian Ethnic Sizing</p>
-          <table className="w-full text-sm text-slate-700">
-            <thead>
-              <tr className="border-b border-slate-100">
-                <th className="text-left text-[10px] tracking-widest uppercase text-slate-400 pb-2 font-medium">Size</th>
-                <th className="text-left text-[10px] tracking-widest uppercase text-slate-400 pb-2 font-medium">Bust (in)</th>
-                <th className="text-left text-[10px] tracking-widest uppercase text-slate-400 pb-2 font-medium">Waist (in)</th>
-                <th className="text-left text-[10px] tracking-widest uppercase text-slate-400 pb-2 font-medium">Hips (in)</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-50">
-              {[
-                ['XS', '32', '26', '36'],
-                ['S',  '34', '28', '38'],
-                ['M',  '36', '30', '40'],
-                ['L',  '38', '32', '42'],
-                ['XL', '40', '34', '44'],
-                ['XXL','42', '36', '46'],
-              ].map(([size, bust, waist, hips]) => (
-                <tr key={size}>
-                  <td className="py-2 font-medium text-slate-900">{size}</td>
-                  <td className="py-2 text-slate-600">{bust}</td>
-                  <td className="py-2 text-slate-600">{waist}</td>
-                  <td className="py-2 text-slate-600">{hips}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-          <p className="mt-5 text-[11px] text-slate-400 leading-relaxed">
-            Measurements are in inches. For the best fit, measure over your fullest points.
-            If you are between sizes, size up. All garments are unstitched unless noted.
-          </p>
-        </div>
-      </div>
-    </div>
-  );
-}
-
 const HIGHLIGHT_ICONS: Record<HighlightKind, typeof Sparkles> = {
   craft: Sparkles,
   fabric: Leaf,
@@ -181,7 +62,7 @@ const HIGHLIGHT_ICONS: Record<HighlightKind, typeof Sparkles> = {
   feature: Check,
 };
 
-export default function ProductInfo({ product, canonicalUrl, specRows = [] }: Props) {
+export default function ProductInfo({ product, canonicalUrl, specRows = [], sizeChart = null }: Props) {
   const specValue = (label: string) => specRows.find((r) => r.label === label)?.value ?? null;
   const highlights = buildHighlights({
     name: product.name,
@@ -242,7 +123,13 @@ export default function ProductInfo({ product, canonicalUrl, specRows = [] }: Pr
 
   return (
     <>
-      {sizeGuideOpen && <SizeGuideModal onClose={() => setSizeGuideOpen(false)} />}
+      {sizeGuideOpen && (
+        <SizeGuideModal
+          onClose={() => setSizeGuideOpen(false)}
+          chart={sizeChart}
+          sizes={(product.sizeAvailability ?? []).map((s) => s.label)}
+        />
+      )}
 
       {/*
        * Vertical rhythm is set per block rather than by a single uniform
@@ -505,6 +392,7 @@ export default function ProductInfo({ product, canonicalUrl, specRows = [] }: Pr
               sizeAvailability={isSizeManaged ? sizeAvailability : undefined}
               selectedSize={selectedSize}
               onSelectSize={setSelectedSize}
+              sizeChart={sizeChart}
             />
 
             {/* Some sizes sold out, others available: a shopper whose size is

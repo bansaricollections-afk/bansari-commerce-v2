@@ -1,7 +1,7 @@
 import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 
-import { getProductById, incrementProductView } from '@/services/product.service';
+import { getProductById, incrementProductView, getSizeChartForProduct } from '@/services/product.service';
 import { getAttributeIndex, buildSpecRows } from '@/services/product-attributes';
 import { getProductReviews, getProductRatingSummary } from '@/services/review.service';
 
@@ -154,9 +154,10 @@ export default async function ProductPage({ params }: Props) {
    * every consumer below guards on that, so a product with no reviews renders
    * exactly as it does today.
    */
-  const [reviews, ratingSummary] = await Promise.all([
+  const [reviews, ratingSummary, sizeChart] = await Promise.all([
     getProductReviews(product.id),
     getProductRatingSummary(product.id),
+    getSizeChartForProduct(product.sizeChartId),
   ]);
 
   const attributeIndex = await getAttributeIndex();
@@ -429,7 +430,7 @@ export default async function ProductPage({ params }: Props) {
           <section className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 pt-8 pb-16">
             <div className="grid gap-8 lg:gap-16 lg:grid-cols-[55%_45%]">
               <ProductGallery product={product} />
-              <ProductInfo product={product} canonicalUrl={canonicalUrl} specRows={specRows} />
+              <ProductInfo product={product} canonicalUrl={canonicalUrl} specRows={specRows} sizeChart={sizeChart} />
             </div>
           </section>
 
