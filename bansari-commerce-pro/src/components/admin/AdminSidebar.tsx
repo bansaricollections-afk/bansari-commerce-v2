@@ -13,7 +13,7 @@ import {
   ShoppingCart,
   Tags,
   TicketPercent,
-  Users, Star , Printer, Camera, Compass } from "lucide-react";
+  Users, Star , Printer, Camera, Compass, BellRing } from "lucide-react";
 
 import { cn } from "@/lib/utils";
 
@@ -63,6 +63,7 @@ const navGroups: {
     items: [
       { title: "Analytics", href: "/admin/analytics", icon: BarChart3 },
       { title: "Where Orders Come From", href: "/admin/attribution", icon: Compass },
+      { title: "Waiting for Stock", href: "/admin/stock-alerts", icon: BellRing },
     ],
   },
   {

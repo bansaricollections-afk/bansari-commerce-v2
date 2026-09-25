@@ -103,7 +103,7 @@ export default function WhyBansari() {
                   fontSize: "0.6875rem",
                   letterSpacing: "0.2em",
                   textTransform: "uppercase",
-                  color: "var(--bc-gold)",
+                  color: "var(--bc-gold-dark)",
                   fontWeight: 500,
                 }}
               >
@@ -169,7 +169,7 @@ export default function WhyBansari() {
                   fontFamily: "var(--font-playfair), serif",
                   fontSize: "0.875rem",
                   fontWeight: 500,
-                  color: "var(--bc-gold)",
+                  color: "var(--bc-gold-dark)",
                   letterSpacing: "0.05em",
                 }}
               >

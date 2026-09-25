@@ -4,7 +4,9 @@
  * NotifyMe
  * ─────────
  * Shown instead of the Add to Cart button when a product is out of stock.
- * Accepts an email address and stores the intent (mock — replace with API).
+ * Also used for a single sold-out size on an otherwise available product.
+ * Saves to /api/stock-alerts. (It was a mock until 26 Sep 2026: it showed
+ * "we'll notify you" and stored nothing.)
  * Keeps the same button height (h-12) and uppercase tracking as ProductActions
  * so the layout does not shift when stock status changes.
  */
@@ -14,10 +16,18 @@ import { useState } from 'react';
 interface Props {
   productId: number;
   productName: string;
+  /** Sold-out sizes to choose from; omit for a product without sizes. */
+  sizes?: { variantId: number; label: string }[];
+  /** Heading override — the default reads for a fully sold-out product. */
+  title?: string;
 }
 
-export default function NotifyMe({ productId, productName }: Props) {
+export default function NotifyMe({ productId, sizes = [], title }: Props) {
   const [email, setEmail] = useState('');
+  const [variantId, setVariantId] = useState<number | null>(
+    sizes.length === 1 ? sizes[0]!.variantId : null
+  );
+  const chosenLabel = sizes.find((s) => s.variantId === variantId)?.label ?? null;
   const [submitted, setSubmitted] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -29,13 +39,26 @@ export default function NotifyMe({ productId, productName }: Props) {
       setError('Please enter a valid email address.');
       return;
     }
+    if (sizes.length > 0 && variantId == null) {
+      setError('Please choose your size.');
+      return;
+    }
     setError('');
     setLoading(true);
     try {
-      // TODO: replace with real back-in-stock notification API
-      await new Promise((r) => setTimeout(r, 600));
-      console.info('[NotifyMe] registered', { productId, productName, email });
+      const res = await fetch('/api/stock-alerts', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ productId, variantId, email }),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => null);
+        setError(data?.error?.message ?? 'Could not save your request. Please try again.');
+        return;
+      }
       setSubmitted(true);
+    } catch {
+      setError('Could not save your request. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -55,7 +78,8 @@ export default function NotifyMe({ productId, productName }: Props) {
           <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
         </svg>
         <p className="text-xs text-green-700">
-          We\'ll notify you at <span className="font-medium">{email}</span> when it\'s back.
+          We&apos;ll email <span className="font-medium">{email}</span> when{' '}
+          {chosenLabel ? `size ${chosenLabel}` : 'it'} is back.
         </p>
       </div>
     );
@@ -64,8 +88,29 @@ export default function NotifyMe({ productId, productName }: Props) {
   return (
     <div className="flex flex-col gap-2">
       <p className="text-[10px] tracking-[0.18em] uppercase text-slate-500 font-medium">
-        Out of Stock · Notify Me When Available
+        {title ?? 'Out of Stock · Notify Me When Available'}
       </p>
+      {sizes.length > 1 && (
+        <div className="flex flex-wrap gap-2" role="radiogroup" aria-label="Size to be notified about">
+          {sizes.map((s) => (
+            <button
+              key={s.variantId}
+              type="button"
+              role="radio"
+              aria-checked={variantId === s.variantId}
+              onClick={() => { setVariantId(s.variantId); setError(''); }}
+              className={[
+                'h-9 min-w-9 px-2.5 border text-xs font-medium transition-colors',
+                variantId === s.variantId
+                  ? 'border-slate-900 bg-slate-900 text-white'
+                  : 'border-slate-200 text-slate-700 hover:border-slate-900',
+              ].join(' ')}
+            >
+              {s.label}
+            </button>
+          ))}
+        </div>
+      )}
       <form onSubmit={handleSubmit} className="flex gap-2" noValidate>
         <input
           type="email"

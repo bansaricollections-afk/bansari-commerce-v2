@@ -13,6 +13,7 @@ import { Sparkles, Leaf, Layers, Check } from 'lucide-react';
 
 import DeliveryEstimate from './DeliveryEstimate';
 import ProductActions from './ProductActions';
+import NotifyMe from './NotifyMe';
 import ProductVariantSelector from './ProductVariantSelector';
 import QuantitySelector from './QuantitySelector';
 import PincodeChecker from './PincodeChecker';
@@ -189,6 +190,7 @@ export default function ProductInfo({ product, canonicalUrl, specRows = [] }: Pr
     work: specValue('Work'),
   });
   const [quantity, setQuantity] = useState(1);
+  const [notifyOpen, setNotifyOpen] = useState(false);
   const [selectedVariant, setSelectedVariant] = useState<ProductVariant | null>(null);
   const [selectedSize, setSelectedSize] = useState<SizeAvailability | null>(null);
   const [sizeGuideOpen, setSizeGuideOpen] = useState(false);
@@ -222,6 +224,9 @@ export default function ProductInfo({ product, canonicalUrl, specRows = [] }: Pr
   const sizeAvailability = product.sizeAvailability ?? [];
   const isSizeManaged = sizeAvailability.length > 0;
   const sellableSizes = sizeAvailability.filter((s) => s.status !== 'SOLD_OUT');
+  const soldOutSizes = sizeAvailability
+    .filter((s) => s.status === 'SOLD_OUT')
+    .map((s) => ({ variantId: s.variantId, label: s.label }));
 
   const isOutOfStock = isSizeManaged
     ? sellableSizes.length === 0
@@ -501,6 +506,30 @@ export default function ProductInfo({ product, canonicalUrl, specRows = [] }: Pr
               selectedSize={selectedSize}
               onSelectSize={setSelectedSize}
             />
+
+            {/* Some sizes sold out, others available: a shopper whose size is
+                gone used to have no option but to leave. Fully sold-out
+                products get the full Notify Me in place of the buy buttons. */}
+            {soldOutSizes.length > 0 && sellableSizes.length > 0 && (
+              <div className="mt-3">
+                {notifyOpen ? (
+                  <NotifyMe
+                    productId={product.id}
+                    productName={product.name}
+                    sizes={soldOutSizes}
+                    title="Notify me when my size is back"
+                  />
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => setNotifyOpen(true)}
+                    className="text-[12px] text-slate-600 underline underline-offset-2 decoration-slate-300 hover:decoration-slate-600"
+                  >
+                    Your size sold out? Get notified when it&apos;s back
+                  </button>
+                )}
+              </div>
+            )}
           </div>
         )}
 

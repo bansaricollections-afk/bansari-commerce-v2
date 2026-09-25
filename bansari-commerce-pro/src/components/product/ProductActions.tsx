@@ -172,7 +172,11 @@ export default function ProductActions({
 
         {/* Out-of-stock: Notify Me replaces CTA row */}
         {isOutOfStock ? (
-          <NotifyMe productId={product.id} productName={product.name} />
+          <NotifyMe
+            productId={product.id}
+            productName={product.name}
+            sizes={(product.sizeAvailability ?? []).map((s) => ({ variantId: s.variantId, label: s.label }))}
+          />
         ) : (
           <>
             {/*
