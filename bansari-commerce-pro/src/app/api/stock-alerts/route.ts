@@ -69,7 +69,7 @@ export async function POST(request: NextRequest) {
     sizeLabel = (variant.size_label as string | null) ?? masterName ?? null;
   }
 
-  const { error } = await sb.from('stock_alerts').insert({
+  const { error } = await sb.from('back_in_stock_requests').insert({
     product_id: productId,
     variant_id: variantId,
     size_label: sizeLabel,

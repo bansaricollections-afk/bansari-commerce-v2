@@ -30,7 +30,7 @@ type Row = {
 export default async function StockAlertsPage() {
   const sb = createServiceRoleClient();
   const { data, error } = await sb
-    .from('stock_alerts')
+    .from('back_in_stock_requests')
     .select('product_id, size_label, email, created_at, products(name)')
     .is('notified_at', null)
     .order('created_at', { ascending: false })
@@ -69,7 +69,7 @@ export default async function StockAlertsPage() {
 
       {error ? (
         <p className="rounded border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
-          Could not load requests. If this is new, the stock_alerts migration may not have been run yet.
+          Could not load requests. If this is new, the back_in_stock_requests migration may not have been run yet.
         </p>
       ) : rows.length === 0 ? (
         <p className="rounded border border-slate-200 bg-white p-6 text-sm text-slate-600">
