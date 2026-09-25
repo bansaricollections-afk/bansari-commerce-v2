@@ -808,6 +808,10 @@ export default function ProductManagement() {
 
   const [viewDialogOpen, setViewDialogOpen] = useState(false);
   const [viewProduct, setViewProduct]       = useState<Product | null>(null);
+  // Quick price edit — price changes often, and the full form is six steps.
+  const [priceProduct, setPriceProduct] = useState<Product | null>(null);
+  const [priceDraft, setPriceDraft] = useState({ price: "", mrp: "" });
+  const [isSavingPrice, setIsSavingPrice] = useState(false);
 
   // Catalog lookups
   const [catalog, setCatalog]           = useState<CatalogData>(emptyCatalog);
@@ -1459,6 +1463,45 @@ export default function ProductManagement() {
   }, [editProduct, form, loadProducts, mustDraftFirst, router]);
 
 
+  // ── Quick price edit ───────────────────────────────────────────────────────
+  // Sends ONLY price and compare_price; the update is partial server-side, so
+  // nothing else on the product is touched.
+
+  const openPriceEdit = useCallback((p: Product) => {
+    const mrp = p.comparePrice ?? null;
+    setPriceDraft({ price: String(p.price ?? ""), mrp: mrp ? String(mrp) : "" });
+    setPriceProduct(p);
+  }, []);
+
+  const priceNum = Number(priceDraft.price);
+  const mrpNum = priceDraft.mrp.trim() === "" ? null : Number(priceDraft.mrp);
+  const priceError =
+    !Number.isFinite(priceNum) || priceNum <= 0
+      ? "Enter a price above ₹0."
+      : mrpNum !== null && (!Number.isFinite(mrpNum) || mrpNum <= priceNum)
+        ? "MRP must be higher than the price, or left empty for no discount."
+        : null;
+  const oldPrice = priceProduct?.price ?? 0;
+  const bigJump = !priceError && oldPrice > 0 && Math.abs(priceNum - oldPrice) / oldPrice > 0.5;
+
+  const handleSavePrice = useCallback(async () => {
+    if (!priceProduct || priceError) return;
+    setIsSavingPrice(true);
+    try {
+      await apiFetch(`/api/admin/products/${priceProduct.id}`, {
+        method: "PUT",
+        body: JSON.stringify({ price: priceNum, compare_price: mrpNum }),
+      });
+      toast.success(`Price updated: ₹${priceNum.toLocaleString("en-IN")} — "${priceProduct.name}"`);
+      setPriceProduct(null);
+      await loadProducts();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Price update failed.");
+    } finally {
+      setIsSavingPrice(false);
+    }
+  }, [priceProduct, priceError, priceNum, mrpNum, loadProducts]);
+
   // ── Delete ─────────────────────────────────────────────────────────────────
 
   const handleDelete = useCallback(async () => {
@@ -1604,7 +1647,15 @@ export default function ProductManagement() {
                   <p className="font-medium text-neutral-900 text-sm line-clamp-1">{p.name}</p>
                   <p className="text-xs text-neutral-500 mt-0.5">{p.sku} · {p.category}</p>
                   <div className="flex items-center justify-between mt-2">
-                    <span className="font-semibold text-neutral-900">₹{p.price.toLocaleString("en-IN")}</span>
+                    <button
+                      type="button"
+                      onClick={() => openPriceEdit(p)}
+                      title="Change price"
+                      className="inline-flex items-center gap-1 rounded px-1 -mx-1 font-semibold text-neutral-900 hover:bg-amber-50 hover:text-amber-800"
+                    >
+                      ₹{p.price.toLocaleString("en-IN")}
+                      <Edit className="h-3 w-3 text-neutral-400" aria-hidden="true" />
+                    </button>
                     {/*
                       Unit count is always shown, and only zero is coloured as a
                       warning. It used to appear only below a threshold of 5 and
@@ -1645,6 +1696,15 @@ export default function ProductManagement() {
                       onClick={() => openEdit(p)}
                     >
                       <Edit className="h-3 w-3 mr-1" /> Edit
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="text-xs"
+                      onClick={() => openPriceEdit(p)}
+                      aria-label={`Change price of ${p.name}`}
+                    >
+                      ₹
                     </Button>
                     <Button
                       size="sm"
@@ -2505,6 +2565,80 @@ export default function ProductManagement() {
           </SheetFooter>
         </SheetContent>
       </Sheet>
+
+      {/* ── Quick Price Dialog ─────────────────────────────────────────────── */}
+      <Dialog open={priceProduct !== null} onOpenChange={(open) => { if (!open) setPriceProduct(null); }}>
+        <DialogContent className="sm:max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Change price</DialogTitle>
+            <DialogDescription className="line-clamp-2">{priceProduct?.name}</DialogDescription>
+          </DialogHeader>
+          <form
+            className="space-y-4"
+            onSubmit={(e) => { e.preventDefault(); void handleSavePrice(); }}
+          >
+            <label className="block space-y-1">
+              <span className="text-sm font-medium text-neutral-800">Selling price (₹)</span>
+              <input
+                type="number"
+                inputMode="decimal"
+                min={1}
+                step="1"
+                autoFocus
+                value={priceDraft.price}
+                onChange={(e) => setPriceDraft((d) => ({ ...d, price: e.target.value }))}
+                className="w-full rounded-md border border-neutral-300 px-3 py-2 text-lg font-semibold"
+              />
+            </label>
+            <label className="block space-y-1">
+              <span className="text-sm font-medium text-neutral-800">MRP (₹) — optional, shown struck through</span>
+              <input
+                type="number"
+                inputMode="decimal"
+                min={1}
+                step="1"
+                value={priceDraft.mrp}
+                onChange={(e) => setPriceDraft((d) => ({ ...d, mrp: e.target.value }))}
+                placeholder="Leave empty for no discount"
+                className="w-full rounded-md border border-neutral-300 px-3 py-2"
+              />
+            </label>
+
+            {priceError ? (
+              <p className="text-sm text-rose-600">{priceError}</p>
+            ) : (
+              <div className="rounded-md bg-neutral-50 px-3 py-2 text-sm">
+                <span className="text-neutral-500">Customers will see: </span>
+                <span className="font-semibold">₹{priceNum.toLocaleString("en-IN")}</span>
+                {mrpNum !== null && (
+                  <>
+                    {" "}
+                    <span className="text-neutral-400 line-through">₹{mrpNum.toLocaleString("en-IN")}</span>
+                    {" "}
+                    <span className="font-medium text-amber-700">
+                      −{Math.round(((mrpNum - priceNum) / mrpNum) * 100)}%
+                    </span>
+                  </>
+                )}
+              </div>
+            )}
+            {bigJump && (
+              <p className="text-sm text-amber-700">
+                This changes the price by more than half (was ₹{oldPrice.toLocaleString("en-IN")}). Please double-check before saving.
+              </p>
+            )}
+
+            <DialogFooter className="flex gap-2 sm:justify-end">
+              <Button type="button" variant="outline" onClick={() => setPriceProduct(null)} disabled={isSavingPrice}>
+                Cancel
+              </Button>
+              <Button type="submit" disabled={isSavingPrice || priceError !== null}>
+                {isSavingPrice ? <Loader2 className="h-4 w-4 animate-spin" /> : "Save price"}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
 
       {/* ── Delete Dialog ───────────────────────────────────────────────────── */}
       <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>

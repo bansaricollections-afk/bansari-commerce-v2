@@ -64,6 +64,13 @@ export async function PUT(request: NextRequest, context: RouteContext) {
 
   try {
     const payload = body as UpdateProductV2Payload;
+
+    // Price is what checkout charges, so it is checked here too, not only in
+    // the form: a zero or negative price must never be saved from any caller.
+    if ('price' in payload && !(typeof payload.price === 'number' && Number.isFinite(payload.price) && payload.price > 0)) {
+      return apiError(requestId, 'VALIDATION', 'Price must be a number above 0.', 422);
+    }
+
     payload.updated_by = userId;
 
     const product = await ProductV2Service.update(parsed.id, payload);
