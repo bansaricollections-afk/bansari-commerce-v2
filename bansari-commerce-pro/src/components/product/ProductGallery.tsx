@@ -554,6 +554,11 @@ export default function ProductGallery({ product, selectedVariant }: Props) {
         className={[
           'hidden lg:block',
           'absolute top-0 left-[calc(100%+1.5rem)]',
+          // Above the purchase panel beside it. That panel is lg:sticky, which
+          // makes it positioned and paints it AFTER this one — so without a
+          // z-index the title, price and buttons showed on top of the zoomed
+          // image. Raised tier only: it must still sit under the site header.
+          'z-[var(--bc-z-raised)]',
           'w-[420px] aspect-[3/4]',
           'overflow-hidden rounded-sm border border-slate-200 bg-slate-50',
           'shadow-lg',
